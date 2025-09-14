@@ -1,0 +1,5 @@
+
+
+> api@0.0.1 lint /Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api
+> eslint "{src,apps,libs,test}/**/*.ts" --fix
+

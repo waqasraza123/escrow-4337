@@ -1,0 +1,23 @@
+
+
+> web@0.1.0 lint /Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/web
+> eslint
+
+
+Oops! Something went wrong! :(
+
+ESLint: 9.35.0
+
+TypeError: context.getScope is not a function
+Occurred while linting /Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/web/src/app/layout.tsx:20
+Rule: "react-hooks/rules-of-hooks"
+    at FunctionDeclaration (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint-plugin-react-hooks@5.0.0-canary-7118f5dd7-20230705_eslint@9.35.0/node_modules/eslint-plugin-react-hooks/cjs/eslint-plugin-react-hooks.development.js:744:52)
+    at ruleErrorHandler (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/linter.js:1173:33)
+    at /Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/source-code-visitor.js:76:46
+    at Array.forEach (<anonymous>)
+    at SourceCodeVisitor.callSync (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/source-code-visitor.js:76:30)
+    at /Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/source-code-traverser.js:291:18
+    at Array.forEach (<anonymous>)
+    at SourceCodeTraverser.traverseSync (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/source-code-traverser.js:290:10)
+    at runRules (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/linter.js:1214:12)
+    at #flatVerifyWithoutProcessors (/Users/mc/development/blockchain/ethereum/base/Escrow4337/node_modules/.pnpm/eslint@9.35.0/node_modules/eslint/lib/linter/linter.js:2101:4)
