@@ -5,4 +5,5 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   await app.listen(process.env.NEST_API_PORT ?? 4000);
 }
-bootstrap();
+
+void bootstrap();
