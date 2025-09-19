@@ -22,5 +22,9 @@
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts", "../../packages/compliance/src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../../packages/compliance/src/**/*.ts",
+    "test/**/*.ts"
+  ]
 }
