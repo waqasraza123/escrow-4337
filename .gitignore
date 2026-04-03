@@ -10,3 +10,4 @@ broadcast
 artifacts
 tmp
 **/.turbo/*
+docs/_local/

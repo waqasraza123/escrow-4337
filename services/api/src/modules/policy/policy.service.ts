@@ -1,4 +1,4 @@
-import shariah from '../../../../../packages/compliance/src/policies/shariah';
+import { shariah } from '@escrow4334/compliance';
 import { Injectable } from '@nestjs/common';
 
 type ProhibitedCategory = (typeof shariah.prohibited_categories)[number];

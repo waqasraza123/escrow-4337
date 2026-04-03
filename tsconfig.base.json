@@ -11,8 +11,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@sdk/*": ["packages/sdk/src/*"],
-      "@compliance/*": ["packages/compliance/src/*"]
+      "@sdk/*": ["packages/sdk/src/*"]
     }
   }
 }
