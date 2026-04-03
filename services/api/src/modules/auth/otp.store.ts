@@ -54,7 +54,7 @@ export class OtpStore {
     const key = this.key(email);
     const now = this.now();
     const e = this.codes.get(key);
-    console.log(ip);
+    void ip;
 
     if (e?.lockedUntil && e.lockedUntil > now)
       throw new TooManyRequestsException('Temporarily locked');

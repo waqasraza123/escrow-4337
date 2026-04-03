@@ -1,66 +1,45 @@
-## Foundry
+# Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Foundry workspace for the Milestone Escrow smart-contract layer.
 
-Foundry consists of:
+## Purpose
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+This package owns the onchain escrow primitives for the product, including milestone state transitions and dispute-related actions.
 
-## Documentation
+## Current State
 
-https://book.getfoundry.sh/
+- `WorkstreamEscrow.sol` is the main contract
+- contract tests cover the core happy-path escrow and refund flows
+- this is currently the strongest implemented slice in the repo
 
-## Usage
+## Local Development
 
-### Build
+From this directory:
 
-```shell
-$ forge build
+```bash
+forge build
+forge test
+forge fmt --check
 ```
 
-### Test
+## Expected Responsibilities
 
-```shell
-$ forge test
-```
+This package should remain responsible for:
 
-### Format
+- escrow lifecycle state transitions
+- funding and release primitives
+- dispute and resolution primitives
+- contract-level invariants and failure conditions
 
-```shell
-$ forge fmt
-```
+Business workflow orchestration should stay in the API, not be pushed into offchain consumers or frontend code.
 
-### Gas Snapshots
+## Notes
 
-```shell
-$ forge snapshot
-```
+- `lib/` contains third-party dependencies with their own upstream documentation
+- do not rewrite vendored dependency READMEs as part of normal repo cleanup
 
-### Anvil
+## Related Docs
 
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- [Root README](/Users/mc/development/blockchain/ethereum/base/Escrow4337/readme.md)
+- [Architecture](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md)
+- [Execution Guide](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md)

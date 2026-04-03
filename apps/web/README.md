@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Web App
 
-## Getting Started
+User-facing product surface for Milestone Escrow.
 
-First, run the development server:
+## Purpose
+
+This app is intended to become the client and contractor experience for:
+
+- onboarding
+- job and milestone creation
+- escrow funding and release flows
+- delivery and dispute actions
+- future smart-account onboarding
+
+The app is still scaffold-stage. The current UI is not product-complete and should not be treated as representative of the intended experience.
+
+## Current State
+
+- built with Next.js App Router
+- root lint and typecheck are wired and meaningful
+- current pages are starter-level placeholders
+- no real API client, wallet flow, or escrow journey is implemented yet
+
+## Local Development
+
+From the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm --filter web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the app-specific quality checks:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm --filter web typecheck
+pnpm --filter web lint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Expected Direction
 
-## Learn More
+This app should eventually own:
 
-To learn more about Next.js, take a look at the following resources:
+- account onboarding UX
+- job and milestone lifecycle screens
+- funding, delivery, release, and dispute interactions
+- loading, empty, error, and retry states for every core workflow
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Do not build real product UI here on top of placeholder API endpoints. Follow the sequence in the root execution guide first.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Related Docs
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Root README](/Users/mc/development/blockchain/ethereum/base/Escrow4337/readme.md)
+- [Architecture](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md)
+- [Execution Guide](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md)

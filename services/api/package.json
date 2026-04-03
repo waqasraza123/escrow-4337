@@ -82,6 +82,9 @@
           "tsconfig": "<rootDir>/tsconfig.json"
         }
       ]
+    },
+    "moduleNameMapper": {
+      "^jose$": "<rootDir>/test/mocks/jose.ts"
     }
   }
 }

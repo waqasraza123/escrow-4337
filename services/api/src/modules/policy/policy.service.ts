@@ -2,6 +2,10 @@ import { shariah } from '@escrow4334/compliance';
 import { Injectable } from '@nestjs/common';
 
 type ProhibitedCategory = (typeof shariah.prohibited_categories)[number];
+type PolicyUser = {
+  shariahMode?: boolean;
+  shariah_mode?: boolean;
+};
 
 const prohibitedSet: ReadonlySet<ProhibitedCategory> = new Set(
   shariah.prohibited_categories,
@@ -13,8 +17,8 @@ function isProhibitedCategory(x: string): x is ProhibitedCategory {
 
 @Injectable()
 export class PolicyService {
-  shariahEnabledFor(user: { shariah_mode?: boolean }) {
-    return !!user?.shariah_mode;
+  shariahEnabledFor(user: PolicyUser | null | undefined) {
+    return Boolean(user?.shariahMode ?? user?.shariah_mode);
   }
 
   isCategoryAllowed(cat: string, shariahMode: boolean) {

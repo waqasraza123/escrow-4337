@@ -49,6 +49,7 @@ Current implemented slices:
 - `WorkstreamEscrow` Solidity contract with milestone release, dispute, resolution, and remainder refund behavior
 - contract tests for the main happy-path and refund scenarios
 - NestJS auth prototype with OTP/JWT/session flow and Shariah preference toggle
+- validated in-memory escrow API prototype covering job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval
 - compliance package with a concrete prohibited-category policy list
 
 Current missing or incomplete slices:
@@ -56,7 +57,7 @@ Current missing or incomplete slices:
 - persistent database layer and migrations
 - real email delivery
 - real wallet and ERC-4337 orchestration
-- real escrow API behavior
+- contract-backed escrow orchestration and persistence in the API
 - real product UI in `apps/web` and `apps/admin`
 - indexer, subgraph, shared UI package, and deployment infrastructure described in the original repo vision
 
@@ -166,7 +167,7 @@ Important repo truths:
 
 - `pnpm typecheck` is meaningful and currently green.
 - `pnpm lint` is meaningful and currently green.
-- `pnpm test` is not yet a reliable root quality gate because the API package still lacks the expected test coverage layout.
+- `pnpm test` is meaningful and currently backend-heavy rather than product-complete.
 - Do not claim repo health beyond the checks you actually ran.
 
 ## Production Readiness Direction

@@ -1,0 +1,57 @@
+import { z } from 'zod';
+
+const amountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+
+export const createJobSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    description: z.string().trim().min(1).max(5000),
+    category: z.string().trim().min(1).max(64),
+    termsJSON: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+export const fundJobSchema = z
+  .object({
+    amount: z.string().regex(amountPattern),
+  })
+  .strict();
+
+export const milestoneSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    deliverable: z.string().trim().min(1).max(5000),
+    amount: z.string().regex(amountPattern),
+    dueAt: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const setMilestonesSchema = z.array(milestoneSchema).min(1).max(20);
+
+export const deliverMilestoneSchema = z
+  .object({
+    note: z.string().trim().min(1).max(5000),
+    evidenceUrls: z.array(z.string().url().max(2048)).max(10).default([]),
+  })
+  .strict();
+
+export const disputeMilestoneSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(5000),
+  })
+  .strict();
+
+export const resolveMilestoneSchema = z
+  .object({
+    action: z.enum(['release', 'refund']),
+    note: z.string().trim().min(1).max(5000),
+  })
+  .strict();
+
+export type CreateJobDto = z.infer<typeof createJobSchema>;
+export type FundJobDto = z.infer<typeof fundJobSchema>;
+export type MilestoneDto = z.infer<typeof milestoneSchema>;
+export type SetMilestonesDto = z.infer<typeof setMilestonesSchema>;
+export type DeliverMilestoneDto = z.infer<typeof deliverMilestoneSchema>;
+export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
+export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;
