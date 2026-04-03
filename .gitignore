@@ -4,10 +4,25 @@ dist
 .next
 out
 coverage
+*.tsbuildinfo
 .env*
 cache
 broadcast
 artifacts
 tmp
 **/.turbo/*
+
+# Local planning and AI working files
 docs/_local/
+.ai/
+.claude/
+.codex/
+scratch/
+PLAN.md
+*.plan.md
+*.scratch.md
+*.local.md
+
+# Generated source-adjacent artifacts that do not belong in git
+packages/compliance/src/**/*.js
+packages/compliance/src/**/*.js.map

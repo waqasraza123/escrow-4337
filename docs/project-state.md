@@ -21,17 +21,18 @@
 - Do not claim checks are green unless they were run successfully.
 
 ## Current Roadmap
-- Make the root typecheck pipeline real instead of a no-op.
 - Replace in-memory auth state with persistent storage and real integrations.
 - Turn wallet and escrow API endpoints into real contract orchestration.
 - Implement real web and admin product surfaces.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
+- Make root build and test flows meaningful end to end, not just partially wired.
 
 ## Completed Major Slices
 - `WorkstreamEscrow` contract supports job creation, funding, milestone delivery/release, disputes, resolution, and remainder refunds.
 - Contract tests cover happy-path release/dispute and refund behavior.
 - API auth prototype supports OTP start/verify, refresh, logout, `me`, and Shariah preference toggling.
 - Compliance package contains a concrete Shariah prohibited-category list used by the API policy service.
+- Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 
 ## Important Decisions
 - This repo should be treated as a contract-first prototype, not a production-ready product.
@@ -39,6 +40,9 @@
 - `docs/_local/current-session.md` is the ignored restart/handoff file for the current working slice.
 - The current active backend direction is to consume compliance rules through the workspace package instead of importing repo-relative source paths.
 - The API TypeScript config resolves `@escrow4334/compliance` through the built declaration surface in `packages/compliance/dist`.
+- Workspace packages now own their own `typecheck` scripts, and the root Turbo `typecheck` task depends on upstream package builds.
+- Typecheck scripts must not leave new repo artifacts behind; `*.tsbuildinfo` is ignored and package typecheck commands disable incremental writes.
+- Repo framing and governance now live in `readme.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `COLLABORATION.md`, `SECURITY.md`, `docs/ARCHITECTURE.md`, and `docs/EXECUTION_GUIDE.md`.
 
 ## Deferred / Not Yet Implemented
 - Real database, migrations, and persistence layer.
@@ -49,10 +53,11 @@
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
 ## Risks / Watchouts
-- Root `pnpm typecheck` currently does not validate packages because no workspace package defines a `typecheck` script.
 - Root `pnpm test` currently fails because the API package has no tests under its configured `test/**/*.spec.ts` path.
 - Frontend apps are starter templates and should not be treated as implemented product surfaces.
 - The worktree is already dirty around auth, policy, compliance, and TS config changes; read before editing nearby files.
+- API typechecking still depends on the compliance package build output existing and matching source.
+- Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
 
 ## Standard Verification
 - `git status --short`

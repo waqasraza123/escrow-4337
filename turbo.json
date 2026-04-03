@@ -8,6 +8,6 @@
     },
     "test": { "dependsOn": ["^build"], "outputs": [] },
     "lint": { "outputs": [] },
-    "typecheck": { "outputs": [] }
+    "typecheck": { "dependsOn": ["^build"], "outputs": [] }
   }
 }
