@@ -5,9 +5,15 @@ type JwtPayload = {
   sub: string;
   email: string;
   sid: string;
+  rid?: string;
   typ: 'access' | 'refresh';
 };
-type VerifyResult = { userId: string; email: string; sid: string };
+type VerifyResult = {
+  userId: string;
+  email: string;
+  sid: string;
+  refreshTokenId?: string;
+};
 
 @Injectable()
 export class JwtService {
@@ -25,8 +31,18 @@ export class JwtService {
     10,
   );
 
-  async signAccess(userId: string, email: string, sid: string) {
+  async signAccess(
+    userId: string,
+    email: string,
+    sid: string,
+    sessionExpiresAtMs?: number,
+  ) {
     const now = Math.floor(Date.now() / 1000);
+    const expirationTime = this.resolveExpirationTime(
+      now,
+      this.accessTtlSec,
+      sessionExpiresAtMs,
+    );
     return await new SignJWT({
       sub: userId,
       email,
@@ -37,23 +53,35 @@ export class JwtService {
       .setIssuer(this.issuer)
       .setAudience(this.audience)
       .setIssuedAt(now)
-      .setExpirationTime(now + this.accessTtlSec)
+      .setExpirationTime(expirationTime)
       .sign(this.secret);
   }
 
-  async signRefresh(userId: string, email: string, sid: string) {
+  async signRefresh(
+    userId: string,
+    email: string,
+    sid: string,
+    refreshTokenId: string,
+    sessionExpiresAtMs?: number,
+  ) {
     const now = Math.floor(Date.now() / 1000);
+    const expirationTime = this.resolveExpirationTime(
+      now,
+      this.refreshTtlSec,
+      sessionExpiresAtMs,
+    );
     return await new SignJWT({
       sub: userId,
       email,
       sid,
+      rid: refreshTokenId,
       typ: 'refresh',
     } as JwtPayload)
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(this.issuer)
       .setAudience(this.audience)
       .setIssuedAt(now)
-      .setExpirationTime(now + this.refreshTtlSec)
+      .setExpirationTime(expirationTime)
       .sign(this.secret);
   }
 
@@ -82,6 +110,20 @@ export class JwtService {
       userId: String(payload.sub),
       email: String(payload.email),
       sid: String(payload.sid),
+      refreshTokenId: String(payload.rid ?? payload.sid),
     };
+  }
+
+  private resolveExpirationTime(
+    issuedAtSec: number,
+    ttlSec: number,
+    sessionExpiresAtMs?: number,
+  ) {
+    if (sessionExpiresAtMs === undefined) {
+      return issuedAtSec + ttlSec;
+    }
+
+    const sessionExpiresAtSec = Math.floor(sessionExpiresAtMs / 1000);
+    return Math.min(issuedAtSec + ttlSec, sessionExpiresAtSec);
   }
 }

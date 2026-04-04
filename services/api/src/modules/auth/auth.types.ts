@@ -4,6 +4,7 @@ export type SessionRecord = {
   email: string;
   exp: number;
   revoked: boolean;
+  refreshTokenId: string;
 };
 
 export type OtpEntry = {

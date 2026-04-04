@@ -112,11 +112,20 @@ describe('Auth integration', () => {
     });
     expect(refreshResult.accessToken).toEqual(expect.any(String));
     expect(refreshResult.refreshToken).toEqual(expect.any(String));
-
-    await authService.logout(verifyResult.refreshToken);
+    expect(refreshResult.refreshToken).not.toBe(verifyResult.refreshToken);
 
     await expect(
       authService.refresh({ refreshToken: verifyResult.refreshToken }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    await expect(
+      authService.refresh({ refreshToken: refreshResult.refreshToken }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    await authService.logout(refreshResult.refreshToken);
+
+    await expect(
+      authService.refresh({ refreshToken: refreshResult.refreshToken }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 

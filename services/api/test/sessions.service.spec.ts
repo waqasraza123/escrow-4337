@@ -62,4 +62,37 @@ describe('SessionsService', () => {
       sessionsService.revoke('missing-session'),
     ).resolves.toBeUndefined();
   });
+
+  it('rotates refresh tokens for an active session', async () => {
+    const session = await sessionsService.create('user-1', 'user@example.com');
+
+    const rotatedSession = await sessionsService.rotateRefreshToken(
+      session.sid,
+      session.refreshTokenId,
+    );
+
+    expect(rotatedSession.refreshTokenId).not.toBe(session.refreshTokenId);
+    await expect(sessionsService.validate(session.sid)).resolves.toEqual(
+      rotatedSession,
+    );
+  });
+
+  it('revokes the session when an old refresh token is replayed', async () => {
+    const session = await sessionsService.create('user-1', 'user@example.com');
+    const rotatedSession = await sessionsService.rotateRefreshToken(
+      session.sid,
+      session.refreshTokenId,
+    );
+
+    await expect(
+      sessionsService.rotateRefreshToken(session.sid, session.refreshTokenId),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    await expect(
+      sessionsService.rotateRefreshToken(
+        rotatedSession.sid,
+        rotatedSession.refreshTokenId,
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
 });

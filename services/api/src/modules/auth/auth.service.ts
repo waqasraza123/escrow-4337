@@ -40,11 +40,14 @@ export class AuthService {
       user.id,
       user.email,
       session.sid,
+      session.exp,
     );
     const refreshToken = await this.jwt.signRefresh(
       user.id,
       user.email,
       session.sid,
+      session.refreshTokenId,
+      session.exp,
     );
 
     return {
@@ -55,12 +58,26 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto) {
-    const { userId, email, sid } = await this.jwt.verifyRefresh(
+    const { userId, email, sid, refreshTokenId } = await this.jwt.verifyRefresh(
       dto.refreshToken,
     );
-    await this.sessions.validate(sid);
-    const accessToken = await this.jwt.signAccess(userId, email, sid);
-    const newRefresh = await this.jwt.signRefresh(userId, email, sid);
+    const session = await this.sessions.rotateRefreshToken(
+      sid,
+      String(refreshTokenId),
+    );
+    const accessToken = await this.jwt.signAccess(
+      userId,
+      email,
+      sid,
+      session.exp,
+    );
+    const newRefresh = await this.jwt.signRefresh(
+      userId,
+      email,
+      sid,
+      session.refreshTokenId,
+      session.exp,
+    );
     return { accessToken, refreshToken: newRefresh };
   }
 

@@ -33,6 +33,7 @@
 - API auth prototype supports OTP start/verify, refresh, logout, `me`, and Shariah preference toggling.
 - API auth, user, session, OTP, and wallet state now persist behind repository interfaces, with a Postgres driver and SQL migration runner plus a file-backed test adapter.
 - API auth email delivery now runs through mock and relay-backed provider boundaries, renders a product-owned OTP template, and clears issued OTP codes if delivery fails.
+- API auth refresh tokens now rotate on every refresh, are capped to the persisted session lifetime, and revoke the session if an old refresh token is replayed.
 - API escrow lifecycle state now persists behind the same persistence boundary and records confirmed or failed contract execution attempts for job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
 - API wallet endpoints now let authenticated users link wallets, set a default execution wallet, and surface wallet state through auth profile responses.
 - API wallet linking now requires a persisted SIWE challenge and signature verification before a wallet can be attached to a user profile.
@@ -65,7 +66,7 @@
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.
-- Additional production auth hardening beyond OTP delivery and session persistence.
+- Additional production auth hardening beyond OTP delivery, rotating refresh sessions, and session persistence.
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
 - Live end-to-end validation of the configured escrow execution relay against real environments.
 - Real user-facing web and admin flows.

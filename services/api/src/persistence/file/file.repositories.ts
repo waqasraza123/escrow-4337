@@ -24,6 +24,17 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function normalizeSessionRecord(
+  session:
+    | SessionRecord
+    | (Omit<SessionRecord, 'refreshTokenId'> & { refreshTokenId?: string }),
+): SessionRecord {
+  return {
+    ...session,
+    refreshTokenId: session.refreshTokenId ?? session.sid,
+  };
+}
+
 function normalizeUserRecord(
   user:
     | UserRecord
@@ -172,15 +183,16 @@ export class FileSessionsRepository implements SessionsRepository {
 
   async create(session: SessionRecord) {
     return this.store.write((data) => {
-      data.sessions[session.sid] = cloneValue(session);
-      return cloneValue(session);
+      const normalizedSession = normalizeSessionRecord(session);
+      data.sessions[session.sid] = cloneValue(normalizedSession);
+      return cloneValue(normalizedSession);
     });
   }
 
   async getBySid(sid: string) {
     return this.store.read((data) => {
       const session = data.sessions[sid];
-      return session ? cloneValue(session) : null;
+      return session ? normalizeSessionRecord(cloneValue(session)) : null;
     });
   }
 
@@ -192,6 +204,35 @@ export class FileSessionsRepository implements SessionsRepository {
       }
       session.revoked = true;
       data.sessions[sid] = session;
+    });
+  }
+
+  async rotate(
+    sid: string,
+    currentRefreshTokenId: string,
+    nextRefreshTokenId: string,
+  ) {
+    return this.store.write((data) => {
+      const session = data.sessions[sid];
+      if (!session) {
+        return null;
+      }
+
+      const normalizedSession = normalizeSessionRecord(session);
+      if (
+        normalizedSession.revoked ||
+        normalizedSession.exp < Date.now() ||
+        normalizedSession.refreshTokenId !== currentRefreshTokenId
+      ) {
+        return null;
+      }
+
+      const rotatedSession: SessionRecord = {
+        ...normalizedSession,
+        refreshTokenId: nextRefreshTokenId,
+      };
+      data.sessions[sid] = cloneValue(rotatedSession);
+      return cloneValue(rotatedSession);
     });
   }
 }

@@ -64,6 +64,7 @@ type SessionRow = QueryResultRow & {
   user_id: string;
   email: string;
   expires_at_ms: string;
+  refresh_token_id: string;
   revoked_at_ms: string | null;
 };
 
@@ -215,6 +216,7 @@ function mapSession(row: SessionRow): SessionRecord {
     email: row.email,
     exp: Number(row.expires_at_ms),
     revoked: row.revoked_at_ms !== null,
+    refreshTokenId: row.refresh_token_id,
   };
 }
 
@@ -855,15 +857,23 @@ export class PostgresSessionsRepository implements SessionsRepository {
   async create(session: SessionRecord) {
     const result = await this.db.query<SessionRow>(
       `
-        INSERT INTO auth_sessions (sid, user_id, email, expires_at_ms, revoked_at_ms)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING sid, user_id, email, expires_at_ms, revoked_at_ms
+        INSERT INTO auth_sessions (
+          sid,
+          user_id,
+          email,
+          expires_at_ms,
+          refresh_token_id,
+          revoked_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING sid, user_id, email, expires_at_ms, refresh_token_id, revoked_at_ms
       `,
       [
         session.sid,
         session.userId,
         session.email,
         String(session.exp),
+        session.refreshTokenId,
         session.revoked ? String(Date.now()) : null,
       ],
     );
@@ -873,7 +883,7 @@ export class PostgresSessionsRepository implements SessionsRepository {
   async getBySid(sid: string) {
     const result = await this.db.query<SessionRow>(
       `
-        SELECT sid, user_id, email, expires_at_ms, revoked_at_ms
+        SELECT sid, user_id, email, expires_at_ms, refresh_token_id, revoked_at_ms
         FROM auth_sessions
         WHERE sid = $1
         LIMIT 1
@@ -892,6 +902,26 @@ export class PostgresSessionsRepository implements SessionsRepository {
       `,
       [sid, String(Date.now())],
     );
+  }
+
+  async rotate(
+    sid: string,
+    currentRefreshTokenId: string,
+    nextRefreshTokenId: string,
+  ) {
+    const result = await this.db.query<SessionRow>(
+      `
+        UPDATE auth_sessions
+        SET refresh_token_id = $3
+        WHERE sid = $1
+          AND refresh_token_id = $2
+          AND revoked_at_ms IS NULL
+          AND expires_at_ms >= $4
+        RETURNING sid, user_id, email, expires_at_ms, refresh_token_id, revoked_at_ms
+      `,
+      [sid, currentRefreshTokenId, nextRefreshTokenId, String(Date.now())],
+    );
+    return result.rows[0] ? mapSession(result.rows[0]) : null;
   }
 }
 

@@ -17,6 +17,7 @@ The API is intended to own:
 - auth prototype exists with OTP, JWT, refresh, logout, `me`, and Shariah preference toggling
 - auth, user, session, OTP, wallet, and escrow records now flow through repository-backed persistence boundaries
 - auth email delivery now runs through a product-owned template plus mock or relay-backed provider boundary, and OTP issuance is cleared if delivery fails
+- refresh tokens now rotate on every refresh and replay of an old refresh token revokes the session
 - tests use a file-backed persistence adapter, while the production driver targets Postgres
 - wallet module now supports authenticated SIWE challenge issuance, wallet ownership verification, smart-account provisioning, explicit sponsorship policy, and default execution-wallet selection
 - escrow module now submits job creation, funding, milestone, dispute, and resolution actions through a contract gateway and persists confirmed execution history alongside local state

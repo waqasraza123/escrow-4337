@@ -19,6 +19,7 @@ export class SessionsService {
       email,
       exp: Date.now() + this.ttlMs,
       revoked: false,
+      refreshTokenId: crypto.randomUUID(),
     };
 
     return this.sessionsRepository.create(session);
@@ -34,5 +35,29 @@ export class SessionsService {
 
   async revoke(sid: string) {
     await this.sessionsRepository.revoke(sid);
+  }
+
+  async rotateRefreshToken(sid: string, refreshTokenId: string) {
+    const session = await this.sessionsRepository.getBySid(sid);
+    if (!session || session.revoked || session.exp < Date.now()) {
+      throw new UnauthorizedException('Invalid session');
+    }
+
+    if (session.refreshTokenId !== refreshTokenId) {
+      await this.sessionsRepository.revoke(sid);
+      throw new UnauthorizedException('Invalid session');
+    }
+
+    const rotatedSession = await this.sessionsRepository.rotate(
+      sid,
+      refreshTokenId,
+      crypto.randomUUID(),
+    );
+    if (!rotatedSession) {
+      await this.sessionsRepository.revoke(sid);
+      throw new UnauthorizedException('Invalid session');
+    }
+
+    return rotatedSession;
   }
 }

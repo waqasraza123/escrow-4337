@@ -21,6 +21,11 @@ export interface SessionsRepository {
   create(session: SessionRecord): Promise<SessionRecord>;
   getBySid(sid: string): Promise<SessionRecord | null>;
   revoke(sid: string): Promise<void>;
+  rotate(
+    sid: string,
+    currentRefreshTokenId: string,
+    nextRefreshTokenId: string,
+  ): Promise<SessionRecord | null>;
 }
 
 export interface EscrowRepository {
@@ -39,7 +44,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 5;
+  version: 6;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   sessions: Record<string, SessionRecord>;
