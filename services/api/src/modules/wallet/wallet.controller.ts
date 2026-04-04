@@ -4,7 +4,10 @@ import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import * as walletDto from './wallet.dto';
 import { WalletService } from './wallet.service';
-import type { WalletStateResponse } from './wallet.types';
+import type {
+  WalletLinkChallengeResponse,
+  WalletStateResponse,
+} from './wallet.types';
 
 @Controller('wallet')
 export class WalletController {
@@ -17,13 +20,23 @@ export class WalletController {
   }
 
   @UseGuards(AuthGuard)
-  @Post('link')
-  linkWallet(
+  @Post('link/challenge')
+  createLinkWalletChallenge(
     @User() user: ReqUser,
-    @Body(new ZodValidationPipe(walletDto.linkWalletSchema))
-    dto: walletDto.LinkWalletDto,
+    @Body(new ZodValidationPipe(walletDto.createLinkWalletChallengeSchema))
+    dto: walletDto.CreateLinkWalletChallengeDto,
+  ): Promise<WalletLinkChallengeResponse> {
+    return this.walletService.createLinkWalletChallenge(user.id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('link/verify')
+  verifyLinkWallet(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(walletDto.verifyLinkWalletSchema))
+    dto: walletDto.VerifyLinkWalletDto,
   ): Promise<WalletStateResponse> {
-    return this.walletService.linkWallet(user.id, dto);
+    return this.walletService.verifyLinkWallet(user.id, dto);
   }
 
   @UseGuards(AuthGuard)

@@ -46,8 +46,8 @@ The repository currently has four active system areas:
 ## Current Gaps
 
 - API auth and escrow state now persist through repository adapters, but the production path still needs a deployed Postgres environment and real provider integrations.
-- The escrow module now uses a contract gateway with receipt handling and authenticated wallet-backed actor resolution, but wallet ownership proof and smart-account provisioning are still missing.
-- The wallet module now owns linked wallet state and default execution-wallet selection, but not ERC-4337 provisioning yet.
+- The escrow module now uses a contract gateway with receipt handling and authenticated proof-backed wallet actor resolution, but smart-account provisioning is still missing.
+- The wallet module now owns linked wallet state, SIWE-based ownership proof, and default execution-wallet selection, but not ERC-4337 provisioning yet.
 - Frontend apps do not yet represent real product flows.
 - The repo structure described in the original README is broader than the current tree.
 

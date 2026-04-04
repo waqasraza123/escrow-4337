@@ -1,6 +1,7 @@
 import type { OtpEntry, SessionRecord } from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type { UserRecord } from '../modules/users/users.types';
+import type { WalletLinkChallengeRecord } from '../modules/wallet/wallet.types';
 
 export interface UsersRepository {
   getByEmail(email: string): Promise<UserRecord | null>;
@@ -28,12 +29,20 @@ export interface EscrowRepository {
   save(job: EscrowJobRecord): Promise<void>;
 }
 
+export interface WalletLinkChallengesRepository {
+  create(challenge: WalletLinkChallengeRecord): Promise<void>;
+  getById(challengeId: string): Promise<WalletLinkChallengeRecord | null>;
+  recordFailedAttempt(challengeId: string, failedAt: number): Promise<void>;
+  markConsumed(challengeId: string, consumedAt: number): Promise<void>;
+}
+
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 3;
+  version: 4;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   sessions: Record<string, SessionRecord>;
   escrowJobs: Record<string, EscrowJobRecord>;
+  walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

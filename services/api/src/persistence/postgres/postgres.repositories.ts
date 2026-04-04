@@ -13,8 +13,10 @@ import type {
   OtpRepository,
   SessionsRepository,
   UsersRepository,
+  WalletLinkChallengesRepository,
 } from '../persistence.types';
 import { PostgresDatabaseService } from './postgres-database.service';
+import type { WalletLinkChallengeRecord } from '../../modules/wallet/wallet.types';
 
 type UserRow = QueryResultRow & {
   id: string;
@@ -52,6 +54,22 @@ type SessionRow = QueryResultRow & {
   email: string;
   expires_at_ms: string;
   revoked_at_ms: string | null;
+};
+
+type WalletLinkChallengeRow = QueryResultRow & {
+  id: string;
+  user_id: string;
+  address: string;
+  wallet_kind: WalletLinkChallengeRecord['walletKind'];
+  label: string | null;
+  chain_id: number;
+  nonce: string;
+  message: string;
+  issued_at_ms: string;
+  expires_at_ms: string;
+  failed_attempts: number;
+  consumed_at_ms: string | null;
+  last_failed_at_ms: string | null;
 };
 
 type JobRow = QueryResultRow & {
@@ -164,6 +182,26 @@ function mapSession(row: SessionRow): SessionRecord {
     email: row.email,
     exp: Number(row.expires_at_ms),
     revoked: row.revoked_at_ms !== null,
+  };
+}
+
+function mapWalletLinkChallenge(
+  row: WalletLinkChallengeRow,
+): WalletLinkChallengeRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    address: row.address,
+    walletKind: row.wallet_kind,
+    label: row.label ?? undefined,
+    chainId: row.chain_id,
+    nonce: row.nonce,
+    message: row.message,
+    issuedAt: Number(row.issued_at_ms),
+    expiresAt: Number(row.expires_at_ms),
+    failedAttempts: row.failed_attempts,
+    consumedAt: asNumber(row.consumed_at_ms),
+    lastFailedAt: asNumber(row.last_failed_at_ms),
   };
 }
 
@@ -765,6 +803,104 @@ export class PostgresSessionsRepository implements SessionsRepository {
         WHERE sid = $1
       `,
       [sid, String(Date.now())],
+    );
+  }
+}
+
+export class PostgresWalletLinkChallengesRepository
+  implements WalletLinkChallengesRepository
+{
+  constructor(private readonly db: PostgresDatabaseService) {}
+
+  async create(challenge: WalletLinkChallengeRecord) {
+    await this.db.query(
+      `
+        INSERT INTO wallet_link_challenges (
+          id,
+          user_id,
+          address,
+          wallet_kind,
+          label,
+          chain_id,
+          nonce,
+          message,
+          issued_at_ms,
+          expires_at_ms,
+          failed_attempts,
+          consumed_at_ms,
+          last_failed_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `,
+      [
+        challenge.id,
+        challenge.userId,
+        challenge.address,
+        challenge.walletKind,
+        challenge.label ?? null,
+        challenge.chainId,
+        challenge.nonce,
+        challenge.message,
+        String(challenge.issuedAt),
+        String(challenge.expiresAt),
+        challenge.failedAttempts,
+        challenge.consumedAt === undefined
+          ? null
+          : String(challenge.consumedAt),
+        challenge.lastFailedAt === undefined
+          ? null
+          : String(challenge.lastFailedAt),
+      ],
+    );
+  }
+
+  async getById(challengeId: string) {
+    const result = await this.db.query<WalletLinkChallengeRow>(
+      `
+        SELECT
+          id,
+          user_id,
+          address,
+          wallet_kind,
+          label,
+          chain_id,
+          nonce,
+          message,
+          issued_at_ms,
+          expires_at_ms,
+          failed_attempts,
+          consumed_at_ms,
+          last_failed_at_ms
+        FROM wallet_link_challenges
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [challengeId],
+    );
+    return result.rows[0] ? mapWalletLinkChallenge(result.rows[0]) : null;
+  }
+
+  async recordFailedAttempt(challengeId: string, failedAt: number) {
+    await this.db.query(
+      `
+        UPDATE wallet_link_challenges
+        SET
+          failed_attempts = failed_attempts + 1,
+          last_failed_at_ms = $2
+        WHERE id = $1 AND consumed_at_ms IS NULL
+      `,
+      [challengeId, String(failedAt)],
+    );
+  }
+
+  async markConsumed(challengeId: string, consumedAt: number) {
+    await this.db.query(
+      `
+        UPDATE wallet_link_challenges
+        SET consumed_at_ms = COALESCE(consumed_at_ms, $2)
+        WHERE id = $1
+      `,
+      [challengeId, String(consumedAt)],
     );
   }
 }

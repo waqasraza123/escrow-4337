@@ -45,6 +45,12 @@ export class UsersService {
     return this.usersRepository.getById(id);
   }
 
+  async getByWalletAddress(address: string) {
+    return this.usersRepository.getByWalletAddress(
+      normalizeEvmAddress(address),
+    );
+  }
+
   async getRequiredById(id: string) {
     const user = await this.usersRepository.getById(id);
     if (!user) {

@@ -22,7 +22,7 @@
 
 ## Current Roadmap
 - Finish production-facing backend integrations on top of the new persistence layer, including real email delivery and deployed Postgres migration flow.
-- Add wallet ownership proof and smart-account provisioning on top of the new wallet-backed escrow actor model.
+- Add smart-account provisioning on top of the new proof-backed wallet actor model.
 - Implement real web and admin product surfaces.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
@@ -35,6 +35,7 @@
 - API auth, user, session, OTP, and wallet state now persist behind repository interfaces, with a Postgres driver and SQL migration runner plus a file-backed test adapter.
 - API escrow lifecycle state now persists behind the same persistence boundary and records confirmed or failed contract execution attempts for job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
 - API wallet endpoints now let authenticated users link wallets, set a default execution wallet, and surface wallet state through auth profile responses.
+- API wallet linking now requires a persisted SIWE challenge and signature verification before a wallet can be attached to a user profile.
 - API escrow mutations no longer accept explicit actor addresses; they derive the acting wallet from the authenticated user plus the persisted job role or arbitrator configuration.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
@@ -56,12 +57,11 @@
 - `PolicyService` accepts both `shariahMode` and `shariah_mode` inputs so tests and future integrations can bridge existing naming drift safely.
 - The execution guide now treats tests as a required deliverable for each phase rather than a later hardening pass.
 - API persistence is now owned through repository tokens so tests can use a file-backed adapter while production wiring targets Postgres.
-- The escrow module now depends on a contract gateway boundary and wallet-backed actor resolution; in non-test environments it expects relay configuration, while wallet linking is currently application-trusted until signature proof exists.
+- The escrow module now depends on a contract gateway boundary and proof-backed wallet actor resolution; in non-test environments it expects relay configuration, while smart-account provisioning is still pending.
 
 ## Deferred / Not Yet Implemented
 - Real email provider and production auth hardening.
 - Real ERC-4337 smart-account creation and paymaster/bundler integration.
-- Wallet ownership proof for linked addresses.
 - Real ERC-4337 smart-account creation and provisioning.
 - Production relay or signer infrastructure for escrow execution.
 - Real user-facing web and admin flows.
@@ -73,7 +73,7 @@
 - Non-test escrow execution now expects `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, and `ESCROW_RELAY_BASE_URL`; missing config will fail the contract gateway path.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
-- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, signature-backed wallet ownership, real relay integration, or product UIs end to end.
+- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, smart-account provisioning, real relay integration, or product UIs end to end.
 
 ## Standard Verification
 - `git status --short`

@@ -175,7 +175,7 @@ Important repo truths:
 The next serious milestones are:
 
 1. deploy and operationalize the new persistence layer in real environments
-2. replace explicit actor-address payloads with the real wallet and ERC-4337 flow, and operationalize escrow execution infrastructure
+2. provision real smart accounts on top of the new proof-backed wallet flow, and operationalize escrow execution infrastructure
 3. build real web and admin surfaces
 4. add indexing, audit exports, and operations visibility
 5. harden CI, deployment, observability, and security posture

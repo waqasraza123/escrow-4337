@@ -4,6 +4,7 @@ import {
   FileOtpRepository,
   FileSessionsRepository,
   FileUsersRepository,
+  FileWalletLinkChallengesRepository,
 } from './file/file.repositories';
 import { FilePersistenceStore } from './file/file-persistence.store';
 import { PersistenceConfigService } from './persistence.config';
@@ -12,6 +13,7 @@ import {
   OTP_REPOSITORY,
   SESSIONS_REPOSITORY,
   USERS_REPOSITORY,
+  WALLET_LINK_CHALLENGES_REPOSITORY,
 } from './persistence.tokens';
 import { PostgresDatabaseService } from './postgres/postgres-database.service';
 import {
@@ -19,6 +21,7 @@ import {
   PostgresOtpRepository,
   PostgresSessionsRepository,
   PostgresUsersRepository,
+  PostgresWalletLinkChallengesRepository,
 } from './postgres/postgres.repositories';
 
 @Global()
@@ -91,6 +94,22 @@ import {
           ? new FileEscrowRepository(fileStore)
           : new PostgresEscrowRepository(db),
     },
+    {
+      provide: WALLET_LINK_CHALLENGES_REPOSITORY,
+      inject: [
+        PersistenceConfigService,
+        FilePersistenceStore,
+        PostgresDatabaseService,
+      ],
+      useFactory: (
+        config: PersistenceConfigService,
+        fileStore: FilePersistenceStore,
+        db: PostgresDatabaseService,
+      ) =>
+        config.driver === 'file'
+          ? new FileWalletLinkChallengesRepository(fileStore)
+          : new PostgresWalletLinkChallengesRepository(db),
+    },
   ],
   exports: [
     PersistenceConfigService,
@@ -98,6 +117,7 @@ import {
     OTP_REPOSITORY,
     SESSIONS_REPOSITORY,
     ESCROW_REPOSITORY,
+    WALLET_LINK_CHALLENGES_REPOSITORY,
   ],
 })
 export class PersistenceModule {}

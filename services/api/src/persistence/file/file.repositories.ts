@@ -1,11 +1,13 @@
 import type { OtpEntry, SessionRecord } from '../../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../../modules/escrow/escrow.types';
 import type { UserRecord } from '../../modules/users/users.types';
+import type { WalletLinkChallengeRecord } from '../../modules/wallet/wallet.types';
 import type {
   EscrowRepository,
   OtpRepository,
   SessionsRepository,
   UsersRepository,
+  WalletLinkChallengesRepository,
 } from '../persistence.types';
 import { FilePersistenceStore } from './file-persistence.store';
 
@@ -153,6 +155,48 @@ export class FileEscrowRepository implements EscrowRepository {
   async save(job: EscrowJobRecord) {
     await this.store.write((data) => {
       data.escrowJobs[job.id] = cloneValue(job);
+    });
+  }
+}
+
+export class FileWalletLinkChallengesRepository
+  implements WalletLinkChallengesRepository
+{
+  constructor(private readonly store: FilePersistenceStore) {}
+
+  async create(challenge: WalletLinkChallengeRecord) {
+    await this.store.write((data) => {
+      data.walletLinkChallenges[challenge.id] = cloneValue(challenge);
+    });
+  }
+
+  async getById(challengeId: string) {
+    return this.store.read((data) => {
+      const challenge = data.walletLinkChallenges[challengeId];
+      return challenge ? cloneValue(challenge) : null;
+    });
+  }
+
+  async recordFailedAttempt(challengeId: string, failedAt: number) {
+    await this.store.write((data) => {
+      const challenge = data.walletLinkChallenges[challengeId];
+      if (!challenge || challenge.consumedAt !== undefined) {
+        return;
+      }
+      challenge.failedAttempts += 1;
+      challenge.lastFailedAt = failedAt;
+      data.walletLinkChallenges[challengeId] = challenge;
+    });
+  }
+
+  async markConsumed(challengeId: string, consumedAt: number) {
+    await this.store.write((data) => {
+      const challenge = data.walletLinkChallenges[challengeId];
+      if (!challenge) {
+        return;
+      }
+      challenge.consumedAt = consumedAt;
+      data.walletLinkChallenges[challengeId] = challenge;
     });
   }
 }
