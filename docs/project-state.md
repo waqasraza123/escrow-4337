@@ -5,7 +5,7 @@
 - Current reality: prototype-stage monorepo. The contract is the strongest completed slice; the API and frontends are not production-ready.
 
 ## Current Architecture
-- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, and smart-account provisioning boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers.
+- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, and smart-account provisioning boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
 - `apps/web` and `apps/admin`: Next.js apps still on starter-template pages.
@@ -21,7 +21,7 @@
 - Do not claim checks are green unless they were run successfully.
 
 ## Current Roadmap
-- Finish production-facing backend integrations on top of the new persistence layer and smart-account flow, including deployed Postgres migration flow, live relay/provider validation, and OTP abuse hardening.
+- Finish production-facing backend integrations on top of the new persistence layer and smart-account flow, including deployed Postgres migration flow, live relay/provider validation, and deployed ingress or proxy validation.
 - Implement real web and admin product surfaces.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
@@ -35,6 +35,7 @@
 - API auth email delivery now runs through mock and relay-backed provider boundaries, renders a product-owned OTP template, and clears issued OTP codes if delivery fails.
 - API auth refresh tokens now rotate on every refresh, are capped to the persisted session lifetime, and revoke the session if an old refresh token is replayed.
 - API auth runtime now validates JWT secret strength in non-test environments and reads JWT, session, and OTP timing and rate-limit controls from environment configuration instead of hardcoded defaults.
+- API auth start now persists source-IP OTP request throttle state, enforces IP-scoped send windows across different email addresses, and supports environment-driven trusted-proxy handling for deployments behind ingress.
 - API escrow lifecycle state now persists behind the same persistence boundary and records confirmed or failed contract execution attempts for job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
 - API wallet endpoints now let authenticated users link wallets, set a default execution wallet, and surface wallet state through auth profile responses.
 - API wallet linking now requires a persisted SIWE challenge and signature verification before a wallet can be attached to a user profile.
@@ -63,12 +64,13 @@
 - API persistence is now owned through repository tokens so tests can use a file-backed adapter while production wiring targets Postgres.
 - The auth module now uses a relay-backed email provider model in non-test environments and invalidates issued OTP codes when delivery fails.
 - The auth module now validates JWT secret strength outside tests and centralizes JWT, session, and OTP runtime controls behind environment-driven configuration.
+- The auth module now persists OTP request throttles by source IP, and API bootstrap can honor `NEST_API_TRUST_PROXY` so IP-aware auth controls work correctly behind trusted proxies.
 - The wallet module now uses a relay-backed smart-account provider model in non-test environments, defaults recovery to the verified owner EOA, and only enables sponsored execution for SIWE-verified owners.
 - The escrow module now depends on proof-backed wallet actor resolution plus a provisioned smart-account default for client job creation; in non-test environments it expects relay configuration for both escrow execution and smart-account provisioning.
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.
-- Additional OTP abuse hardening beyond OTP delivery, rotating refresh sessions, session persistence, and validated auth runtime configuration.
+- Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
 - Live end-to-end validation of the configured escrow execution relay against real environments.
 - Real user-facing web and admin flows.
@@ -78,6 +80,7 @@
 - Frontend apps are starter templates and should not be treated as implemented product surfaces.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
 - Non-test auth startup now expects a strong `JWT_SECRET`; missing or weak values will fail auth runtime initialization.
+- IP-aware OTP throttling depends on `NEST_API_TRUST_PROXY` being set correctly when the API runs behind a reverse proxy or ingress.
 - Non-test auth email delivery now expects sender and email relay configuration; missing config will fail the delivery path.
 - Non-test escrow execution now expects `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, and `ESCROW_RELAY_BASE_URL`; missing config will fail the contract gateway path.
 - Non-test smart-account provisioning now expects wallet relay, bundler, entry-point, factory, and optionally paymaster configuration; missing config will fail the provisioning path.

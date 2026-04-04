@@ -16,6 +16,8 @@ describe('AuthConfigService', () => {
     delete process.env.AUTH_OTP_LOCK_SEC;
     delete process.env.AUTH_OTP_SEND_WINDOW_SEC;
     delete process.env.AUTH_OTP_SEND_MAX_PER_WINDOW;
+    delete process.env.AUTH_OTP_IP_SEND_WINDOW_SEC;
+    delete process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW;
     delete process.env.NODE_ENV;
   });
 
@@ -36,6 +38,8 @@ describe('AuthConfigService', () => {
     process.env.AUTH_OTP_LOCK_SEC = '300';
     process.env.AUTH_OTP_SEND_WINDOW_SEC = '1800';
     process.env.AUTH_OTP_SEND_MAX_PER_WINDOW = '3';
+    process.env.AUTH_OTP_IP_SEND_WINDOW_SEC = '900';
+    process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW = '8';
 
     const config = new AuthConfigService();
 
@@ -50,6 +54,8 @@ describe('AuthConfigService', () => {
     expect(config.otpLockMs).toBe(300_000);
     expect(config.otpSendWindowMs).toBe(1_800_000);
     expect(config.otpSendMaxPerWindow).toBe(3);
+    expect(config.otpIpSendWindowMs).toBe(900_000);
+    expect(config.otpIpSendMaxPerWindow).toBe(8);
   });
 
   it('requires a strong jwt secret outside test mode', () => {

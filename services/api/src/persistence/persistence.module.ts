@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import {
   FileEscrowRepository,
   FileOtpRepository,
+  FileOtpRequestThrottlesRepository,
   FileSessionsRepository,
   FileUsersRepository,
   FileWalletLinkChallengesRepository,
@@ -11,6 +12,7 @@ import { PersistenceConfigService } from './persistence.config';
 import {
   ESCROW_REPOSITORY,
   OTP_REPOSITORY,
+  OTP_REQUEST_THROTTLES_REPOSITORY,
   SESSIONS_REPOSITORY,
   USERS_REPOSITORY,
   WALLET_LINK_CHALLENGES_REPOSITORY,
@@ -19,6 +21,7 @@ import { PostgresDatabaseService } from './postgres/postgres-database.service';
 import {
   PostgresEscrowRepository,
   PostgresOtpRepository,
+  PostgresOtpRequestThrottlesRepository,
   PostgresSessionsRepository,
   PostgresUsersRepository,
   PostgresWalletLinkChallengesRepository,
@@ -61,6 +64,22 @@ import {
         config.driver === 'file'
           ? new FileOtpRepository(fileStore)
           : new PostgresOtpRepository(db),
+    },
+    {
+      provide: OTP_REQUEST_THROTTLES_REPOSITORY,
+      inject: [
+        PersistenceConfigService,
+        FilePersistenceStore,
+        PostgresDatabaseService,
+      ],
+      useFactory: (
+        config: PersistenceConfigService,
+        fileStore: FilePersistenceStore,
+        db: PostgresDatabaseService,
+      ) =>
+        config.driver === 'file'
+          ? new FileOtpRequestThrottlesRepository(fileStore)
+          : new PostgresOtpRequestThrottlesRepository(db),
     },
     {
       provide: SESSIONS_REPOSITORY,
@@ -115,6 +134,7 @@ import {
     PersistenceConfigService,
     USERS_REPOSITORY,
     OTP_REPOSITORY,
+    OTP_REQUEST_THROTTLES_REPOSITORY,
     SESSIONS_REPOSITORY,
     ESCROW_REPOSITORY,
     WALLET_LINK_CHALLENGES_REPOSITORY,

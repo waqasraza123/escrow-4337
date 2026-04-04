@@ -1,4 +1,8 @@
-import type { OtpEntry, SessionRecord } from '../modules/auth/auth.types';
+import type {
+  OtpEntry,
+  OtpRequestThrottleRecord,
+  SessionRecord,
+} from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type { UserRecord } from '../modules/users/users.types';
 import type { WalletLinkChallengeRecord } from '../modules/wallet/wallet.types';
@@ -15,6 +19,14 @@ export interface OtpRepository {
   getByEmail(email: string): Promise<OtpEntry | null>;
   set(entry: OtpEntry): Promise<void>;
   delete(email: string): Promise<void>;
+}
+
+export interface OtpRequestThrottlesRepository {
+  get(
+    scope: OtpRequestThrottleRecord['scope'],
+    key: string,
+  ): Promise<OtpRequestThrottleRecord | null>;
+  set(record: OtpRequestThrottleRecord): Promise<void>;
 }
 
 export interface SessionsRepository {
@@ -44,9 +56,10 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 6;
+  version: 7;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
+  otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
   sessions: Record<string, SessionRecord>;
   escrowJobs: Record<string, EscrowJobRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;

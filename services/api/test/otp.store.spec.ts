@@ -5,6 +5,7 @@ import {
   type HttpException,
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { OtpRequestThrottleService } from '../src/modules/auth/otp-request-throttle.service';
 import { PersistenceModule } from '../src/persistence/persistence.module';
 import { OtpStore } from '../src/modules/auth/otp.store';
 import { configureFilePersistence } from './support/test-persistence';
@@ -31,12 +32,14 @@ describe('OtpStore', () => {
     const persistence = configureFilePersistence();
     cleanupPersistence = persistence.cleanup;
     delete process.env.AUTH_OTP_TTL_SEC;
+    delete process.env.AUTH_OTP_IP_SEND_WINDOW_SEC;
+    delete process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW;
     delete process.env.AUTH_OTP_SEND_MAX_PER_WINDOW;
     currentTime = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
     moduleRef = await Test.createTestingModule({
       imports: [PersistenceModule],
-      providers: [AuthConfigService, OtpStore],
+      providers: [AuthConfigService, OtpRequestThrottleService, OtpStore],
     }).compile();
     otpStore = moduleRef.get(OtpStore);
   });
@@ -135,7 +138,7 @@ describe('OtpStore', () => {
 
     moduleRef = await Test.createTestingModule({
       imports: [PersistenceModule],
-      providers: [AuthConfigService, OtpStore],
+      providers: [AuthConfigService, OtpRequestThrottleService, OtpStore],
     }).compile();
     otpStore = moduleRef.get(OtpStore);
 
@@ -147,5 +150,51 @@ describe('OtpStore', () => {
     await expect(
       otpStore.verify('user@example.com', '333333'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rate limits otp requests from the same ip across different emails', async () => {
+    await moduleRef.close();
+    process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW = '2';
+
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [AuthConfigService, OtpRequestThrottleService, OtpStore],
+    }).compile();
+    otpStore = moduleRef.get(OtpStore);
+
+    await expect(
+      otpStore.request('one@example.com', '127.0.0.1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      otpStore.request('two@example.com', '127.0.0.1'),
+    ).resolves.toBeUndefined();
+
+    const exception = await captureHttpException(() =>
+      otpStore.request('three@example.com', '127.0.0.1'),
+    );
+
+    expect(exception.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    expect(exception.message).toBe('Too many requests');
+  });
+
+  it('resets the ip rate-limit window after enough time passes', async () => {
+    await moduleRef.close();
+    process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW = '2';
+    process.env.AUTH_OTP_IP_SEND_WINDOW_SEC = '60';
+
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [AuthConfigService, OtpRequestThrottleService, OtpStore],
+    }).compile();
+    otpStore = moduleRef.get(OtpStore);
+
+    await otpStore.request('one@example.com', '127.0.0.1');
+    await otpStore.request('two@example.com', '127.0.0.1');
+
+    currentTime += 60_001;
+
+    await expect(
+      otpStore.request('three@example.com', '127.0.0.1'),
+    ).resolves.toBeUndefined();
   });
 });

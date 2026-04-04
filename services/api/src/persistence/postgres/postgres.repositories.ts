@@ -1,5 +1,9 @@
 import type { PoolClient, QueryResultRow } from 'pg';
-import type { OtpEntry, SessionRecord } from '../../modules/auth/auth.types';
+import type {
+  OtpEntry,
+  OtpRequestThrottleRecord,
+  SessionRecord,
+} from '../../modules/auth/auth.types';
 import type {
   EscrowAuditEvent,
   EscrowExecutionRecord,
@@ -11,6 +15,7 @@ import type { UserRecord } from '../../modules/users/users.types';
 import type {
   EscrowRepository,
   OtpRepository,
+  OtpRequestThrottlesRepository,
   SessionsRepository,
   UsersRepository,
   WalletLinkChallengesRepository,
@@ -57,6 +62,14 @@ type OtpRow = QueryResultRow & {
   last_sent_at_ms: string;
   send_window_start_ms: string;
   send_window_count: number;
+};
+
+type OtpRequestThrottleRow = QueryResultRow & {
+  scope: OtpRequestThrottleRecord['scope'];
+  throttle_key: string;
+  window_start_ms: string;
+  request_count: number;
+  updated_at_ms: string;
 };
 
 type SessionRow = QueryResultRow & {
@@ -206,6 +219,18 @@ function mapOtp(row: OtpRow): OtpEntry {
       windowStart: Number(row.send_window_start_ms),
       count: row.send_window_count,
     },
+  };
+}
+
+function mapOtpRequestThrottle(
+  row: OtpRequestThrottleRow,
+): OtpRequestThrottleRecord {
+  return {
+    scope: row.scope,
+    key: row.throttle_key,
+    windowStart: Number(row.window_start_ms),
+    count: row.request_count,
+    updatedAt: Number(row.updated_at_ms),
   };
 }
 
@@ -848,6 +873,58 @@ export class PostgresOtpRepository implements OtpRepository {
     await this.db.query('DELETE FROM auth_otp_entries WHERE email = $1', [
       email.trim().toLowerCase(),
     ]);
+  }
+}
+
+export class PostgresOtpRequestThrottlesRepository
+  implements OtpRequestThrottlesRepository
+{
+  constructor(private readonly db: PostgresDatabaseService) {}
+
+  async get(scope: OtpRequestThrottleRecord['scope'], key: string) {
+    const result = await this.db.query<OtpRequestThrottleRow>(
+      `
+        SELECT
+          scope,
+          throttle_key,
+          window_start_ms,
+          request_count,
+          updated_at_ms
+        FROM auth_otp_request_throttles
+        WHERE scope = $1
+          AND throttle_key = $2
+        LIMIT 1
+      `,
+      [scope, key.trim().toLowerCase()],
+    );
+    return result.rows[0] ? mapOtpRequestThrottle(result.rows[0]) : null;
+  }
+
+  async set(record: OtpRequestThrottleRecord) {
+    await this.db.query(
+      `
+        INSERT INTO auth_otp_request_throttles (
+          scope,
+          throttle_key,
+          window_start_ms,
+          request_count,
+          updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (scope, throttle_key) DO UPDATE
+        SET
+          window_start_ms = EXCLUDED.window_start_ms,
+          request_count = EXCLUDED.request_count,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        record.scope,
+        record.key.trim().toLowerCase(),
+        String(record.windowStart),
+        record.count,
+        String(record.updatedAt),
+      ],
+    );
   }
 }
 

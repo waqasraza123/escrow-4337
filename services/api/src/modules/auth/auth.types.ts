@@ -17,3 +17,13 @@ export type OtpEntry = {
   lastSentAt: number;
   sentCountWindow: { windowStart: number; count: number };
 };
+
+export type OtpRequestThrottleScope = 'ip';
+
+export type OtpRequestThrottleRecord = {
+  scope: OtpRequestThrottleScope;
+  key: string;
+  windowStart: number;
+  count: number;
+  updatedAt: number;
+};

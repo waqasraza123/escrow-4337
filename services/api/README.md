@@ -19,6 +19,7 @@ The API is intended to own:
 - auth email delivery now runs through a product-owned template plus mock or relay-backed provider boundary, and OTP issuance is cleared if delivery fails
 - refresh tokens now rotate on every refresh and replay of an old refresh token revokes the session
 - JWT secret requirements plus JWT, session, and OTP timing and rate-limit controls are now validated through environment-driven auth configuration
+- OTP request throttling now persists per source IP, applies across different email addresses, and can respect trusted proxy configuration during bootstrap
 - tests use a file-backed persistence adapter, while the production driver targets Postgres
 - wallet module now supports authenticated SIWE challenge issuance, wallet ownership verification, smart-account provisioning, explicit sponsorship policy, and default execution-wallet selection
 - escrow module now submits job creation, funding, milestone, dispute, and resolution actions through a contract gateway and persists confirmed execution history alongside local state
@@ -83,6 +84,9 @@ AUTH_OTP_VERIFY_MAX_ATTEMPTS=5
 AUTH_OTP_LOCK_SEC=600
 AUTH_OTP_SEND_WINDOW_SEC=3600
 AUTH_OTP_SEND_MAX_PER_WINDOW=5
+AUTH_OTP_IP_SEND_WINDOW_SEC=3600
+AUTH_OTP_IP_SEND_MAX_PER_WINDOW=20
+NEST_API_TRUST_PROXY=loopback
 ```
 
 Smart-account environment:
@@ -113,7 +117,7 @@ WALLET_SMART_ACCOUNT_PAYMASTER_URL=https://...
 Before this service can be treated as production-grade, it still needs:
 
 - live validation of the configured email relay, contract relay, and smart-account relay infrastructure
-- stronger OTP abuse controls beyond the current per-email runtime limits
+- live validation of trusted-proxy and IP-throttle behavior in deployed environments
 - admin and audit workflows
 - stronger integration coverage around escrow and wallet behavior
 

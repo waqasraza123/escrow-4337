@@ -1,4 +1,8 @@
-import type { OtpEntry, SessionRecord } from '../../modules/auth/auth.types';
+import type {
+  OtpEntry,
+  OtpRequestThrottleRecord,
+  SessionRecord,
+} from '../../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../../modules/escrow/escrow.types';
 import type {
   EoaUserWalletRecord,
@@ -10,6 +14,7 @@ import type { WalletLinkChallengeRecord } from '../../modules/wallet/wallet.type
 import type {
   EscrowRepository,
   OtpRepository,
+  OtpRequestThrottlesRepository,
   SessionsRepository,
   UsersRepository,
   WalletLinkChallengesRepository,
@@ -22,6 +27,10 @@ function cloneValue<T>(value: T): T {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function throttleStorageKey(scope: string, key: string) {
+  return `${scope}:${key.trim().toLowerCase()}`;
 }
 
 function normalizeSessionRecord(
@@ -174,6 +183,27 @@ export class FileOtpRepository implements OtpRepository {
     const normalizedEmail = normalizeEmail(email);
     await this.store.write((data) => {
       delete data.otpEntries[normalizedEmail];
+    });
+  }
+}
+
+export class FileOtpRequestThrottlesRepository
+  implements OtpRequestThrottlesRepository
+{
+  constructor(private readonly store: FilePersistenceStore) {}
+
+  async get(scope: OtpRequestThrottleRecord['scope'], key: string) {
+    const storageKey = throttleStorageKey(scope, key);
+    return this.store.read((data) => {
+      const record = data.otpRequestThrottles[storageKey];
+      return record ? cloneValue(record) : null;
+    });
+  }
+
+  async set(record: OtpRequestThrottleRecord) {
+    const storageKey = throttleStorageKey(record.scope, record.key);
+    await this.store.write((data) => {
+      data.otpRequestThrottles[storageKey] = cloneValue(record);
     });
   }
 }

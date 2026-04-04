@@ -1,4 +1,9 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  UnauthorizedException,
+  type HttpException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ZodValidationPipe } from '../src/common/zod.pipe';
 import * as authDto from '../src/modules/auth/auth.dto';
@@ -11,6 +16,18 @@ type SentOtp = {
   email: string;
   code: string;
 };
+
+async function captureHttpException(
+  action: () => Promise<unknown>,
+): Promise<HttpException> {
+  try {
+    await action();
+  } catch (error) {
+    return error as HttpException;
+  }
+
+  throw new Error('Expected HttpException to be thrown');
+}
 
 describe('Auth integration', () => {
   let authService: AuthService;
@@ -30,6 +47,8 @@ describe('Auth integration', () => {
 
   beforeEach(async () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_integration_123';
+    delete process.env.AUTH_OTP_IP_SEND_WINDOW_SEC;
+    delete process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW;
     const persistence = configureFilePersistence();
     cleanupPersistence = persistence.cleanup;
 
@@ -190,5 +209,33 @@ describe('Auth integration', () => {
         code: failingDeliveryOtps[0]?.code ?? '',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rate limits auth start requests from the same ip across different emails', async () => {
+    await moduleFixture.close();
+    process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW = '2';
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [AuthModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue(emailService)
+      .compile();
+
+    authService = moduleFixture.get(AuthService);
+
+    await expect(
+      authService.start({ email: 'one@example.com' }, '127.0.0.1'),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      authService.start({ email: 'two@example.com' }, '127.0.0.1'),
+    ).resolves.toEqual({ ok: true });
+
+    const exception = await captureHttpException(() =>
+      authService.start({ email: 'three@example.com' }, '127.0.0.1'),
+    );
+
+    expect(exception.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    expect(exception.message).toBe('Too many requests');
   });
 });

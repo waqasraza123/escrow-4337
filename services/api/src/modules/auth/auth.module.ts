@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
 import { AuthGuard } from './guards/auth.guard';
 import { JwtService } from './jwt';
+import { OtpRequestThrottleService } from './otp-request-throttle.service';
 import { OtpStore } from './otp.store';
 import { SessionsService } from './sessions.service';
 
@@ -17,6 +18,7 @@ import { SessionsService } from './sessions.service';
   providers: [
     AuthConfigService,
     AuthService,
+    OtpRequestThrottleService,
     OtpStore,
     EmailService,
     JwtService,

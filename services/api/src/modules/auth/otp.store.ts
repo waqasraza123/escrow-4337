@@ -1,26 +1,17 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { OTP_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { OtpRepository } from '../../persistence/persistence.types';
 import { AuthConfigService } from './auth.config';
+import { AuthTooManyRequestsException } from './auth.errors';
 import type { OtpEntry } from './auth.types';
-
-class TooManyRequestsException extends HttpException {
-  constructor(message = 'Too many requests') {
-    super(message, HttpStatus.TOO_MANY_REQUESTS);
-  }
-}
+import { OtpRequestThrottleService } from './otp-request-throttle.service';
 
 @Injectable()
 export class OtpStore {
   constructor(
     private readonly config: AuthConfigService,
+    private readonly otpRequestThrottleService: OtpRequestThrottleService,
     @Inject(OTP_REPOSITORY)
     private readonly otpRepository: OtpRepository,
   ) {}
@@ -46,11 +37,11 @@ export class OtpStore {
   async request(email: string, ip?: string) {
     const key = this.key(email);
     const now = this.now();
+    await this.otpRequestThrottleService.consumeIpRequest(ip);
     const entry = await this.otpRepository.getByEmail(key);
-    void ip;
 
     if (entry?.lockedUntil && entry.lockedUntil > now) {
-      throw new TooManyRequestsException('Temporarily locked');
+      throw new AuthTooManyRequestsException('Temporarily locked');
     }
 
     if (entry) {
@@ -58,7 +49,7 @@ export class OtpStore {
         entry.sentCountWindow = { windowStart: now, count: 0 };
       }
       if (entry.sentCountWindow.count >= this.sendMaxPerWindow) {
-        throw new TooManyRequestsException('Too many requests');
+        throw new AuthTooManyRequestsException('Too many requests');
       }
       entry.sentCountWindow.count += 1;
       entry.lastSentAt = now;

@@ -81,4 +81,15 @@ export class AuthConfigService {
   get otpSendMaxPerWindow() {
     return readPositiveInteger(process.env.AUTH_OTP_SEND_MAX_PER_WINDOW, 5);
   }
+
+  get otpIpSendWindowMs() {
+    return readPositiveMilliseconds(
+      process.env.AUTH_OTP_IP_SEND_WINDOW_SEC,
+      3600,
+    );
+  }
+
+  get otpIpSendMaxPerWindow() {
+    return readPositiveInteger(process.env.AUTH_OTP_IP_SEND_MAX_PER_WINDOW, 20);
+  }
 }
