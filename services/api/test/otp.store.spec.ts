@@ -1,3 +1,4 @@
+import { AuthConfigService } from '../src/modules/auth/auth.config';
 import {
   HttpStatus,
   UnauthorizedException,
@@ -29,17 +30,19 @@ describe('OtpStore', () => {
   beforeEach(async () => {
     const persistence = configureFilePersistence();
     cleanupPersistence = persistence.cleanup;
+    delete process.env.AUTH_OTP_TTL_SEC;
+    delete process.env.AUTH_OTP_SEND_MAX_PER_WINDOW;
     currentTime = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
     moduleRef = await Test.createTestingModule({
       imports: [PersistenceModule],
-      providers: [OtpStore],
+      providers: [AuthConfigService, OtpStore],
     }).compile();
     otpStore = moduleRef.get(OtpStore);
   });
 
   afterEach(async () => {
-    await moduleRef.close();
+    await moduleRef?.close();
     cleanupPersistence?.();
     cleanupPersistence = undefined;
     jest.restoreAllMocks();
@@ -124,5 +127,25 @@ describe('OtpStore', () => {
 
     expect(exception.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
     expect(exception.message).toBe('Temporarily locked');
+  });
+
+  it('uses the configured otp ttl', async () => {
+    await moduleRef.close();
+    process.env.AUTH_OTP_TTL_SEC = '1';
+
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [AuthConfigService, OtpStore],
+    }).compile();
+    otpStore = moduleRef.get(OtpStore);
+
+    await otpStore.request('user@example.com');
+    await otpStore.set('user@example.com', '333333');
+
+    currentTime += 1001;
+
+    await expect(
+      otpStore.verify('user@example.com', '333333'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

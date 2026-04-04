@@ -1,13 +1,13 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { SESSIONS_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { SessionsRepository } from '../../persistence/persistence.types';
+import { AuthConfigService } from './auth.config';
 import type { SessionRecord } from './auth.types';
 
 @Injectable()
 export class SessionsService {
-  private readonly ttlMs = 14 * 24 * 60 * 60 * 1000;
-
   constructor(
+    private readonly config: AuthConfigService,
     @Inject(SESSIONS_REPOSITORY)
     private readonly sessionsRepository: SessionsRepository,
   ) {}
@@ -17,7 +17,7 @@ export class SessionsService {
       sid: crypto.randomUUID(),
       userId,
       email,
-      exp: Date.now() + this.ttlMs,
+      exp: Date.now() + this.config.sessionTtlMs,
       revoked: false,
       refreshTokenId: crypto.randomUUID(),
     };

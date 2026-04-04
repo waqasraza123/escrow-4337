@@ -29,7 +29,7 @@ describe('Auth integration', () => {
   };
 
   beforeEach(async () => {
-    process.env.JWT_SECRET = 'test_jwt_secret_for_integration';
+    process.env.JWT_SECRET = 'test_jwt_secret_for_integration_123';
     const persistence = configureFilePersistence();
     cleanupPersistence = persistence.cleanup;
 

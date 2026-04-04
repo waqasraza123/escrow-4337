@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PersistenceModule } from '../../persistence/persistence.module';
 import { UsersModule } from '../users/users.module';
+import { AuthConfigService } from './auth.config';
 import { AuthController } from './auth.controller';
 import { AuthEmailModule } from './email/email.module';
 import { AuthService } from './auth.service';
@@ -14,6 +15,7 @@ import { SessionsService } from './sessions.service';
   imports: [PersistenceModule, UsersModule, AuthEmailModule],
   controllers: [AuthController],
   providers: [
+    AuthConfigService,
     AuthService,
     OtpStore,
     EmailService,

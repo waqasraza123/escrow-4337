@@ -51,6 +51,7 @@ Current implemented slices:
 - NestJS auth API with OTP/JWT/session flow, Shariah preference toggle, and repository-backed persistence boundaries
 - provider-backed OTP email delivery with relay-mode production wiring and rollback-safe invalidation when delivery fails
 - rotating refresh-token sessions with replay-triggered session revocation
+- validated auth runtime configuration for JWT secrets plus JWT, session, and OTP timing and rate-limit controls
 - wallet API flow with SIWE-backed ownership proof, deterministic smart-account provisioning, explicit sponsorship policy, and default execution-wallet management
 - escrow API orchestration that now submits lifecycle actions through a contract gateway, waits for confirmed receipts, and persists execution history for job creation, funding, milestones, delivery, release, dispute, resolution, and audit retrieval
 - Postgres persistence driver and SQL migrations for users, OTP/session state, and escrow records, plus a file-backed adapter used in tests
@@ -178,7 +179,7 @@ Important repo truths:
 The next serious milestones are:
 
 1. deploy and operationalize the new persistence layer in real environments
-2. validate the configured smart-account and escrow relay infrastructure in real environments, and replace remaining placeholder backend integrations
+2. validate the configured smart-account and escrow relay infrastructure in real environments, complete OTP abuse hardening, and replace remaining placeholder backend integrations
 3. build real web and admin surfaces
 4. add indexing, audit exports, and operations visibility
 5. harden CI, deployment, observability, and security posture

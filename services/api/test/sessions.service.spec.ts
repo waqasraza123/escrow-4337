@@ -1,3 +1,4 @@
+import { AuthConfigService } from '../src/modules/auth/auth.config';
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { SessionsService } from '../src/modules/auth/sessions.service';
@@ -13,17 +14,19 @@ describe('SessionsService', () => {
   beforeEach(async () => {
     const persistence = configureFilePersistence();
     cleanupPersistence = persistence.cleanup;
+    process.env.JWT_SECRET = 'test_jwt_secret_for_integration_123';
+    delete process.env.AUTH_SESSION_TTL_SEC;
     currentTime = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
     moduleRef = await Test.createTestingModule({
       imports: [PersistenceModule],
-      providers: [SessionsService],
+      providers: [AuthConfigService, SessionsService],
     }).compile();
     sessionsService = moduleRef.get(SessionsService);
   });
 
   afterEach(async () => {
-    await moduleRef.close();
+    await moduleRef?.close();
     cleanupPersistence?.();
     cleanupPersistence = undefined;
     jest.restoreAllMocks();
@@ -61,6 +64,21 @@ describe('SessionsService', () => {
     await expect(
       sessionsService.revoke('missing-session'),
     ).resolves.toBeUndefined();
+  });
+
+  it('uses the configured session ttl', async () => {
+    await moduleRef.close();
+    process.env.AUTH_SESSION_TTL_SEC = '60';
+
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [AuthConfigService, SessionsService],
+    }).compile();
+    sessionsService = moduleRef.get(SessionsService);
+
+    const session = await sessionsService.create('user-1', 'user@example.com');
+
+    expect(session.exp).toBe(currentTime + 60_000);
   });
 
   it('rotates refresh tokens for an active session', async () => {

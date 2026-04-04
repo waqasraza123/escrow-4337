@@ -6,6 +6,13 @@ function readPositiveInteger(value: string | undefined, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function readPositiveIntegerSeconds(
+  value: string | undefined,
+  fallbackSeconds: number,
+) {
+  return readPositiveInteger(value, fallbackSeconds);
+}
+
 function readRequiredValue(
   value: string | undefined,
   envName: string,
@@ -52,7 +59,11 @@ export class EmailConfigService {
   }
 
   get otpTtlMinutes() {
-    return readPositiveInteger(process.env.AUTH_EMAIL_OTP_TTL_MINUTES, 10);
+    const otpTtlSeconds = readPositiveIntegerSeconds(
+      process.env.AUTH_OTP_TTL_SEC,
+      readPositiveInteger(process.env.AUTH_EMAIL_OTP_TTL_MINUTES, 10) * 60,
+    );
+    return Math.ceil(otpTtlSeconds / 60);
   }
 
   get relayBaseUrl() {

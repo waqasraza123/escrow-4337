@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { SignJWT, jwtVerify } from 'jose';
+import { AuthConfigService } from './auth.config';
 
 type JwtPayload = {
   sub: string;
@@ -17,19 +18,7 @@ type VerifyResult = {
 
 @Injectable()
 export class JwtService {
-  private readonly secret = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'dev_secret_change_me',
-  );
-  private readonly issuer = process.env.JWT_ISSUER || 'escrow4337';
-  private readonly audience = process.env.JWT_AUDIENCE || 'escrow4337:web';
-  private readonly accessTtlSec = parseInt(
-    process.env.JWT_ACCESS_TTL_SEC || '900',
-    10,
-  );
-  private readonly refreshTtlSec = parseInt(
-    process.env.JWT_REFRESH_TTL_SEC || '1209600',
-    10,
-  );
+  constructor(private readonly config: AuthConfigService) {}
 
   async signAccess(
     userId: string,
@@ -40,7 +29,7 @@ export class JwtService {
     const now = Math.floor(Date.now() / 1000);
     const expirationTime = this.resolveExpirationTime(
       now,
-      this.accessTtlSec,
+      this.config.accessTtlSec,
       sessionExpiresAtMs,
     );
     return await new SignJWT({
@@ -50,11 +39,11 @@ export class JwtService {
       typ: 'access',
     } as JwtPayload)
       .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(this.issuer)
-      .setAudience(this.audience)
+      .setIssuer(this.config.jwtIssuer)
+      .setAudience(this.config.jwtAudience)
       .setIssuedAt(now)
       .setExpirationTime(expirationTime)
-      .sign(this.secret);
+      .sign(this.getSecret());
   }
 
   async signRefresh(
@@ -67,7 +56,7 @@ export class JwtService {
     const now = Math.floor(Date.now() / 1000);
     const expirationTime = this.resolveExpirationTime(
       now,
-      this.refreshTtlSec,
+      this.config.refreshTtlSec,
       sessionExpiresAtMs,
     );
     return await new SignJWT({
@@ -78,17 +67,17 @@ export class JwtService {
       typ: 'refresh',
     } as JwtPayload)
       .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(this.issuer)
-      .setAudience(this.audience)
+      .setIssuer(this.config.jwtIssuer)
+      .setAudience(this.config.jwtAudience)
       .setIssuedAt(now)
       .setExpirationTime(expirationTime)
-      .sign(this.secret);
+      .sign(this.getSecret());
   }
 
   async verifyAccess(token: string): Promise<VerifyResult> {
-    const { payload } = await jwtVerify(token, this.secret, {
-      issuer: this.issuer,
-      audience: this.audience,
+    const { payload } = await jwtVerify(token, this.getSecret(), {
+      issuer: this.config.jwtIssuer,
+      audience: this.config.jwtAudience,
     });
     if (payload.typ !== 'access')
       throw new UnauthorizedException('Invalid token');
@@ -100,9 +89,9 @@ export class JwtService {
   }
 
   async verifyRefresh(token: string): Promise<VerifyResult> {
-    const { payload } = await jwtVerify(token, this.secret, {
-      issuer: this.issuer,
-      audience: this.audience,
+    const { payload } = await jwtVerify(token, this.getSecret(), {
+      issuer: this.config.jwtIssuer,
+      audience: this.config.jwtAudience,
     });
     if (payload.typ !== 'refresh')
       throw new UnauthorizedException('Invalid token');
@@ -125,5 +114,9 @@ export class JwtService {
 
     const sessionExpiresAtSec = Math.floor(sessionExpiresAtMs / 1000);
     return Math.min(issuedAtSec + ttlSec, sessionExpiresAtSec);
+  }
+
+  private getSecret() {
+    return new TextEncoder().encode(this.config.jwtSecret);
   }
 }

@@ -8,6 +8,7 @@ import {
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { OTP_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { OtpRepository } from '../../persistence/persistence.types';
+import { AuthConfigService } from './auth.config';
 import type { OtpEntry } from './auth.types';
 
 class TooManyRequestsException extends HttpException {
@@ -18,13 +19,8 @@ class TooManyRequestsException extends HttpException {
 
 @Injectable()
 export class OtpStore {
-  private readonly ttlMs = 10 * 60 * 1000;
-  private readonly verifyMaxAttempts = 5;
-  private readonly lockMs = 10 * 60 * 1000;
-  private readonly sendWindowMs = 60 * 60 * 1000;
-  private readonly sendMaxPerWindow = 5;
-
   constructor(
+    private readonly config: AuthConfigService,
     @Inject(OTP_REPOSITORY)
     private readonly otpRepository: OtpRepository,
   ) {}
@@ -93,7 +89,7 @@ export class OtpStore {
       email: key,
       hash,
       salt,
-      exp: now + this.ttlMs,
+      exp: now + this.otpTtlMs,
       attempts: 0,
       lastSentAt: base?.lastSentAt ?? now,
       sentCountWindow: base?.sentCountWindow ?? { windowStart: now, count: 1 },
@@ -143,12 +139,32 @@ export class OtpStore {
     if (!isValid) {
       entry.attempts += 1;
       if (entry.attempts >= this.verifyMaxAttempts) {
-        entry.lockedUntil = now + this.lockMs;
+        entry.lockedUntil = now + this.otpLockMs;
       }
       await this.otpRepository.set(entry);
       throw new UnauthorizedException('Invalid or expired code');
     }
 
     await this.otpRepository.delete(key);
+  }
+
+  private get otpTtlMs() {
+    return this.config.otpTtlMs;
+  }
+
+  private get verifyMaxAttempts() {
+    return this.config.otpVerifyMaxAttempts;
+  }
+
+  private get otpLockMs() {
+    return this.config.otpLockMs;
+  }
+
+  private get sendWindowMs() {
+    return this.config.otpSendWindowMs;
+  }
+
+  private get sendMaxPerWindow() {
+    return this.config.otpSendMaxPerWindow;
   }
 }
