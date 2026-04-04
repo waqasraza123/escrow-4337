@@ -14,6 +14,7 @@ import { UsersService } from '../src/modules/users/users.service';
 import { configureFilePersistence } from './support/test-persistence';
 
 const clientAddress = '0x1111111111111111111111111111111111111111';
+const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
@@ -39,6 +40,7 @@ describe('EscrowService', () => {
       usersService,
       'client@example.com',
       clientAddress,
+      clientSmartAccountAddress,
     );
     workerUserId = await createLinkedUserId(
       usersService,
@@ -273,6 +275,7 @@ describe('EscrowService', () => {
       usersService,
       'client@example.com',
       clientAddress,
+      clientSmartAccountAddress,
     );
 
     const createdJob = await escrowService.createJob(clientUserId, {
@@ -389,17 +392,65 @@ describe('EscrowService', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('rejects create-job calls when the default execution wallet is not a smart account', async () => {
+    const linkedAt = Date.now();
+    const eoaOnlyUser = await usersService.getOrCreateByEmail(
+      'eoa-only@example.com',
+    );
+    await usersService.linkWallet(eoaOnlyUser.id, {
+      address: '0x7777777777777777777777777777777777777777',
+      walletKind: 'eoa',
+      verificationMethod: 'siwe',
+      verificationChainId: 84532,
+      verifiedAt: linkedAt,
+    });
+
+    await expect(
+      escrowService.createJob(eoaOnlyUser.id, {
+        workerAddress,
+        currencyAddress,
+        title: 'EOA execution',
+        description: 'Smart-account execution is required.',
+        category: 'design',
+        termsJSON: {
+          currency: 'USDC',
+        },
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });
 
 async function createLinkedUserId(
   usersService: UsersService,
   email: string,
   address: string,
+  smartAccountAddress?: string,
 ) {
+  const linkedAt = Date.now();
   const user = await usersService.getOrCreateByEmail(email);
   await usersService.linkWallet(user.id, {
     address,
     walletKind: 'eoa',
+    verificationMethod: 'siwe',
+    verifiedAt: linkedAt,
+    verificationChainId: 84532,
   });
+  if (smartAccountAddress) {
+    await usersService.linkWallet(user.id, {
+      address: smartAccountAddress,
+      walletKind: 'smart_account',
+      ownerAddress: address,
+      recoveryAddress: address,
+      chainId: 84532,
+      providerKind: 'mock',
+      entryPointAddress: '0x00000061fefce24a79343c27127435286bb7a4e1',
+      factoryAddress: '0x3333333333333333333333333333333333333333',
+      sponsorshipPolicy: 'sponsored',
+      provisionedAt: linkedAt,
+      label: 'Client execution wallet',
+    });
+    await usersService.setDefaultExecutionWallet(user.id, smartAccountAddress);
+  }
   return user.id;
 }

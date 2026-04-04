@@ -9,6 +9,7 @@ import { UsersService } from '../src/modules/users/users.service';
 import { configureFilePersistence } from './support/test-persistence';
 
 const clientAddress = '0x1111111111111111111111111111111111111111';
+const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
@@ -36,6 +37,7 @@ describe('EscrowController integration', () => {
       usersService,
       'client@example.com',
       clientAddress,
+      clientSmartAccountAddress,
     );
     workerUser = await createLinkedUser(
       usersService,
@@ -236,6 +238,7 @@ describe('EscrowController integration', () => {
       usersService,
       'client@example.com',
       clientAddress,
+      clientSmartAccountAddress,
     );
 
     const auditResponse = await controller.audit(created.jobId);
@@ -255,12 +258,33 @@ async function createLinkedUser(
   usersService: UsersService,
   email: string,
   address: string,
+  smartAccountAddress?: string,
 ): Promise<ReqUser> {
+  const linkedAt = Date.now();
   const user = await usersService.getOrCreateByEmail(email);
   await usersService.linkWallet(user.id, {
     address,
     walletKind: 'eoa',
+    verificationMethod: 'siwe',
+    verifiedAt: linkedAt,
+    verificationChainId: 84532,
   });
+  if (smartAccountAddress) {
+    await usersService.linkWallet(user.id, {
+      address: smartAccountAddress,
+      walletKind: 'smart_account',
+      ownerAddress: address,
+      recoveryAddress: address,
+      chainId: 84532,
+      providerKind: 'mock',
+      entryPointAddress: '0x00000061fefce24a79343c27127435286bb7a4e1',
+      factoryAddress: '0x3333333333333333333333333333333333333333',
+      sponsorshipPolicy: 'sponsored',
+      provisionedAt: linkedAt,
+      label: 'Client execution wallet',
+    });
+    await usersService.setDefaultExecutionWallet(user.id, smartAccountAddress);
+  }
 
   return {
     id: user.id,

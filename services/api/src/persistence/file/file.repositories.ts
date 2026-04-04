@@ -1,6 +1,11 @@
 import type { OtpEntry, SessionRecord } from '../../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../../modules/escrow/escrow.types';
-import type { UserRecord } from '../../modules/users/users.types';
+import type {
+  EoaUserWalletRecord,
+  SmartAccountUserWalletRecord,
+  UserRecord,
+  UserWalletRecord,
+} from '../../modules/users/users.types';
 import type { WalletLinkChallengeRecord } from '../../modules/wallet/wallet.types';
 import type {
   EscrowRepository,
@@ -27,11 +32,66 @@ function normalizeUserRecord(
         defaultExecutionWalletAddress?: string | null;
       }),
 ): UserRecord {
+  const normalizedWallets = (user.wallets ?? []).map((wallet) =>
+    normalizeUserWallet(wallet),
+  );
+
   return {
     ...user,
     defaultExecutionWalletAddress: user.defaultExecutionWalletAddress ?? null,
-    wallets: structuredClone(user.wallets ?? []),
+    wallets: structuredClone(normalizedWallets),
   };
+}
+
+function normalizeUserWallet(
+  wallet: Partial<UserWalletRecord>,
+): UserWalletRecord {
+  const createdAt = Number(wallet.createdAt ?? 0);
+  const updatedAt = Number(wallet.updatedAt ?? createdAt);
+
+  if (wallet.walletKind === 'smart_account') {
+    const smartAccountWallet = wallet as Partial<SmartAccountUserWalletRecord>;
+    return {
+      address: String(smartAccountWallet.address),
+      walletKind: 'smart_account',
+      ownerAddress: String(smartAccountWallet.ownerAddress),
+      recoveryAddress: String(
+        smartAccountWallet.recoveryAddress ?? smartAccountWallet.ownerAddress,
+      ),
+      chainId: Number(smartAccountWallet.chainId),
+      providerKind:
+        smartAccountWallet.providerKind === 'relay' ? 'relay' : 'mock',
+      entryPointAddress: String(smartAccountWallet.entryPointAddress),
+      factoryAddress: String(smartAccountWallet.factoryAddress),
+      sponsorshipPolicy:
+        smartAccountWallet.sponsorshipPolicy === 'sponsored'
+          ? 'sponsored'
+          : 'disabled',
+      provisionedAt: Number(smartAccountWallet.provisionedAt ?? createdAt),
+      label:
+        typeof smartAccountWallet.label === 'string'
+          ? smartAccountWallet.label
+          : undefined,
+      createdAt,
+      updatedAt,
+    } satisfies SmartAccountUserWalletRecord;
+  }
+
+  const eoaWallet = wallet as Partial<EoaUserWalletRecord>;
+  return {
+    address: String(eoaWallet.address),
+    walletKind: 'eoa',
+    verificationMethod:
+      eoaWallet.verificationMethod === 'siwe' ? 'siwe' : 'legacy_link',
+    verificationChainId:
+      typeof eoaWallet.verificationChainId === 'number'
+        ? eoaWallet.verificationChainId
+        : undefined,
+    verifiedAt: Number(eoaWallet.verifiedAt ?? updatedAt),
+    label: typeof eoaWallet.label === 'string' ? eoaWallet.label : undefined,
+    createdAt,
+    updatedAt,
+  } satisfies EoaUserWalletRecord;
 }
 
 export class FileUsersRepository implements UsersRepository {

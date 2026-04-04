@@ -2,12 +2,19 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { USERS_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { UsersRepository } from '../../persistence/persistence.types';
-import type { LinkUserWalletInput, UserRecord } from './users.types';
+import type {
+  LinkEoaWalletInput,
+  LinkSmartAccountWalletInput,
+  LinkUserWalletInput,
+  UserRecord,
+  UserWalletRecord,
+} from './users.types';
 
 @Injectable()
 export class UsersService {
@@ -60,7 +67,8 @@ export class UsersService {
   }
 
   async linkWallet(userId: string, input: LinkUserWalletInput) {
-    const normalizedAddress = normalizeEvmAddress(input.address);
+    const normalizedInput = this.normalizeWalletInput(input);
+    const normalizedAddress = normalizedInput.address;
     const user = await this.getRequiredById(userId);
     const existingOwner =
       await this.usersRepository.getByWalletAddress(normalizedAddress);
@@ -70,11 +78,7 @@ export class UsersService {
     }
 
     const now = Date.now();
-    const nextWallets = this.upsertWallet(user, {
-      address: normalizedAddress,
-      walletKind: input.walletKind,
-      label: input.label?.trim() || undefined,
-    });
+    const nextWallets = this.upsertWallet(user, normalizedInput);
     const defaultExecutionWalletAddress =
       user.defaultExecutionWalletAddress ?? normalizedAddress;
 
@@ -117,6 +121,20 @@ export class UsersService {
     return this.hasWallet(user, normalizeEvmAddress(address));
   }
 
+  findWallet(user: UserRecord, address: string): UserWalletRecord | undefined {
+    const normalizedAddress = normalizeEvmAddress(address);
+    return user.wallets.find((wallet) => wallet.address === normalizedAddress);
+  }
+
+  async getRequiredWallet(userId: string, address: string) {
+    const user = await this.getRequiredById(userId);
+    const wallet = this.findWallet(user, address);
+    if (!wallet) {
+      throw new NotFoundException('Wallet address is not linked');
+    }
+    return wallet;
+  }
+
   private hasWallet(user: UserRecord, address: string) {
     return user.wallets.some((wallet) => wallet.address === address);
   }
@@ -126,37 +144,85 @@ export class UsersService {
     input: LinkUserWalletInput,
   ): UserRecord['wallets'] {
     const now = Date.now();
+    const normalizedInput = this.normalizeWalletInput(input);
     const existingWallet = user.wallets.find(
-      (wallet) => wallet.address === input.address,
+      (wallet) => wallet.address === normalizedInput.address,
     );
 
     if (existingWallet) {
-      if (existingWallet.walletKind !== input.walletKind) {
+      if (existingWallet.walletKind !== normalizedInput.walletKind) {
         throw new ConflictException(
           'Wallet address is already linked with a different wallet kind',
         );
       }
 
       return user.wallets.map((wallet) =>
-        wallet.address === input.address
-          ? {
-              ...wallet,
-              label: input.label,
-              updatedAt: now,
-            }
+        wallet.address === normalizedInput.address
+          ? this.createWalletRecord(normalizedInput, wallet.createdAt, now)
           : wallet,
       );
     }
 
     return [
       ...user.wallets,
-      {
+      this.createWalletRecord(normalizedInput, now, now),
+    ];
+  }
+
+  private normalizeWalletInput(
+    input: LinkUserWalletInput,
+  ): LinkUserWalletInput {
+    if (input.walletKind === 'eoa') {
+      return {
+        ...input,
+        address: normalizeEvmAddress(input.address),
+        label: input.label?.trim() || undefined,
+      } satisfies LinkEoaWalletInput;
+    }
+
+    return {
+      ...input,
+      address: normalizeEvmAddress(input.address),
+      ownerAddress: normalizeEvmAddress(input.ownerAddress),
+      recoveryAddress: normalizeEvmAddress(input.recoveryAddress),
+      entryPointAddress: normalizeEvmAddress(input.entryPointAddress),
+      factoryAddress: normalizeEvmAddress(input.factoryAddress),
+      label: input.label?.trim() || undefined,
+    } satisfies LinkSmartAccountWalletInput;
+  }
+
+  private createWalletRecord(
+    input: LinkUserWalletInput,
+    createdAt: number,
+    updatedAt: number,
+  ): UserWalletRecord {
+    if (input.walletKind === 'eoa') {
+      return {
         address: input.address,
         walletKind: input.walletKind,
+        verificationMethod: input.verificationMethod,
+        verificationChainId: input.verificationChainId,
+        verifiedAt: input.verifiedAt,
         label: input.label,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
+        createdAt,
+        updatedAt,
+      };
+    }
+
+    return {
+      address: input.address,
+      walletKind: input.walletKind,
+      ownerAddress: input.ownerAddress,
+      recoveryAddress: input.recoveryAddress,
+      chainId: input.chainId,
+      providerKind: input.providerKind,
+      entryPointAddress: input.entryPointAddress,
+      factoryAddress: input.factoryAddress,
+      sponsorshipPolicy: input.sponsorshipPolicy,
+      provisionedAt: input.provisionedAt,
+      label: input.label,
+      createdAt,
+      updatedAt,
+    };
   }
 }

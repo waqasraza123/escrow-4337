@@ -6,6 +6,7 @@ import * as walletDto from './wallet.dto';
 import { WalletService } from './wallet.service';
 import type {
   WalletLinkChallengeResponse,
+  SmartAccountProvisionResponse,
   WalletStateResponse,
 } from './wallet.types';
 
@@ -47,5 +48,15 @@ export class WalletController {
     dto: walletDto.SetDefaultWalletDto,
   ): Promise<WalletStateResponse> {
     return this.walletService.setDefaultWallet(user.id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('smart-account/provision')
+  provisionSmartAccount(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(walletDto.provisionSmartAccountSchema))
+    dto: walletDto.ProvisionSmartAccountDto,
+  ): Promise<SmartAccountProvisionResponse> {
+    return this.walletService.provisionSmartAccount(user.id, dto);
   }
 }

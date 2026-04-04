@@ -8,7 +8,7 @@ The API is intended to own:
 
 - authentication and session management
 - policy and compliance-aware behavior
-- future wallet orchestration
+- wallet and smart-account orchestration
 - escrow orchestration and admin-action foundations
 - persistence, audit metadata, and operator tooling support
 
@@ -17,10 +17,12 @@ The API is intended to own:
 - auth prototype exists with OTP, JWT, refresh, logout, `me`, and Shariah preference toggling
 - auth, user, session, OTP, wallet, and escrow records now flow through repository-backed persistence boundaries
 - tests use a file-backed persistence adapter, while the production driver targets Postgres
-- wallet module now supports authenticated SIWE challenge issuance, wallet ownership verification, and default execution-wallet selection
+- wallet module now supports authenticated SIWE challenge issuance, wallet ownership verification, smart-account provisioning, explicit sponsorship policy, and default execution-wallet selection
 - escrow module now submits job creation, funding, milestone, dispute, and resolution actions through a contract gateway and persists confirmed execution history alongside local state
 - escrow mutation routes now derive actor identity from the authenticated user's linked wallets instead of accepting actor addresses in request payloads
+- client job creation now requires a provisioned smart account as the default execution wallet
 - test mode uses a mock contract gateway, while non-test environments target a configured relay for contract execution
+- test mode uses a mock smart-account provider, while non-test environments target a configured relay plus environment-driven chain, bundler, paymaster, and recovery settings
 - API tests currently cover auth flow, policy behavior, OTP lifecycle behavior, session lifecycle behavior, and escrow lifecycle behavior
 
 ## Local Development
@@ -51,11 +53,25 @@ ESCROW_RELAY_BASE_URL=https://...
 ESCROW_RELAY_API_KEY=optional
 ```
 
+Smart-account environment:
+
+```bash
+WALLET_SMART_ACCOUNT_MODE=relay
+WALLET_SMART_ACCOUNT_CHAIN_ID=84532
+WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS=0x...
+WALLET_SMART_ACCOUNT_FACTORY_ADDRESS=0x...
+WALLET_SMART_ACCOUNT_BUNDLER_URL=https://...
+WALLET_SMART_ACCOUNT_RELAY_BASE_URL=https://...
+WALLET_SMART_ACCOUNT_RELAY_API_KEY=optional
+WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE=verified_owner
+WALLET_SMART_ACCOUNT_PAYMASTER_URL=https://...
+```
+
 ## Current Module Layout
 
 - `src/modules/auth`: auth, OTP, JWT, guards, sessions
 - `src/modules/policy`: Shariah mode and category policy checks
-- `src/modules/wallet`: authenticated SIWE challenge verification plus default execution-wallet management
+- `src/modules/wallet`: authenticated SIWE challenge verification, smart-account provisioning, and execution-wallet management
 - `src/modules/escrow`: persisted escrow lifecycle orchestration plus contract-gateway execution and receipt handling
 - `src/persistence`: repository interfaces, file-backed test adapter, Postgres driver, and SQL migrations
 - `src/common`: shared request and validation helpers
@@ -65,8 +81,7 @@ ESCROW_RELAY_API_KEY=optional
 Before this service can be treated as production-grade, it still needs:
 
 - real email delivery
-- production relay or signer infrastructure for the contract gateway
-- real wallet and ERC-4337 strategy
+- live validation of the configured contract relay and smart-account relay infrastructure
 - admin and audit workflows
 - stronger integration coverage around escrow and wallet behavior
 

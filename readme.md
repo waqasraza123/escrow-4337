@@ -38,7 +38,7 @@ This project aims to close that gap with:
 
 Target capabilities:
 
-- email-first onboarding with future ERC-4337 smart-account support
+- email-first onboarding with ERC-4337-style smart-account support
 - milestone creation, funding, delivery, release, refund, and dispute flows
 - compliance-aware category controls, including optional Shariah mode
 - admin or arbitrator resolution workflows
@@ -49,6 +49,7 @@ Current implemented slices:
 - `WorkstreamEscrow` Solidity contract with milestone release, dispute, resolution, and remainder refund behavior
 - contract tests for the main happy-path and refund scenarios
 - NestJS auth API with OTP/JWT/session flow, Shariah preference toggle, and repository-backed persistence boundaries
+- wallet API flow with SIWE-backed ownership proof, deterministic smart-account provisioning, explicit sponsorship policy, and default execution-wallet management
 - escrow API orchestration that now submits lifecycle actions through a contract gateway, waits for confirmed receipts, and persists execution history for job creation, funding, milestones, delivery, release, dispute, resolution, and audit retrieval
 - Postgres persistence driver and SQL migrations for users, OTP/session state, and escrow records, plus a file-backed adapter used in tests
 - compliance package with a concrete prohibited-category policy list
@@ -56,8 +57,8 @@ Current implemented slices:
 Current missing or incomplete slices:
 
 - real email delivery
-- real wallet and ERC-4337 orchestration
-- production relay or signer infrastructure and wallet-backed actor identity for escrow execution
+- live validation of the configured smart-account relay, bundler, and paymaster infrastructure
+- live validation of the configured escrow execution relay infrastructure
 - real product UI in `apps/web` and `apps/admin`
 - indexer, subgraph, shared UI package, and deployment infrastructure described in the original repo vision
 
@@ -116,7 +117,7 @@ Optional but expected later:
 
 - Postgres
 - Base Sepolia RPC access
-- future bundler and paymaster credentials for ERC-4337 work
+- relay, bundler, and paymaster credentials for smart-account work
 
 ### Install
 
@@ -175,7 +176,7 @@ Important repo truths:
 The next serious milestones are:
 
 1. deploy and operationalize the new persistence layer in real environments
-2. provision real smart accounts on top of the new proof-backed wallet flow, and operationalize escrow execution infrastructure
+2. validate the configured smart-account and escrow relay infrastructure in real environments, and replace remaining placeholder backend integrations
 3. build real web and admin surfaces
 4. add indexing, audit exports, and operations visibility
 5. harden CI, deployment, observability, and security posture

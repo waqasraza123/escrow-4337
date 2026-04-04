@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { UsersService } from '../users/users.service';
+import { isSmartAccountWallet } from '../users/users.types';
 import type { EscrowJobRecord } from './escrow.types';
 import { EscrowContractConfigService } from './onchain/escrow-contract.config';
 
@@ -15,10 +16,19 @@ export class EscrowActorService {
     const user = await this.usersService.getRequiredById(userId);
     if (!user.defaultExecutionWalletAddress) {
       throw new ForbiddenException(
-        'Link a wallet and set a default execution wallet before creating jobs',
+        'Provision a smart account and set it as the default execution wallet before creating jobs',
       );
     }
-    return user.defaultExecutionWalletAddress;
+    const executionWallet = this.usersService.findWallet(
+      user,
+      user.defaultExecutionWalletAddress,
+    );
+    if (!executionWallet || !isSmartAccountWallet(executionWallet)) {
+      throw new ForbiddenException(
+        'Default execution wallet must be a provisioned smart account before creating jobs',
+      );
+    }
+    return executionWallet.address;
   }
 
   async resolveClientForJob(userId: string, job: EscrowJobRecord) {

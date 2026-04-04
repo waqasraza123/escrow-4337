@@ -30,7 +30,6 @@ The repository currently has four active system areas:
 
 ### Planned Missing Layers
 
-- wallet and ERC-4337 orchestration layer
 - indexer or event ingestion layer
 - audit export and reporting layer
 - deployment and environment management layer
@@ -45,9 +44,9 @@ The repository currently has four active system areas:
 
 ## Current Gaps
 
-- API auth and escrow state now persist through repository adapters, but the production path still needs a deployed Postgres environment and real provider integrations.
-- The escrow module now uses a contract gateway with receipt handling and authenticated proof-backed wallet actor resolution, but smart-account provisioning is still missing.
-- The wallet module now owns linked wallet state, SIWE-based ownership proof, and default execution-wallet selection, but not ERC-4337 provisioning yet.
+- API auth and escrow state now persist through repository adapters, but the production path still needs a deployed Postgres environment and live provider validation.
+- The escrow module now uses a contract gateway with receipt handling and authenticated proof-backed wallet actor resolution, and client job creation now requires a provisioned smart-account execution wallet.
+- The wallet module now owns linked wallet state, SIWE-based ownership proof, smart-account provisioning, sponsorship policy, and default execution-wallet selection through mock and relay-backed provider boundaries.
 - Frontend apps do not yet represent real product flows.
 - The repo structure described in the original README is broader than the current tree.
 

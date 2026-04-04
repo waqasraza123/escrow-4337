@@ -34,8 +34,19 @@ export const setDefaultWalletSchema = z
   })
   .strict();
 
+export const provisionSmartAccountSchema = z
+  .object({
+    ownerAddress: walletAddressSchema,
+    label: z.string().trim().min(1).max(80).optional(),
+    setAsDefault: z.boolean().default(true),
+  })
+  .strict();
+
 export type CreateLinkWalletChallengeDto = z.infer<
   typeof createLinkWalletChallengeSchema
 >;
 export type VerifyLinkWalletDto = z.infer<typeof verifyLinkWalletSchema>;
 export type SetDefaultWalletDto = z.infer<typeof setDefaultWalletSchema>;
+export type ProvisionSmartAccountDto = z.infer<
+  typeof provisionSmartAccountSchema
+>;

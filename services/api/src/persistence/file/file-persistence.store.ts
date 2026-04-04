@@ -6,7 +6,7 @@ import { PersistenceConfigService } from '../persistence.config';
 
 function createInitialData(): PersistenceFileData {
   return {
-    version: 4,
+    version: 5,
     users: {},
     otpEntries: {},
     sessions: {},
@@ -62,7 +62,7 @@ export class FilePersistenceStore {
     const parsed = JSON.parse(raw) as Partial<PersistenceFileData>;
 
     return {
-      version: 4,
+      version: 5,
       users: parsed.users ?? {},
       otpEntries: parsed.otpEntries ?? {},
       sessions: parsed.sessions ?? {},

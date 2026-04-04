@@ -32,6 +32,17 @@ type UserWalletRow = QueryResultRow & {
   address: string;
   wallet_kind: UserRecord['wallets'][number]['walletKind'];
   label: string | null;
+  verification_method: 'siwe' | 'legacy_link' | null;
+  verification_chain_id: number | null;
+  verified_at_ms: string | null;
+  owner_address: string | null;
+  recovery_address: string | null;
+  chain_id: number | null;
+  provider_kind: 'mock' | 'relay' | null;
+  entry_point_address: string | null;
+  factory_address: string | null;
+  sponsorship_policy: 'disabled' | 'sponsored' | null;
+  provisioned_at_ms: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -150,9 +161,31 @@ function mapUser(row: UserRow): UserRecord {
 }
 
 function mapUserWallet(row: UserWalletRow): UserRecord['wallets'][number] {
+  if (row.wallet_kind === 'smart_account') {
+    return {
+      address: row.address,
+      walletKind: row.wallet_kind,
+      ownerAddress: row.owner_address ?? row.address,
+      recoveryAddress: row.recovery_address ?? row.owner_address ?? row.address,
+      chainId: row.chain_id ?? 0,
+      providerKind: row.provider_kind ?? 'relay',
+      entryPointAddress: row.entry_point_address ?? row.address,
+      factoryAddress: row.factory_address ?? row.address,
+      sponsorshipPolicy: row.sponsorship_policy ?? 'disabled',
+      provisionedAt:
+        asNumber(row.provisioned_at_ms) ?? Number(row.created_at_ms),
+      label: row.label ?? undefined,
+      createdAt: Number(row.created_at_ms),
+      updatedAt: Number(row.updated_at_ms),
+    };
+  }
+
   return {
     address: row.address,
     walletKind: row.wallet_kind,
+    verificationMethod: row.verification_method ?? 'legacy_link',
+    verificationChainId: row.verification_chain_id ?? undefined,
+    verifiedAt: asNumber(row.verified_at_ms) ?? Number(row.updated_at_ms),
     label: row.label ?? undefined,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
@@ -642,6 +675,17 @@ export class PostgresUsersRepository implements UsersRepository {
           address,
           wallet_kind,
           label,
+          verification_method,
+          verification_chain_id,
+          verified_at_ms,
+          owner_address,
+          recovery_address,
+          chain_id,
+          provider_kind,
+          entry_point_address,
+          factory_address,
+          sponsorship_policy,
+          provisioned_at_ms,
           created_at_ms,
           updated_at_ms
         FROM user_wallets
@@ -672,16 +716,60 @@ async function replaceUserWallets(client: PoolClient, user: UserRecord) {
           address,
           wallet_kind,
           label,
+          verification_method,
+          verification_chain_id,
+          verified_at_ms,
+          owner_address,
+          recovery_address,
+          chain_id,
+          provider_kind,
+          entry_point_address,
+          factory_address,
+          sponsorship_policy,
+          provisioned_at_ms,
           created_at_ms,
           updated_at_ms
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14,
+          $15,
+          $16,
+          $17
+        )
       `,
       [
         user.id,
         wallet.address,
         wallet.walletKind,
         wallet.label ?? null,
+        wallet.walletKind === 'eoa' ? wallet.verificationMethod : null,
+        wallet.walletKind === 'eoa'
+          ? (wallet.verificationChainId ?? null)
+          : null,
+        wallet.walletKind === 'eoa' ? String(wallet.verifiedAt) : null,
+        wallet.walletKind === 'smart_account' ? wallet.ownerAddress : null,
+        wallet.walletKind === 'smart_account' ? wallet.recoveryAddress : null,
+        wallet.walletKind === 'smart_account' ? wallet.chainId : null,
+        wallet.walletKind === 'smart_account' ? wallet.providerKind : null,
+        wallet.walletKind === 'smart_account' ? wallet.entryPointAddress : null,
+        wallet.walletKind === 'smart_account' ? wallet.factoryAddress : null,
+        wallet.walletKind === 'smart_account' ? wallet.sponsorshipPolicy : null,
+        wallet.walletKind === 'smart_account'
+          ? String(wallet.provisionedAt)
+          : null,
         String(wallet.createdAt),
         String(wallet.updatedAt),
       ],

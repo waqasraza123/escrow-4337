@@ -5,7 +5,7 @@
 - Current reality: prototype-stage monorepo. The contract is the strongest completed slice; the API and frontends are not production-ready.
 
 ## Current Architecture
-- `services/api`: NestJS API with auth, wallet, escrow, policy, persistence, and escrow-contract gateway modules. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence boundaries; wallet records are now product-owned, and escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway. Tests use a file-backed adapter plus a mock contract gateway; the production path targets Postgres and a configured relay-backed gateway.
+- `services/api`: NestJS API with auth, wallet, escrow, policy, persistence, escrow-contract gateway, and smart-account provisioning boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway. Tests use file-backed persistence plus mock contract and smart-account providers; the production path targets Postgres and configured relay-backed providers.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
 - `apps/web` and `apps/admin`: Next.js apps still on starter-template pages.
@@ -21,8 +21,7 @@
 - Do not claim checks are green unless they were run successfully.
 
 ## Current Roadmap
-- Finish production-facing backend integrations on top of the new persistence layer, including real email delivery and deployed Postgres migration flow.
-- Add smart-account provisioning on top of the new proof-backed wallet actor model.
+- Finish production-facing backend integrations on top of the new persistence layer and smart-account flow, including real email delivery, deployed Postgres migration flow, and live relay/provider validation.
 - Implement real web and admin product surfaces.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
@@ -36,7 +35,9 @@
 - API escrow lifecycle state now persists behind the same persistence boundary and records confirmed or failed contract execution attempts for job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
 - API wallet endpoints now let authenticated users link wallets, set a default execution wallet, and surface wallet state through auth profile responses.
 - API wallet linking now requires a persisted SIWE challenge and signature verification before a wallet can be attached to a user profile.
+- API wallet provisioning now derives deterministic smart-account execution identities from SIWE-verified EOAs, persists execution metadata, exposes explicit sponsorship decisions, and supports mock or relay-backed providers through environment-driven chain, bundler, paymaster, and recovery configuration.
 - API escrow mutations no longer accept explicit actor addresses; they derive the acting wallet from the authenticated user plus the persisted job role or arbitrator configuration.
+- API job creation now requires the authenticated user's default execution wallet to be a provisioned smart account rather than a bare EOA.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
 - API now has direct service and controller coverage for escrow lifecycle rules and endpoint validation.
@@ -57,13 +58,13 @@
 - `PolicyService` accepts both `shariahMode` and `shariah_mode` inputs so tests and future integrations can bridge existing naming drift safely.
 - The execution guide now treats tests as a required deliverable for each phase rather than a later hardening pass.
 - API persistence is now owned through repository tokens so tests can use a file-backed adapter while production wiring targets Postgres.
-- The escrow module now depends on a contract gateway boundary and proof-backed wallet actor resolution; in non-test environments it expects relay configuration, while smart-account provisioning is still pending.
+- The wallet module now uses a relay-backed smart-account provider model in non-test environments, defaults recovery to the verified owner EOA, and only enables sponsored execution for SIWE-verified owners.
+- The escrow module now depends on proof-backed wallet actor resolution plus a provisioned smart-account default for client job creation; in non-test environments it expects relay configuration for both escrow execution and smart-account provisioning.
 
 ## Deferred / Not Yet Implemented
 - Real email provider and production auth hardening.
-- Real ERC-4337 smart-account creation and paymaster/bundler integration.
-- Real ERC-4337 smart-account creation and provisioning.
-- Production relay or signer infrastructure for escrow execution.
+- Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
+- Live end-to-end validation of the configured escrow execution relay against real environments.
 - Real user-facing web and admin flows.
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
@@ -71,9 +72,10 @@
 - Frontend apps are starter templates and should not be treated as implemented product surfaces.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
 - Non-test escrow execution now expects `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, and `ESCROW_RELAY_BASE_URL`; missing config will fail the contract gateway path.
+- Non-test smart-account provisioning now expects wallet relay, bundler, entry-point, factory, and optionally paymaster configuration; missing config will fail the provisioning path.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
-- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, smart-account provisioning, real relay integration, or product UIs end to end.
+- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, live smart-account provisioning, live relay integration, or product UIs end to end.
 
 ## Standard Verification
 - `git status --short`

@@ -1,4 +1,9 @@
-import type { UserWalletRecord } from '../users/users.types';
+import type {
+  SmartAccountProviderKind,
+  SmartAccountSponsorshipPolicy,
+  SmartAccountUserWalletRecord,
+  UserWalletRecord,
+} from '../users/users.types';
 
 export type WalletLinkChallengeRecord = {
   id: string;
@@ -26,4 +31,15 @@ export type WalletLinkChallengeResponse = {
   message: string;
   issuedAt: number;
   expiresAt: number;
+};
+
+export type SmartAccountProvisionResponse = WalletStateResponse & {
+  smartAccount: SmartAccountUserWalletRecord;
+  sponsorship: {
+    eligible: boolean;
+    policy: SmartAccountSponsorshipPolicy;
+    providerKind: SmartAccountProviderKind;
+    chainId: number;
+    reason?: string;
+  };
 };
