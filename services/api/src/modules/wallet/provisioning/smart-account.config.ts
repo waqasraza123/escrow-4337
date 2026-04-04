@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import {
+  readPositiveInteger,
+  readRequiredUrl,
+} from '../../../common/config/readers';
 import { normalizeEvmAddress } from '../../../common/evm-address';
 import type {
   SmartAccountProvisioningMode,
   SmartAccountSponsorshipMode,
 } from './smart-account.types';
-
-function readPositiveInteger(value: string | undefined, fallback: number) {
-  const parsed = Number.parseInt(value ?? '', 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 function readRequiredAddress(
   value: string | undefined,
@@ -20,18 +19,6 @@ function readRequiredAddress(
     throw new Error(`${envName} must be set`);
   }
   return normalizeEvmAddress(candidate);
-}
-
-function readRequiredUrl(
-  value: string | undefined,
-  envName: string,
-  fallback: string | null,
-) {
-  const candidate = value?.trim() || fallback;
-  if (!candidate) {
-    throw new Error(`${envName} must be set`);
-  }
-  return candidate.replace(/\/+$/, '');
 }
 
 @Injectable()

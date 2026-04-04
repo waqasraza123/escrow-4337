@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { readRequiredUrl } from '../../../common/config/readers';
+import { normalizeEvmAddress } from '../../../common/evm-address';
 
 @Injectable()
 export class EscrowContractConfigService {
@@ -32,7 +34,7 @@ export class EscrowContractConfigService {
     if (!value) {
       throw new Error('ESCROW_CONTRACT_ADDRESS must be set');
     }
-    return value.toLowerCase();
+    return normalizeEvmAddress(value);
   }
 
   get arbitratorAddress() {
@@ -43,15 +45,15 @@ export class EscrowContractConfigService {
     if (!value) {
       throw new Error('ESCROW_ARBITRATOR_ADDRESS must be set');
     }
-    return value.toLowerCase();
+    return normalizeEvmAddress(value);
   }
 
   get relayBaseUrl() {
-    const value = process.env.ESCROW_RELAY_BASE_URL?.trim();
-    if (!value) {
-      throw new Error('ESCROW_RELAY_BASE_URL must be set');
-    }
-    return value.replace(/\/+$/, '');
+    return readRequiredUrl(
+      process.env.ESCROW_RELAY_BASE_URL,
+      'ESCROW_RELAY_BASE_URL',
+      process.env.NODE_ENV === 'test' ? 'https://escrow-relay.local' : null,
+    );
   }
 
   get relayApiKey() {

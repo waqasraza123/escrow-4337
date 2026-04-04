@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { readRequiredUrl } from '../common/config/readers';
 import type { PersistenceDriver } from './persistence.types';
 
 @Injectable()
@@ -24,13 +25,7 @@ export class PersistenceConfigService {
   }
 
   get databaseUrl(): string {
-    const databaseUrl = process.env.DATABASE_URL?.trim();
-    if (!databaseUrl) {
-      throw new Error(
-        'DATABASE_URL must be set when PERSISTENCE_DRIVER=postgres',
-      );
-    }
-    return databaseUrl;
+    return readRequiredUrl(process.env.DATABASE_URL, 'DATABASE_URL', null);
   }
 
   get databaseSsl(): boolean {

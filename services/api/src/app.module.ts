@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { EscrowModule } from './modules/escrow/escrow.module';
+import { OperationsModule } from './modules/operations/operations.module';
+import { RuntimeValidationService } from './modules/operations/runtime-validation.service';
 import { PolicyModule } from './modules/policy/policy.module';
 import { WalletModule } from './modules/wallet/wallet.module';
-import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { ConfigModule } from '@nestjs/config';
     WalletModule,
     EscrowModule,
     PolicyModule,
+    OperationsModule,
   ],
+  providers: [RuntimeValidationService],
 })
 export class AppModule {}

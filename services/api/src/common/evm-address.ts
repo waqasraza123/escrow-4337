@@ -1,7 +1,11 @@
 export const evmAddressPattern = /^0x[a-fA-F0-9]{40}$/;
 
 export function normalizeEvmAddress(address: string) {
-  return address.trim().toLowerCase();
+  const normalized = address.trim().toLowerCase();
+  if (!evmAddressPattern.test(normalized)) {
+    throw new Error('Invalid EVM address');
+  }
+  return normalized;
 }
 
 export function isEvmAddress(address: string) {

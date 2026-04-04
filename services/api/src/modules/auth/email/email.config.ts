@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import {
+  readPositiveInteger,
+  readRequiredUrl,
+} from '../../../common/config/readers';
 import type { EmailDeliveryMode } from './email.types';
-
-function readPositiveInteger(value: string | undefined, fallback: number) {
-  const parsed = Number.parseInt(value ?? '', 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 function readPositiveIntegerSeconds(
   value: string | undefined,
@@ -67,11 +66,11 @@ export class EmailConfigService {
   }
 
   get relayBaseUrl() {
-    return readRequiredValue(
+    return readRequiredUrl(
       process.env.AUTH_EMAIL_RELAY_BASE_URL,
       'AUTH_EMAIL_RELAY_BASE_URL',
       process.env.NODE_ENV === 'test' ? 'https://email-relay.local' : null,
-    ).replace(/\/+$/, '');
+    );
   }
 
   get relayApiKey() {

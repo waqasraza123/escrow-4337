@@ -1,0 +1,209 @@
+import { readdirSync } from 'fs';
+import { join } from 'path';
+import { AuthConfigService } from '../src/modules/auth/auth.config';
+import { EmailConfigService } from '../src/modules/auth/email/email.config';
+import { EscrowContractConfigService } from '../src/modules/escrow/onchain/escrow-contract.config';
+import { DeploymentValidationService } from '../src/modules/operations/deployment-validation.service';
+import { PersistenceConfigService } from '../src/persistence/persistence.config';
+import { SmartAccountConfigService } from '../src/modules/wallet/provisioning/smart-account.config';
+
+describe('DeploymentValidationService', () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'test_jwt_secret_for_integration_123';
+    process.env.DATABASE_URL =
+      'postgresql://escrow:escrow@localhost:5432/escrow';
+    process.env.AUTH_EMAIL_MODE = 'relay';
+    process.env.AUTH_EMAIL_FROM_EMAIL = 'no-reply@example.com';
+    process.env.AUTH_EMAIL_RELAY_BASE_URL = 'https://email.example.com';
+    process.env.WALLET_SMART_ACCOUNT_MODE = 'relay';
+    process.env.WALLET_SMART_ACCOUNT_CHAIN_ID = '84532';
+    process.env.WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS =
+      '0x00000061FEfce24A79343c27127435286BB7A4E1';
+    process.env.WALLET_SMART_ACCOUNT_FACTORY_ADDRESS =
+      '0x3333333333333333333333333333333333333333';
+    process.env.WALLET_SMART_ACCOUNT_BUNDLER_URL =
+      'https://bundler.example.com';
+    process.env.WALLET_SMART_ACCOUNT_PAYMASTER_URL =
+      'https://paymaster.example.com';
+    process.env.WALLET_SMART_ACCOUNT_RELAY_BASE_URL =
+      'https://relay.example.com';
+    process.env.ESCROW_CONTRACT_MODE = 'relay';
+    process.env.ESCROW_CHAIN_ID = '84532';
+    process.env.ESCROW_CONTRACT_ADDRESS =
+      '0x1111111111111111111111111111111111111111';
+    process.env.ESCROW_ARBITRATOR_ADDRESS =
+      '0x2222222222222222222222222222222222222222';
+    process.env.ESCROW_RELAY_BASE_URL = 'https://escrow.example.com';
+    process.env.NEST_API_TRUST_PROXY = 'loopback';
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    global.fetch = originalFetch;
+  });
+
+  it('reports a green deployment validation result when configuration and probes pass', async () => {
+    const fetchMock = jest.mocked(global.fetch);
+    fetchMock.mockImplementation((input) => {
+      const url = resolveFetchInput(input);
+      if (url === 'https://bundler.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      if (url === 'https://paymaster.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(true);
+    expect(report.checks.find((check) => check.id === 'database')).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'bundler')).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+  });
+
+  it('fails when migrations are pending and warns when the paymaster does not expose eth_chainId', async () => {
+    const fetchMock = jest.mocked(global.fetch);
+    fetchMock.mockImplementation((input) => {
+      const url = resolveFetchInput(input);
+      if (url === 'https://bundler.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      if (url === 'https://paymaster.example.com') {
+        return Promise.resolve(
+          jsonResponse({
+            error: {
+              code: -32601,
+              message: 'Method not found',
+            },
+          }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+
+    const service = createService(pendingMigrationQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(false);
+    expect(report.checks.find((check) => check.id === 'database')).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
+      expect.objectContaining({
+        status: 'warning',
+      }),
+    );
+  });
+
+  function createService(
+    query: (text: string) => Promise<{ rows: Record<string, unknown>[] }>,
+  ) {
+    return new DeploymentValidationService(
+      new AuthConfigService(),
+      new EmailConfigService(),
+      new EscrowContractConfigService(),
+      new PersistenceConfigService(),
+      { query } as never,
+      new SmartAccountConfigService(),
+    );
+  }
+
+  function allMigrationsAppliedQuery() {
+    return (text: string) => {
+      if (text.includes('current_database()')) {
+        return Promise.resolve({
+          rows: [{ currentDatabase: 'escrow' }],
+        });
+      }
+
+      if (text.includes("to_regclass('public.schema_migrations')")) {
+        return Promise.resolve({
+          rows: [{ relationName: 'schema_migrations' }],
+        });
+      }
+
+      if (text.includes('SELECT name FROM schema_migrations')) {
+        return Promise.resolve({
+          rows: migrationRows(),
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected query: ${text}`));
+    };
+  }
+
+  function pendingMigrationQuery() {
+    return (text: string) => {
+      if (text.includes('current_database()')) {
+        return Promise.resolve({
+          rows: [{ currentDatabase: 'escrow' }],
+        });
+      }
+
+      if (text.includes("to_regclass('public.schema_migrations')")) {
+        return Promise.resolve({
+          rows: [{ relationName: 'schema_migrations' }],
+        });
+      }
+
+      if (text.includes('SELECT name FROM schema_migrations')) {
+        return Promise.resolve({
+          rows: migrationRows().slice(0, -1),
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected query: ${text}`));
+    };
+  }
+
+  function migrationRows() {
+    return readdirSync(
+      join(process.cwd(), 'src', 'persistence', 'postgres', 'migrations'),
+    )
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .map((name) => ({ name }));
+  }
+
+  function jsonResponse(body: Record<string, unknown>) {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  function resolveFetchInput(input: RequestInfo | URL) {
+    if (typeof input === 'string') {
+      return input;
+    }
+
+    if (input instanceof URL) {
+      return input.toString();
+    }
+
+    return input.url;
+  }
+});

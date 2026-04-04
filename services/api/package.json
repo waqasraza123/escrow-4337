@@ -16,6 +16,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "db:migrate": "ts-node-esm src/persistence/postgres/migration-runner.ts",
+    "db:migrate:status": "ts-node-esm src/persistence/postgres/migration-runner.ts --status",
+    "deployment:validate": "ts-node-esm src/modules/operations/deployment-validation-runner.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental false",
     "test": "jest --runInBand",

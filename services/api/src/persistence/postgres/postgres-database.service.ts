@@ -4,31 +4,42 @@ import { PersistenceConfigService } from '../persistence.config';
 
 @Injectable()
 export class PostgresDatabaseService implements OnModuleDestroy {
-  private readonly pool: Pool | null;
+  private pool: Pool | null = null;
 
-  constructor(config: PersistenceConfigService) {
-    this.pool =
-      config.driver === 'postgres'
-        ? new Pool({
-            connectionString: config.databaseUrl,
-            ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
-          })
-        : null;
+  constructor(private readonly config: PersistenceConfigService) {}
+
+  private getPool() {
+    if (this.config.driver !== 'postgres') {
+      return null;
+    }
+
+    if (!this.pool) {
+      this.pool = new Pool({
+        connectionString: this.config.databaseUrl,
+        ssl: this.config.databaseSsl
+          ? { rejectUnauthorized: false }
+          : undefined,
+      });
+    }
+
+    return this.pool;
   }
 
   async query<T extends QueryResultRow>(text: string, values: unknown[] = []) {
-    if (!this.pool) {
+    const pool = this.getPool();
+    if (!pool) {
       throw new Error('Postgres driver is not enabled');
     }
-    return this.pool.query<T>(text, values);
+    return pool.query<T>(text, values);
   }
 
   async transaction<T>(handler: (client: PoolClient) => Promise<T>) {
-    if (!this.pool) {
+    const pool = this.getPool();
+    if (!pool) {
       throw new Error('Postgres driver is not enabled');
     }
 
-    const client = await this.pool.connect();
+    const client = await pool.connect();
 
     try {
       await client.query('BEGIN');

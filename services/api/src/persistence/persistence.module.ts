@@ -132,6 +132,7 @@ import {
   ],
   exports: [
     PersistenceConfigService,
+    PostgresDatabaseService,
     USERS_REPOSITORY,
     OTP_REPOSITORY,
     OTP_REQUEST_THROTTLES_REPOSITORY,

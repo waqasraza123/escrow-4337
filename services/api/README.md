@@ -27,6 +27,7 @@ The API is intended to own:
 - client job creation now requires a provisioned smart account as the default execution wallet
 - test mode uses a mock contract gateway, while non-test environments target a configured relay for contract execution
 - test mode uses a mock smart-account provider, while non-test environments target a configured relay plus environment-driven chain, bundler, paymaster, and recovery settings
+- non-test startup now fails fast on invalid deployment configuration and the API exposes a deployment validation CLI for runtime config, migration status, relay reachability, bundler or paymaster probing, and trust-proxy posture
 - API tests currently cover auth flow, policy behavior, OTP lifecycle behavior, session lifecycle behavior, and escrow lifecycle behavior
 
 ## Local Development
@@ -44,6 +45,8 @@ pnpm --filter escrow4334-api typecheck
 pnpm --filter escrow4334-api lint
 pnpm --filter escrow4334-api test -- --runInBand
 pnpm --filter escrow4334-api db:migrate
+pnpm --filter escrow4334-api db:migrate:status
+pnpm --filter escrow4334-api deployment:validate
 ```
 
 Contract-execution environment:
@@ -103,6 +106,17 @@ WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE=verified_owner
 WALLET_SMART_ACCOUNT_PAYMASTER_URL=https://...
 ```
 
+Optional deployment-validation overrides:
+
+```bash
+DEPLOYMENT_VALIDATION_TIMEOUT_MS=5000
+AUTH_EMAIL_RELAY_HEALTHCHECK_URL=https://...
+WALLET_SMART_ACCOUNT_RELAY_HEALTHCHECK_URL=https://...
+WALLET_SMART_ACCOUNT_BUNDLER_HEALTHCHECK_URL=https://...
+WALLET_SMART_ACCOUNT_PAYMASTER_HEALTHCHECK_URL=https://...
+ESCROW_RELAY_HEALTHCHECK_URL=https://...
+```
+
 ## Current Module Layout
 
 - `src/modules/auth`: auth, OTP, JWT, guards, sessions, and provider-backed email delivery
@@ -116,8 +130,8 @@ WALLET_SMART_ACCOUNT_PAYMASTER_URL=https://...
 
 Before this service can be treated as production-grade, it still needs:
 
-- live validation of the configured email relay, contract relay, and smart-account relay infrastructure
-- live validation of trusted-proxy and IP-throttle behavior in deployed environments
+- actual staging or production execution of the new deployment validation flow against the configured email relay, contract relay, and smart-account infrastructure
+- actual staging or production verification of trusted-proxy and IP-throttle behavior behind ingress
 - admin and audit workflows
 - stronger integration coverage around escrow and wallet behavior
 

@@ -1,9 +1,10 @@
-import { readFile, readdir } from 'fs/promises';
-import { join } from 'path';
 import { Client } from 'pg';
+import { loadApiEnvironment } from '../../common/env/load-env';
 import { PersistenceConfigService } from '../persistence.config';
+import { applyPendingMigrations, inspectMigrationStatus } from './migrations';
 
 async function main() {
+  loadApiEnvironment();
   const config = new PersistenceConfigService();
   if (config.driver !== 'postgres') {
     throw new Error(
@@ -16,53 +17,28 @@ async function main() {
     ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
   });
 
-  const migrationsDir = join(
-    process.cwd(),
-    'src',
-    'persistence',
-    'postgres',
-    'migrations',
-  );
-
   await client.connect();
 
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        name TEXT PRIMARY KEY,
-        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    const appliedResult = await client.query<{ name: string }>(
-      'SELECT name FROM schema_migrations',
-    );
-    const applied = new Set(
-      appliedResult.rows.map((row: { name: string }) => row.name),
-    );
-
-    const filenames = (await readdir(migrationsDir))
-      .filter((name) => name.endsWith('.sql'))
-      .sort();
-
-    for (const filename of filenames) {
-      if (applied.has(filename)) {
-        continue;
-      }
-
-      const sql = await readFile(join(migrationsDir, filename), 'utf8');
-      await client.query('BEGIN');
-      try {
-        await client.query(sql);
-        await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [
-          filename,
-        ]);
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      }
+    if (process.argv.includes('--status')) {
+      const status = await inspectMigrationStatus(client);
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(status, null, 2));
+      return;
     }
+
+    const applied = await applyPendingMigrations(client);
+    // eslint-disable-next-line no-console
+    console.log(
+      JSON.stringify(
+        {
+          applied,
+          appliedCount: applied.length,
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
     await client.end();
   }
