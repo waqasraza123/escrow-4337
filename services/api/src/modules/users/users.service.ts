@@ -1,50 +1,156 @@
-import { Injectable } from '@nestjs/common';
-
-export type UserRecord = {
-  id: string;
-  email: string;
-  shariahMode: boolean;
-  createdAt: number;
-  updatedAt: number;
-};
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { normalizeEvmAddress } from '../../common/evm-address';
+import { USERS_REPOSITORY } from '../../persistence/persistence.tokens';
+import type { UsersRepository } from '../../persistence/persistence.types';
+import type { LinkUserWalletInput, UserRecord } from './users.types';
 
 @Injectable()
 export class UsersService {
-  private readonly byEmail = new Map<string, UserRecord>();
-  private readonly byId = new Map<string, UserRecord>();
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
 
   private key(email: string) {
     return email.trim().toLowerCase();
   }
 
-  getOrCreateByEmail(email: string) {
-    const k = this.key(email);
-    const found = this.byEmail.get(k);
-    if (found) return found;
+  async getOrCreateByEmail(email: string) {
+    const normalizedEmail = this.key(email);
+    const found = await this.usersRepository.getByEmail(normalizedEmail);
+    if (found) {
+      return found;
+    }
+
     const now = Date.now();
-    const u: UserRecord = {
+    const user: UserRecord = {
       id: crypto.randomUUID(),
-      email: k,
+      email: normalizedEmail,
       shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
       createdAt: now,
       updatedAt: now,
     };
-    this.byEmail.set(k, u);
-    this.byId.set(u.id, u);
-    return u;
+
+    return this.usersRepository.create(user);
   }
 
-  getById(id: string) {
-    return this.byId.get(id) || null;
+  async getById(id: string) {
+    return this.usersRepository.getById(id);
   }
 
-  setShariahMode(id: string, value: boolean) {
-    const u = this.byId.get(id);
-    if (!u) return null;
-    u.shariahMode = value;
-    u.updatedAt = Date.now();
-    this.byId.set(id, u);
-    this.byEmail.set(u.email, u);
-    return u;
+  async getRequiredById(id: string) {
+    const user = await this.usersRepository.getById(id);
+    if (!user) {
+      throw new UnauthorizedException('Not found');
+    }
+    return user;
+  }
+
+  async linkWallet(userId: string, input: LinkUserWalletInput) {
+    const normalizedAddress = normalizeEvmAddress(input.address);
+    const user = await this.getRequiredById(userId);
+    const existingOwner =
+      await this.usersRepository.getByWalletAddress(normalizedAddress);
+
+    if (existingOwner && existingOwner.id !== userId) {
+      throw new ConflictException('Wallet address is already linked');
+    }
+
+    const now = Date.now();
+    const nextWallets = this.upsertWallet(user, {
+      address: normalizedAddress,
+      walletKind: input.walletKind,
+      label: input.label?.trim() || undefined,
+    });
+    const defaultExecutionWalletAddress =
+      user.defaultExecutionWalletAddress ?? normalizedAddress;
+
+    return this.usersRepository.update({
+      ...user,
+      wallets: nextWallets,
+      defaultExecutionWalletAddress,
+      updatedAt: now,
+    });
+  }
+
+  async setDefaultExecutionWallet(userId: string, address: string) {
+    const normalizedAddress = normalizeEvmAddress(address);
+    const user = await this.getRequiredById(userId);
+
+    if (!this.hasWallet(user, normalizedAddress)) {
+      throw new ConflictException('Wallet address is not linked');
+    }
+
+    return this.usersRepository.update({
+      ...user,
+      defaultExecutionWalletAddress: normalizedAddress,
+      updatedAt: Date.now(),
+    });
+  }
+
+  async setShariahMode(id: string, value: boolean) {
+    const user = await this.usersRepository.getById(id);
+    if (!user) {
+      return null;
+    }
+    return this.usersRepository.update({
+      ...user,
+      shariahMode: value,
+      updatedAt: Date.now(),
+    });
+  }
+
+  userHasWalletAddress(user: UserRecord, address: string) {
+    return this.hasWallet(user, normalizeEvmAddress(address));
+  }
+
+  private hasWallet(user: UserRecord, address: string) {
+    return user.wallets.some((wallet) => wallet.address === address);
+  }
+
+  private upsertWallet(
+    user: UserRecord,
+    input: LinkUserWalletInput,
+  ): UserRecord['wallets'] {
+    const now = Date.now();
+    const existingWallet = user.wallets.find(
+      (wallet) => wallet.address === input.address,
+    );
+
+    if (existingWallet) {
+      if (existingWallet.walletKind !== input.walletKind) {
+        throw new ConflictException(
+          'Wallet address is already linked with a different wallet kind',
+        );
+      }
+
+      return user.wallets.map((wallet) =>
+        wallet.address === input.address
+          ? {
+              ...wallet,
+              label: input.label,
+              updatedAt: now,
+            }
+          : wallet,
+      );
+    }
+
+    return [
+      ...user.wallets,
+      {
+        address: input.address,
+        walletKind: input.walletKind,
+        label: input.label,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
   }
 }

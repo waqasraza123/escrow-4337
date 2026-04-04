@@ -1,0 +1,4 @@
+export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');
+export const OTP_REPOSITORY = Symbol('OTP_REPOSITORY');
+export const SESSIONS_REPOSITORY = Symbol('SESSIONS_REPOSITORY');
+export const ESCROW_REPOSITORY = Symbol('ESCROW_REPOSITORY');

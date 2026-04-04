@@ -1,10 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { OtpStore } from './otp.store';
-import { EmailService } from './email.service';
 import { UsersService } from '../users/users.service';
+import { toUserProfile } from '../users/users.types';
+import { RefreshDto, StartDto, VerifyDto } from './auth.dto';
+import { EmailService } from './email.service';
 import { JwtService } from './jwt';
+import { OtpStore } from './otp.store';
 import { SessionsService } from './sessions.service';
-import { StartDto, VerifyDto, RefreshDto } from './auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -16,20 +17,20 @@ export class AuthService {
     private readonly sessions: SessionsService,
   ) {}
 
-  start(dto: StartDto, ip?: string) {
+  async start(dto: StartDto, ip?: string) {
     const email = dto.email.trim().toLowerCase();
-    this.otp.request(email, ip);
+    await this.otp.request(email, ip);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    this.otp.set(email, code);
+    await this.otp.set(email, code);
     this.emailer.sendOtp(email, code);
     return { ok: true as const };
   }
 
   async verify(dto: VerifyDto) {
     const email = dto.email.trim().toLowerCase();
-    this.otp.verify(email, dto.code);
-    const user = this.users.getOrCreateByEmail(email);
-    const session = this.sessions.create(user.id, user.email);
+    await this.otp.verify(email, dto.code);
+    const user = await this.users.getOrCreateByEmail(email);
+    const session = await this.sessions.create(user.id, user.email);
     const accessToken = await this.jwt.signAccess(
       user.id,
       user.email,
@@ -40,10 +41,11 @@ export class AuthService {
       user.email,
       session.sid,
     );
+
     return {
       accessToken,
       refreshToken,
-      user: { id: user.id, email: user.email, shariahMode: user.shariahMode },
+      user: toUserProfile(user),
     };
   }
 
@@ -51,32 +53,38 @@ export class AuthService {
     const { userId, email, sid } = await this.jwt.verifyRefresh(
       dto.refreshToken,
     );
-    this.sessions.validate(sid);
+    await this.sessions.validate(sid);
     const accessToken = await this.jwt.signAccess(userId, email, sid);
     const newRefresh = await this.jwt.signRefresh(userId, email, sid);
     return { accessToken, refreshToken: newRefresh };
   }
 
   async logout(refreshToken?: string) {
-    if (!refreshToken) return { ok: true as const };
+    if (!refreshToken) {
+      return { ok: true as const };
+    }
     try {
       const { sid } = await this.jwt.verifyRefresh(refreshToken);
-      this.sessions.revoke(sid);
+      await this.sessions.revoke(sid);
     } catch {
       return { ok: true as const };
     }
     return { ok: true as const };
   }
 
-  me(userId: string) {
-    const u = this.users.getById(userId);
-    if (!u) throw new UnauthorizedException('Not found');
-    return { id: u.id, email: u.email, shariahMode: u.shariahMode };
+  async me(userId: string) {
+    const user = await this.users.getById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Not found');
+    }
+    return toUserProfile(user);
   }
 
-  setShariah(userId: string, value: boolean) {
-    const u = this.users.setShariahMode(userId, value);
-    if (!u) throw new UnauthorizedException('Not found');
-    return { id: u.id, email: u.email, shariahMode: u.shariahMode };
+  async setShariah(userId: string, value: boolean) {
+    const user = await this.users.setShariahMode(userId, value);
+    if (!user) {
+      throw new UnauthorizedException('Not found');
+    }
+    return toUserProfile(user);
   }
 }

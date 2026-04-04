@@ -5,7 +5,7 @@
 - Current reality: prototype-stage monorepo. The contract is the strongest completed slice; the API and frontends are not production-ready.
 
 ## Current Architecture
-- `services/api`: NestJS API with auth, wallet, escrow, and policy modules. Auth and escrow behavior exist as validated in-memory prototypes; users, OTPs, sessions, and escrow state are not yet persistent.
+- `services/api`: NestJS API with auth, wallet, escrow, policy, persistence, and escrow-contract gateway modules. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence boundaries; wallet records are now product-owned, and escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway. Tests use a file-backed adapter plus a mock contract gateway; the production path targets Postgres and a configured relay-backed gateway.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
 - `apps/web` and `apps/admin`: Next.js apps still on starter-template pages.
@@ -21,8 +21,8 @@
 - Do not claim checks are green unless they were run successfully.
 
 ## Current Roadmap
-- Replace in-memory auth state with persistent storage and real integrations.
-- Turn wallet and escrow API endpoints from validated in-memory orchestration into real contract-backed flows.
+- Finish production-facing backend integrations on top of the new persistence layer, including real email delivery and deployed Postgres migration flow.
+- Add wallet ownership proof and smart-account provisioning on top of the new wallet-backed escrow actor model.
 - Implement real web and admin product surfaces.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
@@ -32,7 +32,10 @@
 - `WorkstreamEscrow` contract supports job creation, funding, milestone delivery/release, disputes, resolution, and remainder refunds.
 - Contract tests cover happy-path release/dispute and refund behavior.
 - API auth prototype supports OTP start/verify, refresh, logout, `me`, and Shariah preference toggling.
-- API escrow prototype now supports validated in-memory job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
+- API auth, user, session, OTP, and wallet state now persist behind repository interfaces, with a Postgres driver and SQL migration runner plus a file-backed test adapter.
+- API escrow lifecycle state now persists behind the same persistence boundary and records confirmed or failed contract execution attempts for job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval.
+- API wallet endpoints now let authenticated users link wallets, set a default execution wallet, and surface wallet state through auth profile responses.
+- API escrow mutations no longer accept explicit actor addresses; they derive the acting wallet from the authenticated user plus the persisted job role or arbitrator configuration.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
 - API now has direct service and controller coverage for escrow lifecycle rules and endpoint validation.
@@ -52,21 +55,25 @@
 - API Jest tests map `jose` to a local test mock so the current test environment can exercise auth flows without blocking on ESM package loading.
 - `PolicyService` accepts both `shariahMode` and `shariah_mode` inputs so tests and future integrations can bridge existing naming drift safely.
 - The execution guide now treats tests as a required deliverable for each phase rather than a later hardening pass.
+- API persistence is now owned through repository tokens so tests can use a file-backed adapter while production wiring targets Postgres.
+- The escrow module now depends on a contract gateway boundary and wallet-backed actor resolution; in non-test environments it expects relay configuration, while wallet linking is currently application-trusted until signature proof exists.
 
 ## Deferred / Not Yet Implemented
-- Real database, migrations, and persistence layer.
 - Real email provider and production auth hardening.
 - Real ERC-4337 smart-account creation and paymaster/bundler integration.
-- Contract-backed escrow orchestration and persistence in the API.
+- Wallet ownership proof for linked addresses.
+- Real ERC-4337 smart-account creation and provisioning.
+- Production relay or signer infrastructure for escrow execution.
 - Real user-facing web and admin flows.
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
 ## Risks / Watchouts
 - Frontend apps are starter templates and should not be treated as implemented product surfaces.
-- The worktree is already dirty around auth, policy, compliance, and TS config changes; read before editing nearby files.
+- The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
+- Non-test escrow execution now expects `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, and `ESCROW_RELAY_BASE_URL`; missing config will fail the contract gateway path.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
-- Root test coverage is still backend-heavy and does not yet validate contract-backed escrow integration, wallet flows, or product UIs end to end.
+- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, signature-backed wallet ownership, real relay integration, or product UIs end to end.
 
 ## Standard Verification
 - `git status --short`

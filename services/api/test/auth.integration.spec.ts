@@ -5,6 +5,7 @@ import * as authDto from '../src/modules/auth/auth.dto';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { EmailService } from '../src/modules/auth/email.service';
+import { configureFilePersistence } from './support/test-persistence';
 
 type SentOtp = {
   email: string;
@@ -13,6 +14,8 @@ type SentOtp = {
 
 describe('Auth integration', () => {
   let authService: AuthService;
+  let moduleFixture: TestingModule;
+  let cleanupPersistence: (() => void) | undefined;
   const sentOtps: SentOtp[] = [];
 
   const emailService = {
@@ -22,10 +25,12 @@ describe('Auth integration', () => {
     },
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_integration';
+    const persistence = configureFilePersistence();
+    cleanupPersistence = persistence.cleanup;
 
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    moduleFixture = await Test.createTestingModule({
       imports: [AuthModule],
     })
       .overrideProvider(EmailService)
@@ -33,10 +38,13 @@ describe('Auth integration', () => {
       .compile();
 
     authService = moduleFixture.get(AuthService);
+    sentOtps.length = 0;
   });
 
-  beforeEach(() => {
-    sentOtps.length = 0;
+  afterEach(async () => {
+    await moduleFixture.close();
+    cleanupPersistence?.();
+    cleanupPersistence = undefined;
   });
 
   it('rejects invalid auth start payloads', () => {
@@ -50,7 +58,7 @@ describe('Auth integration', () => {
   it('supports the full auth session flow', async () => {
     const email = 'User@example.com';
 
-    const startResult = authService.start({ email }, '127.0.0.1');
+    const startResult = await authService.start({ email }, '127.0.0.1');
     expect(startResult).toEqual({ ok: true });
 
     expect(sentOtps).toHaveLength(1);
@@ -66,24 +74,33 @@ describe('Auth integration', () => {
       expect.objectContaining({
         email: email.toLowerCase(),
         shariahMode: false,
+        defaultExecutionWalletAddress: null,
+        wallets: [],
       }),
     );
     expect(verifyResult.accessToken).toEqual(expect.any(String));
     expect(verifyResult.refreshToken).toEqual(expect.any(String));
 
-    const meResult = authService.me(verifyResult.user.id);
+    const meResult = await authService.me(verifyResult.user.id);
     expect(meResult).toEqual(
       expect.objectContaining({
         email: email.toLowerCase(),
         shariahMode: false,
+        defaultExecutionWalletAddress: null,
+        wallets: [],
       }),
     );
 
-    const shariahResult = authService.setShariah(verifyResult.user.id, true);
+    const shariahResult = await authService.setShariah(
+      verifyResult.user.id,
+      true,
+    );
     expect(shariahResult).toEqual(
       expect.objectContaining({
         email: email.toLowerCase(),
         shariahMode: true,
+        defaultExecutionWalletAddress: null,
+        wallets: [],
       }),
     );
 
@@ -98,5 +115,36 @@ describe('Auth integration', () => {
     await expect(
       authService.refresh({ refreshToken: verifyResult.refreshToken }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('retains users and sessions after the auth module is recreated', async () => {
+    const email = 'persisted@example.com';
+
+    await authService.start({ email });
+    const verification = await authService.verify({
+      email,
+      code: sentOtps[0]?.code ?? '',
+    });
+
+    const persistedRefreshToken = verification.refreshToken;
+    const userId = verification.user.id;
+
+    await moduleFixture.close();
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [AuthModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue(emailService)
+      .compile();
+    authService = moduleFixture.get(AuthService);
+
+    const meResult = await authService.me(userId);
+    expect(meResult.email).toBe(email);
+
+    const refreshResult = await authService.refresh({
+      refreshToken: persistedRefreshToken,
+    });
+    expect(refreshResult.accessToken).toEqual(expect.any(String));
   });
 });

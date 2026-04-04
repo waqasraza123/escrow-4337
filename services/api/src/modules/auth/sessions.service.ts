@@ -1,38 +1,38 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-
-type Session = {
-  sid: string;
-  userId: string;
-  email: string;
-  exp: number;
-  revoked: boolean;
-};
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { SESSIONS_REPOSITORY } from '../../persistence/persistence.tokens';
+import type { SessionsRepository } from '../../persistence/persistence.types';
+import type { SessionRecord } from './auth.types';
 
 @Injectable()
 export class SessionsService {
-  private readonly store = new Map<string, Session>();
   private readonly ttlMs = 14 * 24 * 60 * 60 * 1000;
 
-  create(userId: string, email: string) {
-    const sid = crypto.randomUUID();
-    const exp = Date.now() + this.ttlMs;
-    const s: Session = { sid, userId, email, exp, revoked: false };
-    this.store.set(sid, s);
-    return s;
+  constructor(
+    @Inject(SESSIONS_REPOSITORY)
+    private readonly sessionsRepository: SessionsRepository,
+  ) {}
+
+  async create(userId: string, email: string) {
+    const session: SessionRecord = {
+      sid: crypto.randomUUID(),
+      userId,
+      email,
+      exp: Date.now() + this.ttlMs,
+      revoked: false,
+    };
+
+    return this.sessionsRepository.create(session);
   }
 
-  validate(sid: string) {
-    const s = this.store.get(sid);
-    if (!s || s.revoked || s.exp < Date.now())
+  async validate(sid: string) {
+    const session = await this.sessionsRepository.getBySid(sid);
+    if (!session || session.revoked || session.exp < Date.now()) {
       throw new UnauthorizedException('Invalid session');
-    return s;
+    }
+    return session;
   }
 
-  revoke(sid: string) {
-    const s = this.store.get(sid);
-    if (s) {
-      s.revoked = true;
-      this.store.set(sid, s);
-    }
+  async revoke(sid: string) {
+    await this.sessionsRepository.revoke(sid);
   }
 }

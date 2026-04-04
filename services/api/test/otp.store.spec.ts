@@ -3,11 +3,16 @@ import {
   UnauthorizedException,
   type HttpException,
 } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { PersistenceModule } from '../src/persistence/persistence.module';
 import { OtpStore } from '../src/modules/auth/otp.store';
+import { configureFilePersistence } from './support/test-persistence';
 
-function captureHttpException(action: () => void): HttpException {
+async function captureHttpException(
+  action: () => Promise<void>,
+): Promise<HttpException> {
   try {
-    action();
+    await action();
   } catch (error) {
     return error as HttpException;
   }
@@ -17,60 +22,75 @@ function captureHttpException(action: () => void): HttpException {
 
 describe('OtpStore', () => {
   let otpStore: OtpStore;
+  let moduleRef: TestingModule;
+  let cleanupPersistence: (() => void) | undefined;
   let currentTime: number;
 
-  beforeEach(() => {
-    otpStore = new OtpStore();
+  beforeEach(async () => {
+    const persistence = configureFilePersistence();
+    cleanupPersistence = persistence.cleanup;
     currentTime = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [OtpStore],
+    }).compile();
+    otpStore = moduleRef.get(OtpStore);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await moduleRef.close();
+    cleanupPersistence?.();
+    cleanupPersistence = undefined;
     jest.restoreAllMocks();
   });
 
-  it('verifies a valid code once and invalidates it after use', () => {
-    otpStore.request('User@example.com');
-    otpStore.set('User@example.com', '123456');
+  it('verifies a valid code once and invalidates it after use', async () => {
+    await otpStore.request('User@example.com');
+    await otpStore.set('User@example.com', '123456');
 
-    expect(() => otpStore.verify('user@example.com', '123456')).not.toThrow();
-    expect(() => otpStore.verify('user@example.com', '123456')).toThrow(
-      UnauthorizedException,
-    );
+    await expect(
+      otpStore.verify('user@example.com', '123456'),
+    ).resolves.toBeUndefined();
+    await expect(
+      otpStore.verify('user@example.com', '123456'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('rejects expired codes', () => {
-    otpStore.request('user@example.com');
-    otpStore.set('user@example.com', '654321');
+  it('rejects expired codes', async () => {
+    await otpStore.request('user@example.com');
+    await otpStore.set('user@example.com', '654321');
 
     currentTime += 10 * 60 * 1000 + 1;
 
-    expect(() => otpStore.verify('user@example.com', '654321')).toThrow(
-      UnauthorizedException,
-    );
+    await expect(
+      otpStore.verify('user@example.com', '654321'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('locks verification after repeated invalid attempts', () => {
-    otpStore.request('user@example.com');
-    otpStore.set('user@example.com', '111111');
+  it('locks verification after repeated invalid attempts', async () => {
+    await otpStore.request('user@example.com');
+    await otpStore.set('user@example.com', '111111');
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect(() => otpStore.verify('user@example.com', '000000')).toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        otpStore.verify('user@example.com', '000000'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
     }
 
-    expect(() => otpStore.verify('user@example.com', '111111')).toThrow(
+    await expect(otpStore.verify('user@example.com', '111111')).rejects.toThrow(
       'Locked',
     );
   });
 
-  it('rate limits repeated OTP requests inside the active window', () => {
+  it('rate limits repeated OTP requests inside the active window', async () => {
     for (let requestCount = 0; requestCount < 5; requestCount += 1) {
-      expect(() => otpStore.request('user@example.com')).not.toThrow();
+      await expect(
+        otpStore.request('user@example.com'),
+      ).resolves.toBeUndefined();
     }
 
-    const exception = captureHttpException(() =>
+    const exception = await captureHttpException(() =>
       otpStore.request('user@example.com'),
     );
 
@@ -78,27 +98,27 @@ describe('OtpStore', () => {
     expect(exception.message).toBe('Too many requests');
   });
 
-  it('rate limit window resets after enough time passes', () => {
+  it('rate limit window resets after enough time passes', async () => {
     for (let requestCount = 0; requestCount < 5; requestCount += 1) {
-      otpStore.request('user@example.com');
+      await otpStore.request('user@example.com');
     }
 
     currentTime += 60 * 60 * 1000 + 1;
 
-    expect(() => otpStore.request('user@example.com')).not.toThrow();
+    await expect(otpStore.request('user@example.com')).resolves.toBeUndefined();
   });
 
-  it('rejects new requests while the OTP entry is still locked', () => {
-    otpStore.request('user@example.com');
-    otpStore.set('user@example.com', '222222');
+  it('rejects new requests while the OTP entry is still locked', async () => {
+    await otpStore.request('user@example.com');
+    await otpStore.set('user@example.com', '222222');
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect(() => otpStore.verify('user@example.com', '999999')).toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        otpStore.verify('user@example.com', '999999'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
     }
 
-    const exception = captureHttpException(() =>
+    const exception = await captureHttpException(() =>
       otpStore.request('user@example.com'),
     );
 

@@ -14,6 +14,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwt: JwtService,
     private readonly sessions: SessionsService,
   ) {}
+
   async canActivate(ctx: ExecutionContext) {
     const request = ctx.switchToHttp().getRequest<unknown>();
 
@@ -27,10 +28,12 @@ export class AuthGuard implements CanActivate {
       : (authorizationHeader ?? '');
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
-    if (!token) throw new UnauthorizedException('Missing token');
+    if (!token) {
+      throw new UnauthorizedException('Missing token');
+    }
 
     const { userId, email, sid } = await this.jwt.verifyAccess(token);
-    this.sessions.validate(sid);
+    await this.sessions.validate(sid);
     request.user = { id: userId, email, sid };
 
     return true;

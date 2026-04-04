@@ -1,47 +1,65 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { SessionsService } from '../src/modules/auth/sessions.service';
+import { PersistenceModule } from '../src/persistence/persistence.module';
+import { configureFilePersistence } from './support/test-persistence';
 
 describe('SessionsService', () => {
   let sessionsService: SessionsService;
+  let moduleRef: TestingModule;
+  let cleanupPersistence: (() => void) | undefined;
   let currentTime: number;
 
-  beforeEach(() => {
-    sessionsService = new SessionsService();
+  beforeEach(async () => {
+    const persistence = configureFilePersistence();
+    cleanupPersistence = persistence.cleanup;
     currentTime = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    moduleRef = await Test.createTestingModule({
+      imports: [PersistenceModule],
+      providers: [SessionsService],
+    }).compile();
+    sessionsService = moduleRef.get(SessionsService);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await moduleRef.close();
+    cleanupPersistence?.();
+    cleanupPersistence = undefined;
     jest.restoreAllMocks();
   });
 
-  it('creates and validates an active session', () => {
-    const session = sessionsService.create('user-1', 'user@example.com');
+  it('creates and validates an active session', async () => {
+    const session = await sessionsService.create('user-1', 'user@example.com');
 
-    expect(sessionsService.validate(session.sid)).toEqual(session);
+    await expect(sessionsService.validate(session.sid)).resolves.toEqual(
+      session,
+    );
   });
 
-  it('rejects revoked sessions', () => {
-    const session = sessionsService.create('user-1', 'user@example.com');
+  it('rejects revoked sessions', async () => {
+    const session = await sessionsService.create('user-1', 'user@example.com');
 
-    sessionsService.revoke(session.sid);
+    await sessionsService.revoke(session.sid);
 
-    expect(() => sessionsService.validate(session.sid)).toThrow(
+    await expect(sessionsService.validate(session.sid)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rejects expired sessions', () => {
-    const session = sessionsService.create('user-1', 'user@example.com');
+  it('rejects expired sessions', async () => {
+    const session = await sessionsService.create('user-1', 'user@example.com');
 
     currentTime += 14 * 24 * 60 * 60 * 1000 + 1;
 
-    expect(() => sessionsService.validate(session.sid)).toThrow(
+    await expect(sessionsService.validate(session.sid)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('ignores revocation of unknown session ids', () => {
-    expect(() => sessionsService.revoke('missing-session')).not.toThrow();
+  it('ignores revocation of unknown session ids', async () => {
+    await expect(
+      sessionsService.revoke('missing-session'),
+    ).resolves.toBeUndefined();
   });
 });

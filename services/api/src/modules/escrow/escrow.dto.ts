@@ -1,9 +1,20 @@
 import { z } from 'zod';
+import {
+  evmAddressPattern,
+  normalizeEvmAddress,
+} from '../../common/evm-address';
 
 const amountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+const addressSchema = z
+  .string()
+  .trim()
+  .regex(evmAddressPattern)
+  .transform(normalizeEvmAddress);
 
 export const createJobSchema = z
   .object({
+    workerAddress: addressSchema,
+    currencyAddress: addressSchema,
     title: z.string().trim().min(1).max(120),
     description: z.string().trim().min(1).max(5000),
     category: z.string().trim().min(1).max(64),
@@ -26,7 +37,11 @@ export const milestoneSchema = z
   })
   .strict();
 
-export const setMilestonesSchema = z.array(milestoneSchema).min(1).max(20);
+export const setMilestonesSchema = z
+  .object({
+    milestones: z.array(milestoneSchema).min(1).max(20),
+  })
+  .strict();
 
 export const deliverMilestoneSchema = z
   .object({
@@ -34,6 +49,8 @@ export const deliverMilestoneSchema = z
     evidenceUrls: z.array(z.string().url().max(2048)).max(10).default([]),
   })
   .strict();
+
+export const releaseMilestoneSchema = z.object({}).strict();
 
 export const disputeMilestoneSchema = z
   .object({
@@ -53,5 +70,6 @@ export type FundJobDto = z.infer<typeof fundJobSchema>;
 export type MilestoneDto = z.infer<typeof milestoneSchema>;
 export type SetMilestonesDto = z.infer<typeof setMilestonesSchema>;
 export type DeliverMilestoneDto = z.infer<typeof deliverMilestoneSchema>;
+export type ReleaseMilestoneDto = z.infer<typeof releaseMilestoneSchema>;
 export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
 export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;

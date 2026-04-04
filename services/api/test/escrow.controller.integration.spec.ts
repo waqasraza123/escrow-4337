@@ -1,19 +1,58 @@
 import { BadRequestException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { ReqUser } from '../src/common/decorators/user.decorator';
 import { ZodValidationPipe } from '../src/common/zod.pipe';
-import * as escrowDto from '../src/modules/escrow/escrow.dto';
 import { EscrowController } from '../src/modules/escrow/escrow.controller';
+import * as escrowDto from '../src/modules/escrow/escrow.dto';
 import { EscrowModule } from '../src/modules/escrow/escrow.module';
+import { UsersService } from '../src/modules/users/users.service';
+import { configureFilePersistence } from './support/test-persistence';
+
+const clientAddress = '0x1111111111111111111111111111111111111111';
+const workerAddress = '0x3333333333333333333333333333333333333333';
+const currencyAddress = '0x4444444444444444444444444444444444444444';
+const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 
 describe('EscrowController integration', () => {
   let controller: EscrowController;
+  let usersService: UsersService;
+  let moduleRef: TestingModule;
+  let cleanupPersistence: (() => void) | undefined;
+  let clientUser: ReqUser;
+  let workerUser: ReqUser;
+  let arbitratorUser: ReqUser;
 
   beforeEach(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
+    const persistence = configureFilePersistence();
+    cleanupPersistence = persistence.cleanup;
+
+    moduleRef = await Test.createTestingModule({
       imports: [EscrowModule],
     }).compile();
 
     controller = moduleRef.get(EscrowController);
+    usersService = moduleRef.get(UsersService);
+    clientUser = await createLinkedUser(
+      usersService,
+      'client@example.com',
+      clientAddress,
+    );
+    workerUser = await createLinkedUser(
+      usersService,
+      'worker@example.com',
+      workerAddress,
+    );
+    arbitratorUser = await createLinkedUser(
+      usersService,
+      'arbitrator@example.com',
+      arbitratorAddress,
+    );
+  });
+
+  afterEach(async () => {
+    await moduleRef.close();
+    cleanupPersistence?.();
+    cleanupPersistence = undefined;
   });
 
   it('rejects invalid create-job payloads', () => {
@@ -28,8 +67,10 @@ describe('EscrowController integration', () => {
     ).toThrow(BadRequestException);
   });
 
-  it('supports the escrow lifecycle through dispute resolution and audit retrieval', () => {
-    const createResponse = controller.create({
+  it('supports the escrow lifecycle through dispute resolution and audit retrieval', async () => {
+    const createResponse = await controller.create(clientUser, {
+      workerAddress,
+      currencyAddress,
       title: 'Escrow orchestration',
       description: 'Implement lifecycle validation in the API layer.',
       category: 'software-development',
@@ -41,95 +82,107 @@ describe('EscrowController integration', () => {
 
     expect(createResponse.jobHash).toMatch(/^0x[a-f0-9]{64}$/);
     expect(createResponse.status).toBe('draft');
+    expect(createResponse.escrowId).toBe('1');
+    expect(createResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
     const jobId = createResponse.jobId;
 
-    expect(
-      controller.fund(jobId, {
-        amount: '150',
-      }),
-    ).toEqual({
-      jobId,
-      fundedAmount: '150',
-      status: 'funded',
+    const fundedResponse = await controller.fund(clientUser, jobId, {
+      amount: '150',
     });
+    expect(fundedResponse.jobId).toBe(jobId);
+    expect(fundedResponse.fundedAmount).toBe('150');
+    expect(fundedResponse.status).toBe('funded');
+    expect(fundedResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(
-      controller.setMilestones(jobId, [
-        {
-          title: 'Implementation',
-          deliverable: 'First implementation drop',
-          amount: '75',
-        },
-        {
-          title: 'Revision',
-          deliverable: 'Final revised delivery',
-          amount: '75',
-        },
-      ]),
-    ).toEqual({
+    const milestonesResponse = await controller.setMilestones(
+      clientUser,
       jobId,
-      milestoneCount: 2,
-      status: 'funded',
-    });
+      {
+        milestones: [
+          {
+            title: 'Implementation',
+            deliverable: 'First implementation drop',
+            amount: '75',
+          },
+          {
+            title: 'Revision',
+            deliverable: 'Final revised delivery',
+            amount: '75',
+          },
+        ],
+      },
+    );
+    expect(milestonesResponse.jobId).toBe(jobId);
+    expect(milestonesResponse.milestoneCount).toBe(2);
+    expect(milestonesResponse.status).toBe('funded');
+    expect(milestonesResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(
-      controller.deliver(jobId, 0, {
+    const firstDeliveryResponse = await controller.deliver(
+      workerUser,
+      jobId,
+      0,
+      {
         note: 'First delivery submitted',
         evidenceUrls: ['https://example.com/implementation'],
-      }),
-    ).toEqual({
-      jobId,
-      milestoneIndex: 0,
-      milestoneStatus: 'delivered',
-      jobStatus: 'in_progress',
-    });
+      },
+    );
+    expect(firstDeliveryResponse.jobId).toBe(jobId);
+    expect(firstDeliveryResponse.milestoneIndex).toBe(0);
+    expect(firstDeliveryResponse.milestoneStatus).toBe('delivered');
+    expect(firstDeliveryResponse.jobStatus).toBe('in_progress');
+    expect(firstDeliveryResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(
-      controller.dispute(jobId, 0, {
-        reason: 'The delivery is incomplete',
-      }),
-    ).toEqual({
-      jobId,
-      milestoneIndex: 0,
-      milestoneStatus: 'disputed',
-      jobStatus: 'disputed',
+    const disputeResponse = await controller.dispute(clientUser, jobId, 0, {
+      reason: 'The delivery is incomplete',
     });
+    expect(disputeResponse.jobId).toBe(jobId);
+    expect(disputeResponse.milestoneIndex).toBe(0);
+    expect(disputeResponse.milestoneStatus).toBe('disputed');
+    expect(disputeResponse.jobStatus).toBe('disputed');
+    expect(disputeResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(
-      controller.resolve(jobId, 0, {
+    const resolutionResponse = await controller.resolve(
+      arbitratorUser,
+      jobId,
+      0,
+      {
         action: 'refund',
         note: 'Refunding after dispute review',
-      }),
-    ).toEqual({
-      jobId,
-      milestoneIndex: 0,
-      milestoneStatus: 'refunded',
-      jobStatus: 'in_progress',
-    });
+      },
+    );
+    expect(resolutionResponse.jobId).toBe(jobId);
+    expect(resolutionResponse.milestoneIndex).toBe(0);
+    expect(resolutionResponse.milestoneStatus).toBe('refunded');
+    expect(resolutionResponse.jobStatus).toBe('in_progress');
+    expect(resolutionResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(
-      controller.deliver(jobId, 1, {
+    const secondDeliveryResponse = await controller.deliver(
+      workerUser,
+      jobId,
+      1,
+      {
         note: 'Second delivery submitted',
         evidenceUrls: [],
-      }),
-    ).toEqual({
-      jobId,
-      milestoneIndex: 1,
-      milestoneStatus: 'delivered',
-      jobStatus: 'in_progress',
-    });
+      },
+    );
+    expect(secondDeliveryResponse.jobId).toBe(jobId);
+    expect(secondDeliveryResponse.milestoneIndex).toBe(1);
+    expect(secondDeliveryResponse.milestoneStatus).toBe('delivered');
+    expect(secondDeliveryResponse.jobStatus).toBe('in_progress');
+    expect(secondDeliveryResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    expect(controller.release(jobId, 1)).toEqual({
-      jobId,
-      milestoneIndex: 1,
-      milestoneStatus: 'released',
-      jobStatus: 'resolved',
-    });
+    const releaseResponse = await controller.release(clientUser, jobId, 1, {});
+    expect(releaseResponse.jobId).toBe(jobId);
+    expect(releaseResponse.milestoneIndex).toBe(1);
+    expect(releaseResponse.milestoneStatus).toBe('released');
+    expect(releaseResponse.jobStatus).toBe('resolved');
+    expect(releaseResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    const auditResponse = controller.audit(jobId);
+    const auditResponse = await controller.audit(jobId);
 
     expect(auditResponse.bundle.job.status).toBe('resolved');
+    expect(auditResponse.bundle.job.onchain.escrowId).toBe('1');
     expect(auditResponse.bundle.job.milestones).toHaveLength(2);
     expect(auditResponse.bundle.audit.map((event) => event.type)).toEqual([
       'job.created',
@@ -141,5 +194,77 @@ describe('EscrowController integration', () => {
       'milestone.delivered',
       'milestone.released',
     ]);
+    expect(auditResponse.bundle.executions).toHaveLength(8);
+    expect(
+      auditResponse.bundle.executions.map((execution) => execution.action),
+    ).toEqual([
+      'create_job',
+      'fund_job',
+      'set_milestones',
+      'deliver_milestone',
+      'open_dispute',
+      'resolve_dispute',
+      'deliver_milestone',
+      'release_milestone',
+    ]);
+  });
+
+  it('retains persisted jobs after the escrow module is recreated', async () => {
+    const created = await controller.create(clientUser, {
+      workerAddress,
+      currencyAddress,
+      title: 'Persist escrow state',
+      description: 'Ensure jobs survive restarts.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    await controller.fund(clientUser, created.jobId, {
+      amount: '10',
+    });
+
+    await moduleRef.close();
+
+    moduleRef = await Test.createTestingModule({
+      imports: [EscrowModule],
+    }).compile();
+    controller = moduleRef.get(EscrowController);
+    usersService = moduleRef.get(UsersService);
+    clientUser = await createLinkedUser(
+      usersService,
+      'client@example.com',
+      clientAddress,
+    );
+
+    const auditResponse = await controller.audit(created.jobId);
+    expect(auditResponse.bundle.job.fundedAmount).toBe('10');
+    expect(auditResponse.bundle.job.onchain.escrowId).toBe('1');
+    expect(auditResponse.bundle.audit.map((event) => event.type)).toEqual([
+      'job.created',
+      'job.funded',
+    ]);
+    expect(
+      auditResponse.bundle.executions.map((execution) => execution.action),
+    ).toEqual(['create_job', 'fund_job']);
   });
 });
+
+async function createLinkedUser(
+  usersService: UsersService,
+  email: string,
+  address: string,
+): Promise<ReqUser> {
+  const user = await usersService.getOrCreateByEmail(email);
+  await usersService.linkWallet(user.id, {
+    address,
+    walletKind: 'eoa',
+  });
+
+  return {
+    id: user.id,
+    email: user.email,
+    sid: `${user.id}-session`,
+  };
+}

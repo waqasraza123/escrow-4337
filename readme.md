@@ -48,16 +48,16 @@ Current implemented slices:
 
 - `WorkstreamEscrow` Solidity contract with milestone release, dispute, resolution, and remainder refund behavior
 - contract tests for the main happy-path and refund scenarios
-- NestJS auth prototype with OTP/JWT/session flow and Shariah preference toggle
-- validated in-memory escrow API prototype covering job creation, funding, milestone setup, delivery, release, dispute, resolution, and audit retrieval
+- NestJS auth API with OTP/JWT/session flow, Shariah preference toggle, and repository-backed persistence boundaries
+- escrow API orchestration that now submits lifecycle actions through a contract gateway, waits for confirmed receipts, and persists execution history for job creation, funding, milestones, delivery, release, dispute, resolution, and audit retrieval
+- Postgres persistence driver and SQL migrations for users, OTP/session state, and escrow records, plus a file-backed adapter used in tests
 - compliance package with a concrete prohibited-category policy list
 
 Current missing or incomplete slices:
 
-- persistent database layer and migrations
 - real email delivery
 - real wallet and ERC-4337 orchestration
-- contract-backed escrow orchestration and persistence in the API
+- production relay or signer infrastructure and wallet-backed actor identity for escrow execution
 - real product UI in `apps/web` and `apps/admin`
 - indexer, subgraph, shared UI package, and deployment infrastructure described in the original repo vision
 
@@ -174,8 +174,8 @@ Important repo truths:
 
 The next serious milestones are:
 
-1. replace in-memory API state with persistence
-2. complete wallet and escrow orchestration in the API
+1. deploy and operationalize the new persistence layer in real environments
+2. replace explicit actor-address payloads with the real wallet and ERC-4337 flow, and operationalize escrow execution infrastructure
 3. build real web and admin surfaces
 4. add indexing, audit exports, and operations visibility
 5. harden CI, deployment, observability, and security posture
