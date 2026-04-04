@@ -12,7 +12,7 @@ The repository currently has four active system areas:
 ## Current Boundaries
 
 - Contracts own onchain escrow state transitions.
-- The API owns authentication, escrow orchestration, policy checks, persistence, and the contract-gateway boundary.
+- The API owns authentication, email delivery, escrow orchestration, policy checks, persistence, and the provider boundaries for contract and wallet execution.
 - The compliance package owns reusable policy definitions rather than API-local rule duplication.
 - Frontends should consume product APIs and signing flows, not embed business logic that belongs in the backend or contracts.
 
@@ -45,6 +45,7 @@ The repository currently has four active system areas:
 ## Current Gaps
 
 - API auth and escrow state now persist through repository adapters, but the production path still needs a deployed Postgres environment and live provider validation.
+- The auth module now uses a provider-backed OTP email boundary with rollback-safe issuance, but still needs live relay validation and further auth hardening.
 - The escrow module now uses a contract gateway with receipt handling and authenticated proof-backed wallet actor resolution, and client job creation now requires a provisioned smart-account execution wallet.
 - The wallet module now owns linked wallet state, SIWE-based ownership proof, smart-account provisioning, sponsorship policy, and default execution-wallet selection through mock and relay-backed provider boundaries.
 - Frontend apps do not yet represent real product flows.

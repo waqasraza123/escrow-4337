@@ -103,6 +103,23 @@ export class OtpStore {
     await this.otpRepository.set(entry);
   }
 
+  async clear(email: string) {
+    const key = this.key(email);
+    const entry = await this.otpRepository.getByEmail(key);
+    if (!entry) {
+      return;
+    }
+
+    await this.otpRepository.set({
+      ...entry,
+      hash: '',
+      salt: '',
+      exp: 0,
+      attempts: 0,
+      lockedUntil: undefined,
+    });
+  }
+
   async verify(email: string, code: string) {
     const key = this.key(email);
     const now = this.now();

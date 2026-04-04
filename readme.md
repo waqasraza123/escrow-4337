@@ -49,6 +49,7 @@ Current implemented slices:
 - `WorkstreamEscrow` Solidity contract with milestone release, dispute, resolution, and remainder refund behavior
 - contract tests for the main happy-path and refund scenarios
 - NestJS auth API with OTP/JWT/session flow, Shariah preference toggle, and repository-backed persistence boundaries
+- provider-backed OTP email delivery with relay-mode production wiring and rollback-safe invalidation when delivery fails
 - wallet API flow with SIWE-backed ownership proof, deterministic smart-account provisioning, explicit sponsorship policy, and default execution-wallet management
 - escrow API orchestration that now submits lifecycle actions through a contract gateway, waits for confirmed receipts, and persists execution history for job creation, funding, milestones, delivery, release, dispute, resolution, and audit retrieval
 - Postgres persistence driver and SQL migrations for users, OTP/session state, and escrow records, plus a file-backed adapter used in tests
@@ -56,7 +57,7 @@ Current implemented slices:
 
 Current missing or incomplete slices:
 
-- real email delivery
+- live validation of the configured email relay infrastructure
 - live validation of the configured smart-account relay, bundler, and paymaster infrastructure
 - live validation of the configured escrow execution relay infrastructure
 - real product UI in `apps/web` and `apps/admin`

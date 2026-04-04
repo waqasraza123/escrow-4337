@@ -21,7 +21,10 @@ describe('Auth integration', () => {
   const emailService = {
     sendOtp(email: string, code: string) {
       sentOtps.push({ email, code });
-      return true;
+      return Promise.resolve({
+        providerKind: 'mock' as const,
+        acceptedAt: Date.now(),
+      });
     },
   };
 
@@ -146,5 +149,37 @@ describe('Auth integration', () => {
       refreshToken: persistedRefreshToken,
     });
     expect(refreshResult.accessToken).toEqual(expect.any(String));
+  });
+
+  it('clears the issued OTP when email delivery fails', async () => {
+    const failingDeliveryOtps: SentOtp[] = [];
+    await moduleFixture.close();
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [AuthModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue({
+        sendOtp(email: string, code: string) {
+          failingDeliveryOtps.push({ email, code });
+          return Promise.reject(new Error('Email delivery failed'));
+        },
+      })
+      .compile();
+
+    authService = moduleFixture.get(AuthService);
+    const email = 'delivery-failure@example.com';
+
+    await expect(authService.start({ email })).rejects.toThrow(
+      'Email delivery failed',
+    );
+
+    expect(failingDeliveryOtps).toHaveLength(1);
+    await expect(
+      authService.verify({
+        email,
+        code: failingDeliveryOtps[0]?.code ?? '',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

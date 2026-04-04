@@ -22,8 +22,13 @@ export class AuthService {
     await this.otp.request(email, ip);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await this.otp.set(email, code);
-    this.emailer.sendOtp(email, code);
-    return { ok: true as const };
+    try {
+      await this.emailer.sendOtp(email, code);
+      return { ok: true as const };
+    } catch (error) {
+      await this.otp.clear(email);
+      throw error;
+    }
   }
 
   async verify(dto: VerifyDto) {
