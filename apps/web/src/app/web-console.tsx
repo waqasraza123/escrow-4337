@@ -275,6 +275,9 @@ export function EscrowConsole() {
   );
 
   const selectedMilestone = selectedJob?.job.milestones[Number(selectedMilestoneIndex)];
+  const selectedJobRoles = selectedJob?.participantRoles ?? [];
+  const isClientForSelectedJob = selectedJobRoles.includes('client');
+  const isWorkerForSelectedJob = selectedJobRoles.includes('worker');
 
   const [createJobState, setCreateJobState] = useState<JobComposerState>(
     createInitialJobComposerState,
@@ -1685,152 +1688,211 @@ export function EscrowConsole() {
                   <strong>{formatTime(selectedJob.job.updatedAt)}</strong>
                 </article>
               </div>
-              <div className={styles.actionPanel}>
-                <h3>Mutation controls</h3>
-                <label className={styles.field}>
-                  <span>Fund amount</span>
-                  <input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} />
-                </label>
-                <button type="button" onClick={handleFundJob}>
-                  Fund selected job
-                </button>
-
-                <div className={styles.stack}>
-                  <h4>Milestones</h4>
-                  {milestones.map((milestone, index) => (
-                    <div key={`draft-${index}`} className={styles.milestoneEditor}>
-                      <input
-                        value={milestone.title}
-                        onChange={(event) =>
-                          setMilestones((current) =>
-                            current.map((entry, entryIndex) =>
-                              entryIndex === index
-                                ? { ...entry, title: event.target.value }
-                                : entry,
-                            ),
-                          )
-                        }
-                        placeholder="Title"
-                      />
-                      <input
-                        value={milestone.amount}
-                        onChange={(event) =>
-                          setMilestones((current) =>
-                            current.map((entry, entryIndex) =>
-                              entryIndex === index
-                                ? { ...entry, amount: event.target.value }
-                                : entry,
-                            ),
-                          )
-                        }
-                        placeholder="Amount"
-                      />
-                      <textarea
-                        value={milestone.deliverable}
-                        onChange={(event) =>
-                          setMilestones((current) =>
-                            current.map((entry, entryIndex) =>
-                              entryIndex === index
-                                ? { ...entry, deliverable: event.target.value }
-                                : entry,
-                            ),
-                          )
-                        }
-                        placeholder="Deliverable"
-                        rows={2}
-                      />
+              <div className={styles.roleBar}>
+                {selectedJobRoles.length > 0 ? (
+                  selectedJobRoles.map((role) => (
+                    <span key={role} className={styles.roleBadge}>
+                      {role}
+                    </span>
+                  ))
+                ) : (
+                  <span className={styles.roleBadgeMuted}>observer</span>
+                )}
+              </div>
+              <div className={styles.workspaceStack}>
+                {isClientForSelectedJob ? (
+                  <div className={styles.actionPanel}>
+                    <div className={styles.workspaceHead}>
+                      <div>
+                        <h3>Client workspace</h3>
+                        <p className={styles.muted}>
+                          Fund the escrow, commit milestone drafts, and release accepted work.
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                  <div className={styles.inlineActions}>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() =>
-                        setMilestones((current) => [
-                          ...current,
-                          {
-                            title: '',
-                            deliverable: '',
-                            amount: '',
-                            dueAt: '',
-                          },
-                        ])
-                      }
-                    >
-                      Add milestone
-                    </button>
-                    <button type="button" onClick={handleSetMilestones}>
-                      Commit milestones
+                    <label className={styles.field}>
+                      <span>Fund amount</span>
+                      <input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} />
+                    </label>
+                    <div className={styles.inlineActions}>
+                      <button type="button" onClick={handleFundJob}>
+                        Fund selected job
+                      </button>
+                      <button type="button" className={styles.secondaryButton} onClick={handleUseMilestoneBudget}>
+                        Use drafted milestone total
+                      </button>
+                    </div>
+
+                    <div className={styles.stack}>
+                      <h4>Milestone drafting</h4>
+                      {milestones.map((milestone, index) => (
+                        <div key={`draft-${index}`} className={styles.milestoneEditor}>
+                          <input
+                            value={milestone.title}
+                            onChange={(event) =>
+                              setMilestones((current) =>
+                                current.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, title: event.target.value }
+                                    : entry,
+                                ),
+                              )
+                            }
+                            placeholder="Title"
+                          />
+                          <input
+                            value={milestone.amount}
+                            onChange={(event) =>
+                              setMilestones((current) =>
+                                current.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, amount: event.target.value }
+                                    : entry,
+                                ),
+                              )
+                            }
+                            placeholder="Amount"
+                          />
+                          <textarea
+                            value={milestone.deliverable}
+                            onChange={(event) =>
+                              setMilestones((current) =>
+                                current.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, deliverable: event.target.value }
+                                    : entry,
+                                ),
+                              )
+                            }
+                            placeholder="Deliverable"
+                            rows={2}
+                          />
+                        </div>
+                      ))}
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() =>
+                            setMilestones((current) => [
+                              ...current,
+                              {
+                                title: '',
+                                deliverable: '',
+                                amount: '',
+                                dueAt: '',
+                              },
+                            ])
+                          }
+                        >
+                          Add milestone
+                        </button>
+                        <button type="button" onClick={handleSetMilestones}>
+                          Commit milestones
+                        </button>
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={handleReleaseMilestone}>
+                      Release active milestone
                     </button>
                   </div>
+                ) : null}
+
+                {isWorkerForSelectedJob ? (
+                  <div className={styles.actionPanel}>
+                    <div className={styles.workspaceHead}>
+                      <div>
+                        <h3>Worker workspace</h3>
+                        <p className={styles.muted}>
+                          Deliver milestone evidence and escalate when delivery is contested.
+                        </p>
+                      </div>
+                    </div>
+                    <label className={styles.field}>
+                      <span>Delivery note</span>
+                      <textarea value={deliveryNote} onChange={(event) => setDeliveryNote(event.target.value)} rows={3} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>Evidence URLs</span>
+                      <textarea
+                        value={deliveryEvidence}
+                        onChange={(event) => setDeliveryEvidence(event.target.value)}
+                        rows={2}
+                        placeholder="https://... https://..."
+                      />
+                    </label>
+                    <button type="button" onClick={handleDeliverMilestone}>
+                      Deliver active milestone
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className={styles.actionPanel}>
+                  <div className={styles.workspaceHead}>
+                    <div>
+                      <h3>Shared dispute posture</h3>
+                      <p className={styles.muted}>
+                        Both participants need a clear view of the active milestone and any escalation path.
+                      </p>
+                    </div>
+                  </div>
+                  <label className={styles.field}>
+                    <span>Active milestone index</span>
+                    <input
+                      value={selectedMilestoneIndex}
+                      onChange={(event) => setSelectedMilestoneIndex(event.target.value)}
+                    />
+                  </label>
+                  <p className={styles.muted}>
+                    Current milestone: {selectedMilestone?.title || 'No milestone at this index'}
+                  </p>
+                  <label className={styles.field}>
+                    <span>Dispute reason</span>
+                    <textarea
+                      value={disputeReason}
+                      onChange={(event) => setDisputeReason(event.target.value)}
+                      rows={3}
+                    />
+                  </label>
+                  <button type="button" onClick={handleDisputeMilestone}>
+                    Open dispute
+                  </button>
                 </div>
 
-                <label className={styles.field}>
-                  <span>Active milestone index</span>
-                  <input
-                    value={selectedMilestoneIndex}
-                    onChange={(event) => setSelectedMilestoneIndex(event.target.value)}
-                  />
-                </label>
-                <p className={styles.muted}>
-                  Current milestone: {selectedMilestone?.title || 'No milestone at this index'}
-                </p>
-                <label className={styles.field}>
-                  <span>Delivery note</span>
-                  <textarea value={deliveryNote} onChange={(event) => setDeliveryNote(event.target.value)} rows={3} />
-                </label>
-                <label className={styles.field}>
-                  <span>Evidence URLs</span>
-                  <textarea
-                    value={deliveryEvidence}
-                    onChange={(event) => setDeliveryEvidence(event.target.value)}
-                    rows={2}
-                    placeholder="https://... https://..."
-                  />
-                </label>
-                <button type="button" onClick={handleDeliverMilestone}>
-                  Deliver milestone
-                </button>
-
-                <button type="button" onClick={handleReleaseMilestone}>
-                  Release milestone
-                </button>
-
-                <label className={styles.field}>
-                  <span>Dispute reason</span>
-                  <textarea
-                    value={disputeReason}
-                    onChange={(event) => setDisputeReason(event.target.value)}
-                    rows={3}
-                  />
-                </label>
-                <button type="button" onClick={handleDisputeMilestone}>
-                  Open dispute
-                </button>
-
-                <label className={styles.field}>
-                  <span>Resolution action</span>
-                  <select
-                    value={resolutionAction}
-                    onChange={(event) =>
-                      setResolutionAction(event.target.value as 'release' | 'refund')
-                    }
-                  >
-                    <option value="release">Release</option>
-                    <option value="refund">Refund</option>
-                  </select>
-                </label>
-                <label className={styles.field}>
-                  <span>Resolution note</span>
-                  <textarea
-                    value={resolutionNote}
-                    onChange={(event) => setResolutionNote(event.target.value)}
-                    rows={3}
-                  />
-                </label>
-                <button type="button" onClick={handleResolveMilestone}>
-                  Resolve dispute
-                </button>
+                <div className={styles.actionPanel}>
+                  <div className={styles.workspaceHead}>
+                    <div>
+                      <h3>Operator posture</h3>
+                      <p className={styles.muted}>
+                        Privileged operator workflows are still incomplete. Resolution remains available here only for sessions that already control the configured arbitrator wallet.
+                      </p>
+                    </div>
+                  </div>
+                  <label className={styles.field}>
+                    <span>Resolution action</span>
+                    <select
+                      value={resolutionAction}
+                      onChange={(event) =>
+                        setResolutionAction(event.target.value as 'release' | 'refund')
+                      }
+                    >
+                      <option value="release">Release</option>
+                      <option value="refund">Refund</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>Resolution note</span>
+                    <textarea
+                      value={resolutionNote}
+                      onChange={(event) => setResolutionNote(event.target.value)}
+                      rows={3}
+                    />
+                  </label>
+                  <button type="button" onClick={handleResolveMilestone}>
+                    Resolve dispute
+                  </button>
+                </div>
               </div>
             </div>
 

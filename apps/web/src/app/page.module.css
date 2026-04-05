@@ -230,6 +230,46 @@
   min-width: 64px;
 }
 
+.roleBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.roleBadge,
+.roleBadgeMuted {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.roleBadge {
+  background: rgba(255, 229, 201, 0.9);
+  color: #7a4318;
+}
+
+.roleBadgeMuted {
+  background: rgba(116, 94, 74, 0.12);
+  color: var(--muted);
+}
+
+.workspaceStack {
+  display: grid;
+  gap: 14px;
+}
+
+.workspaceHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
 .walletTitleRow,
 .timelineHead {
   display: flex;
