@@ -307,6 +307,77 @@ describe('EscrowService', () => {
     );
   });
 
+  it('lists jobs for the current participant with derived roles', async () => {
+    const firstJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Client-visible job',
+      description: 'The client should see this job in their console.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    await escrowService.fundJob(clientUserId, firstJob.jobId, {
+      amount: '35',
+    });
+
+    const otherClient = await usersService.getOrCreateByEmail(
+      'other-client@example.com',
+    );
+    const otherClientAddress = '0x6666666666666666666666666666666666666666';
+    const otherExecutionAddress = '0x7777777777777777777777777777777777777777';
+    const linkedAt = Date.now();
+    await usersService.linkWallet(otherClient.id, {
+      address: otherClientAddress,
+      walletKind: 'eoa',
+      verificationMethod: 'siwe',
+      verificationChainId: 84532,
+      verifiedAt: linkedAt,
+    });
+    await usersService.linkWallet(otherClient.id, {
+      address: otherExecutionAddress,
+      walletKind: 'smart_account',
+      ownerAddress: otherClientAddress,
+      recoveryAddress: otherClientAddress,
+      chainId: 84532,
+      providerKind: 'mock',
+      entryPointAddress: '0x00000061fefce24a79343c27127435286bb7a4e1',
+      factoryAddress: '0x3333333333333333333333333333333333333333',
+      sponsorshipPolicy: 'sponsored',
+      provisionedAt: linkedAt,
+      label: 'Other execution wallet',
+    });
+    await usersService.setDefaultExecutionWallet(
+      otherClient.id,
+      otherExecutionAddress,
+    );
+
+    await escrowService.createJob(otherClient.id, {
+      workerAddress,
+      currencyAddress,
+      title: 'Worker-visible job',
+      description: 'The worker should see this job too.',
+      category: 'design',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    const clientJobs = await escrowService.listJobsForUser(clientUserId);
+    expect(clientJobs.jobs).toHaveLength(1);
+    expect(clientJobs.jobs[0]?.participantRoles).toEqual(['client']);
+    expect(clientJobs.jobs[0]?.job.id).toBe(firstJob.jobId);
+    expect(clientJobs.jobs[0]?.job.fundedAmount).toBe('35');
+
+    const workerJobs = await escrowService.listJobsForUser(workerUserId);
+    expect(workerJobs.jobs).toHaveLength(2);
+    expect(
+      workerJobs.jobs.map((job) => job.participantRoles.join(',')),
+    ).toEqual(['worker', 'worker']);
+  });
+
   it('rejects milestone totals that do not match the funded amount', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
       workerAddress,

@@ -8,7 +8,8 @@
 - `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, smart-account provisioning, and deployment-validation boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway; API startup now fails fast on invalid non-test deployment config and exposes built deployment-validation and migration-status commands that operate from compiled JS, ship SQL migration assets in `dist`, and return structured validation reports instead of crashing when config is incomplete. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
-- `apps/web` and `apps/admin`: Next.js apps still on starter-template pages.
+- `apps/web`: Next.js client console with OTP auth, manual SIWE wallet-link challenge handling, smart-account provisioning, authenticated job listing, lifecycle mutation forms, and audit visibility wired to the API.
+- `apps/admin`: Next.js operator console with job-audit lookup, milestone posture review, and execution receipt inspection wired to the public audit endpoint.
 - `packages/sdk`: source files exist, but it is not a real workspace package.
 - `packages/abi`: directory exists but is empty.
 - README describes indexer, subgraph, shared UI, and infra layers, but those directories do not currently exist in the repo tree.
@@ -22,7 +23,7 @@
 
 ## Current Roadmap
 - Execute the new API deployment validation flow against real staging or production-like infrastructure, including deployed Postgres migration checks, live relay or provider reachability, bundler or paymaster chain validation, and deployed ingress or proxy validation.
-- Implement real web and admin product surfaces after the backend deployment validation command has been exercised against a real environment.
+- Harden and validate the new web and admin product-console surfaces against a real backend environment, then iterate toward browser-wallet-native onboarding and privileged operator workflows.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
 - Keep each implementation phase explicitly test-heavy, with targeted unit or integration coverage added alongside the code change.
@@ -44,10 +45,12 @@
 - API job creation now requires the authenticated user's default execution wallet to be a provisioned smart account rather than a bare EOA.
 - API now has deployment-validation tooling that fails fast on invalid non-test runtime config, reports Postgres connectivity plus migration status, probes configured relays, checks bundler chain identity, warns on non-introspectable paymasters, and surfaces trusted-proxy posture through a dedicated CLI command.
 - API deployment-validation and migration CLIs now execute built `dist` entrypoints instead of `ts-node`, copy SQL migrations into build output, and keep deployment validation in a structured-report mode when config gaps block downstream probes.
+- API escrow now exposes an authenticated jobs list so product surfaces can render participant-specific job views with derived client or worker roles.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
 - API now has direct service and controller coverage for escrow lifecycle rules and endpoint validation.
 - Compliance package contains a concrete Shariah prohibited-category list used by the API policy service.
+- Web and admin apps now have real product-console surfaces instead of starter templates, with environment-driven API targets and explicit loading, empty, and error states.
 - Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 - Root `pnpm test` now executes a real API test path instead of failing on an empty Jest contract.
 
@@ -77,11 +80,11 @@
 - Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
 - Live end-to-end validation of the configured escrow execution relay against real environments.
-- Real user-facing web and admin flows.
+- Browser-wallet-native wallet onboarding and privileged admin action workflows are not yet implemented; current web and admin surfaces are read/write console prototypes on top of the existing API.
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
 ## Risks / Watchouts
-- Frontend apps are starter templates and should not be treated as implemented product surfaces.
+- Frontend apps now expose real console workflows, but they still depend on the prototype API surface and manual environment configuration rather than hardened production deployment.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
 - Non-test auth startup now expects a strong `JWT_SECRET`; missing or weak values will fail auth runtime initialization.
 - IP-aware OTP throttling depends on `NEST_API_TRUST_PROXY` being set correctly when the API runs behind a reverse proxy or ingress.

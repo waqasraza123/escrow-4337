@@ -283,6 +283,21 @@ export class FileEscrowRepository implements EscrowRepository {
     });
   }
 
+  async listByParticipantAddresses(addresses: string[]) {
+    const normalizedAddresses = new Set(addresses);
+
+    return this.store.read((data) =>
+      Object.values(data.escrowJobs)
+        .filter(
+          (job) =>
+            normalizedAddresses.has(job.onchain.clientAddress) ||
+            normalizedAddresses.has(job.onchain.workerAddress),
+        )
+        .map((job) => cloneValue(job))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
   async save(job: EscrowJobRecord) {
     await this.store.write((data) => {
       data.escrowJobs[job.id] = cloneValue(job);

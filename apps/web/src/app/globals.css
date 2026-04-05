@@ -1,25 +1,24 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f6efe7;
+  --foreground: #25160d;
+  --panel: #fff8f1;
+  --line: rgba(74, 49, 27, 0.12);
+  --muted: #785b45;
 }
 
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(255, 198, 137, 0.28), transparent 38%),
+    radial-gradient(circle at 88% 12%, rgba(123, 169, 164, 0.16), transparent 22%),
+    linear-gradient(180deg, #f7f2eb 0%, #f1e8dd 100%);
+  font-family: var(--font-display), "Avenir Next", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -35,8 +34,31 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+button {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #17110d, #4a3120);
+  color: #fff7ee;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+code,
+pre,
+textarea,
+input,
+select {
+  font-family: var(--font-mono), "SFMono-Regular", monospace;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
 }

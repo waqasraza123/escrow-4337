@@ -15,6 +15,7 @@ import { EscrowService } from './escrow.service';
 import type {
   CreateJobResponse,
   EscrowAuditBundle,
+  EscrowJobsListResponse,
   FundJobResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
@@ -23,6 +24,12 @@ import type {
 @Controller('jobs')
 export class EscrowController {
   constructor(private readonly escrowService: EscrowService) {}
+
+  @UseGuards(AuthGuard)
+  @Get()
+  list(@User() user: ReqUser): Promise<EscrowJobsListResponse> {
+    return this.escrowService.listJobsForUser(user.id);
+  }
 
   @UseGuards(AuthGuard)
   @Post()

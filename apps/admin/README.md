@@ -11,14 +11,15 @@ This app is intended to become the internal or privileged interface for:
 - audit and export workflows
 - operational monitoring for escrow activity
 
-The app is still scaffold-stage. The current UI is a placeholder, not an implemented operator tool.
+The app now has a real operator console for public audit bundle lookup, milestone posture review, and execution receipt inspection. It remains prototype-grade and does not yet enforce privileged operator auth.
 
 ## Current State
 
 - built with Next.js App Router
 - root lint and typecheck are wired and meaningful
-- current pages are starter-level placeholders
-- no real dispute, admin, or reporting workflows exist yet
+- current page is a real audit and execution inspector wired to the public job audit endpoint
+- API access is configured through `NEXT_PUBLIC_API_BASE_URL`
+- dispute workflows are inspected here, not executed from this app
 
 ## Local Development
 
@@ -27,6 +28,8 @@ From the repo root:
 ```bash
 pnpm --filter admin dev
 ```
+
+Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/admin/.env.example) to `apps/admin/.env` and point `NEXT_PUBLIC_API_BASE_URL` at the running API.
 
 Run the app-specific quality checks:
 
@@ -39,12 +42,9 @@ pnpm --filter admin lint
 
 This app should eventually own:
 
-- case review and resolution flows
-- operator-only action surfaces
-- compliance and policy review visibility
-- audit exports and operational tooling
-
-Do not build admin UX against placeholder backend behavior and assume the workflow is settled. Use the repo execution sequence and current architecture docs.
+- operator-authenticated actions instead of public read-only audit lookup
+- compliance review, export, and case ownership workflows
+- filtering, saved searches, and operational dashboards
 
 ## Related Docs
 

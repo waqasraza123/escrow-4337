@@ -12,14 +12,15 @@ This app is intended to become the client and contractor experience for:
 - delivery and dispute actions
 - future smart-account onboarding
 
-The app is still scaffold-stage. The current UI is not product-complete and should not be treated as representative of the intended experience.
+The app now has a real console surface for OTP auth, manual SIWE wallet linking, smart-account provisioning, job creation, milestone actions, and audit review. It is still prototype-grade and depends on the current API behavior and environment configuration.
 
 ## Current State
 
 - built with Next.js App Router
 - root lint and typecheck are wired and meaningful
-- current pages are starter-level placeholders
-- no real API client, wallet flow, or escrow journey is implemented yet
+- current page is a real client console wired to the API auth, wallet, jobs, and audit endpoints
+- wallet linking is a manual SIWE challenge plus pasted-signature flow rather than browser-wallet-native UX
+- API access is configured through `NEXT_PUBLIC_API_BASE_URL`
 
 ## Local Development
 
@@ -28,6 +29,8 @@ From the repo root:
 ```bash
 pnpm --filter web dev
 ```
+
+Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/web/.env.example) to `apps/web/.env` and point `NEXT_PUBLIC_API_BASE_URL` at the running API.
 
 Run the app-specific quality checks:
 
@@ -40,12 +43,9 @@ pnpm --filter web lint
 
 This app should eventually own:
 
-- account onboarding UX
-- job and milestone lifecycle screens
-- funding, delivery, release, and dispute interactions
-- loading, empty, error, and retry states for every core workflow
-
-Do not build real product UI here on top of placeholder API endpoints. Follow the sequence in the root execution guide first.
+- browser-wallet-native SIWE signing instead of manual signature paste
+- richer role-aware workflow guidance and task-specific views
+- stronger end-to-end coverage once the backend is exercised against a real environment
 
 ## Related Docs
 

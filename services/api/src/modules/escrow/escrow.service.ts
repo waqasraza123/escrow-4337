@@ -32,10 +32,12 @@ import type {
   EscrowExecutionRecord,
   FundJobResponse,
   EscrowJobRecord,
+  EscrowJobsListResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
 } from './escrow.types';
 import { normalizeEvmAddress } from '../../common/evm-address';
+import { UsersService } from '../users/users.service';
 
 const MINOR_UNIT_SCALE = 1_000_000n;
 const amountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
@@ -106,7 +108,33 @@ export class EscrowService {
     @Inject(ESCROW_CONTRACT_GATEWAY)
     private readonly escrowContractGateway: EscrowContractGateway,
     private readonly escrowActorService: EscrowActorService,
+    private readonly usersService: UsersService,
   ) {}
+
+  async listJobsForUser(userId: string): Promise<EscrowJobsListResponse> {
+    const user = await this.usersService.getRequiredById(userId);
+    const addresses = Array.from(
+      new Set(
+        user.wallets.map((wallet) => normalizeEvmAddress(wallet.address)),
+      ),
+    );
+
+    if (addresses.length === 0) {
+      return { jobs: [] };
+    }
+
+    const jobs =
+      await this.escrowRepository.listByParticipantAddresses(addresses);
+
+    return {
+      jobs: jobs
+        .map((job) => ({
+          job: this.toJobView(job),
+          participantRoles: this.resolveParticipantRoles(job, addresses),
+        }))
+        .sort((left, right) => right.job.updatedAt - left.job.updatedAt),
+    };
+  }
 
   async createJob(
     userId: string,
@@ -541,6 +569,34 @@ export class EscrowService {
         executions,
       },
     };
+  }
+
+  private toJobView(job: EscrowJobRecord) {
+    const { audit, executions, ...jobView } = cloneValue(job);
+    void audit;
+    void executions;
+    return jobView;
+  }
+
+  private resolveParticipantRoles(job: EscrowJobRecord, addresses: string[]) {
+    const normalizedAddresses = new Set(
+      addresses.map((address) => normalizeEvmAddress(address)),
+    );
+    const roles: Array<'client' | 'worker'> = [];
+
+    if (
+      normalizedAddresses.has(normalizeEvmAddress(job.onchain.clientAddress))
+    ) {
+      roles.push('client');
+    }
+
+    if (
+      normalizedAddresses.has(normalizeEvmAddress(job.onchain.workerAddress))
+    ) {
+      roles.push('worker');
+    }
+
+    return roles;
   }
 
   private async executeMutation(input: {

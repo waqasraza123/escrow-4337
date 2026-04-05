@@ -139,6 +139,17 @@ export type EscrowJobRecord = {
 
 export type EscrowJobView = Omit<EscrowJobRecord, 'audit' | 'executions'>;
 
+export type EscrowParticipantRole = 'client' | 'worker';
+
+export type EscrowJobListItem = {
+  job: EscrowJobView;
+  participantRoles: EscrowParticipantRole[];
+};
+
+export type EscrowJobsListResponse = {
+  jobs: EscrowJobListItem[];
+};
+
 export type EscrowAuditBundle = {
   bundle: {
     job: EscrowJobView;

@@ -252,6 +252,53 @@ describe('EscrowController integration', () => {
       auditResponse.bundle.executions.map((execution) => execution.action),
     ).toEqual(['create_job', 'fund_job']);
   });
+
+  it('lists authenticated jobs for the current participant only', async () => {
+    const clientCreated = await controller.create(clientUser, {
+      workerAddress,
+      currencyAddress,
+      title: 'Client-viewable job',
+      description: 'The client should see this in their list.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    const otherClient = await createLinkedUser(
+      usersService,
+      'other-client@example.com',
+      '0x6666666666666666666666666666666666666666',
+      '0x7777777777777777777777777777777777777777',
+    );
+
+    await controller.create(otherClient, {
+      workerAddress,
+      currencyAddress,
+      title: 'Worker-viewable job',
+      description: 'The worker should see the second job.',
+      category: 'design',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    const clientList = await controller.list(clientUser);
+    expect(clientList.jobs).toHaveLength(1);
+    expect(clientList.jobs[0]?.participantRoles).toEqual(['client']);
+    expect(clientList.jobs[0]?.job.id).toBe(clientCreated.jobId);
+    expect(clientList.jobs[0]?.job.title).toBe('Client-viewable job');
+
+    const workerList = await controller.list(workerUser);
+    expect(workerList.jobs).toHaveLength(2);
+    expect(
+      workerList.jobs.every(
+        (entry) =>
+          entry.participantRoles.length === 1 &&
+          entry.participantRoles[0] === 'worker',
+      ),
+    ).toBe(true);
+  });
 });
 
 async function createLinkedUser(
