@@ -13,9 +13,22 @@ import type {
   WalletState,
 } from '../lib/api';
 import { webApi } from '../lib/api';
+import {
+  connectInjectedWallet,
+  readInjectedWalletSnapshot,
+  signMessageWithInjectedWallet,
+  subscribeInjectedWallet,
+} from '../lib/injected-wallet';
 
 type AsyncState = {
   kind: 'idle' | 'working' | 'error' | 'success';
+  message?: string;
+};
+
+type WalletConnectionState = {
+  status: 'checking' | 'unavailable' | 'disconnected' | 'connected';
+  address: string | null;
+  chainId: number | null;
   message?: string;
 };
 
@@ -109,6 +122,11 @@ export function EscrowConsole() {
   const [linkLabel, setLinkLabel] = useState('');
   const [linkChainId, setLinkChainId] = useState('84532');
   const [walletSignature, setWalletSignature] = useState('');
+  const [walletConnection, setWalletConnection] = useState<WalletConnectionState>({
+    status: 'checking',
+    address: null,
+    chainId: null,
+  });
   const [provisionOwnerAddress, setProvisionOwnerAddress] = useState('');
   const [provisionLabel, setProvisionLabel] = useState('Primary execution wallet');
   const [createJobState, setCreateJobState] = useState({
@@ -158,6 +176,87 @@ export function EscrowConsole() {
 
     setAccessToken(session.accessToken);
     setRefreshToken(session.refreshToken);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadInjectedWallet() {
+      try {
+        const snapshot = await readInjectedWalletSnapshot();
+        if (!active) {
+          return;
+        }
+
+        setWalletConnection({
+          status: snapshot.address ? 'connected' : 'disconnected',
+          address: snapshot.address,
+          chainId: snapshot.chainId,
+          message: snapshot.address
+            ? 'Injected wallet detected and ready to sign.'
+            : 'Injected wallet detected. Connect it to sign SIWE challenges.',
+        });
+        if (snapshot.address) {
+          setLinkAddress(snapshot.address);
+          setProvisionOwnerAddress((current) => current || snapshot.address || '');
+        }
+        if (snapshot.chainId) {
+          setLinkChainId(String(snapshot.chainId));
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setWalletConnection({
+          status: 'unavailable',
+          address: null,
+          chainId: null,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'No injected wallet detected.',
+        });
+      }
+    }
+
+    void loadInjectedWallet();
+
+    const unsubscribe = subscribeInjectedWallet((snapshot) => {
+      if (!active) {
+        return;
+      }
+
+      setWalletConnection((current) => {
+        const nextAddress =
+          snapshot.address !== undefined ? snapshot.address : current.address;
+        const nextChainId =
+          snapshot.chainId !== undefined ? snapshot.chainId : current.chainId;
+
+        return {
+          status: nextAddress ? 'connected' : 'disconnected',
+          address: nextAddress,
+          chainId: nextChainId,
+          message: nextAddress
+            ? 'Injected wallet updated.'
+            : 'Injected wallet disconnected.',
+        };
+      });
+
+      if (snapshot.address !== undefined) {
+        setLinkAddress(snapshot.address || '');
+        setProvisionOwnerAddress((current) => current || snapshot.address || '');
+      }
+
+      if (snapshot.chainId !== undefined && snapshot.chainId !== null) {
+        setLinkChainId(String(snapshot.chainId));
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -351,6 +450,118 @@ export function EscrowConsole() {
       setWalletActionState({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Failed to issue challenge',
+      });
+    }
+  }
+
+  async function handleConnectInjectedWallet() {
+    setWalletActionState({
+      kind: 'working',
+      message: 'Connecting injected wallet...',
+    });
+
+    try {
+      const snapshot = await connectInjectedWallet();
+      if (!snapshot.address) {
+        throw new Error('Wallet did not expose an account.');
+      }
+
+      setWalletConnection({
+        status: 'connected',
+        address: snapshot.address,
+        chainId: snapshot.chainId,
+        message: 'Injected wallet connected.',
+      });
+      setLinkAddress(snapshot.address);
+      setProvisionOwnerAddress((current) => current || snapshot.address || '');
+      if (snapshot.chainId) {
+        setLinkChainId(String(snapshot.chainId));
+      }
+      setWalletActionState({
+        kind: 'success',
+        message: 'Wallet connected. You can now sign a SIWE link challenge directly.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to connect wallet';
+      setWalletConnection((current) => ({
+        ...current,
+        status:
+          current.status === 'connected' ? 'connected' : 'disconnected',
+        message,
+      }));
+      setWalletActionState({
+        kind: 'error',
+        message,
+      });
+    }
+  }
+
+  async function handleLinkInjectedWallet() {
+    if (!accessToken) {
+      return;
+    }
+
+    setWalletActionState({
+      kind: 'working',
+      message: 'Connecting wallet, creating SIWE challenge, and requesting signature...',
+    });
+
+    try {
+      const snapshot = await connectInjectedWallet();
+      if (!snapshot.address) {
+        throw new Error('Wallet did not expose an account.');
+      }
+
+      const chainId = snapshot.chainId ?? Number(linkChainId);
+      if (!Number.isInteger(chainId) || chainId <= 0) {
+        throw new Error('Injected wallet did not expose a valid chain id.');
+      }
+
+      const nextChallenge = await webApi.createWalletChallenge(
+        {
+          address: snapshot.address,
+          walletKind: 'eoa',
+          chainId,
+          label: linkLabel || undefined,
+        },
+        accessToken,
+      );
+      const signature = await signMessageWithInjectedWallet(
+        snapshot.address,
+        nextChallenge.message,
+      );
+      const nextWalletState = await webApi.verifyWalletChallenge(
+        {
+          challengeId: nextChallenge.challengeId,
+          message: nextChallenge.message,
+          signature,
+        },
+        accessToken,
+      );
+
+      setWalletConnection({
+        status: 'connected',
+        address: snapshot.address,
+        chainId,
+        message: 'Injected wallet linked successfully.',
+      });
+      setWalletState(nextWalletState);
+      setLinkAddress(snapshot.address);
+      setProvisionOwnerAddress((current) => current || snapshot.address || '');
+      setLinkChainId(String(chainId));
+      setWalletSignature(signature);
+      setChallenge(null);
+      setWalletActionState({
+        kind: 'success',
+        message: 'Wallet linked from the browser wallet. Smart-account provisioning is now available.',
+      });
+      await refreshConsole(accessToken);
+    } catch (error) {
+      setWalletActionState({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : 'Failed to link injected wallet',
       });
     }
   }
@@ -800,10 +1011,40 @@ export function EscrowConsole() {
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>Wallet Link</p>
-              <h2>Manual SIWE challenge flow</h2>
+              <h2>Browser wallet onboarding</h2>
             </div>
           </header>
           <div className={styles.stack}>
+            <div className={styles.walletConnectionCard}>
+              <div className={styles.walletTitleRow}>
+                <strong>
+                  {walletConnection.status === 'connected'
+                    ? 'Injected wallet connected'
+                    : walletConnection.status === 'unavailable'
+                      ? 'No injected wallet detected'
+                      : 'Injected wallet ready to connect'}
+                </strong>
+                <span>
+                  {walletConnection.chainId
+                    ? `Chain ${walletConnection.chainId}`
+                    : 'Chain unknown'}
+                </span>
+              </div>
+              <code>{walletConnection.address || 'No active account'}</code>
+              <p className={styles.stateText}>{walletConnection.message}</p>
+              <div className={styles.inlineActions}>
+                <button type="button" onClick={handleConnectInjectedWallet}>
+                  Connect injected wallet
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={handleLinkInjectedWallet}
+                >
+                  Link connected wallet
+                </button>
+              </div>
+            </div>
             <label className={styles.field}>
               <span>EOA address</span>
               <input value={linkAddress} onChange={(event) => setLinkAddress(event.target.value)} placeholder="0x..." />
@@ -816,6 +1057,9 @@ export function EscrowConsole() {
               <span>Chain id</span>
               <input value={linkChainId} onChange={(event) => setLinkChainId(event.target.value)} />
             </label>
+            <p className={styles.muted}>
+              Use the injected-wallet buttons for the native browser flow. The manual challenge path remains available as a fallback for wallets that do not expose `personal_sign`.
+            </p>
             <button type="button" onClick={handleCreateChallenge}>
               Create SIWE challenge
             </button>

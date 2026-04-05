@@ -139,6 +139,7 @@
 
 .summaryGrid article,
 .walletCard,
+.walletConnectionCard,
 .timelineCard,
 .actionPanel {
   border: 1px solid rgba(140, 101, 68, 0.14);
@@ -148,6 +149,7 @@
 
 .summaryGrid article,
 .walletCard,
+.walletConnectionCard,
 .timelineCard {
   padding: 16px;
 }
