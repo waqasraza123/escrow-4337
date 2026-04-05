@@ -118,6 +118,46 @@ describe('DeploymentValidationService', () => {
     );
   });
 
+  it('returns a structured failed report instead of crashing when required config is missing', async () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.AUTH_EMAIL_RELAY_BASE_URL;
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.checks.find((check) => check.id === 'persistence-config'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        details: 'DATABASE_URL must be set',
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'database')).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        metadata: {
+          blockedBy: 'persistence-config',
+        },
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'email-config')).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        details: 'AUTH_EMAIL_RELAY_BASE_URL must be set',
+      }),
+    );
+    expect(report.checks.find((check) => check.id === 'email-relay')).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        metadata: {
+          blockedBy: 'email-config',
+        },
+      }),
+    );
+  });
+
   function createService(
     query: (text: string) => Promise<{ rows: Record<string, unknown>[] }>,
   ) {

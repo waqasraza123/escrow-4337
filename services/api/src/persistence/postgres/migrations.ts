@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import type { QueryResultRow } from 'pg';
@@ -23,12 +24,35 @@ export type MigrationStatus = {
   total: number;
 };
 
-export function resolveMigrationsDir(baseDir = process.cwd()) {
-  return join(baseDir, 'src', 'persistence', 'postgres', 'migrations');
+export function listMigrationDirCandidates(
+  baseDir = process.cwd(),
+  runtimeDir = __dirname,
+) {
+  return Array.from(
+    new Set([
+      join(runtimeDir, 'migrations'),
+      join(baseDir, 'src', 'persistence', 'postgres', 'migrations'),
+      join(baseDir, 'dist', 'persistence', 'postgres', 'migrations'),
+    ]),
+  );
 }
 
-export async function listMigrationFilenames(baseDir = process.cwd()) {
-  return (await readdir(resolveMigrationsDir(baseDir)))
+export function resolveMigrationsDir(
+  baseDir = process.cwd(),
+  runtimeDir = __dirname,
+) {
+  return (
+    listMigrationDirCandidates(baseDir, runtimeDir).find((candidate) =>
+      existsSync(candidate),
+    ) || join(runtimeDir, 'migrations')
+  );
+}
+
+export async function listMigrationFilenames(
+  baseDir = process.cwd(),
+  runtimeDir = __dirname,
+) {
+  return (await readdir(resolveMigrationsDir(baseDir, runtimeDir)))
     .filter((name) => name.endsWith('.sql'))
     .sort();
 }

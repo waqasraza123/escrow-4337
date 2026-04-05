@@ -6,6 +6,7 @@ out
 coverage
 *.tsbuildinfo
 .env*
+!services/api/.env.example
 cache
 broadcast
 artifacts

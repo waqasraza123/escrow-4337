@@ -38,6 +38,8 @@ From the repo root:
 pnpm --filter escrow4334-api start:dev
 ```
 
+Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/.env.example) to `services/api/.env` before running non-test commands. The operational CLIs now execute the built `dist` entrypoints, so run `pnpm --filter escrow4334-api build` first when the output is missing or stale.
+
 Targeted quality checks:
 
 ```bash

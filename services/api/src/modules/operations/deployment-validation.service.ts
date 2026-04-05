@@ -43,12 +43,60 @@ export class DeploymentValidationService {
   async runValidation(): Promise<DeploymentValidationReport> {
     const checks = this.collectConfigurationChecks();
 
-    checks.push(await this.checkDatabase());
-    checks.push(await this.checkEmailRelay());
-    checks.push(await this.checkSmartAccountRelay());
-    checks.push(await this.checkBundler());
-    checks.push(await this.checkPaymaster());
-    checks.push(await this.checkEscrowRelay());
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['persistence-config'],
+        'database',
+        'Database connectivity skipped because persistence configuration is invalid',
+        () => this.checkDatabase(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['email-config'],
+        'email-relay',
+        'Email relay probe skipped because email configuration is invalid',
+        () => this.checkEmailRelay(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['smart-account-config'],
+        'smart-account-relay',
+        'Smart-account relay probe skipped because smart-account configuration is invalid',
+        () => this.checkSmartAccountRelay(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['smart-account-config'],
+        'bundler',
+        'Bundler probe skipped because smart-account configuration is invalid',
+        () => this.checkBundler(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['smart-account-config'],
+        'paymaster',
+        'Paymaster probe skipped because smart-account configuration is invalid',
+        () => this.checkPaymaster(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['escrow-config'],
+        'escrow-relay',
+        'Escrow relay probe skipped because escrow configuration is invalid',
+        () => this.checkEscrowRelay(),
+      ),
+    );
 
     return {
       generatedAt: new Date().toISOString(),
@@ -62,6 +110,41 @@ export class DeploymentValidationService {
       },
       checks,
     };
+  }
+
+  private async whenChecksPass(
+    checks: DeploymentCheck[],
+    dependencies: string[],
+    id: string,
+    summary: string,
+    probe: () => Promise<DeploymentCheck>,
+  ): Promise<DeploymentCheck> {
+    const failedDependency = this.failedDependencyCheck(dependencies, checks);
+
+    if (!failedDependency) {
+      return probe();
+    }
+
+    return {
+      id,
+      status: 'skipped',
+      summary,
+      details:
+        failedDependency.details ||
+        `Skipped because ${failedDependency.id} failed`,
+      metadata: {
+        blockedBy: failedDependency.id,
+      },
+    };
+  }
+
+  private failedDependencyCheck(
+    dependencies: string[],
+    checks: DeploymentCheck[],
+  ) {
+    return checks.find(
+      (check) => dependencies.includes(check.id) && check.status === 'failed',
+    );
   }
 
   private collectConfigurationChecks() {
