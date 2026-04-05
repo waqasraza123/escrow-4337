@@ -180,7 +180,7 @@ export class DeploymentValidationService {
           : 'Persistence is configured for file storage',
         () => {
           if (
-            process.env.NODE_ENV !== 'test' &&
+            this.isStrictDeploymentEnvironment() &&
             this.persistenceConfig.driver !== 'postgres'
           ) {
             throw new Error(
@@ -208,7 +208,7 @@ export class DeploymentValidationService {
           void this.emailConfig.otpTtlMinutes;
 
           if (
-            process.env.NODE_ENV !== 'test' &&
+            this.isStrictDeploymentEnvironment() &&
             this.emailConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -234,7 +234,7 @@ export class DeploymentValidationService {
           void this.smartAccountConfig.sponsorshipMode;
 
           if (
-            process.env.NODE_ENV !== 'test' &&
+            this.isStrictDeploymentEnvironment() &&
             this.smartAccountConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -265,7 +265,7 @@ export class DeploymentValidationService {
           void this.escrowConfig.chainId;
 
           if (
-            process.env.NODE_ENV !== 'test' &&
+            this.isStrictDeploymentEnvironment() &&
             this.escrowConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -309,7 +309,8 @@ export class DeploymentValidationService {
     );
     checks.push({
       id: 'trust-proxy',
-      status: process.env.NODE_ENV !== 'test' && !trustProxy ? 'warning' : 'ok',
+      status:
+        this.isStrictDeploymentEnvironment() && !trustProxy ? 'warning' : 'ok',
       summary: trustProxy
         ? 'Trusted proxy configuration is set'
         : 'Trusted proxy configuration is not set',
@@ -658,5 +659,9 @@ export class DeploymentValidationService {
       process.env.DEPLOYMENT_VALIDATION_TIMEOUT_MS,
       5000,
     );
+  }
+
+  private isStrictDeploymentEnvironment() {
+    return process.env.NODE_ENV === 'production';
   }
 }

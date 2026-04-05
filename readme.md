@@ -63,7 +63,6 @@ Current missing or incomplete slices:
 - live validation of the configured email relay infrastructure
 - live validation of the configured smart-account relay, bundler, and paymaster infrastructure
 - live validation of the configured escrow execution relay infrastructure
-- real product UI in `apps/web` and `apps/admin`
 - indexer, subgraph, shared UI package, and deployment infrastructure described in the original repo vision
 
 ## High-Level Architecture
@@ -119,7 +118,7 @@ SECURITY.md              Responsible disclosure guidance
 
 Optional but expected later:
 
-- Postgres
+- Postgres, with a zero-cost local Docker Compose stack now provided in `infra/postgres`
 - Base Sepolia RPC access
 - relay, bundler, and paymaster credentials for smart-account work
 
@@ -131,7 +130,26 @@ pnpm install
 
 ### Environment
 
-Current repo environment handling is incomplete. Use `.env.example` as the starting point for the contract and frontend side, and review `services/api` config before introducing new required API variables.
+Current repo environment handling is split by purpose:
+
+- local zero-cost API development: `services/api/.env.local.example`
+- production-like relay-backed API configuration: `services/api/.env.example`
+- local Postgres container overrides: `infra/postgres/.env.example`
+- frontend API targets: `apps/web/.env.example` and `apps/admin/.env.example`
+
+For a zero-cost local API stack, the repo provides Docker Compose for Postgres:
+
+```bash
+cp infra/postgres/.env.example infra/postgres/.env
+pnpm db:up
+cp services/api/.env.local.example services/api/.env.local
+pnpm --filter escrow4334-api db:migrate
+pnpm --filter escrow4334-api start:dev
+```
+
+This repo is not using Supabase. The current persistence path is NestJS plus direct Postgres access through the workspace code in `services/api/src/persistence/postgres`.
+
+Docker is recommended for reproducibility, but it is not required. A native Postgres 16+ instance is also valid if `services/api/.env.local` points `DATABASE_URL` at it.
 
 Current example variables:
 

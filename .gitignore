@@ -7,8 +7,10 @@ coverage
 *.tsbuildinfo
 .env*
 !services/api/.env.example
+!services/api/.env.local.example
 !apps/web/.env.example
 !apps/admin/.env.example
+!infra/postgres/.env.example
 cache
 broadcast
 artifacts

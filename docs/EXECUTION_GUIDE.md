@@ -166,6 +166,7 @@ Make the repo shippable, not just locally runnable.
 
 - define CI stages for typecheck, lint, tests, and contract verification
 - separate local, staging, and production environment expectations
+- maintain a reproducible zero-cost local Postgres path so local development does not depend on managed database vendors
 - add secret handling and deployment runbooks
 - perform focused security review on contract, auth, wallet, and admin paths
 

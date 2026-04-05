@@ -5,7 +5,7 @@
 - Current reality: prototype-stage monorepo. The contract is the strongest completed slice; the API and frontends are not production-ready.
 
 ## Current Architecture
-- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, smart-account provisioning, and deployment-validation boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway; API startup now fails fast on invalid non-test deployment config and exposes built deployment-validation and migration-status commands that operate from compiled JS, ship SQL migration assets in `dist`, and return structured validation reports instead of crashing when config is incomplete. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers.
+- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, smart-account provisioning, and deployment-validation boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway; API startup now fails fast on invalid non-test deployment config and exposes built deployment-validation and migration-status commands that operate from compiled JS, ship SQL migration assets in `dist`, and return structured validation reports instead of crashing when config is incomplete. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers, and the repo now includes a pinned local Postgres Docker Compose stack plus a dedicated `.env.local` profile for zero-cost development against direct Postgres without managed vendors.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
 - `apps/web`: Next.js client console with OTP auth, manual SIWE wallet-link challenge handling, smart-account provisioning, authenticated job listing, lifecycle mutation forms, and audit visibility wired to the API.
@@ -46,6 +46,7 @@
 - API now has deployment-validation tooling that fails fast on invalid non-test runtime config, reports Postgres connectivity plus migration status, probes configured relays, checks bundler chain identity, warns on non-introspectable paymasters, and surfaces trusted-proxy posture through a dedicated CLI command.
 - API deployment-validation and migration CLIs now execute built `dist` entrypoints instead of `ts-node`, copy SQL migrations into build output, and keep deployment validation in a structured-report mode when config gaps block downstream probes.
 - API escrow now exposes an authenticated jobs list so product surfaces can render participant-specific job views with derived client or worker roles.
+- Repo now includes `infra/postgres` plus root `pnpm db:*` scripts so local development can run against a pinned Postgres 16 container and a dedicated `services/api/.env.local.example` profile instead of a managed database vendor.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
 - API now has direct service and controller coverage for escrow lifecycle rules and endpoint validation.
@@ -74,6 +75,7 @@
 - The escrow module now depends on proof-backed wallet actor resolution plus a provisioned smart-account default for client job creation; in non-test environments it expects relay configuration for both escrow execution and smart-account provisioning.
 - Non-test API startup should fail immediately on invalid deployment configuration, and backend deployment readiness should be evaluated through `pnpm --filter escrow4334-api deployment:validate` plus `pnpm --filter escrow4334-api db:migrate:status` rather than ad hoc manual checks.
 - API operational CLIs should run from compiled artifacts, and build output must include SQL migrations so deploy-time database operations do not depend on source files or `ts-node`.
+- Local development should remain zero-license-cost by default: direct Postgres, self-hosted locally through Docker Compose or an equivalent native Postgres install, with mock email, smart-account, and escrow providers allowed in development but not in production.
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.
@@ -86,6 +88,7 @@
 ## Risks / Watchouts
 - Frontend apps now expose real console workflows, but they still depend on the prototype API surface and manual environment configuration rather than hardened production deployment.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
+- Local zero-cost Postgres startup now assumes either a running Docker daemon for `infra/postgres` or an equivalent native Postgres instance with the same connection settings.
 - Non-test auth startup now expects a strong `JWT_SECRET`; missing or weak values will fail auth runtime initialization.
 - IP-aware OTP throttling depends on `NEST_API_TRUST_PROXY` being set correctly when the API runs behind a reverse proxy or ingress.
 - Non-test auth email delivery now expects sender and email relay configuration; missing config will fail the delivery path.
@@ -98,6 +101,7 @@
 
 ## Standard Verification
 - `git status --short`
+- `pnpm db:up`
 - `pnpm --filter escrow4334-api db:migrate:status`
 - `pnpm --filter escrow4334-api deployment:validate`
 - `pnpm --filter @escrow4334/compliance build`

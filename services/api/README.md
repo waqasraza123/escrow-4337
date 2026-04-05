@@ -35,10 +35,16 @@ The API is intended to own:
 From the repo root:
 
 ```bash
+cp infra/postgres/.env.example infra/postgres/.env
+pnpm db:up
+cp services/api/.env.local.example services/api/.env.local
+pnpm --filter escrow4334-api db:migrate
 pnpm --filter escrow4334-api start:dev
 ```
 
-Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/.env.example) to `services/api/.env` before running non-test commands. The operational CLIs now execute the built `dist` entrypoints, so run `pnpm --filter escrow4334-api build` first when the output is missing or stale.
+For zero-cost local development, use the checked-in Docker Postgres stack in [infra/postgres/README.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/infra/postgres/README.md) plus [`.env.local.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/.env.local.example). That profile uses local Postgres with mock email, mock smart-account, and mock escrow execution modes so the API can run without paid relay providers. Docker is recommended for reproducibility, but a native Postgres 16+ install is also valid if it matches the same connection string contract.
+
+Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/.env.example) to `services/api/.env` only when you are configuring a production-like relay-backed environment. The operational CLIs now execute the built `dist` entrypoints, so run `pnpm --filter escrow4334-api build` first when the output is missing or stale.
 
 Targeted quality checks:
 

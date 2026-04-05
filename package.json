@@ -8,6 +8,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "db:up": "docker compose --project-directory infra/postgres -f infra/postgres/docker-compose.yml up -d",
+    "db:down": "docker compose --project-directory infra/postgres -f infra/postgres/docker-compose.yml down",
+    "db:reset": "docker compose --project-directory infra/postgres -f infra/postgres/docker-compose.yml down -v",
+    "db:status": "docker compose --project-directory infra/postgres -f infra/postgres/docker-compose.yml ps",
+    "db:logs": "docker compose --project-directory infra/postgres -f infra/postgres/docker-compose.yml logs -f postgres",
     "prepare": "husky install"
   },
   "devDependencies": {

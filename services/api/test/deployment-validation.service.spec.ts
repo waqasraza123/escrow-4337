@@ -158,6 +158,26 @@ describe('DeploymentValidationService', () => {
     );
   });
 
+  it('allows a zero-cost local development profile to validate runtime configuration', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.AUTH_EMAIL_MODE = 'mock';
+    delete process.env.AUTH_EMAIL_RELAY_BASE_URL;
+    process.env.WALLET_SMART_ACCOUNT_MODE = 'mock';
+    delete process.env.WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS;
+    delete process.env.WALLET_SMART_ACCOUNT_FACTORY_ADDRESS;
+    delete process.env.WALLET_SMART_ACCOUNT_BUNDLER_URL;
+    delete process.env.WALLET_SMART_ACCOUNT_RELAY_BASE_URL;
+    delete process.env.WALLET_SMART_ACCOUNT_PAYMASTER_URL;
+    process.env.ESCROW_CONTRACT_MODE = 'mock';
+    delete process.env.ESCROW_CONTRACT_ADDRESS;
+    delete process.env.ESCROW_ARBITRATOR_ADDRESS;
+    delete process.env.ESCROW_RELAY_BASE_URL;
+
+    const service = createService(allMigrationsAppliedQuery());
+
+    expect(() => service.assertRuntimeConfiguration()).not.toThrow();
+  });
+
   function createService(
     query: (text: string) => Promise<{ rows: Record<string, unknown>[] }>,
   ) {
