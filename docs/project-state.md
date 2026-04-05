@@ -60,6 +60,7 @@
 ## Important Decisions
 - This repo should be treated as a contract-first prototype, not a production-ready product.
 - `docs/project-state.md` is the committed memory file for durable repo facts and decisions.
+- `docs/FRONTEND_PLAN.md` owns the detailed sequencing for `apps/web` and `apps/admin`; `docs/EXECUTION_GUIDE.md` remains the higher-level repo roadmap.
 - `docs/_local/current-session.md` is the ignored restart/handoff file for the current working slice.
 - The current active backend direction is to consume compliance rules through the workspace package instead of importing repo-relative source paths.
 - The API TypeScript config resolves `@escrow4334/compliance` through the built declaration surface in `packages/compliance/dist`.

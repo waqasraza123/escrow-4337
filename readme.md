@@ -210,6 +210,7 @@ The implementation sequence is documented in [docs/EXECUTION_GUIDE.md](/Users/mc
 - [docs/project-state.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/project-state.md): durable project memory
 - [docs/ARCHITECTURE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md): system boundaries and target direction
 - [docs/EXECUTION_GUIDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md): step-by-step completion roadmap
+- [docs/FRONTEND_PLAN.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/FRONTEND_PLAN.md): detailed frontend sequencing for `apps/web` and `apps/admin`
 - [CLAUDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CLAUDE.md): AI assistant working guide
 - [CONTRIBUTING.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CONTRIBUTING.md): contribution expectations
 - [COLLABORATION.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/COLLABORATION.md): working agreements
