@@ -45,6 +45,7 @@
 - API job creation now requires the authenticated user's default execution wallet to be a provisioned smart account rather than a bare EOA.
 - API now has deployment-validation tooling that fails fast on invalid non-test runtime config, reports Postgres connectivity plus migration status, probes configured relays, checks bundler chain identity, warns on non-introspectable paymasters, and surfaces trusted-proxy posture through a dedicated CLI command.
 - API deployment-validation and migration CLIs now execute built `dist` entrypoints instead of `ts-node`, copy SQL migrations into build output, and keep deployment validation in a structured-report mode when config gaps block downstream probes.
+- API built CLIs now honor the same environment-file precedence as Nest runtime startup, so `.env.local` can safely override `.env.<env>` and `.env` during local Postgres and deployment operations without shell-specific workarounds.
 - API escrow now exposes an authenticated jobs list so product surfaces can render participant-specific job views with derived client or worker roles.
 - Repo now includes `infra/postgres` plus root `pnpm db:*` scripts so local development can run against a pinned Postgres 16 container and a dedicated `services/api/.env.local.example` profile instead of a managed database vendor.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.

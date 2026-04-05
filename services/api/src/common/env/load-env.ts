@@ -1,10 +1,13 @@
 import { existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { config as loadDotenv } from 'dotenv';
+import { parse as parseDotenv } from 'dotenv';
 
 export function loadApiEnvironment(baseDir = process.cwd()) {
   const nodeEnv = process.env.NODE_ENV || 'development';
   const candidates = ['.env', `.env.${nodeEnv}`, '.env.local'];
+  const originalEnvironmentKeys = new Set(Object.keys(process.env));
+  const fileManagedKeys = new Set<string>();
 
   for (const filename of candidates) {
     const path = resolve(baseDir, filename);
@@ -12,6 +15,15 @@ export function loadApiEnvironment(baseDir = process.cwd()) {
       continue;
     }
 
-    loadDotenv({ path });
+    const parsed = parseDotenv(readFileSync(path));
+
+    for (const [key, value] of Object.entries(parsed)) {
+      if (originalEnvironmentKeys.has(key) && !fileManagedKeys.has(key)) {
+        continue;
+      }
+
+      process.env[key] = value;
+      fileManagedKeys.add(key);
+    }
   }
 }
