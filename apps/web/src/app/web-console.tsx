@@ -39,6 +39,118 @@ type MilestoneDraft = {
   dueAt: string;
 };
 
+type ComposerStep = 'scope' | 'counterparty' | 'plan';
+
+type JobComposerState = {
+  title: string;
+  description: string;
+  category: string;
+  workerAddress: string;
+  currencyAddress: string;
+  settlementAsset: string;
+  settlementChain: string;
+  payoutStyle: 'milestone-based';
+  reviewWindowDays: string;
+  disputeModel: 'operator-mediation' | 'mutual-resolution';
+  evidenceExpectation: string;
+  kickoffNote: string;
+};
+
+type CreatedJobResult = {
+  jobId: string;
+  escrowId: string;
+  txHash: string;
+};
+
+const categoryOptions = [
+  'software-development',
+  'design',
+  'marketing',
+  'research',
+  'product',
+  'operations',
+];
+
+const composerSteps: Array<{
+  id: ComposerStep;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: 'scope',
+    label: 'Scope',
+    description: 'Define the work, category, and expected outcome.',
+  },
+  {
+    id: 'counterparty',
+    label: 'Counterparty',
+    description: 'Set the worker wallet and settlement posture.',
+  },
+  {
+    id: 'plan',
+    label: 'Plan',
+    description: 'Review milestones, commercial terms, and launch readiness.',
+  },
+];
+
+function createInitialJobComposerState(): JobComposerState {
+  return {
+    title: '',
+    description: '',
+    category: 'software-development',
+    workerAddress: '',
+    currencyAddress: '',
+    settlementAsset: 'USDC',
+    settlementChain: 'base-sepolia',
+    payoutStyle: 'milestone-based',
+    reviewWindowDays: '3',
+    disputeModel: 'operator-mediation',
+    evidenceExpectation: 'delivery note plus linked evidence URLs',
+    kickoffNote: 'Milestones should be accepted or disputed explicitly at each delivery checkpoint.',
+  };
+}
+
+function isMilestoneDraftReady(milestone: MilestoneDraft) {
+  return Boolean(
+    milestone.title.trim() &&
+      milestone.deliverable.trim() &&
+      milestone.amount.trim(),
+  );
+}
+
+function sumMilestoneAmounts(milestones: MilestoneDraft[]) {
+  return milestones.reduce((total, milestone) => {
+    const parsed = Number(milestone.amount);
+    return Number.isFinite(parsed) ? total + parsed : total;
+  }, 0);
+}
+
+function buildJobTermsJson(
+  state: JobComposerState,
+  milestones: MilestoneDraft[],
+): Record<string, unknown> {
+  const readyMilestones = milestones
+    .filter(isMilestoneDraftReady)
+    .map((milestone, index) => ({
+      order: index + 1,
+      title: milestone.title.trim(),
+      deliverable: milestone.deliverable.trim(),
+      amount: milestone.amount.trim(),
+      dueAt: milestone.dueAt ? Number(milestone.dueAt) : null,
+    }));
+
+  return {
+    currency: state.settlementAsset,
+    chain: state.settlementChain,
+    payoutStyle: state.payoutStyle,
+    reviewWindowDays: Number(state.reviewWindowDays) || 0,
+    disputeModel: state.disputeModel,
+    evidenceExpectation: state.evidenceExpectation.trim(),
+    kickoffNote: state.kickoffNote.trim(),
+    milestones: readyMilestones,
+  };
+}
+
 const storageKey = 'escrow4337.web.session';
 
 function readSession(): SessionTokens | null {
@@ -129,14 +241,6 @@ export function EscrowConsole() {
   });
   const [provisionOwnerAddress, setProvisionOwnerAddress] = useState('');
   const [provisionLabel, setProvisionLabel] = useState('Primary execution wallet');
-  const [createJobState, setCreateJobState] = useState({
-    workerAddress: '',
-    currencyAddress: '',
-    title: '',
-    description: '',
-    category: 'software-development',
-    termsJson: '{\n  "currency": "USDC",\n  "chain": "base-sepolia"\n}',
-  });
   const [fundAmount, setFundAmount] = useState('100');
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([
     {
@@ -152,6 +256,7 @@ export function EscrowConsole() {
       dueAt: '',
     },
   ]);
+  const [composerStep, setComposerStep] = useState<ComposerStep>('scope');
   const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState('0');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryEvidence, setDeliveryEvidence] = useState('');
@@ -160,6 +265,9 @@ export function EscrowConsole() {
     'release',
   );
   const [resolutionNote, setResolutionNote] = useState('');
+  const [createdJobResult, setCreatedJobResult] = useState<CreatedJobResult | null>(
+    null,
+  );
 
   const selectedJob = useMemo(
     () => jobsResponse.jobs.find((entry) => entry.job.id === selectedJobId) ?? null,
@@ -167,6 +275,58 @@ export function EscrowConsole() {
   );
 
   const selectedMilestone = selectedJob?.job.milestones[Number(selectedMilestoneIndex)];
+
+  const [createJobState, setCreateJobState] = useState<JobComposerState>(
+    createInitialJobComposerState,
+  );
+
+  const milestoneDraftCount = useMemo(
+    () => milestones.filter(isMilestoneDraftReady).length,
+    [milestones],
+  );
+  const milestoneDraftTotal = useMemo(() => sumMilestoneAmounts(milestones), [milestones]);
+  const composerTermsPreview = useMemo(
+    () => formatJson(buildJobTermsJson(createJobState, milestones)),
+    [createJobState, milestones],
+  );
+  const hasProvisionedDefaultWallet = Boolean(
+    profile?.defaultExecutionWalletAddress &&
+      walletState?.wallets.some(
+        (wallet) =>
+          wallet.address === profile.defaultExecutionWalletAddress &&
+          wallet.walletKind === 'smart_account',
+      ),
+  );
+  const composerChecklist = useMemo(
+    () => [
+      {
+        label: 'Scope is defined',
+        ok: Boolean(
+          createJobState.title.trim() &&
+            createJobState.description.trim() &&
+            createJobState.category.trim(),
+        ),
+      },
+      {
+        label: 'Worker wallet is set',
+        ok: Boolean(createJobState.workerAddress.trim()),
+      },
+      {
+        label: 'Settlement token address is set',
+        ok: Boolean(createJobState.currencyAddress.trim()),
+      },
+      {
+        label: 'Default execution wallet is a provisioned smart account',
+        ok: hasProvisionedDefaultWallet,
+      },
+      {
+        label: 'At least one milestone draft is ready',
+        ok: milestoneDraftCount > 0,
+      },
+    ],
+    [createJobState, hasProvisionedDefaultWallet, milestoneDraftCount],
+  );
+  const canCreateJob = composerChecklist.every((item) => item.ok);
 
   useEffect(() => {
     const session = readSession();
@@ -672,7 +832,7 @@ export function EscrowConsole() {
     setJobActionState({ kind: 'working', message: 'Creating job...' });
 
     try {
-      const termsJSON = JSON.parse(createJobState.termsJson) as Record<string, unknown>;
+      const termsJSON = buildJobTermsJson(createJobState, milestones);
       const response = await webApi.createJob(
         {
           workerAddress: createJobState.workerAddress,
@@ -685,9 +845,14 @@ export function EscrowConsole() {
         accessToken,
       );
       setSelectedJobId(response.jobId);
+      setCreatedJobResult({
+        jobId: response.jobId,
+        escrowId: response.escrowId,
+        txHash: response.txHash,
+      });
       setJobActionState({
         kind: 'success',
-        message: `Job created. Escrow id ${response.escrowId} on tx ${txHashPreview(response.txHash)}.`,
+        message: `Job created. Escrow id ${response.escrowId} on tx ${txHashPreview(response.txHash)}. Next step: commit milestones or stage funding.`,
       });
       await refreshConsole(accessToken);
     } catch (error) {
@@ -722,15 +887,24 @@ export function EscrowConsole() {
   }
 
   async function handleSetMilestones() {
-    if (!accessToken || !selectedJob) {
+    const targetJobId = selectedJob?.job.id ?? createdJobResult?.jobId ?? null;
+    await handleCommitMilestones(targetJobId);
+  }
+
+  async function handleCommitMilestones(targetJobId: string | null) {
+    if (!accessToken || !targetJobId) {
       return;
+    }
+
+    if (!selectedJob || selectedJob.job.id !== targetJobId) {
+      setSelectedJobId(targetJobId);
     }
 
     setJobActionState({ kind: 'working', message: 'Setting milestones...' });
 
     try {
       const response = await webApi.setMilestones(
-        selectedJob.job.id,
+        targetJobId,
         milestones.map((milestone) => ({
           title: milestone.title,
           deliverable: milestone.deliverable,
@@ -744,13 +918,28 @@ export function EscrowConsole() {
         message: `Milestones committed via ${txHashPreview(response.txHash)}.`,
       });
       await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
+      await loadAudit(targetJobId);
     } catch (error) {
       setJobActionState({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Failed to set milestones',
       });
     }
+  }
+
+  function handleUseMilestoneBudget() {
+    if (milestoneDraftTotal <= 0) {
+      return;
+    }
+
+    setFundAmount(String(milestoneDraftTotal));
+    if (createdJobResult?.jobId) {
+      setSelectedJobId(createdJobResult.jobId);
+    }
+    setJobActionState({
+      kind: 'success',
+      message: `Funding amount staged at ${milestoneDraftTotal}. Review the selected job and submit funding when ready.`,
+    });
   }
 
   async function handleDeliverMilestone() {
@@ -1125,90 +1314,310 @@ export function EscrowConsole() {
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>Compose</p>
-              <h2>Create a new escrow job</h2>
+              <h2>Guided client job authoring</h2>
             </div>
           </header>
           <div className={styles.stack}>
-            <label className={styles.field}>
-              <span>Worker wallet</span>
-              <input
-                value={createJobState.workerAddress}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    workerAddress: event.target.value,
-                  }))
-                }
-                placeholder="0x..."
-              />
-            </label>
-            <label className={styles.field}>
-              <span>USDC or settlement token</span>
-              <input
-                value={createJobState.currencyAddress}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    currencyAddress: event.target.value,
-                  }))
-                }
-                placeholder="0x..."
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Title</span>
-              <input
-                value={createJobState.title}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-                placeholder="Milestone-based build"
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Description</span>
-              <textarea
-                value={createJobState.description}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                rows={4}
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Category</span>
-              <input
-                value={createJobState.category}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    category: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Terms JSON</span>
-              <textarea
-                value={createJobState.termsJson}
-                onChange={(event) =>
-                  setCreateJobState((current) => ({
-                    ...current,
-                    termsJson: event.target.value,
-                  }))
-                }
-                rows={6}
-              />
-            </label>
-            <button type="button" onClick={handleCreateJob}>
-              Create job
-            </button>
+            <div className={styles.composerRail}>
+              {composerSteps.map((step, index) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  className={`${styles.composerStep} ${
+                    composerStep === step.id ? styles.composerStepActive : ''
+                  }`}
+                  onClick={() => setComposerStep(step.id)}
+                >
+                  <span>{`0${index + 1}`}</span>
+                  <strong>{step.label}</strong>
+                  <small>{step.description}</small>
+                </button>
+              ))}
+            </div>
+
+            {composerStep === 'scope' ? (
+              <div className={styles.composerSection}>
+                <div className={styles.summaryGrid}>
+                  <article>
+                    <span className={styles.metaLabel}>Target experience</span>
+                    <strong>Productized escrow launch</strong>
+                    <p className={styles.muted}>
+                      Write the scope in business language first. The API terms will be generated from the structured plan below.
+                    </p>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Drafted milestones</span>
+                    <strong>{milestoneDraftCount}</strong>
+                    <p className={styles.muted}>
+                      Total drafted amount: {milestoneDraftTotal || 0}
+                    </p>
+                  </article>
+                </div>
+                <label className={styles.field}>
+                  <span>Job title</span>
+                  <input
+                    value={createJobState.title}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Milestone-based product implementation"
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Project summary</span>
+                  <textarea
+                    value={createJobState.description}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    rows={5}
+                    placeholder="Describe the scope, delivery expectations, and what the worker will be paid to complete."
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Category</span>
+                  <select
+                    value={createJobState.category}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))
+                    }
+                  >
+                    {categoryOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
+            {composerStep === 'counterparty' ? (
+              <div className={styles.composerSection}>
+                <label className={styles.field}>
+                  <span>Worker wallet</span>
+                  <input
+                    value={createJobState.workerAddress}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        workerAddress: event.target.value,
+                      }))
+                    }
+                    placeholder="0x..."
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Settlement token address</span>
+                  <input
+                    value={createJobState.currencyAddress}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        currencyAddress: event.target.value,
+                      }))
+                    }
+                    placeholder="0x..."
+                  />
+                </label>
+                <div className={styles.composerSplit}>
+                  <label className={styles.field}>
+                    <span>Settlement asset label</span>
+                    <input
+                      value={createJobState.settlementAsset}
+                      onChange={(event) =>
+                        setCreateJobState((current) => ({
+                          ...current,
+                          settlementAsset: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Settlement chain</span>
+                    <input
+                      value={createJobState.settlementChain}
+                      onChange={(event) =>
+                        setCreateJobState((current) => ({
+                          ...current,
+                          settlementChain: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className={styles.summaryGrid}>
+                  <article>
+                    <span className={styles.metaLabel}>Execution wallet posture</span>
+                    <strong>
+                      {hasProvisionedDefaultWallet
+                        ? 'Ready to create jobs'
+                        : 'Smart account required'}
+                    </strong>
+                    <p className={styles.muted}>
+                      Client job creation requires a default smart account execution wallet.
+                    </p>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Counterparty check</span>
+                    <strong>
+                      {createJobState.workerAddress.trim()
+                        ? 'Worker address captured'
+                        : 'Worker address missing'}
+                    </strong>
+                    <p className={styles.muted}>
+                      Keep this aligned with the worker wallet that will deliver milestones.
+                    </p>
+                  </article>
+                </div>
+              </div>
+            ) : null}
+
+            {composerStep === 'plan' ? (
+              <div className={styles.composerSection}>
+                <div className={styles.composerSplit}>
+                  <label className={styles.field}>
+                    <span>Review window in days</span>
+                    <input
+                      value={createJobState.reviewWindowDays}
+                      onChange={(event) =>
+                        setCreateJobState((current) => ({
+                          ...current,
+                          reviewWindowDays: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Dispute model</span>
+                    <select
+                      value={createJobState.disputeModel}
+                      onChange={(event) =>
+                        setCreateJobState((current) => ({
+                          ...current,
+                          disputeModel: event.target.value as JobComposerState['disputeModel'],
+                        }))
+                      }
+                    >
+                      <option value="operator-mediation">operator-mediation</option>
+                      <option value="mutual-resolution">mutual-resolution</option>
+                    </select>
+                  </label>
+                </div>
+                <label className={styles.field}>
+                  <span>Evidence expectation</span>
+                  <input
+                    value={createJobState.evidenceExpectation}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        evidenceExpectation: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Kickoff note</span>
+                  <textarea
+                    value={createJobState.kickoffNote}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        kickoffNote: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                  />
+                </label>
+                <div className={styles.composerSummaryCard}>
+                  <div className={styles.walletTitleRow}>
+                    <strong>Commercial plan</strong>
+                    <span>{milestoneDraftCount} ready milestones</span>
+                  </div>
+                  <p className={styles.muted}>
+                    Total drafted milestone amount: {milestoneDraftTotal || 0}
+                  </p>
+                  <textarea value={composerTermsPreview} readOnly rows={10} />
+                </div>
+              </div>
+            ) : null}
+
+            <div className={styles.checklist}>
+              {composerChecklist.map((item) => (
+                <div key={item.label} className={styles.checklistItem}>
+                  <strong>{item.ok ? 'Ready' : 'Pending'}</strong>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.inlineActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => {
+                  const index = composerSteps.findIndex((step) => step.id === composerStep);
+                  setComposerStep(composerSteps[Math.max(0, index - 1)]?.id ?? 'scope');
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => {
+                  const index = composerSteps.findIndex((step) => step.id === composerStep);
+                  setComposerStep(
+                    composerSteps[Math.min(composerSteps.length - 1, index + 1)]?.id ??
+                      'plan',
+                  );
+                }}
+              >
+                Next
+              </button>
+              <button type="button" onClick={handleCreateJob} disabled={!canCreateJob}>
+                Create guided job
+              </button>
+            </div>
+            {createdJobResult ? (
+              <div className={styles.composerSummaryCard}>
+                <div className={styles.walletTitleRow}>
+                  <strong>Job created</strong>
+                  <span>{txHashPreview(createdJobResult.txHash)}</span>
+                </div>
+                <p className={styles.muted}>
+                  Escrow id {createdJobResult.escrowId}. Use the drafted milestones and funding amount below to move directly into launch steps.
+                </p>
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setSelectedJobId(createdJobResult.jobId)}
+                  >
+                    Review selected job
+                  </button>
+                  <button type="button" onClick={() => void handleCommitMilestones(createdJobResult.jobId)}>
+                    Commit drafted milestones
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={handleUseMilestoneBudget}
+                  >
+                    Stage funding from milestone total
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <p className={styles.stateText}>{jobActionState.message}</p>
           </div>
         </section>

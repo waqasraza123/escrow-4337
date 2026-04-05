@@ -161,6 +161,75 @@
   gap: 12px;
 }
 
+.composerRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.composerStep {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  border-radius: 22px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1px rgba(140, 101, 68, 0.12);
+}
+
+.composerStep span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.composerStep small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.composerStepActive {
+  background: rgba(255, 241, 226, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(191, 121, 54, 0.32);
+}
+
+.composerSection,
+.composerSummaryCard {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 0 0 1px rgba(140, 101, 68, 0.12);
+}
+
+.composerSplit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.checklistItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(246, 235, 221, 0.68);
+}
+
+.checklistItem strong {
+  min-width: 64px;
+}
+
 .walletTitleRow,
 .timelineHead {
   display: flex;
@@ -236,7 +305,9 @@
   .hero,
   .grid,
   .detailGrid,
-  .summaryGrid {
+  .summaryGrid,
+  .composerRail,
+  .composerSplit {
     grid-template-columns: 1fr;
   }
 }
