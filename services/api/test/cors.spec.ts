@@ -21,17 +21,19 @@ describe('cors helpers', () => {
   });
 
   it('allows same-process requests without an origin header', () => {
-    expect(isCorsOriginAllowed(undefined, ['http://localhost:3000'])).toBe(true);
+    expect(isCorsOriginAllowed(undefined, ['http://localhost:3000'])).toBe(
+      true,
+    );
   });
 
   it('matches normalized origins against the allowlist', () => {
     const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001'];
 
-    expect(
-      isCorsOriginAllowed('http://localhost:3000/', allowedOrigins),
-    ).toBe(true);
-    expect(
-      isCorsOriginAllowed('http://localhost:3999', allowedOrigins),
-    ).toBe(false);
+    expect(isCorsOriginAllowed('http://localhost:3000/', allowedOrigins)).toBe(
+      true,
+    );
+    expect(isCorsOriginAllowed('http://localhost:3999', allowedOrigins)).toBe(
+      false,
+    );
   });
 });

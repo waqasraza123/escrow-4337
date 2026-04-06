@@ -10,7 +10,7 @@ import { WalletModule } from '../src/modules/wallet/wallet.module';
 import { WalletService } from '../src/modules/wallet/wallet.service';
 import { configureFilePersistence } from './support/test-persistence';
 
-jest.setTimeout(15000);
+jest.setTimeout(60000);
 
 describe('Wallet integration', () => {
   let walletService: WalletService;

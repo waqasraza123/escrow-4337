@@ -67,6 +67,8 @@ test('web console surfaces the expected deployed API target and runtime posture'
       exact: true,
     }),
   ).toBeVisible();
+  await expect(runtimePanel.getByText('Current origin allowed').first()).toBeVisible();
+  await expect(runtimePanel.getByText('HTTPS target').first()).toBeVisible();
 });
 
 test('admin console surfaces the expected deployed API target and runtime posture', async ({
@@ -90,6 +92,8 @@ test('admin console surfaces the expected deployed API target and runtime postur
       exact: true,
     }),
   ).toBeVisible();
+  await expect(runtimePanel.getByText('Current origin allowed').first()).toBeVisible();
+  await expect(runtimePanel.getByText('HTTPS target').first()).toBeVisible();
 });
 
 test('admin can load the configured deployed audit bundle', async ({ page, request }) => {

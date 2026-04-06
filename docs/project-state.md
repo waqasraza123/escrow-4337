@@ -61,6 +61,7 @@
 - Web now hardens milestone lifecycle UX with status-aware milestone selection, explicit ready/pending/confirmed/failed action posture, inline audit and execution receipt context, and focused frontend lifecycle helper tests in `apps/web`.
 - Admin now organizes the public audit bundle around operator tasks with case pressure summaries, dispute-focused milestone review, execution failure triage, combined event or receipt streams, explicit blocked privileged actions, recent lookup history, and focused admin helper tests in `apps/admin`.
 - Web and admin now surface backend runtime-profile posture directly in the product UI, including provider modes, configured arbitrator wallet visibility, and warnings when the current backend is not deployment-ready.
+- Web and admin now surface frontend-to-backend runtime alignment diagnostics directly in the product UI, including current frontend origin, CORS readiness against the backend allowlist, API transport safety, persistence posture, and trusted-proxy visibility through a shared frontend-core helper.
 - Admin now supports authenticated operator sessions plus manual SIWE linking of the configured arbitrator wallet and can call the existing protected milestone-resolution endpoint when the session actually controls that wallet.
 - Web and admin now share a dedicated `@escrow4334/frontend-core` workspace package for normalized API requests, async state transitions, formatting, persisted list utilities, and consistent status or empty-state primitives.
 - Web and admin now have app-local Vitest `jsdom` plus Testing Library harnesses, shared browser-test helpers via `@escrow4334/frontend-core/testing`, route-level interaction coverage for onboarding, guided job authoring, selected-job posture, and operator lookup states, plus a root Playwright entrypoint with a local-profile cross-surface flow that signs in, links a wallet, provisions a smart account, creates and funds a job, and opens the same audit bundle in admin.
@@ -95,6 +96,7 @@
 - Browser-hosted frontend profiles should set `NEST_API_CORS_ORIGINS` explicitly instead of assuming same-origin hosting; local profiles should allow the web and admin app origins they actually run on.
 - Frontend product surfaces should use the public runtime-profile contract to distinguish local-mock versus deployment-like backend posture instead of inferring readiness from environment names or manual operator knowledge.
 - Deployed frontend validation should run through the explicit `PLAYWRIGHT_PROFILE=deployed` lane with declared web, admin, and API targets; remote smoke checks should stay read-only unless a known-safe public audit job id is supplied.
+- Long-running route-level frontend tests and the API wallet integration test now use explicit timeout budgets instead of framework defaults so root `pnpm test` remains stable under concurrent Turbo execution.
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.

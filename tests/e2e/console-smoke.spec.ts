@@ -16,6 +16,7 @@ test('web console renders onboarding shell', async ({ page }) => {
     page.getByText('Authenticate first. The console will then load your profile, wallets, and jobs.'),
   ).toBeVisible();
   await expect(page.getByText('http://localhost:4100', { exact: true })).toBeVisible();
+  await expect(page.getByText('Current origin allowed').first()).toBeVisible();
 });
 
 test('admin console renders public audit review shell', async ({ page }) => {
@@ -33,4 +34,5 @@ test('admin console renders public audit review shell', async ({ page }) => {
     page.getByRole('button', { name: 'Load public bundle' }),
   ).toBeVisible();
   await expect(page.getByText('http://localhost:4100', { exact: true })).toBeVisible();
+  await expect(page.getByText('Current origin allowed').first()).toBeVisible();
 });

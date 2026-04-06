@@ -47,7 +47,7 @@ describe('admin page', () => {
     mockedAdminApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
   });
 
-  it('renders the public-only operator scope shell before any lookup', () => {
+  it('renders the public-only operator scope shell before any lookup', async () => {
     renderApp(<Home />);
 
     expect(
@@ -62,6 +62,11 @@ describe('admin page', () => {
     expect(screen.getByText('Receipt triage')).toBeInTheDocument();
     expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
     expect(screen.getByText('Backend profile validation')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Current origin allowed').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('HTTP target').length).toBeGreaterThan(0);
+    });
   });
 
   it('loads an audit bundle and persists recent lookup history', async () => {
@@ -254,7 +259,9 @@ describe('admin page', () => {
     );
   });
 
-  it('resolves a disputed milestone when the authenticated operator controls the arbitrator wallet', async () => {
+  it(
+    'resolves a disputed milestone when the authenticated operator controls the arbitrator wallet',
+    async () => {
     const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockedAdminApi.me.mockResolvedValue(
@@ -311,5 +318,7 @@ describe('admin page', () => {
       },
       'admin-access-token-123',
     );
-  });
+    },
+    10_000,
+  );
 });

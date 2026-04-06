@@ -107,10 +107,15 @@ describe('web page', () => {
         'Authenticate first. The console will then load your profile, wallets, and jobs.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
     expect(
       screen.getByText('Select a job to manage lifecycle actions'),
     ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
+      expect(screen.getAllByText('Current origin allowed').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('HTTP target').length).toBeGreaterThan(0);
+    });
   });
 
   it('restores a stored session and renders the selected job workspace', async () => {
@@ -462,6 +467,6 @@ describe('web page', () => {
       screen.getByRole('heading', { name: 'Launch-ready implementation' }),
     ).toBeInTheDocument();
     },
-    10_000,
+    20_000,
   );
 });

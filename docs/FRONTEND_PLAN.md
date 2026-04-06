@@ -4,8 +4,8 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 
 ## Current Reality
 
-- `apps/web` is now a productized client and worker console with guided job authoring, role-aware job workspaces, milestone lifecycle posture, audit visibility, and backend runtime-profile validation posture.
-- `apps/admin` is now a task-oriented operator console for public audit lookup, dispute posture review, execution receipt inspection, backend runtime-profile validation, authenticated operator session handling, and arbitrator-wallet-bound dispute resolution.
+- `apps/web` is now a productized client and worker console with guided job authoring, role-aware job workspaces, milestone lifecycle posture, audit visibility, backend runtime-profile validation, and explicit frontend-to-backend origin/CORS/transport diagnostics.
+- `apps/admin` is now a task-oriented operator console for public audit lookup, dispute posture review, execution receipt inspection, backend runtime-profile validation, authenticated operator session handling, arbitrator-wallet-bound dispute resolution, and explicit frontend-to-backend origin/CORS/transport diagnostics.
 - Shared frontend infrastructure now exists in `@escrow4334/frontend-core` for request handling, async-state helpers, formatting, storage, and status or empty-state primitives.
 - Frontend-specific automated coverage now exists at the helper, route, local-profile end-to-end, and deployed-profile smoke levels in `apps/web`, `apps/admin`, and `packages/frontend-core`.
 
@@ -207,6 +207,7 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 - add app-local UI testing dependencies for `apps/web` and `apps/admin`
 - add a small shared test utility layer only for repeated mocks and render helpers
 - add one root Playwright-based e2e entrypoint with separate local and deployed-profile lanes
+- keep runtime validation actionable inside the product UI by surfacing the frontend origin, backend CORS allowlist posture, and API transport safety
 - do not add new backend API surface as part of Step 7
 - do not add privileged admin flows as part of Step 7
 

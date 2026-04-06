@@ -69,7 +69,7 @@ export function createRuntimeProfile(
       nodeEnv: 'development',
       persistenceDriver: 'postgres',
       trustProxyRaw: 'loopback',
-      corsOrigins: ['http://localhost:3000', 'http://localhost:3001'],
+      corsOrigins: ['http://localhost', 'http://localhost:3000', 'http://localhost:3001'],
     },
     providers: {
       emailMode: 'mock',

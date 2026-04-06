@@ -27,7 +27,8 @@ describe('RuntimeProfileService', () => {
   it('reports a deployment-like profile when Postgres and all relay providers are configured', () => {
     process.env.NODE_ENV = 'production';
     process.env.PERSISTENCE_DRIVER = 'postgres';
-    process.env.DATABASE_URL = 'postgresql://escrow:escrow@localhost:5432/escrow';
+    process.env.DATABASE_URL =
+      'postgresql://escrow:escrow@localhost:5432/escrow';
     process.env.AUTH_EMAIL_MODE = 'relay';
     process.env.AUTH_EMAIL_FROM_EMAIL = 'ops@example.com';
     process.env.AUTH_EMAIL_RELAY_BASE_URL = 'https://email.example.com';
@@ -69,7 +70,8 @@ describe('RuntimeProfileService', () => {
   it('reports a local-mock profile with explicit warnings for development defaults', () => {
     process.env.NODE_ENV = 'development';
     process.env.PERSISTENCE_DRIVER = 'postgres';
-    process.env.DATABASE_URL = 'postgresql://escrow:escrow@localhost:5432/escrow';
+    process.env.DATABASE_URL =
+      'postgresql://escrow:escrow@localhost:5432/escrow';
     process.env.AUTH_EMAIL_MODE = 'mock';
     process.env.AUTH_EMAIL_FROM_EMAIL = 'ops@example.com';
     process.env.WALLET_SMART_ACCOUNT_MODE = 'mock';

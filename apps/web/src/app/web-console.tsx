@@ -6,6 +6,7 @@ import {
   createIdleState,
   createSuccessState,
   createWorkingState,
+  describeRuntimeAlignment,
   EmptyStateCard,
   formatTimestamp,
   previewHash,
@@ -1217,6 +1218,11 @@ export function EscrowConsole() {
     milestoneLifecycleCards.find((card) => card.action === 'open_dispute') ?? null;
   const resolveCard =
     milestoneLifecycleCards.find((card) => card.action === 'resolve_dispute') ?? null;
+  const runtimeAlignment = describeRuntimeAlignment(
+    webApi.baseUrl,
+    runtimeProfile,
+    typeof window === 'undefined' ? null : window.location.origin,
+  );
 
   return (
     <div className={styles.console}>
@@ -1284,11 +1290,45 @@ export function EscrowConsole() {
               {previewHash(runtimeProfile?.operator.arbitratorAddress ?? undefined)}
             </strong>
           </article>
+          <article>
+            <span className={styles.metaLabel}>Frontend origin</span>
+            <strong>{runtimeAlignment.currentOrigin}</strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>CORS readiness</span>
+            <strong>{runtimeAlignment.corsLabel}</strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>API transport</span>
+            <strong>{runtimeAlignment.transportLabel}</strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Persistence</span>
+            <strong>{runtimeAlignment.persistenceLabel}</strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Trust proxy</span>
+            <strong>{runtimeAlignment.trustProxyLabel}</strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Allowed origins</span>
+            <strong>{runtimeAlignment.corsOriginsLabel}</strong>
+          </article>
         </div>
-        <StatusNotice
-          message={runtimeProfile?.summary || runtimeState.message}
-          messageClassName={styles.stateText}
-        />
+        <div className={styles.stack}>
+          <StatusNotice
+            message={runtimeProfile?.summary || runtimeState.message}
+            messageClassName={styles.stateText}
+          />
+          <article className={styles.statusBanner}>
+            <strong>{runtimeAlignment.corsLabel}</strong>
+            <p className={styles.stateText}>{runtimeAlignment.corsMessage}</p>
+          </article>
+          <article className={styles.statusBanner}>
+            <strong>{runtimeAlignment.transportLabel}</strong>
+            <p className={styles.stateText}>{runtimeAlignment.transportMessage}</p>
+          </article>
+        </div>
       </section>
 
       <div className={styles.grid}>

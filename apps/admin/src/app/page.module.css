@@ -61,6 +61,12 @@
   color: var(--muted);
 }
 
+.heroCard strong,
+.summaryGrid article strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .panelHeader {
   display: flex;
   justify-content: space-between;

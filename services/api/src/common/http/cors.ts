@@ -8,10 +8,7 @@ export function readCorsOrigins(value: string | undefined): string[] {
     return [];
   }
 
-  const origins = candidate
-    .split(',')
-    .map(normalizeOrigin)
-    .filter(Boolean);
+  const origins = candidate.split(',').map(normalizeOrigin).filter(Boolean);
 
   for (const origin of origins) {
     try {

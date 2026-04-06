@@ -8,6 +8,7 @@ import {
   pushStoredStringList,
   readErrorMessage,
   requestJson,
+  describeRuntimeAlignment,
   resolveApiBaseUrl,
   toErrorMessage,
 } from '../index';
@@ -88,5 +89,47 @@ describe('frontend core helpers', () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
     expect(headers.get('content-type')).toBe('application/json');
     expect(headers.get('authorization')).toBe('Bearer token-123');
+  });
+
+  it('describes runtime alignment for deployment diagnostics', () => {
+    expect(
+      describeRuntimeAlignment(
+        'https://api.example.com',
+        {
+          environment: {
+            corsOrigins: ['https://web.example.com'],
+            persistenceDriver: 'postgres',
+            trustProxyRaw: 'loopback',
+          },
+        },
+        'https://web.example.com',
+      ),
+    ).toMatchObject({
+      currentOrigin: 'https://web.example.com',
+      transportLabel: 'HTTPS target',
+      corsLabel: 'Current origin allowed',
+      persistenceLabel: 'Postgres',
+      trustProxyLabel: 'loopback',
+      corsOriginsLabel: 'https://web.example.com',
+    });
+
+    expect(
+      describeRuntimeAlignment(
+        'http://api.example.com',
+        {
+          environment: {
+            corsOrigins: [],
+            persistenceDriver: 'file',
+            trustProxyRaw: null,
+          },
+        },
+        'https://web.example.com',
+      ),
+    ).toMatchObject({
+      transportLabel: 'HTTP target',
+      corsLabel: 'CORS not configured',
+      persistenceLabel: 'File',
+      trustProxyLabel: 'Not configured',
+    });
   });
 });

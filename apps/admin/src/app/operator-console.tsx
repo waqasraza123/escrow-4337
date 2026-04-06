@@ -7,6 +7,7 @@ import {
   createIdleState,
   createSuccessState,
   createWorkingState,
+  describeRuntimeAlignment,
   EmptyStateCard,
   formatTimestamp,
   previewHash,
@@ -408,6 +409,11 @@ export function OperatorConsole() {
   const controlsArbitratorWallet = Boolean(
     arbitratorAddress && linkedWalletAddresses.has(arbitratorAddress),
   );
+  const runtimeAlignment = describeRuntimeAlignment(
+    adminApi.baseUrl,
+    runtimeProfile,
+    typeof window === 'undefined' ? null : window.location.origin,
+  );
   const selectedResolutionCard = useMemo(
     () =>
       disputedMilestoneCards.find(
@@ -536,6 +542,30 @@ export function OperatorConsole() {
               <span className={styles.metaLabel}>Arbitrator wallet</span>
               <strong>{previewHash(arbitratorAddress ?? undefined)}</strong>
             </article>
+            <article>
+              <span className={styles.metaLabel}>Frontend origin</span>
+              <strong>{runtimeAlignment.currentOrigin}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>CORS readiness</span>
+              <strong>{runtimeAlignment.corsLabel}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>API transport</span>
+              <strong>{runtimeAlignment.transportLabel}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Persistence</span>
+              <strong>{runtimeAlignment.persistenceLabel}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Trust proxy</span>
+              <strong>{runtimeAlignment.trustProxyLabel}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Allowed origins</span>
+              <strong>{runtimeAlignment.corsOriginsLabel}</strong>
+            </article>
           </div>
           <div className={styles.stack}>
             <StatusNotice
@@ -544,6 +574,14 @@ export function OperatorConsole() {
               }
               messageClassName={styles.stateText}
             />
+            <article className={styles.boundaryCard}>
+              <strong>{runtimeAlignment.corsLabel}</strong>
+              <p className={styles.stateText}>{runtimeAlignment.corsMessage}</p>
+            </article>
+            <article className={styles.boundaryCard}>
+              <strong>{runtimeAlignment.transportLabel}</strong>
+              <p className={styles.stateText}>{runtimeAlignment.transportMessage}</p>
+            </article>
             {runtimeProfile?.warnings.map((warning) => (
               <article key={warning} className={styles.boundaryCard}>
                 <strong>Validation warning</strong>
