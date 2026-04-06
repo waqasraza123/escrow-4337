@@ -65,6 +65,13 @@ export const resolveMilestoneSchema = z
   })
   .strict();
 
+export const exportArtifactQuerySchema = z
+  .object({
+    artifact: z.enum(['job-history', 'dispute-case']).default('job-history'),
+    format: z.enum(['json', 'csv']).default('json'),
+  })
+  .strict();
+
 export type CreateJobDto = z.infer<typeof createJobSchema>;
 export type FundJobDto = z.infer<typeof fundJobSchema>;
 export type MilestoneDto = z.infer<typeof milestoneSchema>;
@@ -73,3 +80,4 @@ export type DeliverMilestoneDto = z.infer<typeof deliverMilestoneSchema>;
 export type ReleaseMilestoneDto = z.infer<typeof releaseMilestoneSchema>;
 export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
 export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;
+export type ExportArtifactQueryDto = z.infer<typeof exportArtifactQuerySchema>;

@@ -13,6 +13,7 @@ import {
   previewHash,
   pushStoredStringList,
   readStoredStringList,
+  saveDownloadedDocument,
   StatusNotice,
   type AsyncState,
   writeStoredStringList,
@@ -20,6 +21,8 @@ import {
 import {
   adminApi,
   type AuditBundle,
+  type CaseExportArtifact,
+  type CaseExportFormat,
   type RuntimeProfile,
   type SessionTokens,
   type UserProfile,
@@ -141,6 +144,7 @@ export function OperatorConsole() {
   const [resolutionState, setResolutionState] = useState<AsyncState>(
     createIdleState(),
   );
+  const [exportState, setExportState] = useState<AsyncState>(createIdleState());
   const [resolutionMilestoneIndex, setResolutionMilestoneIndex] = useState<number | null>(
     null,
   );
@@ -229,6 +233,7 @@ export function OperatorConsole() {
     try {
       const nextAudit = await adminApi.getAudit(normalizedJobId);
       setAudit(nextAudit);
+      setExportState(createIdleState());
       const nextHistory = pushStoredStringList(lookupHistory, normalizedJobId);
       setLookupHistory(nextHistory);
       writeStoredStringList(historyKey, nextHistory);
@@ -240,6 +245,7 @@ export function OperatorConsole() {
       return true;
     } catch (error) {
       setAudit(null);
+      setExportState(createIdleState());
       setState(createErrorState(error, 'Failed to load operator case'));
       return false;
     }
@@ -476,6 +482,35 @@ export function OperatorConsole() {
     }
   }
 
+  async function handleDownloadExport(
+    artifact: CaseExportArtifact,
+    format: CaseExportFormat,
+  ) {
+    if (!audit) {
+      return;
+    }
+
+    setExportState(
+      createWorkingState(`Preparing ${artifact} ${format.toUpperCase()} export...`),
+    );
+
+    try {
+      const documentToSave = await adminApi.downloadCaseExport(
+        audit.bundle.job.id,
+        artifact,
+        format,
+      );
+      saveDownloadedDocument(documentToSave);
+      setExportState(
+        createSuccessState(
+          `Downloaded ${artifact} ${format.toUpperCase()} export.`,
+        ),
+      );
+    } catch (error) {
+      setExportState(createErrorState(error, 'Failed to download case export'));
+    }
+  }
+
   return (
     <div className={styles.console}>
       <section className={styles.hero}>
@@ -565,6 +600,12 @@ export function OperatorConsole() {
             <article>
               <span className={styles.metaLabel}>Allowed origins</span>
               <strong>{runtimeAlignment.corsOriginsLabel}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Export support</span>
+              <strong>
+                {runtimeProfile?.operator.exportSupport ? 'Available' : 'Unavailable'}
+              </strong>
             </article>
           </div>
           <div className={styles.stack}>
@@ -827,6 +868,52 @@ export function OperatorConsole() {
               message={caseBrief.pressureSummary}
               messageClassName={styles.stateText}
             />
+            <div className={styles.stack}>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadExport('job-history', 'json')}
+                >
+                  Export job history JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadExport('job-history', 'csv')}
+                >
+                  Export job history CSV
+                </button>
+              </div>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadExport('dispute-case', 'json')}
+                >
+                  Export dispute case JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadExport('dispute-case', 'csv')}
+                >
+                  Export dispute case CSV
+                </button>
+              </div>
+              <StatusNotice
+                message={exportState.message}
+                messageClassName={styles.stateText}
+              />
+              <article className={styles.boundaryCard}>
+                <strong>
+                  {runtimeProfile?.operator.exportSupport
+                    ? 'Backend export support verified'
+                    : 'Runtime profile did not confirm export support'}
+                </strong>
+                <p className={styles.stateText}>
+                  Job-history exports are always available from the public bundle.
+                  Dispute-case exports stay truthful to the current milestone and
+                  receipt posture, even when no active disputes remain.
+                </p>
+              </article>
+            </div>
           </section>
 
           <div className={styles.grid}>
@@ -966,12 +1053,6 @@ export function OperatorConsole() {
                         The authenticated session does not currently control the configured arbitrator wallet {arbitratorAddress}.
                       </p>
                     </article>
-                    <article className={styles.boundaryCard}>
-                      <strong>Blocked by export support</strong>
-                      <p className={styles.stateText}>
-                        Evidence bundles and case exports should not appear as fake actions before backend export support lands.
-                      </p>
-                    </article>
                   </>
                 ) : (
                   <>
@@ -1026,12 +1107,6 @@ export function OperatorConsole() {
                       <strong>Resolution authority confirmed</strong>
                       <p className={styles.stateText}>
                         The session controls the configured arbitrator wallet, so the existing protected resolve endpoint can be used from this console.
-                      </p>
-                    </article>
-                    <article className={styles.boundaryCard}>
-                      <strong>Still blocked by export support</strong>
-                      <p className={styles.stateText}>
-                        Evidence bundles and case exports remain intentionally unavailable until backend export support exists.
                       </p>
                     </article>
                   </>
@@ -1149,8 +1224,8 @@ export function OperatorConsole() {
               messageClassName={styles.stateText}
             />
             <EmptyStateCard
-              title="Blocked privileged actions"
-              message="Operator resolution and exports remain blocked until backend authorization and export support exist."
+              title="Case exports"
+              message="Load a public bundle to export job history or dispute-case artifacts without endpoint spelunking."
               className={styles.emptyCard}
               messageClassName={styles.stateText}
             />

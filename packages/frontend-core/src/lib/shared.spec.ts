@@ -7,7 +7,10 @@ import {
   previewHash,
   pushStoredStringList,
   readErrorMessage,
+  readContentDispositionFilename,
+  requestDocument,
   requestJson,
+  saveDownloadedDocument,
   describeRuntimeAlignment,
   resolveApiBaseUrl,
   toErrorMessage,
@@ -16,6 +19,7 @@ import {
 describe('frontend core helpers', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('formats async state and errors consistently', () => {
@@ -91,6 +95,75 @@ describe('frontend core helpers', () => {
     expect(headers.get('authorization')).toBe('Bearer token-123');
   });
 
+  it('requests downloadable documents and parses attachment filenames', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('case export', {
+        status: 200,
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition':
+            'attachment; filename="escrow-job-123-job-history.csv"',
+        },
+      }),
+    );
+
+    await expect(
+      requestDocument('http://localhost:4000', '/jobs/job-123/export'),
+    ).resolves.toMatchObject({
+      filename: 'escrow-job-123-job-history.csv',
+      contentType: 'text/csv; charset=utf-8',
+    });
+
+    expect(
+      readContentDispositionFilename(
+        "attachment; filename*=UTF-8''escrow-job-123-dispute-case.json",
+      ),
+    ).toBe('escrow-job-123-dispute-case.json');
+  });
+
+  it('saves downloaded documents through a browser anchor', () => {
+    const clickSpy = vi.fn();
+    const anchor = {
+      click: clickSpy,
+      remove: vi.fn(),
+      style: {},
+      rel: '',
+      href: '',
+      download: '',
+    };
+    const createObjectUrl = vi.fn(() => 'blob:download');
+    const revokeObjectUrl = vi.fn();
+    vi.stubGlobal('window', {
+      URL: {
+        createObjectURL: createObjectUrl,
+        revokeObjectURL: revokeObjectUrl,
+      },
+      setTimeout,
+    });
+    vi.stubGlobal('document', {
+      createElement: vi.fn(() => anchor),
+      body: {
+        appendChild: vi.fn(),
+      },
+    });
+
+    saveDownloadedDocument({
+      blob: new Blob(['hello'], { type: 'text/plain' }),
+      filename: 'hello.txt',
+      contentType: 'text/plain',
+    });
+
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download');
+        resolve();
+      }, 0);
+    });
+  });
+
   it('describes runtime alignment for deployment diagnostics', () => {
     expect(
       describeRuntimeAlignment(
@@ -130,6 +203,20 @@ describe('frontend core helpers', () => {
       corsLabel: 'CORS not configured',
       persistenceLabel: 'File',
       trustProxyLabel: 'Not configured',
+    });
+
+    expect(
+      describeRuntimeAlignment(
+        'https://api.example.com',
+        null,
+        'https://web.example.com',
+      ),
+    ).toMatchObject({
+      transportLabel: 'HTTPS target',
+      corsLabel: 'Runtime profile unavailable',
+      persistenceLabel: 'Unknown',
+      trustProxyLabel: 'Unavailable',
+      corsOriginsLabel: 'Unavailable',
     });
   });
 });

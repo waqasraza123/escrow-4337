@@ -174,7 +174,7 @@ export type RuntimeProfile = {
   operator: {
     arbitratorAddress: string | null;
     resolutionAuthority: 'linked_arbitrator_wallet';
-    exportSupport: false;
+    exportSupport: boolean;
   };
   warnings: string[];
 };

@@ -158,6 +158,73 @@ export type EscrowAuditBundle = {
   };
 };
 
+export type EscrowExportArtifactKind = 'job-history' | 'dispute-case';
+
+export type EscrowExportFormat = 'json' | 'csv';
+
+export type EscrowExportTimelineEntry = {
+  source: 'audit' | 'execution';
+  at: number;
+  label: string;
+  milestoneIndex: number | null;
+  status: string | null;
+  actorAddress: string | null;
+  txHash: string | null;
+  detail: Record<string, unknown>;
+};
+
+export type EscrowJobHistoryExport = {
+  schemaVersion: 1;
+  artifact: 'job-history';
+  exportedAt: string;
+  job: EscrowJobView;
+  summary: {
+    milestoneCount: number;
+    disputedMilestones: number;
+    failedExecutions: number;
+    latestActivityAt: number | null;
+  };
+  audit: EscrowAuditEvent[];
+  executions: EscrowExecutionRecord[];
+  timeline: EscrowExportTimelineEntry[];
+};
+
+export type EscrowDisputeCaseExport = {
+  schemaVersion: 1;
+  artifact: 'dispute-case';
+  exportedAt: string;
+  job: EscrowJobView;
+  summary: {
+    disputeCount: number;
+    openDisputes: number;
+    resolvedDisputes: number;
+    failedExecutions: number;
+    latestActivityAt: number | null;
+  };
+  disputes: Array<{
+    milestoneIndex: number;
+    title: string;
+    status: MilestoneStatus;
+    amount: string;
+    disputedAt: number | null;
+    resolvedAt: number | null;
+    disputeReason: string | null;
+    resolutionAction: 'release' | 'refund' | null;
+    resolutionNote: string | null;
+    relatedAudit: EscrowAuditEvent[];
+    relatedExecutions: EscrowExecutionRecord[];
+  }>;
+  failedExecutions: EscrowExecutionRecord[];
+};
+
+export type EscrowExportDocument = {
+  artifact: EscrowExportArtifactKind;
+  format: EscrowExportFormat;
+  contentType: string;
+  fileName: string;
+  body: string | EscrowJobHistoryExport | EscrowDisputeCaseExport;
+};
+
 export type CreateJobResponse = {
   jobId: string;
   jobHash: string;

@@ -5,8 +5,11 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { User, type ReqUser } from '../../common/decorators/user.decorator';
 import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -130,5 +133,28 @@ export class EscrowController {
   @Get(':id/audit')
   audit(@Param('id') id: string): Promise<EscrowAuditBundle> {
     return this.escrowService.getAuditBundle(id);
+  }
+
+  @Get(':id/export')
+  async exportArtifact(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(escrowDto.exportArtifactQuerySchema))
+    query: escrowDto.ExportArtifactQueryDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const document = await this.escrowService.getExportDocument(
+      id,
+      query.artifact,
+      query.format,
+    );
+
+    response.setHeader('content-type', document.contentType);
+    response.setHeader(
+      'content-disposition',
+      `attachment; filename="${document.fileName}"`,
+    );
+    response.setHeader('cache-control', 'no-store');
+
+    return document.body;
   }
 }

@@ -84,7 +84,7 @@ export class RuntimeProfileService {
       operator: {
         arbitratorAddress: this.readArbitratorAddress(),
         resolutionAuthority: 'linked_arbitrator_wallet',
-        exportSupport: false,
+        exportSupport: true,
       },
       warnings,
     };

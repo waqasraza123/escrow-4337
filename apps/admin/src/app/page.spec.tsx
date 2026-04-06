@@ -31,6 +31,7 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     createWalletChallenge: vi.fn(),
     verifyWalletChallenge: vi.fn(),
     getAudit: vi.fn(),
+    downloadCaseExport: vi.fn(),
     resolveMilestone: vi.fn(),
   },
 }));
@@ -69,6 +70,21 @@ describe('admin page', () => {
     });
   });
 
+  it('shows truthful runtime diagnostics when the backend profile cannot load', async () => {
+    mockedAdminApi.getRuntimeProfile.mockRejectedValue(new Error('Failed to fetch'));
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Runtime profile unavailable').length,
+      ).toBeGreaterThan(0);
+      expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
+      expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
+    });
+  });
+
   it('loads an audit bundle and persists recent lookup history', async () => {
     const user = userEvent.setup();
     seedJsonStorage(lookupHistoryStorageKey, ['job-legacy']);
@@ -94,6 +110,9 @@ describe('admin page', () => {
     expect(window.localStorage.getItem(lookupHistoryStorageKey)).toBe(
       JSON.stringify(['job-123', 'job-legacy']),
     );
+    expect(
+      screen.getByRole('button', { name: 'Export job history JSON' }),
+    ).toBeInTheDocument();
   });
 
   it('surfaces a validation error when lookup is submitted without a job id', async () => {
@@ -321,4 +340,53 @@ describe('admin page', () => {
     },
     10_000,
   );
+
+  it('downloads operator export artifacts from the loaded public bundle', async () => {
+    const user = userEvent.setup();
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:case-export'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(() => undefined),
+    });
+    mockedAdminApi.getAudit.mockResolvedValue(createAuditBundle());
+    mockedAdminApi.downloadCaseExport.mockResolvedValue({
+      blob: new Blob(['case export'], { type: 'text/csv' }),
+      filename: 'escrow-job-123-dispute-case.csv',
+      contentType: 'text/csv; charset=utf-8',
+    });
+
+    renderApp(<Home />);
+
+    await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-123');
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Disputed implementation' }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Export dispute case CSV' }),
+    );
+
+    await waitFor(() => {
+      expect(mockedAdminApi.downloadCaseExport).toHaveBeenCalledWith(
+        'job-123',
+        'dispute-case',
+        'csv',
+      );
+      expect(
+        screen.getByText('Downloaded dispute-case CSV export.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
 });

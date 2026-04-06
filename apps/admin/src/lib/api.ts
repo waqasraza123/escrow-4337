@@ -1,6 +1,8 @@
 import {
+  requestDocument,
   requestJson,
   resolveApiBaseUrl,
+  type DownloadedDocument,
 } from '@escrow4334/frontend-core';
 
 export type UserWallet =
@@ -77,10 +79,14 @@ export type RuntimeProfile = {
   operator: {
     arbitratorAddress: string | null;
     resolutionAuthority: 'linked_arbitrator_wallet';
-    exportSupport: false;
+    exportSupport: boolean;
   };
   warnings: string[];
 };
+
+export type CaseExportArtifact = 'job-history' | 'dispute-case';
+
+export type CaseExportFormat = 'json' | 'csv';
 
 export type AuditBundle = {
   bundle: {
@@ -215,6 +221,23 @@ export const adminApi = {
     return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
       method: 'GET',
     });
+  },
+  downloadCaseExport(
+    jobId: string,
+    artifact: CaseExportArtifact,
+    format: CaseExportFormat,
+  ): Promise<DownloadedDocument> {
+    const query = new URLSearchParams({
+      artifact,
+      format,
+    });
+    return requestDocument(
+      apiBaseUrl,
+      `/jobs/${encodeURIComponent(jobId)}/export?${query.toString()}`,
+      {
+        method: 'GET',
+      },
+    );
   },
   resolveMilestone(
     jobId: string,

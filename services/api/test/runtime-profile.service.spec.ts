@@ -64,6 +64,7 @@ describe('RuntimeProfileService', () => {
     expect(profile.operator.arbitratorAddress).toBe(
       '0x2222222222222222222222222222222222222222',
     );
+    expect(profile.operator.exportSupport).toBe(true);
     expect(profile.warnings).toEqual([]);
   });
 

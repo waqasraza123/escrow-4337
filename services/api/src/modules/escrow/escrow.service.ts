@@ -38,6 +38,7 @@ import type {
 } from './escrow.types';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { UsersService } from '../users/users.service';
+import { buildEscrowExportDocument } from './escrow-export';
 
 const MINOR_UNIT_SCALE = 1_000_000n;
 const amountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
@@ -569,6 +570,15 @@ export class EscrowService {
         executions,
       },
     };
+  }
+
+  async getExportDocument(
+    jobId: string,
+    artifact: 'job-history' | 'dispute-case',
+    format: 'json' | 'csv',
+  ) {
+    const bundle = (await this.getAuditBundle(jobId)).bundle;
+    return buildEscrowExportDocument(bundle, artifact, format);
   }
 
   private toJobView(job: EscrowJobRecord) {

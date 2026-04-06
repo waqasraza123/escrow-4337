@@ -79,7 +79,7 @@ export function createRuntimeProfile(
     operator: {
       arbitratorAddress: createHexAddress('2'),
       resolutionAuthority: 'linked_arbitrator_wallet',
-      exportSupport: false,
+      exportSupport: true,
     },
     warnings: [
       'Escrow execution is using mock mode, so lifecycle mutations are not exercising deployed contract relay infrastructure.',

@@ -1,4 +1,10 @@
+import {
+  describeRuntimeAlignment,
+  type RuntimeAlignmentDiagnostics,
+} from '@escrow4334/frontend-core';
+
 type RuntimeProfileKind = 'mixed' | 'deployment-like';
+type RuntimeProfileLabelKind = 'local-mock' | RuntimeProfileKind;
 
 export type DeployedProfileConfig = {
   webBaseUrl: string;
@@ -8,6 +14,28 @@ export type DeployedProfileConfig = {
   expectedProfile: RuntimeProfileKind;
   allowInsecureHttp: boolean;
   allowLocalhost: boolean;
+};
+
+export type RuntimeProfileResponse = {
+  generatedAt: string;
+  profile: 'local-mock' | 'mixed' | 'deployment-like';
+  summary: string;
+  environment: {
+    corsOrigins: string[];
+    persistenceDriver: 'postgres' | 'file';
+    trustProxyRaw: string | null;
+  };
+  providers: {
+    emailMode: 'mock' | 'relay';
+    smartAccountMode: 'mock' | 'relay';
+    escrowMode: 'mock' | 'relay';
+  };
+  operator: {
+    arbitratorAddress: string | null;
+    resolutionAuthority: 'linked_arbitrator_wallet';
+    exportSupport: boolean;
+  };
+  warnings: string[];
 };
 
 function readBooleanFlag(value: string | undefined) {
@@ -109,11 +137,29 @@ export function readDeployedProfileConfig(
   };
 }
 
-export function getRuntimeProfileLabel(profile: RuntimeProfileKind) {
+export function getRuntimeProfileLabel(profile: RuntimeProfileLabelKind) {
   switch (profile) {
+    case 'local-mock':
+      return 'Local mock';
     case 'deployment-like':
       return 'Deployment-like';
     case 'mixed':
       return 'Mixed';
   }
+}
+
+export function describeDeployedRuntimeAlignment(
+  apiBaseUrl: string,
+  currentOrigin: string,
+  runtimeProfile: RuntimeProfileResponse | null,
+): RuntimeAlignmentDiagnostics {
+  return describeRuntimeAlignment(
+    apiBaseUrl,
+    runtimeProfile
+      ? {
+          environment: runtimeProfile.environment,
+        }
+      : null,
+    currentOrigin,
+  );
 }
