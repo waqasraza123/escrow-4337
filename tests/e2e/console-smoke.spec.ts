@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { adminBaseUrl, webBaseUrl } from './local-profile';
 
 test('web console renders onboarding shell', async ({ page }) => {
-  await page.goto('http://127.0.0.1:3000');
+  await page.goto(webBaseUrl);
 
   await expect(
     page.getByRole('heading', {
@@ -14,10 +15,11 @@ test('web console renders onboarding shell', async ({ page }) => {
   await expect(
     page.getByText('Authenticate first. The console will then load your profile, wallets, and jobs.'),
   ).toBeVisible();
+  await expect(page.getByText('http://localhost:4100', { exact: true })).toBeVisible();
 });
 
 test('admin console renders public audit review shell', async ({ page }) => {
-  await page.goto('http://127.0.0.1:3001');
+  await page.goto(adminBaseUrl);
 
   await expect(
     page.getByRole('heading', {
@@ -30,4 +32,5 @@ test('admin console renders public audit review shell', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Load public bundle' }),
   ).toBeVisible();
+  await expect(page.getByText('http://localhost:4100', { exact: true })).toBeVisible();
 });

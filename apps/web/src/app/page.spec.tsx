@@ -7,7 +7,13 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuditBundle,
+  createCreateJobResponse,
+  createCustomAuditBundle,
+  createCustomJobsListResponse,
+  createCustomJobView,
+  createHexAddress,
   createJobsListResponse,
+  createRuntimeProfile,
   createSessionTokens,
   createUserProfile,
   createVerifyResponse,
@@ -19,6 +25,7 @@ import {
 const { mockedWebApi, mockedInjectedWallet } = vi.hoisted(() => ({
   mockedWebApi: {
     baseUrl: 'http://localhost:4000',
+    getRuntimeProfile: vi.fn(),
     startAuth: vi.fn(),
     verifyAuth: vi.fn(),
     refresh: vi.fn(),
@@ -56,16 +63,20 @@ vi.mock('../lib/injected-wallet', () => mockedInjectedWallet);
 
 import Home from './page';
 
-function mockAuthenticatedConsoleLoad() {
+function mockAuthenticatedConsoleLoad(options?: {
+  jobs?: ReturnType<typeof createJobsListResponse>;
+  audit?: ReturnType<typeof createAuditBundle>;
+}) {
   mockedWebApi.me.mockResolvedValue(createUserProfile());
   mockedWebApi.getWalletState.mockResolvedValue(createWalletState());
-  mockedWebApi.listJobs.mockResolvedValue(createJobsListResponse());
-  mockedWebApi.getAudit.mockResolvedValue(createAuditBundle());
+  mockedWebApi.listJobs.mockResolvedValue(options?.jobs ?? createJobsListResponse());
+  mockedWebApi.getAudit.mockResolvedValue(options?.audit ?? createAuditBundle());
 }
 
 describe('web page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedWebApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
     mockedInjectedWallet.subscribeInjectedWallet.mockReturnValue(() => {});
     mockedInjectedWallet.readInjectedWalletSnapshot.mockResolvedValue({
       address: null,
@@ -96,6 +107,7 @@ describe('web page', () => {
         'Authenticate first. The console will then load your profile, wallets, and jobs.',
       ),
     ).toBeInTheDocument();
+    expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
     expect(
       screen.getByText('Select a job to manage lifecycle actions'),
     ).toBeInTheDocument();
@@ -337,4 +349,119 @@ describe('web page', () => {
       'access-token-123',
     );
   });
+
+  it(
+    'progresses through the guided job flow and exposes post-create actions',
+    async () => {
+    const user = userEvent.setup();
+    const createdJob = createCustomJobView({
+      id: 'job-created',
+      title: 'Launch-ready implementation',
+      description: 'Scoped implementation for guided job coverage.',
+      fundedAmount: null,
+      status: 'draft',
+      onchain: {
+        escrowId: 'escrow-created',
+        workerAddress: createHexAddress('4'),
+        currencyAddress: createHexAddress('5'),
+      },
+      milestones: [],
+    });
+    const createdJobResponse = createCreateJobResponse({
+      jobId: createdJob.id,
+      escrowId: createdJob.onchain.escrowId ?? 'escrow-created',
+    });
+    const refreshedJobs = createCustomJobsListResponse([
+      {
+        job: createdJob,
+        participantRoles: ['client'],
+      },
+    ]);
+    const refreshedAudit = createCustomAuditBundle({
+      job: createdJob,
+      audit: [],
+      executions: [],
+    });
+
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockAuthenticatedConsoleLoad();
+    mockedWebApi.createJob.mockResolvedValue(createdJobResponse);
+    mockedWebApi.listJobs
+      .mockResolvedValue(refreshedJobs)
+      .mockResolvedValueOnce(createJobsListResponse());
+    mockedWebApi.getAudit
+      .mockResolvedValue(refreshedAudit)
+      .mockResolvedValueOnce(createAuditBundle());
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('client@example.com')).toBeInTheDocument();
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('Milestone-based product implementation'),
+      {
+        target: { value: 'Launch-ready implementation' },
+      },
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        'Describe the scope, delivery expectations, and what the worker will be paid to complete.',
+      ),
+      {
+        target: { value: 'Scoped implementation for guided job coverage.' },
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Worker wallet' }), {
+      target: { value: createHexAddress('4') },
+    });
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Settlement token address' }),
+      {
+        target: { value: createHexAddress('5') },
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Create guided job' }),
+      ).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Create guided job' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/Job created\. Escrow id escrow-created/).length,
+      ).toBeGreaterThan(0);
+    });
+
+    expect(mockedWebApi.createJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerAddress: createHexAddress('4'),
+        currencyAddress: createHexAddress('5'),
+        title: 'Launch-ready implementation',
+        description: 'Scoped implementation for guided job coverage.',
+      }),
+      'access-token-123',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Review selected job' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Commit drafted milestones' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Stage funding from milestone total' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Launch-ready implementation' }),
+    ).toBeInTheDocument();
+    },
+    10_000,
+  );
 });

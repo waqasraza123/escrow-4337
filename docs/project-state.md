@@ -5,11 +5,11 @@
 - Current reality: prototype-stage monorepo. The contract is the strongest completed slice; the API and frontends are not production-ready.
 
 ## Current Architecture
-- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, smart-account provisioning, and deployment-validation boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway; API startup now fails fast on invalid non-test deployment config and exposes built deployment-validation and migration-status commands that operate from compiled JS, ship SQL migration assets in `dist`, and return structured validation reports instead of crashing when config is incomplete. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers, and the repo now includes a pinned local Postgres Docker Compose stack plus a dedicated `.env.local` profile for zero-cost development against direct Postgres without managed vendors.
+- `services/api`: NestJS API with auth, email-delivery, wallet, escrow, policy, persistence, escrow-contract gateway, smart-account provisioning, deployment-validation, and runtime-profile boundaries. Auth, OTP, session, user, wallet, and escrow lifecycle state flow through repository-backed persistence adapters; OTP delivery now runs through a provider-backed email boundary with rollback-safe issuance semantics; auth runtime policy is now environment-driven and validated for JWT, session, and OTP behavior; OTP start abuse protection now persists request-throttle state by source IP; wallet records now persist EOA verification metadata plus smart-account execution metadata; escrow mutations resolve actor identity from the authenticated user's linked wallets before submitting through the contract gateway; API startup now fails fast on invalid non-test deployment config, can enable environment-driven browser CORS allowlists for separate frontend origins, exposes a public runtime-profile endpoint that classifies backend posture as `local-mock`, `mixed`, or `deployment-like`, and exposes built deployment-validation and migration-status commands that operate from compiled JS, ship SQL migration assets in `dist`, and return structured validation reports instead of crashing when config is incomplete. Tests use file-backed persistence plus mock contract, email, and smart-account providers; the production path targets Postgres and configured relay-backed providers, and the repo now includes a pinned local Postgres Docker Compose stack plus a dedicated `.env.local` profile for zero-cost development against direct Postgres without managed vendors.
 - `packages/contracts`: Foundry workspace with `WorkstreamEscrow.sol` and contract tests.
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
-- `apps/web`: Next.js client console with OTP auth, browser-wallet-native plus manual SIWE wallet-link challenge handling, smart-account provisioning, guided client job authoring, role-aware job workspaces, lifecycle mutation forms, and audit visibility wired to the API.
-- `apps/admin`: Next.js operator console with job-audit lookup, milestone posture review, and execution receipt inspection wired to the public audit endpoint.
+- `apps/web`: Next.js client console with OTP auth, browser-wallet-native plus manual SIWE wallet-link challenge handling, smart-account provisioning, guided client job authoring, role-aware job workspaces, lifecycle mutation forms, audit visibility, and backend runtime-profile validation posture wired to the API.
+- `apps/admin`: Next.js operator console with public job-audit lookup, milestone posture review, execution receipt inspection, backend runtime-profile validation, authenticated operator session restore or refresh, manual arbitrator-wallet linking, and arbitrator-bound dispute resolution wired to the existing protected API path.
 - `packages/frontend-core`: shared frontend workspace package for async-state helpers, API request and error normalization, local-storage utilities, formatting helpers, and unstyled status or empty-state primitives consumed by both Next apps.
 - `packages/sdk`: source files exist, but it is not a real workspace package.
 - `packages/abi`: directory exists but is empty.
@@ -24,7 +24,7 @@
 
 ## Current Roadmap
 - Execute the new API deployment validation flow against real staging or production-like infrastructure, including deployed Postgres migration checks, live relay or provider reachability, bundler or paymaster chain validation, and deployed ingress or proxy validation.
-- Harden and validate the new web and admin product-console surfaces against a real backend environment, then iterate toward browser-wallet-native onboarding and privileged operator workflows.
+- Harden and validate the new web and admin product-console surfaces against a real deployed backend environment, then expand operator failure coverage, export posture, and live relay-backed workflows.
 - Add missing indexing, audit/export, CI, and deployment/ops slices described in the README.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
 - Keep each implementation phase explicitly test-heavy, with targeted unit or integration coverage added alongside the code change.
@@ -47,6 +47,7 @@
 - API now has deployment-validation tooling that fails fast on invalid non-test runtime config, reports Postgres connectivity plus migration status, probes configured relays, checks bundler chain identity, warns on non-introspectable paymasters, and surfaces trusted-proxy posture through a dedicated CLI command.
 - API deployment-validation and migration CLIs now execute built `dist` entrypoints instead of `ts-node`, copy SQL migrations into build output, and keep deployment validation in a structured-report mode when config gaps block downstream probes.
 - API built CLIs now honor the same environment-file precedence as Nest runtime startup, so `.env.local` can safely override `.env.<env>` and `.env` during local Postgres and deployment operations without shell-specific workarounds.
+- API now exposes `GET /operations/runtime-profile` so web and admin surfaces can validate whether they are pointed at a `local-mock`, `mixed`, or `deployment-like` backend profile before treating operator flows as staging-ready.
 - API escrow now exposes an authenticated jobs list so product surfaces can render participant-specific job views with derived client or worker roles.
 - Repo now includes `infra/postgres` plus root `pnpm db:*` scripts so local development can run against a pinned Postgres 16 container and a dedicated `services/api/.env.local.example` profile instead of a managed database vendor.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
@@ -59,8 +60,11 @@
 - Web now uses participant-role-aware job workspaces so clients, workers, and future operator posture do not all share the same undifferentiated mutation panel.
 - Web now hardens milestone lifecycle UX with status-aware milestone selection, explicit ready/pending/confirmed/failed action posture, inline audit and execution receipt context, and focused frontend lifecycle helper tests in `apps/web`.
 - Admin now organizes the public audit bundle around operator tasks with case pressure summaries, dispute-focused milestone review, execution failure triage, combined event or receipt streams, explicit blocked privileged actions, recent lookup history, and focused admin helper tests in `apps/admin`.
+- Web and admin now surface backend runtime-profile posture directly in the product UI, including provider modes, configured arbitrator wallet visibility, and warnings when the current backend is not deployment-ready.
+- Admin now supports authenticated operator sessions plus manual SIWE linking of the configured arbitrator wallet and can call the existing protected milestone-resolution endpoint when the session actually controls that wallet.
 - Web and admin now share a dedicated `@escrow4334/frontend-core` workspace package for normalized API requests, async state transitions, formatting, persisted list utilities, and consistent status or empty-state primitives.
-- Web and admin now have app-local Vitest `jsdom` plus Testing Library harnesses, shared browser-test helpers via `@escrow4334/frontend-core/testing`, page-level UI coverage for onboarding or selected-job and operator-lookup behavior, and a root Playwright smoke entrypoint for both Next apps.
+- Web and admin now have app-local Vitest `jsdom` plus Testing Library harnesses, shared browser-test helpers via `@escrow4334/frontend-core/testing`, route-level interaction coverage for onboarding, guided job authoring, selected-job posture, and operator lookup states, plus a root Playwright entrypoint with a local-profile cross-surface flow that signs in, links a wallet, provisions a smart account, creates and funds a job, and opens the same audit bundle in admin.
+- Root Playwright now also supports a separate deployed-profile validation lane with explicit `PLAYWRIGHT_DEPLOYED_*` target configuration, read-only remote smoke coverage for web, admin, and the public runtime-profile endpoint, and an optional public-audit lookup check when a known remote job id is configured.
 - Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 - Root `pnpm test` now executes a real API test path instead of failing on an empty Jest contract.
 
@@ -88,17 +92,21 @@
 - API operational CLIs should run from compiled artifacts, and build output must include SQL migrations so deploy-time database operations do not depend on source files or `ts-node`.
 - Local development should remain zero-license-cost by default: direct Postgres, self-hosted locally through Docker Compose or an equivalent native Postgres install, with mock email, smart-account, and escrow providers allowed in development but not in production.
 - Shared frontend test support should stay minimal: generic browser render or storage helpers can live in `@escrow4334/frontend-core/testing`, while app-specific API and wallet mocks stay package-local to `apps/web` or `apps/admin`.
+- Browser-hosted frontend profiles should set `NEST_API_CORS_ORIGINS` explicitly instead of assuming same-origin hosting; local profiles should allow the web and admin app origins they actually run on.
+- Frontend product surfaces should use the public runtime-profile contract to distinguish local-mock versus deployment-like backend posture instead of inferring readiness from environment names or manual operator knowledge.
+- Deployed frontend validation should run through the explicit `PLAYWRIGHT_PROFILE=deployed` lane with declared web, admin, and API targets; remote smoke checks should stay read-only unless a known-safe public audit job id is supplied.
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.
 - Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
 - Live end-to-end validation of the configured escrow execution relay against real environments.
-- Privileged admin action workflows are not yet implemented; current web and admin surfaces are still read/write console prototypes on top of the existing API.
+- Full operator RBAC, audit export tooling, and non-arbitrator privileged workflows are not yet implemented; the current admin privileged path is limited to authenticated sessions that link the configured arbitrator wallet and call dispute resolution through the existing protected API.
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
 ## Risks / Watchouts
 - Frontend apps now expose real console workflows, but they still depend on the prototype API surface and manual environment configuration rather than hardened production deployment.
+- Admin dispute resolution now exists in the UI, but it still depends on OTP-authenticated sessions manually linking the configured arbitrator wallet; there is not yet a broader operator role model or export workflow.
 - Browser-wallet-native wallet linking now exists in the web app, but it still depends on injected-wallet support for `eth_requestAccounts`, `eth_chainId`, and `personal_sign`; unsupported wallets still need the manual fallback.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
 - Local zero-cost Postgres startup now assumes either a running Docker daemon for `infra/postgres` or an equivalent native Postgres instance with the same connection settings.
@@ -110,8 +118,8 @@
 - Deployment validation now depends on relay health or reachability behavior and bundler JSON-RPC `eth_chainId`; providers that do not expose those conventions may require the new per-target healthcheck URL overrides.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
-- Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, live smart-account provisioning, live relay integration, or product UIs end to end.
-- Frontend coverage now includes focused helper tests plus page-level route coverage in `apps/web` and `apps/admin`, and the repo has a root Playwright smoke entrypoint, but broader interaction matrices and local-profile end-to-end user journeys are still pending.
+- Root verification still does not validate a real deployed frontend/backend target, live relay infrastructure, deployed ingress, or non-mock smart-account and escrow execution by default, even though the repo now includes frontend route coverage, backend runtime-profile visibility, one local-profile browser e2e path, and an explicit deployed-profile smoke lane.
+- Frontend coverage now includes focused helper tests, route-level coverage in `apps/web` and `apps/admin`, a local-profile end-to-end browser flow, runtime-profile validation posture, and one authenticated arbitrator-resolution path, but broader failure-matrix coverage and richer operator workflows are still pending.
 
 ## Standard Verification
 - `git status --short`

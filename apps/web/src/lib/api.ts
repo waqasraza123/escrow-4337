@@ -156,10 +156,38 @@ export type VerifyResponse = SessionTokens & {
   user: UserProfile;
 };
 
+export type RuntimeProfile = {
+  generatedAt: string;
+  profile: 'local-mock' | 'mixed' | 'deployment-like';
+  summary: string;
+  environment: {
+    nodeEnv: string;
+    persistenceDriver: 'postgres' | 'file';
+    trustProxyRaw: string | null;
+    corsOrigins: string[];
+  };
+  providers: {
+    emailMode: 'mock' | 'relay';
+    smartAccountMode: 'mock' | 'relay';
+    escrowMode: 'mock' | 'relay';
+  };
+  operator: {
+    arbitratorAddress: string | null;
+    resolutionAuthority: 'linked_arbitrator_wallet';
+    exportSupport: false;
+  };
+  warnings: string[];
+};
+
 const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export const webApi = {
   baseUrl: apiBaseUrl,
+  getRuntimeProfile() {
+    return requestJson<RuntimeProfile>(apiBaseUrl, '/operations/runtime-profile', {
+      method: 'GET',
+    });
+  },
   startAuth(email: string) {
     return requestJson<{ ok: true }>(apiBaseUrl, '/auth/start', {
       method: 'POST',

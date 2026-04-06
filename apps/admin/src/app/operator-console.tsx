@@ -16,7 +16,14 @@ import {
   type AsyncState,
   writeStoredStringList,
 } from '@escrow4334/frontend-core';
-import { adminApi, type AuditBundle } from '../lib/api';
+import {
+  adminApi,
+  type AuditBundle,
+  type RuntimeProfile,
+  type SessionTokens,
+  type UserProfile,
+  type WalletLinkChallenge,
+} from '../lib/api';
 import {
   buildCaseBrief,
   buildExecutionIssueCards,
@@ -28,6 +35,48 @@ import {
 } from './operator-case';
 
 const historyKey = 'escrow4337.admin.recent-lookups';
+const sessionStorageKey = 'escrow4337.admin.session';
+
+function readSession(): SessionTokens | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(sessionStorageKey);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as SessionTokens;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(tokens: SessionTokens | null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!tokens) {
+    window.localStorage.removeItem(sessionStorageKey);
+    return;
+  }
+
+  window.localStorage.setItem(sessionStorageKey, JSON.stringify(tokens));
+}
+
+function getRuntimeProfileLabel(profile: RuntimeProfile['profile']) {
+  switch (profile) {
+    case 'deployment-like':
+      return 'Deployment-like';
+    case 'local-mock':
+      return 'Local mock';
+    case 'mixed':
+      return 'Mixed';
+  }
+}
 
 function getPressureClassName(pressure: 'stable' | 'attention' | 'critical') {
   switch (pressure) {
@@ -67,14 +116,99 @@ function getTimelineToneClassName(
 }
 
 export function OperatorConsole() {
+  const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
+  const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authCode, setAuthCode] = useState('');
   const [jobId, setJobId] = useState('');
   const [audit, setAudit] = useState<AuditBundle | null>(null);
   const [lookupHistory, setLookupHistory] = useState<string[]>([]);
+  const [challenge, setChallenge] = useState<WalletLinkChallenge | null>(null);
+  const [linkAddress, setLinkAddress] = useState('');
+  const [linkLabel, setLinkLabel] = useState('');
+  const [linkChainId, setLinkChainId] = useState('84532');
+  const [walletSignature, setWalletSignature] = useState('');
+  const [startState, setStartState] = useState<AsyncState>(createIdleState());
+  const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
+  const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
+  const [walletActionState, setWalletActionState] = useState<AsyncState>(
+    createIdleState(),
+  );
+  const [resolutionState, setResolutionState] = useState<AsyncState>(
+    createIdleState(),
+  );
+  const [resolutionMilestoneIndex, setResolutionMilestoneIndex] = useState<number | null>(
+    null,
+  );
+  const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>(
+    'release',
+  );
+  const [resolutionNote, setResolutionNote] = useState('');
   const [state, setState] = useState<AsyncState>(createIdleState());
 
   useEffect(() => {
     setLookupHistory(readStoredStringList(historyKey));
   }, []);
+
+  useEffect(() => {
+    const session = readSession();
+    if (!session) {
+      return;
+    }
+
+    setAccessToken(session.accessToken);
+    setRefreshToken(session.refreshToken);
+  }, []);
+
+  useEffect(() => {
+    void loadRuntimeProfile();
+  }, []);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    void refreshOperatorSession(accessToken);
+  }, [accessToken]);
+
+  async function loadRuntimeProfile() {
+    setRuntimeState(createWorkingState('Loading backend runtime profile...'));
+
+    try {
+      const nextProfile = await adminApi.getRuntimeProfile();
+      setRuntimeProfile(nextProfile);
+      setRuntimeState(createSuccessState(nextProfile.summary));
+    } catch (error) {
+      setRuntimeState(createErrorState(error, 'Failed to load backend runtime profile'));
+    }
+  }
+
+  async function refreshOperatorSession(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setSessionState(createWorkingState('Refreshing operator session...'));
+
+    try {
+      const nextProfile = await adminApi.me(token);
+      setProfile(nextProfile);
+      setLinkAddress(
+        (current) =>
+          current ||
+          nextProfile.wallets.find((wallet) => wallet.walletKind === 'eoa')?.address ||
+          '',
+      );
+      setSessionState(createSuccessState('Operator session is current.'));
+    } catch (error) {
+      setSessionState(createErrorState(error, 'Failed to load operator session'));
+      clearSession();
+    }
+  }
 
   async function handleLookup(nextJobId = jobId) {
     const normalizedJobId = nextJobId.trim();
@@ -85,7 +219,7 @@ export function OperatorConsole() {
           'Provide a job id before loading the public audit bundle.',
         ),
       );
-      return;
+      return false;
     }
 
     setJobId(normalizedJobId);
@@ -102,9 +236,139 @@ export function OperatorConsole() {
           'Operator case loaded. Review dispute pressure, execution receipts, and blocked privileged actions below.',
         ),
       );
+      return true;
     } catch (error) {
       setAudit(null);
       setState(createErrorState(error, 'Failed to load operator case'));
+      return false;
+    }
+  }
+
+  async function handleStartAuth() {
+    setStartState(createWorkingState('Sending OTP...'));
+
+    try {
+      await adminApi.startAuth(authEmail);
+      setStartState(
+        createSuccessState(
+          'OTP issued. Check your configured mail inbox or relay logs.',
+        ),
+      );
+    } catch (error) {
+      setStartState(createErrorState(error, 'Failed to start operator auth'));
+    }
+  }
+
+  async function handleVerifyAuth() {
+    setVerifyState(createWorkingState('Verifying operator session...'));
+
+    try {
+      const response = await adminApi.verifyAuth(authEmail, authCode);
+      setAccessToken(response.accessToken);
+      setRefreshToken(response.refreshToken);
+      setProfile(response.user);
+      writeSession({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+      });
+      setVerifyState(
+        createSuccessState('Operator session established. Loading profile state...'),
+      );
+    } catch (error) {
+      setVerifyState(createErrorState(error, 'Failed to verify operator session'));
+    }
+  }
+
+  async function handleRefreshSession() {
+    if (!refreshToken) {
+      return;
+    }
+
+    setSessionState(createWorkingState('Refreshing operator session...'));
+
+    try {
+      const tokens = await adminApi.refresh(refreshToken);
+      setAccessToken(tokens.accessToken);
+      setRefreshToken(tokens.refreshToken);
+      writeSession(tokens);
+      setSessionState(createSuccessState('Operator session refreshed.'));
+    } catch (error) {
+      setSessionState(createErrorState(error, 'Operator session refresh failed'));
+      clearSession();
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await adminApi.logout(refreshToken);
+    } finally {
+      clearSession();
+    }
+  }
+
+  function clearSession() {
+    setAccessToken(null);
+    setRefreshToken(null);
+    setProfile(null);
+    setChallenge(null);
+    setWalletSignature('');
+    writeSession(null);
+  }
+
+  async function handleCreateChallenge() {
+    if (!accessToken) {
+      return;
+    }
+
+    setWalletActionState(createWorkingState('Issuing operator wallet-link challenge...'));
+
+    try {
+      const nextChallenge = await adminApi.createWalletChallenge(
+        {
+          address: linkAddress,
+          walletKind: 'eoa',
+          chainId: Number(linkChainId),
+          label: linkLabel || undefined,
+        },
+        accessToken,
+      );
+      setChallenge(nextChallenge);
+      setWalletActionState(
+        createSuccessState(
+          'Challenge created. Sign the message with the arbitrator wallet, then paste the signature.',
+        ),
+      );
+    } catch (error) {
+      setWalletActionState(createErrorState(error, 'Failed to issue wallet challenge'));
+    }
+  }
+
+  async function handleVerifyWallet() {
+    if (!accessToken || !challenge) {
+      return;
+    }
+
+    setWalletActionState(createWorkingState('Verifying arbitrator wallet signature...'));
+
+    try {
+      await adminApi.verifyWalletChallenge(
+        {
+          challengeId: challenge.challengeId,
+          message: challenge.message,
+          signature: walletSignature,
+        },
+        accessToken,
+      );
+      setChallenge(null);
+      setWalletSignature('');
+      await refreshOperatorSession(accessToken);
+      setWalletActionState(
+        createSuccessState(
+          'Wallet linked. Arbitrator authority is now available for dispute resolution.',
+        ),
+      );
+    } catch (error) {
+      setWalletActionState(createErrorState(error, 'Failed to verify operator wallet'));
     }
   }
 
@@ -136,6 +400,75 @@ export function OperatorConsole() {
     () => getRecentLookupSuggestions(lookupHistory, jobId),
     [jobId, lookupHistory],
   );
+  const linkedWalletAddresses = useMemo(
+    () => new Set(profile?.wallets.map((wallet) => wallet.address) ?? []),
+    [profile],
+  );
+  const arbitratorAddress = runtimeProfile?.operator.arbitratorAddress ?? null;
+  const controlsArbitratorWallet = Boolean(
+    arbitratorAddress && linkedWalletAddresses.has(arbitratorAddress),
+  );
+  const selectedResolutionCard = useMemo(
+    () =>
+      disputedMilestoneCards.find(
+        (card) => card.milestoneIndex === resolutionMilestoneIndex,
+      ) ??
+      disputedMilestoneCards[0] ??
+      null,
+    [disputedMilestoneCards, resolutionMilestoneIndex],
+  );
+
+  useEffect(() => {
+    setResolutionMilestoneIndex((current) => {
+      if (
+        current !== null &&
+        disputedMilestoneCards.some((card) => card.milestoneIndex === current)
+      ) {
+        return current;
+      }
+
+      return disputedMilestoneCards[0]?.milestoneIndex ?? null;
+    });
+  }, [disputedMilestoneCards]);
+
+  async function handleResolveMilestone() {
+    if (
+      !accessToken ||
+      !audit ||
+      selectedResolutionCard === null
+    ) {
+      return;
+    }
+
+    setResolutionState(createWorkingState('Submitting privileged resolution...'));
+
+    try {
+      const response = await adminApi.resolveMilestone(
+        audit.bundle.job.id,
+        selectedResolutionCard.milestoneIndex,
+        {
+          action: resolutionAction,
+          note: resolutionNote.trim() || undefined,
+        },
+        accessToken,
+      );
+      const refreshed = await handleLookup(audit.bundle.job.id);
+      setResolutionState(
+        refreshed
+          ? createSuccessState(
+              `Resolution submitted via ${previewHash(response.txHash)}.`,
+            )
+          : createErrorState(
+              null,
+              'Resolution submitted, but the case could not be refreshed automatically.',
+            ),
+      );
+    } catch (error) {
+      setResolutionState(
+        createErrorState(error, 'Failed to resolve disputed milestone'),
+      );
+    }
+  }
 
   return (
     <div className={styles.console}>
@@ -156,6 +489,14 @@ export function OperatorConsole() {
             <strong>{adminApi.baseUrl}</strong>
           </div>
           <div>
+            <span className={styles.metaLabel}>Backend profile</span>
+            <strong>
+              {runtimeProfile
+                ? getRuntimeProfileLabel(runtimeProfile.profile)
+                : 'Loading'}
+            </strong>
+          </div>
+          <div>
             <span className={styles.metaLabel}>Loaded case</span>
             <strong>{audit?.bundle.job.id || 'None selected'}</strong>
           </div>
@@ -165,6 +506,201 @@ export function OperatorConsole() {
           </div>
         </div>
       </section>
+
+      <div className={styles.grid}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>Runtime</p>
+              <h2>Backend profile validation</h2>
+            </div>
+          </header>
+          <div className={styles.summaryGrid}>
+            <article>
+              <span className={styles.metaLabel}>Profile</span>
+              <strong>
+                {runtimeProfile
+                  ? getRuntimeProfileLabel(runtimeProfile.profile)
+                  : 'Unavailable'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Providers</span>
+              <strong>
+                {runtimeProfile
+                  ? `${runtimeProfile.providers.emailMode}/${runtimeProfile.providers.smartAccountMode}/${runtimeProfile.providers.escrowMode}`
+                  : 'Unknown'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Arbitrator wallet</span>
+              <strong>{previewHash(arbitratorAddress ?? undefined)}</strong>
+            </article>
+          </div>
+          <div className={styles.stack}>
+            <StatusNotice
+              message={
+                runtimeProfile?.summary || runtimeState.message
+              }
+              messageClassName={styles.stateText}
+            />
+            {runtimeProfile?.warnings.map((warning) => (
+              <article key={warning} className={styles.boundaryCard}>
+                <strong>Validation warning</strong>
+                <p className={styles.stateText}>{warning}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>Access</p>
+              <h2>Operator session and wallet authority</h2>
+            </div>
+            {refreshToken ? (
+              <div className={styles.inlineActions}>
+                <button type="button" onClick={handleRefreshSession}>
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
+              </div>
+            ) : null}
+          </header>
+          <div className={styles.summaryGrid}>
+            <article>
+              <span className={styles.metaLabel}>Session</span>
+              <strong>{accessToken ? 'Authenticated' : 'Signed out'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>User</span>
+              <strong>{profile?.email || 'No operator session'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Arbitrator control</span>
+              <strong>{controlsArbitratorWallet ? 'Ready' : 'Missing'}</strong>
+            </article>
+          </div>
+          <div className={styles.stack}>
+            <div className={styles.fieldGrid}>
+              <label className={styles.field}>
+                <span>Email</span>
+                <input
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="operator@example.com"
+                />
+              </label>
+              <label className={styles.field}>
+                <span>Verification code</span>
+                <input
+                  value={authCode}
+                  onChange={(event) => setAuthCode(event.target.value)}
+                  placeholder="123456"
+                />
+              </label>
+            </div>
+            <div className={styles.inlineActions}>
+              <button type="button" onClick={handleStartAuth}>
+                Send OTP
+              </button>
+              <button type="button" onClick={handleVerifyAuth}>
+                Verify session
+              </button>
+            </div>
+            <StatusNotice message={startState.message} messageClassName={styles.stateText} />
+            <StatusNotice message={verifyState.message} messageClassName={styles.stateText} />
+            <StatusNotice message={sessionState.message} messageClassName={styles.stateText} />
+
+            {accessToken ? (
+              <>
+                <div className={styles.fieldGrid}>
+                  <label className={styles.field}>
+                    <span>EOA address</span>
+                    <input
+                      value={linkAddress}
+                      onChange={(event) => setLinkAddress(event.target.value)}
+                      placeholder="0x..."
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Label</span>
+                    <input
+                      value={linkLabel}
+                      onChange={(event) => setLinkLabel(event.target.value)}
+                      placeholder="Arbitrator wallet"
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Chain id</span>
+                    <input
+                      value={linkChainId}
+                      onChange={(event) => setLinkChainId(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className={styles.inlineActions}>
+                  <button type="button" onClick={handleCreateChallenge}>
+                    Create SIWE challenge
+                  </button>
+                </div>
+                {challenge ? (
+                  <div className={styles.fieldGrid}>
+                    <label className={styles.field}>
+                      <span>Issued message</span>
+                      <textarea readOnly rows={4} value={challenge.message} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>Wallet signature</span>
+                      <textarea
+                        value={walletSignature}
+                        onChange={(event) => setWalletSignature(event.target.value)}
+                        rows={4}
+                        placeholder="0x..."
+                      />
+                    </label>
+                  </div>
+                ) : null}
+                {challenge ? (
+                  <div className={styles.inlineActions}>
+                    <button type="button" onClick={handleVerifyWallet}>
+                      Verify linked wallet
+                    </button>
+                  </div>
+                ) : null}
+                <StatusNotice
+                  message={walletActionState.message}
+                  messageClassName={styles.stateText}
+                />
+                <article className={styles.boundaryCard}>
+                  <strong>
+                    {controlsArbitratorWallet
+                      ? 'Authenticated operator controls the arbitrator wallet.'
+                      : 'Operator resolution remains blocked until the configured arbitrator wallet is linked.'}
+                  </strong>
+                  <p className={styles.stateText}>
+                    Required wallet: {arbitratorAddress || 'Unavailable from backend runtime profile.'}
+                  </p>
+                </article>
+              </>
+            ) : (
+              <article className={styles.boundaryCard}>
+                <strong>Authenticate first</strong>
+                <p className={styles.stateText}>
+                  Operator resolution requires an authenticated session plus a linked arbitrator wallet.
+                </p>
+              </article>
+            )}
+          </div>
+        </section>
+      </div>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
@@ -358,29 +894,110 @@ export function OperatorConsole() {
             <section className={styles.panel}>
               <header className={styles.panelHeader}>
                 <div>
-                  <p className={styles.panelEyebrow}>Operator Boundaries</p>
-                  <h2>Public visibility vs blocked privileges</h2>
+                  <p className={styles.panelEyebrow}>Privileged Resolution</p>
+                  <h2>Operator dispute action center</h2>
                 </div>
               </header>
               <div className={styles.stack}>
-                <article className={styles.boundaryCard}>
-                  <strong>Visible now</strong>
-                  <p className={styles.stateText}>
-                    Public audit events, milestone posture, dispute reasons, and execution receipts.
-                  </p>
-                </article>
-                <article className={styles.boundaryCard}>
-                  <strong>Blocked by backend auth</strong>
-                  <p className={styles.stateText}>
-                    Privileged operator resolution flows remain unavailable until real operator or arbitrator authorization exists.
-                  </p>
-                </article>
-                <article className={styles.boundaryCard}>
-                  <strong>Blocked by export support</strong>
-                  <p className={styles.stateText}>
-                    Evidence bundles and case exports should not appear as fake actions before backend export support lands.
-                  </p>
-                </article>
+                {disputedMilestoneCards.length === 0 ? (
+                  <EmptyStateCard
+                    title="No active disputes"
+                    message="Privileged resolution is only actionable when the current bundle still shows a disputed milestone."
+                    className={styles.emptyCard}
+                    messageClassName={styles.stateText}
+                  />
+                ) : !accessToken ? (
+                  <EmptyStateCard
+                    title="Authenticate operator session"
+                    message="Sign in before attempting privileged dispute resolution."
+                    className={styles.emptyCard}
+                    messageClassName={styles.stateText}
+                  />
+                ) : !arbitratorAddress ? (
+                  <EmptyStateCard
+                    title="Backend profile incomplete"
+                    message="The backend runtime profile did not expose the configured arbitrator wallet."
+                    className={styles.emptyCard}
+                    messageClassName={styles.stateText}
+                  />
+                ) : !controlsArbitratorWallet ? (
+                  <>
+                    <article className={styles.boundaryCard}>
+                      <strong>Blocked by wallet authority</strong>
+                      <p className={styles.stateText}>
+                        The authenticated session does not currently control the configured arbitrator wallet {arbitratorAddress}.
+                      </p>
+                    </article>
+                    <article className={styles.boundaryCard}>
+                      <strong>Blocked by export support</strong>
+                      <p className={styles.stateText}>
+                        Evidence bundles and case exports should not appear as fake actions before backend export support lands.
+                      </p>
+                    </article>
+                  </>
+                ) : (
+                  <>
+                    <label className={styles.field}>
+                      <span>Disputed milestone</span>
+                      <select
+                        value={String(selectedResolutionCard?.milestoneIndex ?? '')}
+                        onChange={(event) =>
+                          setResolutionMilestoneIndex(Number(event.target.value))
+                        }
+                      >
+                        {disputedMilestoneCards.map((card) => (
+                          <option key={card.milestoneIndex} value={card.milestoneIndex}>
+                            {`${card.milestoneIndex + 1}. ${card.title}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className={styles.fieldGrid}>
+                      <label className={styles.field}>
+                        <span>Resolution action</span>
+                        <select
+                          value={resolutionAction}
+                          onChange={(event) =>
+                            setResolutionAction(event.target.value as 'release' | 'refund')
+                          }
+                        >
+                          <option value="release">release</option>
+                          <option value="refund">refund</option>
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>Resolution note</span>
+                        <textarea
+                          rows={4}
+                          value={resolutionNote}
+                          onChange={(event) => setResolutionNote(event.target.value)}
+                          placeholder="Document the operator or arbitrator decision."
+                        />
+                      </label>
+                    </div>
+                    <div className={styles.inlineActions}>
+                      <button type="button" onClick={handleResolveMilestone}>
+                        Resolve disputed milestone
+                      </button>
+                    </div>
+                    <StatusNotice
+                      message={resolutionState.message}
+                      messageClassName={styles.stateText}
+                    />
+                    <article className={styles.boundaryCard}>
+                      <strong>Resolution authority confirmed</strong>
+                      <p className={styles.stateText}>
+                        The session controls the configured arbitrator wallet, so the existing protected resolve endpoint can be used from this console.
+                      </p>
+                    </article>
+                    <article className={styles.boundaryCard}>
+                      <strong>Still blocked by export support</strong>
+                      <p className={styles.stateText}>
+                        Evidence bundles and case exports remain intentionally unavailable until backend export support exists.
+                      </p>
+                    </article>
+                  </>
+                )}
               </div>
             </section>
           </div>

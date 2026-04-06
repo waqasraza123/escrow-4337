@@ -80,6 +80,30 @@
   flex-wrap: wrap;
 }
 
+.inlineActions,
+.fieldGrid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fieldGrid {
+  align-items: stretch;
+}
+
+.field {
+  flex: 1 1 220px;
+  display: grid;
+  gap: 8px;
+}
+
+.field span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .suggestionRow {
   display: flex;
   flex-wrap: wrap;
@@ -92,6 +116,9 @@
 }
 
 .lookupRow input,
+.field input,
+.field select,
+.field textarea,
 .timelineCard pre {
   font-family: var(--font-mono), monospace;
 }
@@ -113,6 +140,20 @@
   padding: 14px 16px;
   color: var(--foreground);
   background: rgba(10, 15, 22, 0.55);
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid rgba(145, 164, 189, 0.2);
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: var(--foreground);
+  background: rgba(10, 15, 22, 0.55);
+}
+
+.field textarea {
+  resize: vertical;
 }
 
 .summaryGrid,

@@ -5,12 +5,17 @@ import type {
   SessionTokens,
   UserProfile,
   VerifyResponse,
+  RuntimeProfile,
   UserWallet,
   WalletLinkChallenge,
   WalletState,
 } from '../lib/api';
 
 export const sessionStorageKey = 'escrow4337.web.session';
+
+export function createHexAddress(fill: string) {
+  return `0x${fill.repeat(40)}`;
+}
 
 export function createSessionTokens(): SessionTokens {
   return {
@@ -125,6 +130,25 @@ export function createJobView(): JobView {
   };
 }
 
+export function createCustomJobView(
+  override: Omit<Partial<JobView>, 'onchain' | 'milestones'> & {
+    onchain?: Partial<JobView['onchain']>;
+    milestones?: JobView['milestones'];
+  } = {},
+): JobView {
+  const base = createJobView();
+
+  return {
+    ...base,
+    ...override,
+    onchain: {
+      ...base.onchain,
+      ...override.onchain,
+    },
+    milestones: override.milestones ?? base.milestones,
+  };
+}
+
 export function createJobsListResponse(): JobsListResponse {
   return {
     jobs: [
@@ -134,6 +158,12 @@ export function createJobsListResponse(): JobsListResponse {
       },
     ],
   };
+}
+
+export function createCustomJobsListResponse(
+  jobs: JobsListResponse['jobs'],
+): JobsListResponse {
+  return { jobs };
 }
 
 export function createAuditBundle(): AuditBundle {
@@ -172,11 +202,79 @@ export function createAuditBundle(): AuditBundle {
   };
 }
 
+export function createCustomAuditBundle(
+  override: Partial<AuditBundle['bundle']> & {
+    job?: Omit<Partial<JobView>, 'onchain' | 'milestones'> & {
+      onchain?: Partial<JobView['onchain']>;
+      milestones?: JobView['milestones'];
+    };
+  } = {},
+): AuditBundle {
+  const base = createAuditBundle();
+
+  return {
+    bundle: {
+      ...base.bundle,
+      ...override,
+      job: createCustomJobView(override.job),
+      audit: override.audit ?? base.bundle.audit,
+      executions: override.executions ?? base.bundle.executions,
+    },
+  };
+}
+
 export function createWalletLinkChallenge(): WalletLinkChallenge {
   return {
     challengeId: 'challenge-123',
     message: 'Sign in to link your wallet.',
     issuedAt: 100,
     expiresAt: 200,
+  };
+}
+
+export function createCreateJobResponse(overrides: {
+  jobId?: string;
+  escrowId?: string;
+  txHash?: string;
+} = {}) {
+  return {
+    jobId: overrides.jobId ?? 'job-created',
+    jobHash: '0xjobhashcreated',
+    status: 'draft' as const,
+    escrowId: overrides.escrowId ?? 'escrow-created',
+    txHash:
+      overrides.txHash ??
+      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  };
+}
+
+export function createRuntimeProfile(
+  overrides: Partial<RuntimeProfile> = {},
+): RuntimeProfile {
+  return {
+    generatedAt: '2026-04-06T00:00:00.000Z',
+    profile: 'local-mock',
+    summary:
+      'This backend profile is optimized for local development and uses mock providers for operator-visible flows.',
+    environment: {
+      nodeEnv: 'development',
+      persistenceDriver: 'postgres',
+      trustProxyRaw: 'loopback',
+      corsOrigins: ['http://localhost:3000', 'http://localhost:3001'],
+    },
+    providers: {
+      emailMode: 'mock',
+      smartAccountMode: 'mock',
+      escrowMode: 'mock',
+    },
+    operator: {
+      arbitratorAddress: createHexAddress('2'),
+      resolutionAuthority: 'linked_arbitrator_wallet',
+      exportSupport: false,
+    },
+    warnings: [
+      'Escrow execution is using mock mode, so lifecycle mutations are not exercising deployed contract relay infrastructure.',
+    ],
+    ...overrides,
   };
 }

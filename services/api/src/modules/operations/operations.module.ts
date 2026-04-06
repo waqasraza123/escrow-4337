@@ -5,6 +5,8 @@ import { EscrowContractModule } from '../escrow/onchain/escrow-contract.module';
 import { PersistenceModule } from '../../persistence/persistence.module';
 import { SmartAccountModule } from '../wallet/provisioning/smart-account.module';
 import { DeploymentValidationService } from './deployment-validation.service';
+import { OperationsController } from './operations.controller';
+import { RuntimeProfileService } from './runtime-profile.service';
 
 @Module({
   imports: [
@@ -13,7 +15,12 @@ import { DeploymentValidationService } from './deployment-validation.service';
     SmartAccountModule,
     EscrowContractModule,
   ],
-  providers: [AuthConfigService, DeploymentValidationService],
-  exports: [DeploymentValidationService],
+  controllers: [OperationsController],
+  providers: [
+    AuthConfigService,
+    DeploymentValidationService,
+    RuntimeProfileService,
+  ],
+  exports: [DeploymentValidationService, RuntimeProfileService],
 })
 export class OperationsModule {}

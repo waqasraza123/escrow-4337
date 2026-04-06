@@ -3,6 +3,85 @@ import {
   resolveApiBaseUrl,
 } from '@escrow4334/frontend-core';
 
+export type UserWallet =
+  | {
+      address: string;
+      label?: string;
+      createdAt: number;
+      updatedAt: number;
+      walletKind: 'eoa';
+      verificationMethod: 'siwe' | 'legacy_link';
+      verificationChainId?: number;
+      verifiedAt: number;
+    }
+  | {
+      address: string;
+      label?: string;
+      createdAt: number;
+      updatedAt: number;
+      walletKind: 'smart_account';
+      ownerAddress: string;
+      recoveryAddress: string;
+      chainId: number;
+      providerKind: 'mock' | 'relay';
+      entryPointAddress: string;
+      factoryAddress: string;
+      sponsorshipPolicy: 'disabled' | 'sponsored';
+      provisionedAt: number;
+    };
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  shariahMode: boolean;
+  defaultExecutionWalletAddress: string | null;
+  wallets: UserWallet[];
+};
+
+export type WalletState = {
+  defaultExecutionWalletAddress: string | null;
+  wallets: UserWallet[];
+};
+
+export type WalletLinkChallenge = {
+  challengeId: string;
+  message: string;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+export type SessionTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+export type VerifyResponse = SessionTokens & {
+  user: UserProfile;
+};
+
+export type RuntimeProfile = {
+  generatedAt: string;
+  profile: 'local-mock' | 'mixed' | 'deployment-like';
+  summary: string;
+  environment: {
+    nodeEnv: string;
+    persistenceDriver: 'postgres' | 'file';
+    trustProxyRaw: string | null;
+    corsOrigins: string[];
+  };
+  providers: {
+    emailMode: 'mock' | 'relay';
+    smartAccountMode: 'mock' | 'relay';
+    escrowMode: 'mock' | 'relay';
+  };
+  operator: {
+    arbitratorAddress: string | null;
+    resolutionAuthority: 'linked_arbitrator_wallet';
+    exportSupport: false;
+  };
+  warnings: string[];
+};
+
 export type AuditBundle = {
   bundle: {
     job: {
@@ -63,9 +142,103 @@ const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export const adminApi = {
   baseUrl: apiBaseUrl,
+  getRuntimeProfile() {
+    return requestJson<RuntimeProfile>(apiBaseUrl, '/operations/runtime-profile', {
+      method: 'GET',
+    });
+  },
+  startAuth(email: string) {
+    return requestJson<{ ok: true }>(apiBaseUrl, '/auth/start', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+  verifyAuth(email: string, code: string) {
+    return requestJson<VerifyResponse>(apiBaseUrl, '/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  },
+  refresh(refreshToken: string) {
+    return requestJson<SessionTokens>(apiBaseUrl, '/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  },
+  logout(refreshToken: string | null) {
+    return requestJson<{ ok: true }>(apiBaseUrl, '/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  },
+  me(accessToken: string) {
+    return requestJson<UserProfile>(apiBaseUrl, '/auth/me', { method: 'GET' }, accessToken);
+  },
+  createWalletChallenge(
+    input: {
+      address: string;
+      walletKind: 'eoa';
+      chainId: number;
+      label?: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<WalletLinkChallenge>(
+      apiBaseUrl,
+      '/wallet/link/challenge',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  verifyWalletChallenge(
+    input: {
+      challengeId: string;
+      message: string;
+      signature: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<WalletState>(
+      apiBaseUrl,
+      '/wallet/link/verify',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
   async getAudit(jobId: string) {
     return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
       method: 'GET',
     });
+  },
+  resolveMilestone(
+    jobId: string,
+    milestoneIndex: number,
+    input: {
+      action: 'release' | 'refund';
+      note?: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      jobId: string;
+      milestoneIndex: number;
+      milestoneStatus: string;
+      jobStatus: string;
+      txHash?: string;
+    }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/milestones/${milestoneIndex}/resolve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
   },
 };

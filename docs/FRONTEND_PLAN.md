@@ -4,10 +4,10 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 
 ## Current Reality
 
-- `apps/web` is now a productized client and worker console with guided job authoring, role-aware job workspaces, milestone lifecycle posture, and audit visibility.
-- `apps/admin` is now a task-oriented operator console for public audit lookup, dispute posture review, and execution receipt inspection.
+- `apps/web` is now a productized client and worker console with guided job authoring, role-aware job workspaces, milestone lifecycle posture, audit visibility, and backend runtime-profile validation posture.
+- `apps/admin` is now a task-oriented operator console for public audit lookup, dispute posture review, execution receipt inspection, backend runtime-profile validation, authenticated operator session handling, and arbitrator-wallet-bound dispute resolution.
 - Shared frontend infrastructure now exists in `@escrow4334/frontend-core` for request handling, async-state helpers, formatting, storage, and status or empty-state primitives.
-- Frontend-specific automated coverage now exists only at the helper level in `apps/web`, `apps/admin`, and `packages/frontend-core`; route-level and end-to-end coverage are still missing.
+- Frontend-specific automated coverage now exists at the helper, route, local-profile end-to-end, and deployed-profile smoke levels in `apps/web`, `apps/admin`, and `packages/frontend-core`.
 
 ## Product Goals
 
@@ -40,7 +40,9 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 - public audit-bundle lookup
 - dispute and milestone posture review
 - execution receipt inspection
-- future privileged operator actions once backend auth and role boundaries exist
+- authenticated operator session refresh or restore
+- manual arbitrator-wallet SIWE linking
+- privileged dispute resolution when the authenticated session controls the configured arbitrator wallet
 
 ## Completed Slices
 
@@ -48,7 +50,7 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 - Step 2: client job authoring is complete, with a guided composer, structured inputs, derived readiness checks, and post-create follow-up guidance.
 - Step 3: role-aware job workspaces are complete, with client, worker, and limited operator posture presented as separate action contexts.
 - Step 4: milestone lifecycle UX is complete, with explicit ready, pending, confirmed, failed, and blocked posture plus inline audit and execution context.
-- Step 5: admin operator surface is complete, with case pressure summaries, dispute-centric milestone review, execution failure triage, and explicit blocked privileged actions.
+- Step 5: admin operator surface is complete for the current API scope, with case pressure summaries, dispute-centric milestone review, execution failure triage, runtime-profile posture, authenticated operator session handling, and arbitrator-wallet-bound dispute resolution.
 - Step 6: shared frontend infrastructure is complete, with `@escrow4334/frontend-core` normalizing repeated request, async-state, formatting, and status-pattern behavior across both apps.
 
 ## Delivery Sequence
@@ -123,6 +125,10 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 
 ## Phase 7.2: `apps/web` Route And Interaction Coverage
 
+### Outcome
+
+- complete
+
 ### Scope
 
 - onboarding and session:
@@ -154,6 +160,10 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 
 ## Phase 7.3: `apps/admin` Route And Interaction Coverage
 
+### Outcome
+
+- complete
+
 ### Scope
 
 - audit lookup success, empty, invalid-id, and request-failure states
@@ -169,6 +179,10 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 - public-versus-blocked posture remains explicit and truthful under failure as well as success
 
 ## Phase 7.4: End-To-End Coverage Against The Local Development Profile
+
+### Outcome
+
+- complete
 
 ### Required First-Pass Scenarios
 
@@ -192,21 +206,21 @@ This document turns Phase 5 of the execution guide into the current frontend sou
 
 - add app-local UI testing dependencies for `apps/web` and `apps/admin`
 - add a small shared test utility layer only for repeated mocks and render helpers
-- add one root Playwright-based e2e entrypoint
+- add one root Playwright-based e2e entrypoint with separate local and deployed-profile lanes
 - do not add new backend API surface as part of Step 7
 - do not add privileged admin flows as part of Step 7
 
 ## Backend Dependencies And Blockers
 
-- privileged admin actions need real operator or arbitrator auth and authorization
+- broader operator RBAC and export surfaces still need future backend authz and operations work
 - export surfaces need backend audit export support
 - live relay-backed UX polish needs truthful staging infrastructure for wallet and escrow execution
 - any production-grade dispute tooling depends on future indexing and operations slices
 
 ## Immediate Next Frontend Step
 
-- expand Phase 7.2 in `apps/web` from the new page-level coverage into deeper interaction coverage for OTP failure paths, session refresh or logout, wallet-link outcomes, and guided create-job progression
-- expand Phase 7.3 in `apps/admin` from the new lookup success path into invalid-id, empty, and request-failure UI coverage before broader e2e expansion
+- Step 7 is complete
+- run the new deployed-profile lane against an actual configured backend target, then expand operator failure coverage, export posture, and richer cross-surface live-environment flows
 
 ## Frontend Definition Of Done
 

@@ -17,6 +17,7 @@ import type {
   AuditBundle,
   JobView,
   JobsListResponse,
+  RuntimeProfile,
   SessionTokens,
   SmartAccountProvisionResponse,
   UserProfile,
@@ -263,7 +264,20 @@ function isLifecycleActionEnabled(card: LifecycleCard) {
   return card.canTrigger && (card.phase === 'ready' || card.phase === 'failed');
 }
 
+function getRuntimeProfileLabel(profile: RuntimeProfile['profile']) {
+  switch (profile) {
+    case 'deployment-like':
+      return 'Deployment-like';
+    case 'local-mock':
+      return 'Local mock';
+    case 'mixed':
+      return 'Mixed';
+  }
+}
+
 export function EscrowConsole() {
+  const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
+  const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -449,6 +463,10 @@ export function EscrowConsole() {
   }, []);
 
   useEffect(() => {
+    void loadRuntimeProfile();
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     async function loadInjectedWallet() {
@@ -600,6 +618,18 @@ export function EscrowConsole() {
       setSessionState(createSuccessState('Console state is current.'));
     } catch (error) {
       setSessionState(createErrorState(error, 'Failed to load session'));
+    }
+  }
+
+  async function loadRuntimeProfile() {
+    setRuntimeState(createWorkingState('Loading backend runtime profile...'));
+
+    try {
+      const nextProfile = await webApi.getRuntimeProfile();
+      setRuntimeProfile(nextProfile);
+      setRuntimeState(createSuccessState(nextProfile.summary));
+    } catch (error) {
+      setRuntimeState(createErrorState(error, 'Failed to load backend runtime profile'));
     }
   }
 
@@ -1206,6 +1236,14 @@ export function EscrowConsole() {
             <strong>{webApi.baseUrl}</strong>
           </div>
           <div>
+            <span className={styles.metaLabel}>Backend profile</span>
+            <strong>
+              {runtimeProfile
+                ? getRuntimeProfileLabel(runtimeProfile.profile)
+                : 'Loading'}
+            </strong>
+          </div>
+          <div>
             <span className={styles.metaLabel}>Session</span>
             <strong>{accessToken ? 'Authenticated' : 'Signed out'}</strong>
           </div>
@@ -1214,6 +1252,43 @@ export function EscrowConsole() {
             <strong>{jobsResponse.jobs.length}</strong>
           </div>
         </div>
+      </section>
+
+      <section className={styles.panel}>
+        <header className={styles.panelHeader}>
+          <div>
+            <p className={styles.panelEyebrow}>Runtime</p>
+            <h2>Backend profile validation</h2>
+          </div>
+        </header>
+        <div className={styles.summaryGrid}>
+          <article>
+            <span className={styles.metaLabel}>Profile</span>
+            <strong>
+              {runtimeProfile
+                ? getRuntimeProfileLabel(runtimeProfile.profile)
+                : 'Unavailable'}
+            </strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Providers</span>
+            <strong>
+              {runtimeProfile
+                ? `${runtimeProfile.providers.emailMode}/${runtimeProfile.providers.smartAccountMode}/${runtimeProfile.providers.escrowMode}`
+                : 'Unknown'}
+            </strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Arbitrator wallet</span>
+            <strong>
+              {previewHash(runtimeProfile?.operator.arbitratorAddress ?? undefined)}
+            </strong>
+          </article>
+        </div>
+        <StatusNotice
+          message={runtimeProfile?.summary || runtimeState.message}
+          messageClassName={styles.stateText}
+        />
       </section>
 
       <div className={styles.grid}>
