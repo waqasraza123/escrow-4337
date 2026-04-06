@@ -1,3 +1,8 @@
+import {
+  requestJson,
+  resolveApiBaseUrl,
+} from '@escrow4334/frontend-core';
+
 export type UserWallet =
   | {
       address: string;
@@ -151,93 +156,40 @@ export type VerifyResponse = SessionTokens & {
   user: UserProfile;
 };
 
-const defaultApiBaseUrl = 'http://localhost:4000';
-
-function resolveApiBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, '') ||
-    defaultApiBaseUrl
-  );
-}
-
-async function readError(response: Response) {
-  const text = await response.text();
-  if (!text) {
-    return `Request failed with ${response.status}`;
-  }
-
-  try {
-    const body = JSON.parse(text) as {
-      message?: string | string[];
-      error?: string;
-    };
-    if (Array.isArray(body.message)) {
-      return body.message.join(', ');
-    }
-    return body.message || body.error || text;
-  } catch {
-    return text;
-  }
-}
-
-async function request<T>(
-  path: string,
-  init: RequestInit = {},
-  accessToken?: string,
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  headers.set('content-type', 'application/json');
-  if (accessToken) {
-    headers.set('authorization', `Bearer ${accessToken}`);
-  }
-
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
-    ...init,
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
+const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export const webApi = {
-  baseUrl: resolveApiBaseUrl(),
+  baseUrl: apiBaseUrl,
   startAuth(email: string) {
-    return request<{ ok: true }>('/auth/start', {
+    return requestJson<{ ok: true }>(apiBaseUrl, '/auth/start', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
   },
   verifyAuth(email: string, code: string) {
-    return request<VerifyResponse>('/auth/verify', {
+    return requestJson<VerifyResponse>(apiBaseUrl, '/auth/verify', {
       method: 'POST',
       body: JSON.stringify({ email, code }),
     });
   },
   refresh(refreshToken: string) {
-    return request<SessionTokens>('/auth/refresh', {
+    return requestJson<SessionTokens>(apiBaseUrl, '/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
     });
   },
   logout(refreshToken: string | null) {
-    return request<{ ok: true }>('/auth/logout', {
+    return requestJson<{ ok: true }>(apiBaseUrl, '/auth/logout', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
     });
   },
   me(accessToken: string) {
-    return request<UserProfile>('/auth/me', { method: 'GET' }, accessToken);
+    return requestJson<UserProfile>(apiBaseUrl, '/auth/me', { method: 'GET' }, accessToken);
   },
   setShariah(shariah: boolean, accessToken: string) {
-    return request<UserProfile>(
+    return requestJson<UserProfile>(
+      apiBaseUrl,
       '/auth/shariah',
       {
         method: 'PATCH',
@@ -247,7 +199,7 @@ export const webApi = {
     );
   },
   getWalletState(accessToken: string) {
-    return request<WalletState>('/wallet', { method: 'GET' }, accessToken);
+    return requestJson<WalletState>(apiBaseUrl, '/wallet', { method: 'GET' }, accessToken);
   },
   createWalletChallenge(
     input: {
@@ -258,7 +210,8 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<WalletLinkChallenge>(
+    return requestJson<WalletLinkChallenge>(
+      apiBaseUrl,
       '/wallet/link/challenge',
       {
         method: 'POST',
@@ -275,7 +228,8 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<WalletState>(
+    return requestJson<WalletState>(
+      apiBaseUrl,
       '/wallet/link/verify',
       {
         method: 'POST',
@@ -292,7 +246,8 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<SmartAccountProvisionResponse>(
+    return requestJson<SmartAccountProvisionResponse>(
+      apiBaseUrl,
       '/wallet/smart-account/provision',
       {
         method: 'POST',
@@ -302,7 +257,8 @@ export const webApi = {
     );
   },
   setDefaultWallet(address: string, accessToken: string) {
-    return request<WalletState>(
+    return requestJson<WalletState>(
+      apiBaseUrl,
       '/wallet/default',
       {
         method: 'PATCH',
@@ -312,7 +268,7 @@ export const webApi = {
     );
   },
   listJobs(accessToken: string) {
-    return request<JobsListResponse>('/jobs', { method: 'GET' }, accessToken);
+    return requestJson<JobsListResponse>(apiBaseUrl, '/jobs', { method: 'GET' }, accessToken);
   },
   createJob(
     input: {
@@ -325,13 +281,14 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<{
+    return requestJson<{
       jobId: string;
       jobHash: string;
       status: JobStatus;
       escrowId: string;
       txHash: string;
     }>(
+      apiBaseUrl,
       '/jobs',
       {
         method: 'POST',
@@ -341,7 +298,8 @@ export const webApi = {
     );
   },
   fundJob(jobId: string, amount: string, accessToken: string) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/fund`,
       {
         method: 'POST',
@@ -360,7 +318,8 @@ export const webApi = {
     }>,
     accessToken: string,
   ) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/milestones`,
       {
         method: 'POST',
@@ -378,7 +337,8 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/milestones/${milestoneIndex}/deliver`,
       {
         method: 'POST',
@@ -388,7 +348,8 @@ export const webApi = {
     );
   },
   releaseMilestone(jobId: string, milestoneIndex: number, accessToken: string) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/milestones/${milestoneIndex}/release`,
       {
         method: 'POST',
@@ -403,7 +364,8 @@ export const webApi = {
     reason: string,
     accessToken: string,
   ) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/milestones/${milestoneIndex}/dispute`,
       {
         method: 'POST',
@@ -421,7 +383,8 @@ export const webApi = {
     },
     accessToken: string,
   ) {
-    return request<{ txHash: string }>(
+    return requestJson<{ txHash: string }>(
+      apiBaseUrl,
       `/jobs/${jobId}/milestones/${milestoneIndex}/resolve`,
       {
         method: 'POST',
@@ -431,6 +394,8 @@ export const webApi = {
     );
   },
   getAudit(jobId: string) {
-    return request<AuditBundle>(`/jobs/${jobId}/audit`, { method: 'GET' });
+    return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
+      method: 'GET',
+    });
   },
 };

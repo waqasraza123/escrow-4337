@@ -1,3 +1,8 @@
+import {
+  requestJson,
+  resolveApiBaseUrl,
+} from '@escrow4334/frontend-core';
+
 export type AuditBundle = {
   bundle: {
     job: {
@@ -14,6 +19,13 @@ export type AuditBundle = {
         deliverable: string;
         amount: string;
         status: string;
+        dueAt?: number;
+        deliveredAt?: number;
+        releasedAt?: number;
+        disputedAt?: number;
+        resolvedAt?: number;
+        deliveryNote?: string;
+        deliveryEvidenceUrls?: string[];
         disputeReason?: string;
         resolutionAction?: 'release' | 'refund';
         resolutionNote?: string;
@@ -47,39 +59,13 @@ export type AuditBundle = {
   };
 };
 
-const defaultApiBaseUrl = 'http://localhost:4000';
-
-function resolveApiBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, '') ||
-    defaultApiBaseUrl
-  );
-}
-
-async function readError(response: Response) {
-  const text = await response.text();
-  if (!text) {
-    return `Request failed with ${response.status}`;
-  }
-
-  try {
-    const body = JSON.parse(text) as { message?: string | string[] };
-    if (Array.isArray(body.message)) {
-      return body.message.join(', ');
-    }
-    return body.message || text;
-  } catch {
-    return text;
-  }
-}
+const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export const adminApi = {
-  baseUrl: resolveApiBaseUrl(),
+  baseUrl: apiBaseUrl,
   async getAudit(jobId: string) {
-    const response = await fetch(`${resolveApiBaseUrl()}/jobs/${jobId}/audit`);
-    if (!response.ok) {
-      throw new Error(await readError(response));
-    }
-    return (await response.json()) as AuditBundle;
+    return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
+      method: 'GET',
+    });
   },
 };

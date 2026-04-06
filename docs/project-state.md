@@ -10,6 +10,7 @@
 - `packages/compliance`: workspace package exporting Shariah prohibited-category policy data.
 - `apps/web`: Next.js client console with OTP auth, browser-wallet-native plus manual SIWE wallet-link challenge handling, smart-account provisioning, guided client job authoring, role-aware job workspaces, lifecycle mutation forms, and audit visibility wired to the API.
 - `apps/admin`: Next.js operator console with job-audit lookup, milestone posture review, and execution receipt inspection wired to the public audit endpoint.
+- `packages/frontend-core`: shared frontend workspace package for async-state helpers, API request and error normalization, local-storage utilities, formatting helpers, and unstyled status or empty-state primitives consumed by both Next apps.
 - `packages/sdk`: source files exist, but it is not a real workspace package.
 - `packages/abi`: directory exists but is empty.
 - README describes indexer, subgraph, shared UI, and infra layers, but those directories do not currently exist in the repo tree.
@@ -56,6 +57,10 @@
 - Web now supports browser-wallet-native SIWE linking through injected EIP-1193 wallets while preserving the manual challenge and signature fallback path.
 - Web now replaces the raw create-job JSON posture with a guided client authoring flow that derives terms JSON, shows launch-readiness checks, and hands the user directly into milestone and funding follow-up actions.
 - Web now uses participant-role-aware job workspaces so clients, workers, and future operator posture do not all share the same undifferentiated mutation panel.
+- Web now hardens milestone lifecycle UX with status-aware milestone selection, explicit ready/pending/confirmed/failed action posture, inline audit and execution receipt context, and focused frontend lifecycle helper tests in `apps/web`.
+- Admin now organizes the public audit bundle around operator tasks with case pressure summaries, dispute-focused milestone review, execution failure triage, combined event or receipt streams, explicit blocked privileged actions, recent lookup history, and focused admin helper tests in `apps/admin`.
+- Web and admin now share a dedicated `@escrow4334/frontend-core` workspace package for normalized API requests, async state transitions, formatting, persisted list utilities, and consistent status or empty-state primitives.
+- Web and admin now have app-local Vitest `jsdom` plus Testing Library harnesses, shared browser-test helpers via `@escrow4334/frontend-core/testing`, page-level UI coverage for onboarding or selected-job and operator-lookup behavior, and a root Playwright smoke entrypoint for both Next apps.
 - Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 - Root `pnpm test` now executes a real API test path instead of failing on an empty Jest contract.
 
@@ -67,6 +72,7 @@
 - The current active backend direction is to consume compliance rules through the workspace package instead of importing repo-relative source paths.
 - The API TypeScript config resolves `@escrow4334/compliance` through the built declaration surface in `packages/compliance/dist`.
 - Workspace packages now own their own `typecheck` scripts, and the root Turbo `typecheck` task depends on upstream package builds.
+- Next app `typecheck` scripts should generate route types with `next typegen` before running `tsc`, so root typecheck does not depend on pre-existing `.next/types` artifacts.
 - Typecheck scripts must not leave new repo artifacts behind; `*.tsbuildinfo` is ignored and package typecheck commands disable incremental writes.
 - Repo framing and governance now live in `readme.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `COLLABORATION.md`, `SECURITY.md`, `docs/ARCHITECTURE.md`, and `docs/EXECUTION_GUIDE.md`.
 - API Jest tests map `jose` to a local test mock so the current test environment can exercise auth flows without blocking on ESM package loading.
@@ -81,6 +87,7 @@
 - Non-test API startup should fail immediately on invalid deployment configuration, and backend deployment readiness should be evaluated through `pnpm --filter escrow4334-api deployment:validate` plus `pnpm --filter escrow4334-api db:migrate:status` rather than ad hoc manual checks.
 - API operational CLIs should run from compiled artifacts, and build output must include SQL migrations so deploy-time database operations do not depend on source files or `ts-node`.
 - Local development should remain zero-license-cost by default: direct Postgres, self-hosted locally through Docker Compose or an equivalent native Postgres install, with mock email, smart-account, and escrow providers allowed in development but not in production.
+- Shared frontend test support should stay minimal: generic browser render or storage helpers can live in `@escrow4334/frontend-core/testing`, while app-specific API and wallet mocks stay package-local to `apps/web` or `apps/admin`.
 
 ## Deferred / Not Yet Implemented
 - Live end-to-end validation of the configured email relay against real environments.
@@ -104,6 +111,7 @@
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
 - Root test coverage is still backend-heavy and does not yet validate live Postgres wiring, live smart-account provisioning, live relay integration, or product UIs end to end.
+- Frontend coverage now includes focused helper tests plus page-level route coverage in `apps/web` and `apps/admin`, and the repo has a root Playwright smoke entrypoint, but broader interaction matrices and local-profile end-to-end user journeys are still pending.
 
 ## Standard Verification
 - `git status --short`
@@ -115,4 +123,5 @@
 - `pnpm build`
 - `pnpm test`
 - `pnpm typecheck`
+- `pnpm exec playwright test --list`
 - `cd packages/contracts && forge test`

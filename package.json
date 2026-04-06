@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
+    "e2e": "playwright test",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -16,6 +17,7 @@
     "prepare": "husky install"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@types/node": "^20.12.12",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.3",

@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "composite": true,
+    "lib": ["dom", "es2021"],
+    "types": ["react"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

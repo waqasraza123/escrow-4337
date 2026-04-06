@@ -1,6 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  createErrorState,
+  createIdleState,
+  createSuccessState,
+  createWorkingState,
+  EmptyStateCard,
+  formatTimestamp,
+  previewHash,
+  StatusNotice,
+  type AsyncState,
+} from '@escrow4334/frontend-core';
 import styles from './page.module.css';
 import type {
   AuditBundle,
@@ -19,11 +30,18 @@ import {
   signMessageWithInjectedWallet,
   subscribeInjectedWallet,
 } from '../lib/injected-wallet';
-
-type AsyncState = {
-  kind: 'idle' | 'working' | 'error' | 'success';
-  message?: string;
-};
+import {
+  buildJobLifecycleCards,
+  buildMilestoneLifecycleCards,
+  buildMilestoneTimelineEntries,
+  getJobAuditEvents,
+  getJobExecutions,
+  getMilestoneAuditEvents,
+  getMilestoneExecutions,
+  pickInitialMilestoneIndex,
+  type LifecycleCard,
+  type PendingLifecycleAction,
+} from './milestone-lifecycle';
 
 type WalletConnectionState = {
   status: 'checking' | 'unavailable' | 'disconnected' | 'connected';
@@ -183,14 +201,6 @@ function writeSession(tokens: SessionTokens | null) {
   window.localStorage.setItem(storageKey, JSON.stringify(tokens));
 }
 
-function formatTime(value?: number | null) {
-  if (!value) {
-    return 'Not set';
-  }
-
-  return new Date(value).toLocaleString();
-}
-
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
@@ -202,12 +212,55 @@ function splitEvidenceUrls(input: string) {
     .filter(Boolean);
 }
 
-function txHashPreview(txHash?: string) {
-  if (!txHash) {
-    return 'Pending';
+function getLifecyclePhaseLabel(phase: LifecycleCard['phase']) {
+  switch (phase) {
+    case 'ready':
+      return 'Ready';
+    case 'pending':
+      return 'Pending';
+    case 'confirmed':
+      return 'Confirmed';
+    case 'failed':
+      return 'Failed';
+    case 'blocked':
+      return 'Blocked';
   }
+}
 
-  return `${txHash.slice(0, 10)}...${txHash.slice(-6)}`;
+function getLifecyclePhaseClassName(phase: LifecycleCard['phase']) {
+  switch (phase) {
+    case 'ready':
+      return styles.lifecycleReady;
+    case 'pending':
+      return styles.lifecyclePending;
+    case 'confirmed':
+      return styles.lifecycleConfirmed;
+    case 'failed':
+      return styles.lifecycleFailed;
+    case 'blocked':
+      return styles.lifecycleBlocked;
+  }
+}
+
+function getMilestoneStatusClassName(
+  status: JobView['milestones'][number]['status'],
+) {
+  switch (status) {
+    case 'pending':
+      return styles.milestonePending;
+    case 'delivered':
+      return styles.milestoneDelivered;
+    case 'released':
+      return styles.milestoneReleased;
+    case 'disputed':
+      return styles.milestoneDisputed;
+    case 'refunded':
+      return styles.milestoneRefunded;
+  }
+}
+
+function isLifecycleActionEnabled(card: LifecycleCard) {
+  return card.canTrigger && (card.phase === 'ready' || card.phase === 'failed');
 }
 
 export function EscrowConsole() {
@@ -220,15 +273,16 @@ export function EscrowConsole() {
   const [auditBundle, setAuditBundle] = useState<AuditBundle | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authCode, setAuthCode] = useState('');
-  const [startState, setStartState] = useState<AsyncState>({ kind: 'idle' });
-  const [verifyState, setVerifyState] = useState<AsyncState>({ kind: 'idle' });
-  const [sessionState, setSessionState] = useState<AsyncState>({ kind: 'idle' });
-  const [walletActionState, setWalletActionState] = useState<AsyncState>({
-    kind: 'idle',
-  });
-  const [jobActionState, setJobActionState] = useState<AsyncState>({
-    kind: 'idle',
-  });
+  const [startState, setStartState] = useState<AsyncState>(createIdleState());
+  const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
+  const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
+  const [walletActionState, setWalletActionState] = useState<AsyncState>(
+    createIdleState(),
+  );
+  const [jobActionState, setJobActionState] = useState<AsyncState>(
+    createIdleState(),
+  );
+  const [auditState, setAuditState] = useState<AsyncState>(createIdleState());
   const [challenge, setChallenge] = useState<WalletLinkChallenge | null>(null);
   const [linkAddress, setLinkAddress] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
@@ -257,7 +311,7 @@ export function EscrowConsole() {
     },
   ]);
   const [composerStep, setComposerStep] = useState<ComposerStep>('scope');
-  const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState('0');
+  const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState(0);
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryEvidence, setDeliveryEvidence] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
@@ -268,13 +322,18 @@ export function EscrowConsole() {
   const [createdJobResult, setCreatedJobResult] = useState<CreatedJobResult | null>(
     null,
   );
+  const [pendingLifecycleAction, setPendingLifecycleAction] =
+    useState<PendingLifecycleAction | null>(null);
 
   const selectedJob = useMemo(
     () => jobsResponse.jobs.find((entry) => entry.job.id === selectedJobId) ?? null,
     [jobsResponse.jobs, selectedJobId],
   );
 
-  const selectedMilestone = selectedJob?.job.milestones[Number(selectedMilestoneIndex)];
+  const selectedJobView = auditBundle?.bundle.job ?? selectedJob?.job ?? null;
+  const jobAuditEvents = auditBundle?.bundle.audit ?? [];
+  const jobExecutions = auditBundle?.bundle.executions ?? [];
+  const selectedMilestone = selectedJobView?.milestones[selectedMilestoneIndex];
   const selectedJobRoles = selectedJob?.participantRoles ?? [];
   const isClientForSelectedJob = selectedJobRoles.includes('client');
   const isWorkerForSelectedJob = selectedJobRoles.includes('worker');
@@ -330,6 +389,54 @@ export function EscrowConsole() {
     [createJobState, hasProvisionedDefaultWallet, milestoneDraftCount],
   );
   const canCreateJob = composerChecklist.every((item) => item.ok);
+  const jobLifecycleCards = useMemo(
+    () =>
+      selectedJobView
+        ? buildJobLifecycleCards({
+            job: selectedJobView,
+            executions: jobExecutions,
+            pendingAction: pendingLifecycleAction,
+          })
+        : [],
+    [jobExecutions, pendingLifecycleAction, selectedJobView],
+  );
+  const milestoneLifecycleCards = useMemo(
+    () =>
+      selectedJobView
+        ? buildMilestoneLifecycleCards({
+            job: selectedJobView,
+            milestoneIndex: selectedMilestoneIndex,
+            executions: jobExecutions,
+            pendingAction: pendingLifecycleAction,
+          })
+        : [],
+    [
+      jobExecutions,
+      pendingLifecycleAction,
+      selectedJobView,
+      selectedMilestoneIndex,
+    ],
+  );
+  const selectedMilestoneTimeline = useMemo(
+    () => buildMilestoneTimelineEntries(selectedMilestone),
+    [selectedMilestone],
+  );
+  const selectedMilestoneAuditEvents = useMemo(
+    () => getMilestoneAuditEvents(jobAuditEvents, selectedMilestoneIndex),
+    [jobAuditEvents, selectedMilestoneIndex],
+  );
+  const selectedMilestoneExecutions = useMemo(
+    () => getMilestoneExecutions(jobExecutions, selectedMilestoneIndex),
+    [jobExecutions, selectedMilestoneIndex],
+  );
+  const jobLevelAuditEvents = useMemo(
+    () => getJobAuditEvents(jobAuditEvents),
+    [jobAuditEvents],
+  );
+  const jobLevelExecutions = useMemo(
+    () => getJobExecutions(jobExecutions),
+    [jobExecutions],
+  );
 
   useEffect(() => {
     const session = readSession();
@@ -433,18 +540,46 @@ export function EscrowConsole() {
   useEffect(() => {
     if (!selectedJobId) {
       setAuditBundle(null);
+      setAuditState(createIdleState());
       return;
     }
 
+    setAuditBundle(null);
     void loadAudit(selectedJobId);
   }, [selectedJobId]);
+
+  useEffect(() => {
+    setDeliveryNote('');
+    setDeliveryEvidence('');
+    setDisputeReason('');
+    setResolutionAction('release');
+    setResolutionNote('');
+  }, [selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJobView) {
+      setSelectedMilestoneIndex(0);
+      return;
+    }
+
+    setSelectedMilestoneIndex((current) => {
+      if (
+        current >= 0 &&
+        current < selectedJobView.milestones.length
+      ) {
+        return current;
+      }
+
+      return pickInitialMilestoneIndex(selectedJobView);
+    });
+  }, [selectedJobView]);
 
   async function refreshConsole(token = accessToken) {
     if (!token) {
       return;
     }
 
-    setSessionState({ kind: 'working', message: 'Syncing session state...' });
+    setSessionState(createWorkingState('Syncing session state...'));
 
     try {
       const [user, wallets, jobs] = await Promise.all([
@@ -462,44 +597,81 @@ export function EscrowConsole() {
         '',
       );
       setSelectedJobId((current) => current || jobs.jobs[0]?.job.id || null);
-      setSessionState({ kind: 'success', message: 'Console state is current.' });
+      setSessionState(createSuccessState('Console state is current.'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load session';
-      setSessionState({ kind: 'error', message });
+      setSessionState(createErrorState(error, 'Failed to load session'));
     }
   }
 
   async function loadAudit(jobId: string) {
+    setAuditState(createWorkingState('Loading audit trail...'));
+
     try {
       const audit = await webApi.getAudit(jobId);
       setAuditBundle(audit);
+      setAuditState(createIdleState());
     } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load audit',
-      });
+      setAuditState(createErrorState(error, 'Failed to load audit'));
+    }
+  }
+
+  async function refreshSelectedJobContext(targetJobId: string | null) {
+    if (!targetJobId) {
+      return;
+    }
+
+    if (accessToken) {
+      await refreshConsole(accessToken);
+    }
+    await loadAudit(targetJobId);
+  }
+
+  async function runLifecycleMutation<T>(input: {
+    jobId: string;
+    pendingAction: PendingLifecycleAction;
+    workingMessage: string;
+    successMessage: (result: T) => string;
+    operation: () => Promise<T>;
+    onSuccess?: (result: T) => void;
+  }) {
+    const { jobId, onSuccess, operation, pendingAction, successMessage, workingMessage } =
+      input;
+
+    setPendingLifecycleAction(pendingAction);
+    setJobActionState(createWorkingState(workingMessage));
+
+    try {
+      const result = await operation();
+      onSuccess?.(result);
+      await refreshSelectedJobContext(jobId);
+      setJobActionState(createSuccessState(successMessage(result)));
+      return result;
+    } catch (error) {
+      await refreshSelectedJobContext(jobId);
+      setJobActionState(createErrorState(error, 'Lifecycle action failed'));
+      return null;
+    } finally {
+      setPendingLifecycleAction(null);
     }
   }
 
   async function handleStartAuth() {
-    setStartState({ kind: 'working', message: 'Sending OTP...' });
+    setStartState(createWorkingState('Sending OTP...'));
 
     try {
       await webApi.startAuth(authEmail);
-      setStartState({
-        kind: 'success',
-        message: 'OTP issued. Check your configured mail inbox or relay logs.',
-      });
+      setStartState(
+        createSuccessState(
+          'OTP issued. Check your configured mail inbox or relay logs.',
+        ),
+      );
     } catch (error) {
-      setStartState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to start auth',
-      });
+      setStartState(createErrorState(error, 'Failed to start auth'));
     }
   }
 
   async function handleVerifyAuth() {
-    setVerifyState({ kind: 'working', message: 'Verifying code...' });
+    setVerifyState(createWorkingState('Verifying code...'));
 
     try {
       const response = await webApi.verifyAuth(authEmail, authCode);
@@ -510,15 +682,11 @@ export function EscrowConsole() {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
       });
-      setVerifyState({
-        kind: 'success',
-        message: 'Session established. Loading product data...',
-      });
+      setVerifyState(
+        createSuccessState('Session established. Loading product data...'),
+      );
     } catch (error) {
-      setVerifyState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to verify code',
-      });
+      setVerifyState(createErrorState(error, 'Failed to verify code'));
     }
   }
 
@@ -527,18 +695,16 @@ export function EscrowConsole() {
       return;
     }
 
-    setSessionState({ kind: 'working', message: 'Refreshing session...' });
+    setSessionState(createWorkingState('Refreshing session...'));
 
     try {
       const tokens = await webApi.refresh(refreshToken);
       setAccessToken(tokens.accessToken);
       setRefreshToken(tokens.refreshToken);
       writeSession(tokens);
-      setSessionState({ kind: 'success', message: 'Session refreshed.' });
+      setSessionState(createSuccessState('Session refreshed.'));
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Session refresh failed';
-      setSessionState({ kind: 'error', message });
+      setSessionState(createErrorState(error, 'Session refresh failed'));
       clearSession();
     }
   }
@@ -567,20 +733,16 @@ export function EscrowConsole() {
       return;
     }
 
-    setSessionState({ kind: 'working', message: 'Updating policy preference...' });
+    setSessionState(createWorkingState('Updating policy preference...'));
 
     try {
       const updated = await webApi.setShariah(nextValue, accessToken);
       setProfile(updated);
-      setSessionState({
-        kind: 'success',
-        message: `Shariah mode ${nextValue ? 'enabled' : 'disabled'}.`,
-      });
+      setSessionState(
+        createSuccessState(`Shariah mode ${nextValue ? 'enabled' : 'disabled'}.`),
+      );
     } catch (error) {
-      setSessionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to update preference',
-      });
+      setSessionState(createErrorState(error, 'Failed to update preference'));
     }
   }
 
@@ -589,10 +751,7 @@ export function EscrowConsole() {
       return;
     }
 
-    setWalletActionState({
-      kind: 'working',
-      message: 'Issuing SIWE wallet-link challenge...',
-    });
+    setWalletActionState(createWorkingState('Issuing SIWE wallet-link challenge...'));
 
     try {
       const nextChallenge = await webApi.createWalletChallenge(
@@ -605,23 +764,18 @@ export function EscrowConsole() {
         accessToken,
       );
       setChallenge(nextChallenge);
-      setWalletActionState({
-        kind: 'success',
-        message: 'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
-      });
+      setWalletActionState(
+        createSuccessState(
+          'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
+        ),
+      );
     } catch (error) {
-      setWalletActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to issue challenge',
-      });
+      setWalletActionState(createErrorState(error, 'Failed to issue challenge'));
     }
   }
 
   async function handleConnectInjectedWallet() {
-    setWalletActionState({
-      kind: 'working',
-      message: 'Connecting injected wallet...',
-    });
+    setWalletActionState(createWorkingState('Connecting injected wallet...'));
 
     try {
       const snapshot = await connectInjectedWallet();
@@ -640,10 +794,11 @@ export function EscrowConsole() {
       if (snapshot.chainId) {
         setLinkChainId(String(snapshot.chainId));
       }
-      setWalletActionState({
-        kind: 'success',
-        message: 'Wallet connected. You can now sign a SIWE link challenge directly.',
-      });
+      setWalletActionState(
+        createSuccessState(
+          'Wallet connected. You can now sign a SIWE link challenge directly.',
+        ),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to connect wallet';
@@ -653,10 +808,7 @@ export function EscrowConsole() {
           current.status === 'connected' ? 'connected' : 'disconnected',
         message,
       }));
-      setWalletActionState({
-        kind: 'error',
-        message,
-      });
+      setWalletActionState(createErrorState(new Error(message), message));
     }
   }
 
@@ -665,10 +817,11 @@ export function EscrowConsole() {
       return;
     }
 
-    setWalletActionState({
-      kind: 'working',
-      message: 'Connecting wallet, creating SIWE challenge, and requesting signature...',
-    });
+    setWalletActionState(
+      createWorkingState(
+        'Connecting wallet, creating SIWE challenge, and requesting signature...',
+      ),
+    );
 
     try {
       const snapshot = await connectInjectedWallet();
@@ -715,17 +868,14 @@ export function EscrowConsole() {
       setLinkChainId(String(chainId));
       setWalletSignature(signature);
       setChallenge(null);
-      setWalletActionState({
-        kind: 'success',
-        message: 'Wallet linked from the browser wallet. Smart-account provisioning is now available.',
-      });
+      setWalletActionState(
+        createSuccessState(
+          'Wallet linked from the browser wallet. Smart-account provisioning is now available.',
+        ),
+      );
       await refreshConsole(accessToken);
     } catch (error) {
-      setWalletActionState({
-        kind: 'error',
-        message:
-          error instanceof Error ? error.message : 'Failed to link injected wallet',
-      });
+      setWalletActionState(createErrorState(error, 'Failed to link injected wallet'));
     }
   }
 
@@ -734,10 +884,7 @@ export function EscrowConsole() {
       return;
     }
 
-    setWalletActionState({
-      kind: 'working',
-      message: 'Verifying signed wallet challenge...',
-    });
+    setWalletActionState(createWorkingState('Verifying signed wallet challenge...'));
 
     try {
       const nextWalletState = await webApi.verifyWalletChallenge(
@@ -752,16 +899,12 @@ export function EscrowConsole() {
       setProvisionOwnerAddress((current) => current || linkAddress);
       setWalletSignature('');
       setChallenge(null);
-      setWalletActionState({
-        kind: 'success',
-        message: 'Wallet linked and ready for smart-account provisioning.',
-      });
+      setWalletActionState(
+        createSuccessState('Wallet linked and ready for smart-account provisioning.'),
+      );
       await refreshConsole(accessToken);
     } catch (error) {
-      setWalletActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to verify wallet',
-      });
+      setWalletActionState(createErrorState(error, 'Failed to verify wallet'));
     }
   }
 
@@ -770,10 +913,7 @@ export function EscrowConsole() {
       return;
     }
 
-    setWalletActionState({
-      kind: 'working',
-      message: 'Provisioning smart account...',
-    });
+    setWalletActionState(createWorkingState('Provisioning smart account...'));
 
     try {
       const response: SmartAccountProvisionResponse =
@@ -786,17 +926,16 @@ export function EscrowConsole() {
           accessToken,
         );
       setWalletState(response);
-      setWalletActionState({
-        kind: 'success',
-        message: `Smart account ready. Sponsorship policy: ${response.sponsorship.policy}.`,
-      });
+      setWalletActionState(
+        createSuccessState(
+          `Smart account ready. Sponsorship policy: ${response.sponsorship.policy}.`,
+        ),
+      );
       await refreshConsole(accessToken);
     } catch (error) {
-      setWalletActionState({
-        kind: 'error',
-        message:
-          error instanceof Error ? error.message : 'Failed to provision smart account',
-      });
+      setWalletActionState(
+        createErrorState(error, 'Failed to provision smart account'),
+      );
     }
   }
 
@@ -805,25 +944,15 @@ export function EscrowConsole() {
       return;
     }
 
-    setWalletActionState({
-      kind: 'working',
-      message: 'Updating default execution wallet...',
-    });
+    setWalletActionState(createWorkingState('Updating default execution wallet...'));
 
     try {
       const response = await webApi.setDefaultWallet(address, accessToken);
       setWalletState(response);
-      setWalletActionState({
-        kind: 'success',
-        message: 'Default execution wallet updated.',
-      });
+      setWalletActionState(createSuccessState('Default execution wallet updated.'));
       await refreshConsole(accessToken);
     } catch (error) {
-      setWalletActionState({
-        kind: 'error',
-        message:
-          error instanceof Error ? error.message : 'Failed to change default wallet',
-      });
+      setWalletActionState(createErrorState(error, 'Failed to change default wallet'));
     }
   }
 
@@ -832,7 +961,7 @@ export function EscrowConsole() {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Creating job...' });
+    setJobActionState(createWorkingState('Creating job...'));
 
     try {
       const termsJSON = buildJobTermsJson(createJobState, milestones);
@@ -853,40 +982,34 @@ export function EscrowConsole() {
         escrowId: response.escrowId,
         txHash: response.txHash,
       });
-      setJobActionState({
-        kind: 'success',
-        message: `Job created. Escrow id ${response.escrowId} on tx ${txHashPreview(response.txHash)}. Next step: commit milestones or stage funding.`,
-      });
-      await refreshConsole(accessToken);
+      setJobActionState(
+        createSuccessState(
+          `Job created. Escrow id ${response.escrowId} on tx ${previewHash(response.txHash)}. Next step: commit milestones or stage funding.`,
+        ),
+      );
+      await refreshSelectedJobContext(response.jobId);
     } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to create job',
-      });
+      setJobActionState(createErrorState(error, 'Failed to create job'));
     }
   }
 
   async function handleFundJob() {
-    if (!accessToken || !selectedJob) {
+    if (!accessToken || !selectedJobView) {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Funding job...' });
-
-    try {
-      const response = await webApi.fundJob(selectedJob.job.id, fundAmount, accessToken);
-      setJobActionState({
-        kind: 'success',
-        message: `Funding confirmed via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to fund job',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: selectedJobView.id,
+      pendingAction: {
+        action: 'fund_job',
+        startedAt: Date.now(),
+        summary: 'Submitting escrow funding. Confirmation will appear once audit receipts refresh.',
+      },
+      workingMessage: 'Funding job...',
+      successMessage: (response: { txHash: string }) =>
+        `Funding confirmed via ${previewHash(response.txHash)}.`,
+      operation: () => webApi.fundJob(selectedJobView.id, fundAmount, accessToken),
+    });
   }
 
   async function handleSetMilestones() {
@@ -903,31 +1026,28 @@ export function EscrowConsole() {
       setSelectedJobId(targetJobId);
     }
 
-    setJobActionState({ kind: 'working', message: 'Setting milestones...' });
-
-    try {
-      const response = await webApi.setMilestones(
-        targetJobId,
-        milestones.map((milestone) => ({
-          title: milestone.title,
-          deliverable: milestone.deliverable,
-          amount: milestone.amount,
-          dueAt: milestone.dueAt ? Number(milestone.dueAt) : undefined,
-        })),
-        accessToken,
-      );
-      setJobActionState({
-        kind: 'success',
-        message: `Milestones committed via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(targetJobId);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to set milestones',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: targetJobId,
+      pendingAction: {
+        action: 'set_milestones',
+        startedAt: Date.now(),
+        summary: 'Committing milestone checkpoints. The timeline will update after audit data refreshes.',
+      },
+      workingMessage: 'Setting milestones...',
+      successMessage: (response: { txHash: string }) =>
+        `Milestones committed via ${previewHash(response.txHash)}.`,
+      operation: () =>
+        webApi.setMilestones(
+          targetJobId,
+          milestones.map((milestone) => ({
+            title: milestone.title,
+            deliverable: milestone.deliverable,
+            amount: milestone.amount,
+            dueAt: milestone.dueAt ? Number(milestone.dueAt) : undefined,
+          })),
+          accessToken,
+        ),
+    });
   }
 
   function handleUseMilestoneBudget() {
@@ -946,121 +1066,127 @@ export function EscrowConsole() {
   }
 
   async function handleDeliverMilestone() {
-    if (!accessToken || !selectedJob) {
+    if (!accessToken || !selectedJobView) {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Submitting milestone delivery...' });
-
-    try {
-      const response = await webApi.deliverMilestone(
-        selectedJob.job.id,
-        Number(selectedMilestoneIndex),
-        {
-          note: deliveryNote,
-          evidenceUrls: splitEvidenceUrls(deliveryEvidence),
-        },
-        accessToken,
-      );
-      setJobActionState({
-        kind: 'success',
-        message: `Delivery recorded via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to deliver milestone',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: selectedJobView.id,
+      pendingAction: {
+        action: 'deliver_milestone',
+        milestoneIndex: selectedMilestoneIndex,
+        startedAt: Date.now(),
+        summary:
+          'Submitting the delivery note and evidence. Confirmation will move this milestone out of pending.',
+      },
+      workingMessage: 'Submitting milestone delivery...',
+      successMessage: (response: { txHash: string }) =>
+        `Delivery recorded via ${previewHash(response.txHash)}.`,
+      operation: () =>
+        webApi.deliverMilestone(
+          selectedJobView.id,
+          selectedMilestoneIndex,
+          {
+            note: deliveryNote,
+            evidenceUrls: splitEvidenceUrls(deliveryEvidence),
+          },
+          accessToken,
+        ),
+    });
   }
 
   async function handleReleaseMilestone() {
-    if (!accessToken || !selectedJob) {
+    if (!accessToken || !selectedJobView) {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Releasing milestone...' });
-
-    try {
-      const response = await webApi.releaseMilestone(
-        selectedJob.job.id,
-        Number(selectedMilestoneIndex),
-        accessToken,
-      );
-      setJobActionState({
-        kind: 'success',
-        message: `Release confirmed via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to release milestone',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: selectedJobView.id,
+      pendingAction: {
+        action: 'release_milestone',
+        milestoneIndex: selectedMilestoneIndex,
+        startedAt: Date.now(),
+        summary: 'Submitting milestone release. The receipt panel will update after refresh.',
+      },
+      workingMessage: 'Releasing milestone...',
+      successMessage: (response: { txHash: string }) =>
+        `Release confirmed via ${previewHash(response.txHash)}.`,
+      operation: () =>
+        webApi.releaseMilestone(
+          selectedJobView.id,
+          selectedMilestoneIndex,
+          accessToken,
+        ),
+    });
   }
 
   async function handleDisputeMilestone() {
-    if (!accessToken || !selectedJob) {
+    if (!accessToken || !selectedJobView) {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Opening dispute...' });
-
-    try {
-      const response = await webApi.disputeMilestone(
-        selectedJob.job.id,
-        Number(selectedMilestoneIndex),
-        disputeReason,
-        accessToken,
-      );
-      setJobActionState({
-        kind: 'success',
-        message: `Dispute opened via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to dispute milestone',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: selectedJobView.id,
+      pendingAction: {
+        action: 'open_dispute',
+        milestoneIndex: selectedMilestoneIndex,
+        startedAt: Date.now(),
+        summary: 'Escalating the selected milestone. Audit history will show the dispute once confirmed.',
+      },
+      workingMessage: 'Opening dispute...',
+      successMessage: (response: { txHash: string }) =>
+        `Dispute opened via ${previewHash(response.txHash)}.`,
+      operation: () =>
+        webApi.disputeMilestone(
+          selectedJobView.id,
+          selectedMilestoneIndex,
+          disputeReason,
+          accessToken,
+        ),
+    });
   }
 
   async function handleResolveMilestone() {
-    if (!accessToken || !selectedJob) {
+    if (!accessToken || !selectedJobView) {
       return;
     }
 
-    setJobActionState({ kind: 'working', message: 'Resolving dispute...' });
-
-    try {
-      const response = await webApi.resolveMilestone(
-        selectedJob.job.id,
-        Number(selectedMilestoneIndex),
-        {
-          action: resolutionAction,
-          note: resolutionNote,
-        },
-        accessToken,
-      );
-      setJobActionState({
-        kind: 'success',
-        message: `Dispute resolved via ${txHashPreview(response.txHash)}.`,
-      });
-      await refreshConsole(accessToken);
-      await loadAudit(selectedJob.job.id);
-    } catch (error) {
-      setJobActionState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : 'Failed to resolve dispute',
-      });
-    }
+    await runLifecycleMutation({
+      jobId: selectedJobView.id,
+      pendingAction: {
+        action: 'resolve_dispute',
+        milestoneIndex: selectedMilestoneIndex,
+        startedAt: Date.now(),
+        summary: 'Submitting dispute resolution. The milestone timeline will refresh with the resolved outcome.',
+      },
+      workingMessage: 'Resolving dispute...',
+      successMessage: (response: { txHash: string }) =>
+        `Dispute resolved via ${previewHash(response.txHash)}.`,
+      operation: () =>
+        webApi.resolveMilestone(
+          selectedJobView.id,
+          selectedMilestoneIndex,
+          {
+            action: resolutionAction,
+            note: resolutionNote,
+          },
+          accessToken,
+        ),
+    });
   }
+
+  const fundJobCard =
+    jobLifecycleCards.find((card) => card.action === 'fund_job') ?? null;
+  const commitMilestonesCard =
+    jobLifecycleCards.find((card) => card.action === 'set_milestones') ?? null;
+  const deliveryCard =
+    milestoneLifecycleCards.find((card) => card.action === 'deliver_milestone') ?? null;
+  const releaseCard =
+    milestoneLifecycleCards.find((card) => card.action === 'release_milestone') ?? null;
+  const disputeCard =
+    milestoneLifecycleCards.find((card) => card.action === 'open_dispute') ?? null;
+  const resolveCard =
+    milestoneLifecycleCards.find((card) => card.action === 'resolve_dispute') ?? null;
 
   return (
     <div className={styles.console}>
@@ -1595,7 +1721,7 @@ export function EscrowConsole() {
               <div className={styles.composerSummaryCard}>
                 <div className={styles.walletTitleRow}>
                   <strong>Job created</strong>
-                  <span>{txHashPreview(createdJobResult.txHash)}</span>
+                  <span>{previewHash(createdJobResult.txHash)}</span>
                 </div>
                 <p className={styles.muted}>
                   Escrow id {createdJobResult.escrowId}. Use the drafted milestones and funding amount below to move directly into launch steps.
@@ -1621,7 +1747,10 @@ export function EscrowConsole() {
                 </div>
               </div>
             ) : null}
-            <p className={styles.stateText}>{jobActionState.message}</p>
+            <StatusNotice
+              message={jobActionState.message}
+              messageClassName={styles.stateText}
+            />
           </div>
         </section>
 
@@ -1634,7 +1763,12 @@ export function EscrowConsole() {
           </header>
           <div className={styles.jobList}>
             {jobsResponse.jobs.length === 0 ? (
-              <p className={styles.muted}>No jobs available yet for the current identity.</p>
+              <EmptyStateCard
+                title="No jobs available"
+                message="No jobs are available yet for the current identity."
+                className={styles.timelineCard}
+                messageClassName={styles.muted}
+              />
             ) : (
               jobsResponse.jobs.map((entry) => (
                 <button
@@ -1664,28 +1798,28 @@ export function EscrowConsole() {
         <header className={styles.panelHeader}>
           <div>
             <p className={styles.panelEyebrow}>Selected Job</p>
-            <h2>{selectedJob?.job.title || 'Select a job to manage lifecycle actions'}</h2>
+            <h2>{selectedJobView?.title || 'Select a job to manage lifecycle actions'}</h2>
           </div>
         </header>
-        {selectedJob ? (
+        {selectedJobView ? (
           <div className={styles.detailGrid}>
             <div className={styles.stack}>
               <div className={styles.summaryGrid}>
                 <article>
                   <span className={styles.metaLabel}>Status</span>
-                  <strong>{selectedJob.job.status}</strong>
+                  <strong>{selectedJobView.status}</strong>
                 </article>
                 <article>
                   <span className={styles.metaLabel}>Funded amount</span>
-                  <strong>{selectedJob.job.fundedAmount || 'Not funded'}</strong>
+                  <strong>{selectedJobView.fundedAmount || 'Not funded'}</strong>
                 </article>
                 <article>
                   <span className={styles.metaLabel}>Escrow id</span>
-                  <strong>{selectedJob.job.onchain.escrowId || 'Pending'}</strong>
+                  <strong>{selectedJobView.onchain.escrowId || 'Pending'}</strong>
                 </article>
                 <article>
                   <span className={styles.metaLabel}>Updated</span>
-                  <strong>{formatTime(selectedJob.job.updatedAt)}</strong>
+                  <strong>{formatTimestamp(selectedJobView.updatedAt)}</strong>
                 </article>
               </div>
               <div className={styles.roleBar}>
@@ -1699,6 +1833,57 @@ export function EscrowConsole() {
                   <span className={styles.roleBadgeMuted}>observer</span>
                 )}
               </div>
+              {jobActionState.message ||
+              (auditState.kind === 'error' && auditState.message) ? (
+                <StatusNotice
+                  className={styles.statusBanner}
+                  messageClassName={styles.stateText}
+                  message={jobActionState.message}
+                >
+                  {auditState.kind === 'error' && auditState.message ? (
+                    <p className={styles.stateText}>{auditState.message}</p>
+                  ) : null}
+                </StatusNotice>
+              ) : null}
+              <div className={styles.milestoneRail}>
+                {selectedJobView.milestones.length === 0 ? (
+                  <article className={styles.milestonePickerEmpty}>
+                    <strong>No milestones committed yet</strong>
+                    <p className={styles.muted}>
+                      Fund the job and commit milestone checkpoints before delivery actions can begin.
+                    </p>
+                  </article>
+                ) : (
+                  selectedJobView.milestones.map((milestone, index) => (
+                    <button
+                      key={`${selectedJobView.id}-milestone-${index}`}
+                      type="button"
+                      className={`${styles.milestoneTile} ${
+                        index === selectedMilestoneIndex ? styles.milestoneTileActive : ''
+                      }`}
+                      onClick={() => setSelectedMilestoneIndex(index)}
+                    >
+                      <div className={styles.timelineHead}>
+                        <strong>{`${index + 1}. ${milestone.title}`}</strong>
+                        <span
+                          className={`${styles.milestoneBadge} ${getMilestoneStatusClassName(
+                            milestone.status,
+                          )}`}
+                        >
+                          {milestone.status}
+                        </span>
+                      </div>
+                      <p>{milestone.deliverable}</p>
+                      <div className={styles.milestoneMetaRow}>
+                        <small>{milestone.amount} USDC</small>
+                        <small>
+                          {milestone.dueAt ? `Due ${formatTimestamp(milestone.dueAt)}` : 'No due date'}
+                        </small>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
               <div className={styles.workspaceStack}>
                 {isClientForSelectedJob ? (
                   <div className={styles.actionPanel}>
@@ -1706,96 +1891,185 @@ export function EscrowConsole() {
                       <div>
                         <h3>Client workspace</h3>
                         <p className={styles.muted}>
-                          Fund the escrow, commit milestone drafts, and release accepted work.
+                          Fund the escrow, commit milestone checkpoints, and release accepted work with explicit receipt posture.
                         </p>
                       </div>
                     </div>
-                    <label className={styles.field}>
-                      <span>Fund amount</span>
-                      <input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} />
-                    </label>
-                    <div className={styles.inlineActions}>
-                      <button type="button" onClick={handleFundJob}>
-                        Fund selected job
-                      </button>
-                      <button type="button" className={styles.secondaryButton} onClick={handleUseMilestoneBudget}>
-                        Use drafted milestone total
-                      </button>
-                    </div>
-
-                    <div className={styles.stack}>
-                      <h4>Milestone drafting</h4>
-                      {milestones.map((milestone, index) => (
-                        <div key={`draft-${index}`} className={styles.milestoneEditor}>
-                          <input
-                            value={milestone.title}
-                            onChange={(event) =>
-                              setMilestones((current) =>
-                                current.map((entry, entryIndex) =>
-                                  entryIndex === index
-                                    ? { ...entry, title: event.target.value }
-                                    : entry,
-                                ),
-                              )
-                            }
-                            placeholder="Title"
-                          />
-                          <input
-                            value={milestone.amount}
-                            onChange={(event) =>
-                              setMilestones((current) =>
-                                current.map((entry, entryIndex) =>
-                                  entryIndex === index
-                                    ? { ...entry, amount: event.target.value }
-                                    : entry,
-                                ),
-                              )
-                            }
-                            placeholder="Amount"
-                          />
-                          <textarea
-                            value={milestone.deliverable}
-                            onChange={(event) =>
-                              setMilestones((current) =>
-                                current.map((entry, entryIndex) =>
-                                  entryIndex === index
-                                    ? { ...entry, deliverable: event.target.value }
-                                    : entry,
-                                ),
-                              )
-                            }
-                            placeholder="Deliverable"
-                            rows={2}
-                          />
+                    {fundJobCard ? (
+                      <article
+                        className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                          fundJobCard.phase,
+                        )}`}
+                      >
+                        <div className={styles.lifecycleHead}>
+                          <div>
+                            <h4>{fundJobCard.title}</h4>
+                            <p>{fundJobCard.summary}</p>
+                          </div>
+                          <span className={styles.lifecycleState}>
+                            {getLifecyclePhaseLabel(fundJobCard.phase)}
+                          </span>
                         </div>
-                      ))}
-                      <div className={styles.inlineActions}>
+                        <p className={styles.muted}>{fundJobCard.detail}</p>
+                        <label className={styles.field}>
+                          <span>Fund amount</span>
+                          <input
+                            value={fundAmount}
+                            onChange={(event) => setFundAmount(event.target.value)}
+                          />
+                        </label>
+                        <div className={styles.inlineActions}>
+                          <button
+                            type="button"
+                            onClick={handleFundJob}
+                            disabled={!isLifecycleActionEnabled(fundJobCard)}
+                          >
+                            Fund selected job
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={handleUseMilestoneBudget}
+                          >
+                            Use drafted milestone total
+                          </button>
+                        </div>
+                        <div className={styles.lifecycleMeta}>
+                          <small>{fundJobCard.timestamp ? formatTimestamp(fundJobCard.timestamp) : 'No receipt yet'}</small>
+                          <small>{previewHash(fundJobCard.txHash)}</small>
+                        </div>
+                      </article>
+                    ) : null}
+
+                    {commitMilestonesCard ? (
+                      <article
+                        className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                          commitMilestonesCard.phase,
+                        )}`}
+                      >
+                        <div className={styles.lifecycleHead}>
+                          <div>
+                            <h4>{commitMilestonesCard.title}</h4>
+                            <p>{commitMilestonesCard.summary}</p>
+                          </div>
+                          <span className={styles.lifecycleState}>
+                            {getLifecyclePhaseLabel(commitMilestonesCard.phase)}
+                          </span>
+                        </div>
+                        <p className={styles.muted}>{commitMilestonesCard.detail}</p>
+                        <div className={styles.stack}>
+                          <h4>Milestone drafting</h4>
+                          {milestones.map((milestone, index) => (
+                            <div key={`draft-${index}`} className={styles.milestoneEditor}>
+                              <input
+                                value={milestone.title}
+                                onChange={(event) =>
+                                  setMilestones((current) =>
+                                    current.map((entry, entryIndex) =>
+                                      entryIndex === index
+                                        ? { ...entry, title: event.target.value }
+                                        : entry,
+                                    ),
+                                  )
+                                }
+                                placeholder="Title"
+                              />
+                              <input
+                                value={milestone.amount}
+                                onChange={(event) =>
+                                  setMilestones((current) =>
+                                    current.map((entry, entryIndex) =>
+                                      entryIndex === index
+                                        ? { ...entry, amount: event.target.value }
+                                        : entry,
+                                    ),
+                                  )
+                                }
+                                placeholder="Amount"
+                              />
+                              <textarea
+                                value={milestone.deliverable}
+                                onChange={(event) =>
+                                  setMilestones((current) =>
+                                    current.map((entry, entryIndex) =>
+                                      entryIndex === index
+                                        ? { ...entry, deliverable: event.target.value }
+                                        : entry,
+                                    ),
+                                  )
+                                }
+                                placeholder="Deliverable"
+                                rows={2}
+                              />
+                            </div>
+                          ))}
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() =>
+                                setMilestones((current) => [
+                                  ...current,
+                                  {
+                                    title: '',
+                                    deliverable: '',
+                                    amount: '',
+                                    dueAt: '',
+                                  },
+                                ])
+                              }
+                            >
+                              Add milestone
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSetMilestones}
+                              disabled={!isLifecycleActionEnabled(commitMilestonesCard)}
+                            >
+                              Commit milestones
+                            </button>
+                          </div>
+                        </div>
+                        <div className={styles.lifecycleMeta}>
+                          <small>
+                            {commitMilestonesCard.timestamp
+                              ? formatTimestamp(commitMilestonesCard.timestamp)
+                              : 'No receipt yet'}
+                          </small>
+                          <small>{previewHash(commitMilestonesCard.txHash)}</small>
+                        </div>
+                      </article>
+                    ) : null}
+
+                    {releaseCard ? (
+                      <article
+                        className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                          releaseCard.phase,
+                        )}`}
+                      >
+                        <div className={styles.lifecycleHead}>
+                          <div>
+                            <h4>{releaseCard.title}</h4>
+                            <p>{releaseCard.summary}</p>
+                          </div>
+                          <span className={styles.lifecycleState}>
+                            {getLifecyclePhaseLabel(releaseCard.phase)}
+                          </span>
+                        </div>
+                        <p className={styles.muted}>{releaseCard.detail}</p>
                         <button
                           type="button"
-                          className={styles.secondaryButton}
-                          onClick={() =>
-                            setMilestones((current) => [
-                              ...current,
-                              {
-                                title: '',
-                                deliverable: '',
-                                amount: '',
-                                dueAt: '',
-                              },
-                            ])
-                          }
+                          onClick={handleReleaseMilestone}
+                          disabled={!isLifecycleActionEnabled(releaseCard)}
                         >
-                          Add milestone
+                          Release selected milestone
                         </button>
-                        <button type="button" onClick={handleSetMilestones}>
-                          Commit milestones
-                        </button>
-                      </div>
-                    </div>
-
-                    <button type="button" onClick={handleReleaseMilestone}>
-                      Release active milestone
-                    </button>
+                        <div className={styles.lifecycleMeta}>
+                          <small>{releaseCard.timestamp ? formatTimestamp(releaseCard.timestamp) : 'No receipt yet'}</small>
+                          <small>{previewHash(releaseCard.txHash)}</small>
+                        </div>
+                      </article>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -1805,26 +2079,56 @@ export function EscrowConsole() {
                       <div>
                         <h3>Worker workspace</h3>
                         <p className={styles.muted}>
-                          Deliver milestone evidence and escalate when delivery is contested.
+                          Deliver milestone evidence with explicit pending and confirmation posture.
                         </p>
                       </div>
                     </div>
-                    <label className={styles.field}>
-                      <span>Delivery note</span>
-                      <textarea value={deliveryNote} onChange={(event) => setDeliveryNote(event.target.value)} rows={3} />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Evidence URLs</span>
-                      <textarea
-                        value={deliveryEvidence}
-                        onChange={(event) => setDeliveryEvidence(event.target.value)}
-                        rows={2}
-                        placeholder="https://... https://..."
-                      />
-                    </label>
-                    <button type="button" onClick={handleDeliverMilestone}>
-                      Deliver active milestone
-                    </button>
+                    {deliveryCard ? (
+                      <article
+                        className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                          deliveryCard.phase,
+                        )}`}
+                      >
+                        <div className={styles.lifecycleHead}>
+                          <div>
+                            <h4>{deliveryCard.title}</h4>
+                            <p>{deliveryCard.summary}</p>
+                          </div>
+                          <span className={styles.lifecycleState}>
+                            {getLifecyclePhaseLabel(deliveryCard.phase)}
+                          </span>
+                        </div>
+                        <p className={styles.muted}>{deliveryCard.detail}</p>
+                        <label className={styles.field}>
+                          <span>Delivery note</span>
+                          <textarea
+                            value={deliveryNote}
+                            onChange={(event) => setDeliveryNote(event.target.value)}
+                            rows={3}
+                          />
+                        </label>
+                        <label className={styles.field}>
+                          <span>Evidence URLs</span>
+                          <textarea
+                            value={deliveryEvidence}
+                            onChange={(event) => setDeliveryEvidence(event.target.value)}
+                            rows={2}
+                            placeholder="https://... https://..."
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleDeliverMilestone}
+                          disabled={!isLifecycleActionEnabled(deliveryCard)}
+                        >
+                          Deliver selected milestone
+                        </button>
+                        <div className={styles.lifecycleMeta}>
+                          <small>{deliveryCard.timestamp ? formatTimestamp(deliveryCard.timestamp) : 'No receipt yet'}</small>
+                          <small>{previewHash(deliveryCard.txHash)}</small>
+                        </div>
+                      </article>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -1833,31 +2137,62 @@ export function EscrowConsole() {
                     <div>
                       <h3>Shared dispute posture</h3>
                       <p className={styles.muted}>
-                        Both participants need a clear view of the active milestone and any escalation path.
+                        Both participants should see the same selected milestone, current state, and escalation evidence.
                       </p>
                     </div>
                   </div>
-                  <label className={styles.field}>
-                    <span>Active milestone index</span>
-                    <input
-                      value={selectedMilestoneIndex}
-                      onChange={(event) => setSelectedMilestoneIndex(event.target.value)}
-                    />
-                  </label>
-                  <p className={styles.muted}>
-                    Current milestone: {selectedMilestone?.title || 'No milestone at this index'}
-                  </p>
-                  <label className={styles.field}>
-                    <span>Dispute reason</span>
-                    <textarea
-                      value={disputeReason}
-                      onChange={(event) => setDisputeReason(event.target.value)}
-                      rows={3}
-                    />
-                  </label>
-                  <button type="button" onClick={handleDisputeMilestone}>
-                    Open dispute
-                  </button>
+                  <div className={styles.selectedMilestoneHeader}>
+                    <div>
+                      <span className={styles.metaLabel}>Selected milestone</span>
+                      <strong>{selectedMilestone ? `${selectedMilestoneIndex + 1}. ${selectedMilestone.title}` : 'No milestone selected'}</strong>
+                    </div>
+                    {selectedMilestone ? (
+                      <span
+                        className={`${styles.milestoneBadge} ${getMilestoneStatusClassName(
+                          selectedMilestone.status,
+                        )}`}
+                      >
+                        {selectedMilestone.status}
+                      </span>
+                    ) : null}
+                  </div>
+                  {disputeCard ? (
+                    <article
+                      className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                        disputeCard.phase,
+                      )}`}
+                    >
+                      <div className={styles.lifecycleHead}>
+                        <div>
+                          <h4>{disputeCard.title}</h4>
+                          <p>{disputeCard.summary}</p>
+                        </div>
+                        <span className={styles.lifecycleState}>
+                          {getLifecyclePhaseLabel(disputeCard.phase)}
+                        </span>
+                      </div>
+                      <p className={styles.muted}>{disputeCard.detail}</p>
+                      <label className={styles.field}>
+                        <span>Dispute reason</span>
+                        <textarea
+                          value={disputeReason}
+                          onChange={(event) => setDisputeReason(event.target.value)}
+                          rows={3}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleDisputeMilestone}
+                        disabled={!isLifecycleActionEnabled(disputeCard)}
+                      >
+                        Open dispute
+                      </button>
+                      <div className={styles.lifecycleMeta}>
+                        <small>{disputeCard.timestamp ? formatTimestamp(disputeCard.timestamp) : 'No receipt yet'}</small>
+                        <small>{previewHash(disputeCard.txHash)}</small>
+                      </div>
+                    </article>
+                  ) : null}
                 </div>
 
                 <div className={styles.actionPanel}>
@@ -1869,81 +2204,234 @@ export function EscrowConsole() {
                       </p>
                     </div>
                   </div>
-                  <label className={styles.field}>
-                    <span>Resolution action</span>
-                    <select
-                      value={resolutionAction}
-                      onChange={(event) =>
-                        setResolutionAction(event.target.value as 'release' | 'refund')
-                      }
+                  {resolveCard ? (
+                    <article
+                      className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                        resolveCard.phase,
+                      )}`}
                     >
-                      <option value="release">Release</option>
-                      <option value="refund">Refund</option>
-                    </select>
-                  </label>
-                  <label className={styles.field}>
-                    <span>Resolution note</span>
-                    <textarea
-                      value={resolutionNote}
-                      onChange={(event) => setResolutionNote(event.target.value)}
-                      rows={3}
-                    />
-                  </label>
-                  <button type="button" onClick={handleResolveMilestone}>
-                    Resolve dispute
-                  </button>
+                      <div className={styles.lifecycleHead}>
+                        <div>
+                          <h4>{resolveCard.title}</h4>
+                          <p>{resolveCard.summary}</p>
+                        </div>
+                        <span className={styles.lifecycleState}>
+                          {getLifecyclePhaseLabel(resolveCard.phase)}
+                        </span>
+                      </div>
+                      <p className={styles.muted}>{resolveCard.detail}</p>
+                      <label className={styles.field}>
+                        <span>Resolution action</span>
+                        <select
+                          value={resolutionAction}
+                          onChange={(event) =>
+                            setResolutionAction(event.target.value as 'release' | 'refund')
+                          }
+                        >
+                          <option value="release">Release</option>
+                          <option value="refund">Refund</option>
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>Resolution note</span>
+                        <textarea
+                          value={resolutionNote}
+                          onChange={(event) => setResolutionNote(event.target.value)}
+                          rows={3}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleResolveMilestone}
+                        disabled={!isLifecycleActionEnabled(resolveCard)}
+                      >
+                        Resolve dispute
+                      </button>
+                      <div className={styles.lifecycleMeta}>
+                        <small>{resolveCard.timestamp ? formatTimestamp(resolveCard.timestamp) : 'No receipt yet'}</small>
+                        <small>{previewHash(resolveCard.txHash)}</small>
+                      </div>
+                    </article>
+                  ) : null}
                 </div>
               </div>
             </div>
 
             <div className={styles.stack}>
               <div className={styles.auditPanel}>
-                <h3>Milestones</h3>
-                {(auditBundle?.bundle.job.milestones ?? selectedJob.job.milestones).map(
-                  (milestone, index) => (
-                    <article key={`${selectedJob.job.id}-milestone-${index}`} className={styles.timelineCard}>
-                      <div className={styles.timelineHead}>
-                        <strong>
-                          {index}. {milestone.title}
-                        </strong>
-                        <span>{milestone.status}</span>
-                      </div>
-                      <p>{milestone.deliverable}</p>
-                      <small>{milestone.amount} USDC</small>
-                    </article>
-                  ),
+                <div className={styles.lifecycleHead}>
+                  <div>
+                    <h3>Selected milestone</h3>
+                    <p className={styles.muted}>
+                      Inline context for the checkpoint currently in focus.
+                    </p>
+                  </div>
+                  {selectedMilestone ? (
+                    <span
+                      className={`${styles.milestoneBadge} ${getMilestoneStatusClassName(
+                        selectedMilestone.status,
+                      )}`}
+                    >
+                      {selectedMilestone.status}
+                    </span>
+                  ) : null}
+                </div>
+                {selectedMilestone ? (
+                  <div className={styles.stack}>
+                    <div className={styles.summaryGrid}>
+                      <article>
+                        <span className={styles.metaLabel}>Amount</span>
+                        <strong>{selectedMilestone.amount} USDC</strong>
+                      </article>
+                      <article>
+                        <span className={styles.metaLabel}>Due</span>
+                        <strong>{selectedMilestone.dueAt ? formatTimestamp(selectedMilestone.dueAt) : 'Not set'}</strong>
+                      </article>
+                    </div>
+                    <p>{selectedMilestone.deliverable}</p>
+                    {selectedMilestone.deliveryNote ? (
+                      <article className={styles.timelineCard}>
+                        <strong>Delivery note</strong>
+                        <p>{selectedMilestone.deliveryNote}</p>
+                      </article>
+                    ) : null}
+                    {selectedMilestone.deliveryEvidenceUrls?.length ? (
+                      <article className={styles.timelineCard}>
+                        <strong>Evidence links</strong>
+                        <div className={styles.linkList}>
+                          {selectedMilestone.deliveryEvidenceUrls.map((url) => (
+                            <a key={url} href={url} target="_blank" rel="noreferrer">
+                              {url}
+                            </a>
+                          ))}
+                        </div>
+                      </article>
+                    ) : null}
+                    {selectedMilestone.disputeReason ? (
+                      <article className={styles.timelineCard}>
+                        <strong>Dispute reason</strong>
+                        <p>{selectedMilestone.disputeReason}</p>
+                      </article>
+                    ) : null}
+                    {selectedMilestone.resolutionAction ? (
+                      <article className={styles.timelineCard}>
+                        <strong>Resolution</strong>
+                        <p>
+                          {selectedMilestone.resolutionAction}
+                          {selectedMilestone.resolutionNote
+                            ? `: ${selectedMilestone.resolutionNote}`
+                            : ''}
+                        </p>
+                      </article>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className={styles.muted}>
+                    Select a committed milestone to inspect delivery evidence and action posture.
+                  </p>
                 )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Audit timeline</h3>
-                {(auditBundle?.bundle.audit ?? []).map((event, index) => (
-                  <article key={`${event.type}-${event.at}-${index}`} className={styles.timelineCard}>
-                    <div className={styles.timelineHead}>
-                      <strong>{event.type}</strong>
-                      <span>{formatTime(event.at)}</span>
-                    </div>
-                    <pre>{formatJson(event.payload)}</pre>
-                  </article>
-                ))}
+                <h3>Milestone timeline</h3>
+                {selectedMilestoneTimeline.length > 0 ? (
+                  selectedMilestoneTimeline.map((entry) => (
+                    <article key={`${entry.label}-${entry.at}`} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{entry.label}</strong>
+                        <span>{formatTimestamp(entry.at)}</span>
+                      </div>
+                      <p>{entry.detail}</p>
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.muted}>
+                    No milestone timeline events recorded yet for the current selection.
+                  </p>
+                )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Execution receipts</h3>
-                {(auditBundle?.bundle.executions ?? []).map((execution) => (
-                  <article key={execution.id} className={styles.timelineCard}>
-                    <div className={styles.timelineHead}>
-                      <strong>{execution.action}</strong>
-                      <span>{execution.status}</span>
-                    </div>
-                    <p>{execution.actorAddress}</p>
-                    <small>{txHashPreview(execution.txHash)}</small>
-                    {execution.failureMessage ? <small>{execution.failureMessage}</small> : null}
-                  </article>
-                ))}
+                <h3>Milestone audit trail</h3>
+                {selectedMilestoneAuditEvents.length > 0 ? (
+                  selectedMilestoneAuditEvents.map((event, index) => (
+                    <article key={`${event.type}-${event.at}-${index}`} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{event.type}</strong>
+                        <span>{formatTimestamp(event.at)}</span>
+                      </div>
+                      <pre>{formatJson(event.payload)}</pre>
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.muted}>
+                    No milestone-specific audit events recorded yet.
+                  </p>
+                )}
+              </div>
+              <div className={styles.auditPanel}>
+                <h3>Milestone receipts</h3>
+                {selectedMilestoneExecutions.length > 0 ? (
+                  selectedMilestoneExecutions.map((execution) => (
+                    <article key={execution.id} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{execution.action}</strong>
+                        <span>{execution.status}</span>
+                      </div>
+                      <p>{execution.actorAddress}</p>
+                      <small>{formatTimestamp(execution.confirmedAt ?? execution.submittedAt)}</small>
+                      <small>{previewHash(execution.txHash)}</small>
+                      {execution.failureMessage ? <small>{execution.failureMessage}</small> : null}
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.muted}>
+                    No milestone-specific execution receipts recorded yet.
+                  </p>
+                )}
+              </div>
+              <div className={styles.auditPanel}>
+                <h3>Job launch history</h3>
+                {jobLevelAuditEvents.length > 0 ? (
+                  jobLevelAuditEvents.map((event, index) => (
+                    <article key={`${event.type}-${event.at}-${index}`} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{event.type}</strong>
+                        <span>{formatTimestamp(event.at)}</span>
+                      </div>
+                      <pre>{formatJson(event.payload)}</pre>
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.muted}>No job-level audit events recorded yet.</p>
+                )}
+              </div>
+              <div className={styles.auditPanel}>
+                <h3>Job launch receipts</h3>
+                {jobLevelExecutions.length > 0 ? (
+                  jobLevelExecutions.map((execution) => (
+                    <article key={execution.id} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{execution.action}</strong>
+                        <span>{execution.status}</span>
+                      </div>
+                      <p>{execution.actorAddress}</p>
+                      <small>{formatTimestamp(execution.confirmedAt ?? execution.submittedAt)}</small>
+                      <small>{previewHash(execution.txHash)}</small>
+                      {execution.failureMessage ? <small>{execution.failureMessage}</small> : null}
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.muted}>No job-level execution receipts recorded yet.</p>
+                )}
               </div>
             </div>
           </div>
         ) : (
-          <p className={styles.muted}>Select a job from the index to view its milestones, audit events, and receipts.</p>
+          <EmptyStateCard
+            title="Select a job"
+            message="Select a job from the index to view its milestones, audit events, and receipts."
+            className={styles.timelineCard}
+            messageClassName={styles.muted}
+          />
         )}
       </section>
     </div>

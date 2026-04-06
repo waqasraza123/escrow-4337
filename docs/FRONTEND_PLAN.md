@@ -1,20 +1,19 @@
 # Frontend Plan
 
-This document turns Phase 5 of the execution guide into a concrete frontend delivery sequence for `apps/web` and `apps/admin`.
+This document turns Phase 5 of the execution guide into the current frontend source of truth for `apps/web` and `apps/admin`.
 
 ## Current Reality
 
-- `apps/web` is a functional console, not a polished product surface.
-- `apps/admin` is an operator console, not a complete privileged workflow product.
-- The frontend is still form-heavy and API-shaped.
-- Browser-wallet-native SIWE linking now exists in `apps/web`.
-- Frontend-specific automated coverage does not exist yet.
+- `apps/web` is now a productized client and worker console with guided job authoring, role-aware job workspaces, milestone lifecycle posture, and audit visibility.
+- `apps/admin` is now a task-oriented operator console for public audit lookup, dispute posture review, and execution receipt inspection.
+- Shared frontend infrastructure now exists in `@escrow4334/frontend-core` for request handling, async-state helpers, formatting, storage, and status or empty-state primitives.
+- Frontend-specific automated coverage now exists only at the helper level in `apps/web`, `apps/admin`, and `packages/frontend-core`; route-level and end-to-end coverage are still missing.
 
 ## Product Goals
 
 - Make user onboarding and escrow operations feel product-native instead of API-demo-driven.
 - Keep the UI honest to the current backend contract and avoid fake or placeholder flows.
-- Ship role-aware client, worker, and operator paths with explicit loading, empty, error, and retry states.
+- Ship role-aware client, worker, and operator paths with explicit loading, empty, error, retry, pending, and confirmed states.
 - Add frontend testing as each product path is hardened.
 
 ## Non-Negotiable Rules
@@ -43,138 +42,159 @@ This document turns Phase 5 of the execution guide into a concrete frontend deli
 - execution receipt inspection
 - future privileged operator actions once backend auth and role boundaries exist
 
+## Completed Slices
+
+- Step 1: onboarding hardening is substantially complete for the current API scope, including browser-wallet-native SIWE linking, manual fallback, wallet posture visibility, and smart-account provisioning flows.
+- Step 2: client job authoring is complete, with a guided composer, structured inputs, derived readiness checks, and post-create follow-up guidance.
+- Step 3: role-aware job workspaces are complete, with client, worker, and limited operator posture presented as separate action contexts.
+- Step 4: milestone lifecycle UX is complete, with explicit ready, pending, confirmed, failed, and blocked posture plus inline audit and execution context.
+- Step 5: admin operator surface is complete, with case pressure summaries, dispute-centric milestone review, execution failure triage, and explicit blocked privileged actions.
+- Step 6: shared frontend infrastructure is complete, with `@escrow4334/frontend-core` normalizing repeated request, async-state, formatting, and status-pattern behavior across both apps.
+
 ## Delivery Sequence
 
 ## Step 1: Harden Onboarding
 
-### Scope
+### Outcome
 
-- keep OTP login simple and obvious
-- improve session lifecycle messaging
-- make browser-wallet connect, sign, and link the primary path
-- keep manual SIWE challenge flow as a fallback
-- make wallet and smart-account state easier to understand at a glance
-
-### Exit Criteria
-
-- a new user can authenticate, link a wallet, and provision a smart account without copying raw backend data unless fallback is needed
-- wallet state clearly shows EOA versus smart-account posture
-- onboarding failures tell the user what to fix next
-
-### Status
-
-- partially complete
-- browser-wallet-native SIWE linking is now implemented
-- smart-account provisioning still needs product polish and better success-state guidance
+- substantially complete for the current API surface
 
 ## Step 2: Productize Client Job Authoring
 
-### Scope
+### Outcome
 
-- replace raw form-heavy job creation with a guided client composer
-- add better defaults and field help for title, category, terms, worker address, and token address
-- reduce direct JSON editing where structured inputs are possible
-- improve success routing from create job into funding and milestone setup
-
-### Exit Criteria
-
-- a client can create a job without reading backend field names
-- the flow guides the client into the next required step after creation
-- validation errors map to the relevant form section
-
-### Dependencies
-
-- current API is already sufficient for the first pass
+- complete
 
 ## Step 3: Build Role-Aware Job Workspaces
 
-### Scope
+### Outcome
 
-- split job detail views by participant role instead of showing every action at once
-- show clients funding, milestone authoring, and release actions prominently
-- show workers delivery and dispute actions prominently
-- show operator or arbitrator posture read-only where privileges are not yet available
-
-### Exit Criteria
-
-- client and worker users see different primary calls to action
-- unavailable actions are explained instead of silently hidden
-- job status, milestone status, and audit context stay visible while actions are taken
-
-### Dependencies
-
-- relies on the existing participant role data from `GET /jobs`
+- complete
 
 ## Step 4: Harden Milestone Lifecycle UX
 
-### Scope
+### Outcome
 
-- improve milestone editors and timeline presentation
-- add strong confirmation states for funding, delivery, release, dispute, and resolution events
-- separate optimistic UI from confirmed onchain or mocked execution outcomes
-- present audit and execution history inline where the user needs it
-
-### Exit Criteria
-
-- milestone actions are understandable without reading raw JSON
-- the user can tell whether an action is pending, confirmed, failed, or blocked
-- audit visibility supports dispute and delivery evidence review
-
-### Dependencies
-
-- current API supports the first hardening pass
+- complete
 
 ## Step 5: Turn `apps/admin` Into A Real Operator Surface
 
-### Scope
+### Outcome
 
-- keep public audit lookup, but organize it around real operator tasks
-- add dispute-centric case review and milestone posture summaries
-- prepare export and evidence bundles once backend export support exists
-- define privileged operator actions only when backend roles and authorization are implemented
-
-### Exit Criteria
-
-- an operator can inspect a dispute or execution problem without raw endpoint spelunking
-- admin screens communicate what is public, what is privileged, and what is still blocked by backend work
-
-### Dependencies
-
-- privileged actions are blocked until the backend defines operator roles and authorization boundaries
-- export actions are blocked until audit export support exists
+- complete
 
 ## Step 6: Add Shared Frontend Infrastructure
 
-### Scope
+### Outcome
 
-- extract repeated loading, empty, error, and status patterns
-- normalize API error presentation
-- standardize wallet, session, and job state refresh behavior
-- define a minimal shared product language between `apps/web` and `apps/admin`
-
-### Exit Criteria
-
-- both frontend apps behave consistently under failure and retry conditions
-- repeated UI logic is not copy-pasted across screens
+- complete
 
 ## Step 7: Add Frontend Test Coverage
 
+### Goal
+
+- add page-level, route-level, and end-to-end coverage so frontend behavior is not validated only by helper specs and manual clicking
+
+### Phase 7.1: Frontend Test Harness Foundation
+
+#### Scope
+
+- use Vitest with `jsdom` and Testing Library for route and component behavior in both frontend apps
+- keep the existing helper specs in place and expand from them rather than replacing them
+- add small shared frontend test utilities for rendering console surfaces, mocking `fetch` or API module responses, mocking injected-wallet or EIP-1193 behavior, and seeding browser storage or session state
+- keep tests package-local to `apps/web` and `apps/admin`; do not introduce a speculative shared UI test framework
+- add one root Playwright entrypoint for browser-level happy-path coverage
+
+#### Exit Criteria
+
+- `apps/web` and `apps/admin` can run page or console behavior tests under their existing `test` scripts
+- repeated test setup is centralized only where it removes real duplication
+- the repo has one explicit root e2e command for browser-path verification
+
+#### Tooling Expectations
+
+- `apps/web`: helper tests plus route or UI behavior tests under the existing `test` path
+- `apps/admin`: helper tests plus route or UI behavior tests under the existing `test` path
+- root: one explicit Playwright-based e2e script
+
+### Outcome
+
+- complete
+
+## Phase 7.2: `apps/web` Route And Interaction Coverage
+
 ### Scope
 
-- add component and route-level tests for onboarding, wallet linking, job creation, and milestone actions
-- add end-to-end coverage for the main client path
-- add focused operator-surface tests for audit lookup and execution inspection
+- onboarding and session:
+  - OTP start success
+  - OTP validation failure and retry messaging
+  - OTP verify success and bad-code failure
+  - session restore, refresh, and logout state transitions
+- wallet linking and provisioning:
+  - injected wallet available path
+  - manual SIWE fallback path
+  - wallet-link failure messaging
+  - smart-account provisioning success or failure and default-wallet posture updates
+- guided client job authoring:
+  - step progression
+  - derived readiness checks
+  - validation mapped to the relevant section
+  - post-create transition into milestone or funding follow-up
+- role-aware job workspace and milestone lifecycle:
+  - client versus worker primary actions
+  - blocked or unavailable action explanations
+  - pending, confirmed, and failed mutation states
+  - audit or receipt visibility for milestone actions
 
 ### Exit Criteria
 
-- frontend changes are not validated only by manual clicking
-- tests assert UI behavior against real API contracts and known failure states
+- `apps/web` tests exercise real UI behavior with mocked API boundaries, not only pure helper functions
+- the main client path is covered from sign-in through selected-job workspace posture
+- failure and retry states are asserted alongside success states
 
-### Preferred Test Order
+## Phase 7.3: `apps/admin` Route And Interaction Coverage
 
-1. component and state-transition tests for onboarding and wallet flows
-2. route-level tests for job and milestone screens
-3. end-to-end tests against the local Postgres-backed API profile
+### Scope
+
+- audit lookup success, empty, invalid-id, and request-failure states
+- case pressure and milestone posture rendering from realistic audit bundles
+- execution-failure triage rendering
+- operator timeline visibility
+- explicit blocked privileged-action messaging
+
+### Exit Criteria
+
+- `apps/admin` tests exercise the page and console surface, not only `operator-case.ts`
+- the main operator lookup path is covered at UI level
+- public-versus-blocked posture remains explicit and truthful under failure as well as success
+
+## Phase 7.4: End-To-End Coverage Against The Local Development Profile
+
+### Required First-Pass Scenarios
+
+1. client signs in, links a wallet, provisions a smart account, creates a job, and reaches the selected-job workspace
+2. client funds or stages the next lifecycle action and sees confirmed UI state after refresh
+3. admin opens the same job's audit surface and sees the public audit bundle render correctly
+
+### Environment Assumptions
+
+- run against the existing local Postgres-backed API profile
+- use truthful mock-provider mode where the repo already supports it
+- do not require live relay infrastructure for the first e2e pass
+- keep e2e focused on stable happy paths before expanding into a broader failure matrix
+
+### Exit Criteria
+
+- at least one cross-surface e2e flow runs against the local API profile
+- e2e verifies browser behavior that cannot be trusted from isolated component tests alone
+
+## Important Interface And Tooling Changes
+
+- add app-local UI testing dependencies for `apps/web` and `apps/admin`
+- add a small shared test utility layer only for repeated mocks and render helpers
+- add one root Playwright-based e2e entrypoint
+- do not add new backend API surface as part of Step 7
+- do not add privileged admin flows as part of Step 7
 
 ## Backend Dependencies And Blockers
 
@@ -185,13 +205,14 @@ This document turns Phase 5 of the execution guide into a concrete frontend deli
 
 ## Immediate Next Frontend Step
 
-- productize client job authoring in `apps/web`
-- replace raw form posture with a guided create-job flow that leads directly into funding and milestone setup
+- expand Phase 7.2 in `apps/web` from the new page-level coverage into deeper interaction coverage for OTP failure paths, session refresh or logout, wallet-link outcomes, and guided create-job progression
+- expand Phase 7.3 in `apps/admin` from the new lookup success path into invalid-id, empty, and request-failure UI coverage before broader e2e expansion
 
 ## Frontend Definition Of Done
 
-- the path is understandable without backend knowledge
-- loading, empty, error, and retry states are explicit
-- the UI reflects real backend behavior instead of guessed future behavior
-- the path has targeted frontend tests
-- docs are updated when the plan or surface meaningfully changes
+- both frontend apps have page-level or console-level behavioral tests, not only helper tests
+- the main user path in `apps/web` is covered from sign-in through job workspace state
+- the main operator lookup path in `apps/admin` is covered at UI level
+- at least one cross-surface e2e flow runs against the local API profile
+- `pnpm test` remains meaningful and includes the expanded frontend coverage
+- loading, empty, error, retry, pending, and confirmed states are asserted, not just happy paths

@@ -236,6 +236,15 @@
   gap: 10px;
 }
 
+.statusBanner {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 245, 232, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(191, 121, 54, 0.18);
+}
+
 .roleBadge,
 .roleBadgeMuted {
   display: inline-flex;
@@ -263,6 +272,63 @@
   gap: 14px;
 }
 
+.milestoneRail {
+  display: grid;
+  gap: 12px;
+}
+
+.milestonePickerEmpty,
+.milestoneTile,
+.lifecycleCard {
+  border: 1px solid rgba(140, 101, 68, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.milestonePickerEmpty,
+.milestoneTile,
+.lifecycleCard {
+  padding: 16px;
+}
+
+.milestoneTile {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  color: inherit;
+}
+
+.milestoneTileActive {
+  border-color: rgba(191, 121, 54, 0.42);
+  background: rgba(255, 241, 226, 0.96);
+}
+
+.milestoneBadge,
+.lifecycleState {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.milestoneMetaRow,
+.lifecycleMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.milestoneMetaRow small,
+.lifecycleMeta small {
+  color: var(--muted);
+}
+
 .workspaceHead {
   display: flex;
   justify-content: space-between;
@@ -276,6 +342,93 @@
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+}
+
+.lifecycleHead,
+.selectedMilestoneHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.lifecycleCard {
+  display: grid;
+  gap: 12px;
+}
+
+.lifecycleReady {
+  box-shadow: inset 0 0 0 1px rgba(123, 169, 164, 0.22);
+}
+
+.lifecyclePending {
+  background: rgba(255, 248, 224, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(184, 142, 39, 0.24);
+}
+
+.lifecycleConfirmed {
+  background: rgba(240, 249, 244, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(67, 140, 98, 0.22);
+}
+
+.lifecycleFailed {
+  background: rgba(255, 240, 236, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(195, 84, 52, 0.22);
+}
+
+.lifecycleBlocked {
+  background: rgba(244, 239, 232, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(116, 94, 74, 0.18);
+}
+
+.lifecycleReady .lifecycleState {
+  background: rgba(220, 244, 239, 0.96);
+  color: #16605c;
+}
+
+.lifecyclePending .lifecycleState {
+  background: rgba(249, 227, 163, 0.96);
+  color: #775100;
+}
+
+.lifecycleConfirmed .lifecycleState {
+  background: rgba(200, 236, 214, 0.96);
+  color: #1d6a3f;
+}
+
+.lifecycleFailed .lifecycleState {
+  background: rgba(245, 205, 194, 0.96);
+  color: #8a2f1b;
+}
+
+.lifecycleBlocked .lifecycleState {
+  background: rgba(221, 214, 205, 0.96);
+  color: #6c5a48;
+}
+
+.milestonePending {
+  background: rgba(236, 231, 224, 0.92);
+  color: #6c5a48;
+}
+
+.milestoneDelivered {
+  background: rgba(249, 227, 163, 0.96);
+  color: #775100;
+}
+
+.milestoneReleased {
+  background: rgba(200, 236, 214, 0.96);
+  color: #1d6a3f;
+}
+
+.milestoneDisputed {
+  background: rgba(245, 205, 194, 0.96);
+  color: #8a2f1b;
+}
+
+.milestoneRefunded {
+  background: rgba(223, 225, 248, 0.96);
+  color: #3f4a8a;
 }
 
 .walletCard code,
@@ -339,6 +492,19 @@
   display: block;
   margin-top: 8px;
   color: var(--muted);
+}
+
+.linkList {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.linkList a {
+  color: #7a4318;
+  text-decoration: underline;
+  text-decoration-color: rgba(122, 67, 24, 0.28);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1120px) {
