@@ -35,13 +35,20 @@ export type EscrowHealthJob = {
 
 export type EscrowHealthReport = {
   generatedAt: string;
+  filters: {
+    reason: EscrowAttentionReason | null;
+    limit: number;
+  };
   thresholds: {
     staleJobHours: number;
     staleJobMs: number;
+    defaultLimit: number;
+    maxLimit: number;
   };
   summary: {
     totalJobs: number;
     jobsNeedingAttention: number;
+    matchedJobs: number;
     openDisputeJobs: number;
     failedExecutionJobs: number;
     staleJobs: number;

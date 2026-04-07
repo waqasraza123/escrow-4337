@@ -90,13 +90,20 @@ export type CaseExportFormat = 'json' | 'csv';
 
 export type EscrowHealthReport = {
   generatedAt: string;
+  filters: {
+    reason: 'failed_execution' | 'open_dispute' | 'stale_job' | null;
+    limit: number;
+  };
   thresholds: {
     staleJobHours: number;
     staleJobMs: number;
+    defaultLimit: number;
+    maxLimit: number;
   };
   summary: {
     totalJobs: number;
     jobsNeedingAttention: number;
+    matchedJobs: number;
     openDisputeJobs: number;
     failedExecutionJobs: number;
     staleJobs: number;
@@ -221,10 +228,25 @@ export const adminApi = {
   me(accessToken: string) {
     return requestJson<UserProfile>(apiBaseUrl, '/auth/me', { method: 'GET' }, accessToken);
   },
-  getEscrowHealth(accessToken: string) {
+  getEscrowHealth(
+    accessToken: string,
+    options?: {
+      reason?: 'failed_execution' | 'open_dispute' | 'stale_job';
+      limit?: number;
+    },
+  ) {
+    const query = new URLSearchParams();
+    if (options?.reason) {
+      query.set('reason', options.reason);
+    }
+    if (typeof options?.limit === 'number') {
+      query.set('limit', String(options.limit));
+    }
+    const queryString = query.toString();
+
     return requestJson<EscrowHealthReport>(
       apiBaseUrl,
-      '/operations/escrow-health',
+      `/operations/escrow-health${queryString ? `?${queryString}` : ''}`,
       { method: 'GET' },
       accessToken,
     );

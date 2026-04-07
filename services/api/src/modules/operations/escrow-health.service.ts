@@ -8,8 +8,17 @@ import type {
   EscrowJobRecord,
 } from '../escrow/escrow.types';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
-import type { EscrowAttentionReason, EscrowHealthJob, EscrowHealthReport } from './escrow-health.types';
+import type {
+  EscrowAttentionReason,
+  EscrowHealthJob,
+  EscrowHealthReport,
+} from './escrow-health.types';
 import { OperationsConfigService } from './operations.config';
+
+type EscrowHealthReportOptions = {
+  reason?: EscrowAttentionReason;
+  limit?: number;
+};
 
 function latestActivityAt(job: EscrowJobRecord) {
   const auditTimes = job.audit.map((event) => event.at);
@@ -25,21 +34,30 @@ function latestActivityAt(job: EscrowJobRecord) {
       milestone.resolvedAt,
     ].filter((value): value is number => typeof value === 'number'),
   );
-  const times = [job.updatedAt, job.createdAt, ...auditTimes, ...executionTimes, ...milestoneTimes];
+  const times = [
+    job.updatedAt,
+    job.createdAt,
+    ...auditTimes,
+    ...executionTimes,
+    ...milestoneTimes,
+  ];
 
   return Math.max(...times);
 }
 
 function latestFailedExecution(executions: EscrowExecutionRecord[]) {
-  const failures = executions.filter((execution) => execution.status === 'failed');
+  const failures = executions.filter(
+    (execution) => execution.status === 'failed',
+  );
   if (failures.length === 0) {
     return null;
   }
 
   const latestFailure = failures.sort(
     (left, right) =>
-      (right.confirmedAt ?? right.submittedAt) - (left.confirmedAt ?? left.submittedAt),
-  )[0]!;
+      (right.confirmedAt ?? right.submittedAt) -
+      (left.confirmedAt ?? left.submittedAt),
+  )[0];
 
   return {
     action: latestFailure.action,
@@ -87,13 +105,22 @@ export class EscrowHealthService {
     private readonly operationsConfig: OperationsConfigService,
   ) {}
 
-  async getReport(userId: string, now = Date.now()): Promise<EscrowHealthReport> {
+  async getReport(
+    userId: string,
+    options: EscrowHealthReportOptions = {},
+    now = Date.now(),
+  ): Promise<EscrowHealthReport> {
     await this.requireOperatorAccess(userId);
 
     const jobs = await this.escrowRepository.listAll();
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const normalizedReason = options.reason ?? null;
+    const normalizedLimit = Math.min(
+      options.limit ?? this.operationsConfig.escrowHealthDefaultLimit,
+      this.operationsConfig.escrowHealthMaxLimit,
+    );
 
-    const jobSummaries = jobs
+    const allAttentionJobs = jobs
       .map((job) => this.buildJobSummary(job, staleCutoff, now))
       .filter((job) => job.reasons.length > 0)
       .sort((left, right) => {
@@ -109,26 +136,38 @@ export class EscrowHealthService {
 
         return left.latestActivityAt - right.latestActivityAt;
       });
+    const matchedJobs = normalizedReason
+      ? allAttentionJobs.filter((job) => job.reasons.includes(normalizedReason))
+      : allAttentionJobs;
+    const limitedJobs = matchedJobs.slice(0, normalizedLimit);
 
     return {
       generatedAt: new Date(now).toISOString(),
+      filters: {
+        reason: normalizedReason,
+        limit: normalizedLimit,
+      },
       thresholds: {
         staleJobHours: this.operationsConfig.escrowStaleJobHours,
         staleJobMs: this.operationsConfig.escrowStaleJobMs,
+        defaultLimit: this.operationsConfig.escrowHealthDefaultLimit,
+        maxLimit: this.operationsConfig.escrowHealthMaxLimit,
       },
       summary: {
         totalJobs: jobs.length,
-        jobsNeedingAttention: jobSummaries.length,
-        openDisputeJobs: jobSummaries.filter((job) =>
+        jobsNeedingAttention: allAttentionJobs.length,
+        matchedJobs: matchedJobs.length,
+        openDisputeJobs: matchedJobs.filter((job) =>
           job.reasons.includes('open_dispute'),
         ).length,
-        failedExecutionJobs: jobSummaries.filter((job) =>
+        failedExecutionJobs: matchedJobs.filter((job) =>
           job.reasons.includes('failed_execution'),
         ).length,
-        staleJobs: jobSummaries.filter((job) => job.reasons.includes('stale_job'))
-          .length,
+        staleJobs: matchedJobs.filter((job) =>
+          job.reasons.includes('stale_job'),
+        ).length,
       },
-      jobs: jobSummaries,
+      jobs: limitedJobs,
     };
   }
 
@@ -169,7 +208,9 @@ export class EscrowHealthService {
       updatedAt: job.updatedAt,
       latestActivityAt: latestActivity,
       staleForMs:
-        reasons.has('stale_job') && latestActivity < now ? now - latestActivity : null,
+        reasons.has('stale_job') && latestActivity < now
+          ? now - latestActivity
+          : null,
       reasons: sortReasons(reasons),
       counts: {
         openDisputes,

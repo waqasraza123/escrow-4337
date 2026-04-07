@@ -169,12 +169,23 @@ describe('EscrowHealthService', () => {
     failedRecord.updatedAt = 900_000;
     await escrowRepository.save(failedRecord);
 
-    const report = await escrowHealthService.getReport(arbitratorUserId, reportNow);
+    const report = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {},
+      reportNow,
+    );
 
+    expect(report.filters).toEqual({
+      reason: null,
+      limit: 25,
+    });
     expect(report.thresholds.staleJobHours).toBe(24);
+    expect(report.thresholds.defaultLimit).toBe(25);
+    expect(report.thresholds.maxLimit).toBe(100);
     expect(report.summary).toEqual({
       totalJobs: 3,
       jobsNeedingAttention: 3,
+      matchedJobs: 3,
       openDisputeJobs: 1,
       failedExecutionJobs: 1,
       staleJobs: 1,
@@ -215,9 +226,92 @@ describe('EscrowHealthService', () => {
     expect(report.jobs[2]?.staleForMs).toBe(99_989_900);
   });
 
+  it('filters and limits matched jobs while preserving overall attention counts', async () => {
+    process.env.OPERATIONS_ESCROW_HEALTH_DEFAULT_LIMIT = '2';
+
+    const reportNow = 100_000_000;
+
+    for (const title of [
+      'Dispute A',
+      'Dispute B',
+      'Dispute C',
+      'Failure A',
+    ]) {
+      const createdJob = await escrowService.createJob(clientUserId, {
+        workerAddress,
+        currencyAddress,
+        title,
+        description: 'Operations filter coverage',
+        category: 'software-development',
+        termsJSON: {
+          currency: 'USDC',
+        },
+      });
+
+      const record = await escrowRepository.getById(createdJob.jobId);
+      if (!record) {
+        throw new Error('Expected job record to exist');
+      }
+
+      if (title.startsWith('Dispute')) {
+        record.milestones = [
+          {
+            title: 'Milestone',
+            deliverable: 'Delivery',
+            amount: '100',
+            status: 'disputed',
+            disputedAt: 50_000,
+          },
+        ];
+        record.status = 'disputed';
+      } else {
+        record.executions.push({
+          id: `failure-${title}`,
+          action: 'fund_job',
+          actorAddress: clientSmartAccountAddress,
+          chainId: 84532,
+          contractAddress: currencyAddress,
+          status: 'failed',
+          submittedAt: 60_000,
+          failureCode: 'relay_rejected',
+          failureMessage: 'Rejected',
+        });
+      }
+
+      record.updatedAt = 60_000;
+      await escrowRepository.save(record);
+    }
+
+    const filtered = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {
+        reason: 'open_dispute',
+        limit: 2,
+      },
+      reportNow,
+    );
+
+    expect(filtered.filters).toEqual({
+      reason: 'open_dispute',
+      limit: 2,
+    });
+    expect(filtered.summary).toEqual({
+      totalJobs: 4,
+      jobsNeedingAttention: 4,
+      matchedJobs: 3,
+      openDisputeJobs: 3,
+      failedExecutionJobs: 0,
+      staleJobs: 0,
+    });
+    expect(filtered.jobs).toHaveLength(2);
+    expect(filtered.jobs.every((job) => job.reasons.includes('open_dispute'))).toBe(
+      true,
+    );
+  });
+
   it('rejects users that do not control the configured arbitrator wallet', async () => {
     await expect(
-      escrowHealthService.getReport(nonOperatorUserId, 100_000_000),
+      escrowHealthService.getReport(nonOperatorUserId, {}, 100_000_000),
     ).rejects.toThrow(ForbiddenException);
   });
 });

@@ -133,6 +133,23 @@ function getOperationsReasonLabel(
   }
 }
 
+type OperationsReasonFilter =
+  | 'all'
+  | EscrowHealthReport['jobs'][number]['reasons'][number];
+
+function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
+  switch (reason) {
+    case 'all':
+      return 'All attention';
+    case 'failed_execution':
+      return 'Failed executions';
+    case 'open_dispute':
+      return 'Open disputes';
+    case 'stale_job':
+      return 'Stale jobs';
+  }
+}
+
 export function OperatorConsole() {
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
@@ -150,6 +167,8 @@ export function OperatorConsole() {
   const [linkChainId, setLinkChainId] = useState('84532');
   const [walletSignature, setWalletSignature] = useState('');
   const [escrowHealth, setEscrowHealth] = useState<EscrowHealthReport | null>(null);
+  const [healthReasonFilter, setHealthReasonFilter] =
+    useState<OperationsReasonFilter>('all');
   const [startState, setStartState] = useState<AsyncState>(createIdleState());
   const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
   const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
@@ -461,8 +480,8 @@ export function OperatorConsole() {
       return;
     }
 
-    void loadEscrowHealth(accessToken);
-  }, [accessToken, controlsArbitratorWallet]);
+    void loadEscrowHealth(accessToken, healthReasonFilter);
+  }, [accessToken, controlsArbitratorWallet, healthReasonFilter]);
 
   useEffect(() => {
     setResolutionMilestoneIndex((current) => {
@@ -477,7 +496,10 @@ export function OperatorConsole() {
     });
   }, [disputedMilestoneCards]);
 
-  async function loadEscrowHealth(token = accessToken) {
+  async function loadEscrowHealth(
+    token = accessToken,
+    reason: OperationsReasonFilter = healthReasonFilter,
+  ) {
     if (!token) {
       return;
     }
@@ -485,11 +507,13 @@ export function OperatorConsole() {
     setHealthState(createWorkingState('Loading escrow operations health...'));
 
     try {
-      const report = await adminApi.getEscrowHealth(token);
+      const report = await adminApi.getEscrowHealth(token, {
+        reason: reason === 'all' ? undefined : reason,
+      });
       setEscrowHealth(report);
       setHealthState(
         createSuccessState(
-          `Loaded ${report.summary.jobsNeedingAttention} jobs requiring operator attention.`,
+          `Loaded ${report.summary.matchedJobs} jobs for ${getOperationsReasonFilterLabel(reason).toLowerCase()}.`,
         ),
       );
     } catch (error) {
@@ -845,7 +869,7 @@ export function OperatorConsole() {
               <button
                 type="button"
                 className={styles.secondaryButton}
-                onClick={() => void loadEscrowHealth()}
+                onClick={() => void loadEscrowHealth(accessToken, healthReasonFilter)}
               >
                 Refresh operations
               </button>
@@ -853,8 +877,8 @@ export function OperatorConsole() {
           </header>
           <div className={styles.summaryGrid}>
             <article>
-              <span className={styles.metaLabel}>Jobs needing attention</span>
-              <strong>{escrowHealth?.summary.jobsNeedingAttention ?? 'Unavailable'}</strong>
+              <span className={styles.metaLabel}>Matched jobs</span>
+              <strong>{escrowHealth?.summary.matchedJobs ?? 'Unavailable'}</strong>
             </article>
             <article>
               <span className={styles.metaLabel}>Open disputes</span>
@@ -869,8 +893,20 @@ export function OperatorConsole() {
               <strong>{escrowHealth?.summary.staleJobs ?? 'Unavailable'}</strong>
             </article>
             <article>
+              <span className={styles.metaLabel}>All attention jobs</span>
+              <strong>{escrowHealth?.summary.jobsNeedingAttention ?? 'Unavailable'}</strong>
+            </article>
+            <article>
               <span className={styles.metaLabel}>Tracked jobs</span>
               <strong>{escrowHealth?.summary.totalJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Active filter</span>
+              <strong>
+                {escrowHealth
+                  ? getOperationsReasonFilterLabel(healthReasonFilter)
+                  : 'Unavailable'}
+              </strong>
             </article>
             <article>
               <span className={styles.metaLabel}>Stale threshold</span>
@@ -906,7 +942,23 @@ export function OperatorConsole() {
                   the backend will expose cross-job attention items.
                 </p>
               </article>
-            ) : escrowHealth && escrowHealth.jobs.length > 0 ? (
+            ) : (
+              <div className={styles.suggestionRow}>
+                {(
+                  ['all', 'open_dispute', 'failed_execution', 'stale_job'] as const
+                ).map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={styles.suggestionChip}
+                    onClick={() => setHealthReasonFilter(reason)}
+                  >
+                    {getOperationsReasonFilterLabel(reason)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {controlsArbitratorWallet && escrowHealth && escrowHealth.jobs.length > 0 ? (
               escrowHealth.jobs.map((job) => (
                 <article key={job.jobId} className={styles.timelineCard}>
                   <div className={styles.timelineHead}>
@@ -935,12 +987,23 @@ export function OperatorConsole() {
                       }`}
                     </code>
                   ) : null}
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleLookup(job.jobId)}
+                    >
+                      {`Open case ${job.jobId}`}
+                    </button>
+                  </div>
                 </article>
               ))
             ) : controlsArbitratorWallet && escrowHealth ? (
               <EmptyStateCard
                 title="No jobs currently need attention"
-                message="The backend did not report any open disputes, failed execution jobs, or stale active jobs."
+                message={`The backend did not report any jobs for ${getOperationsReasonFilterLabel(
+                  healthReasonFilter,
+                ).toLowerCase()}.`}
                 className={styles.emptyCard}
               />
             ) : null}

@@ -94,13 +94,20 @@ export function createEscrowHealthReport(
 ): EscrowHealthReport {
   return {
     generatedAt: '2026-04-07T00:00:00.000Z',
+    filters: {
+      reason: null,
+      limit: 25,
+    },
     thresholds: {
       staleJobHours: 72,
       staleJobMs: 259_200_000,
+      defaultLimit: 25,
+      maxLimit: 100,
     },
     summary: {
       totalJobs: 4,
       jobsNeedingAttention: 1,
+      matchedJobs: 1,
       openDisputeJobs: 1,
       failedExecutionJobs: 0,
       staleJobs: 0,

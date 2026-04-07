@@ -1,7 +1,9 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { User, type ReqUser } from '../../common/decorators/user.decorator';
+import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { EscrowHealthService } from './escrow-health.service';
+import * as operationsDto from './operations.dto';
 import { RuntimeProfileService } from './runtime-profile.service';
 
 @Controller('operations')
@@ -18,7 +20,11 @@ export class OperationsController {
 
   @UseGuards(AuthGuard)
   @Get('escrow-health')
-  getEscrowHealth(@User() user: ReqUser) {
-    return this.escrowHealth.getReport(user.id);
+  getEscrowHealth(
+    @User() user: ReqUser,
+    @Query(new ZodValidationPipe(operationsDto.escrowHealthQuerySchema))
+    query: operationsDto.EscrowHealthQueryDto,
+  ) {
+    return this.escrowHealth.getReport(user.id, query);
   }
 }

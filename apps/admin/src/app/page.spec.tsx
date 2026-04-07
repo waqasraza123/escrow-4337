@@ -292,15 +292,131 @@ describe('admin page', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Loaded 1 jobs requiring operator attention.'),
+        screen.getByText('Loaded 1 jobs for all attention.'),
       ).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.getEscrowHealth).toHaveBeenCalledWith(
       'admin-access-token-123',
+      {
+        reason: undefined,
+      },
     );
     expect(screen.getByText('Operator backlog')).toBeInTheDocument();
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
+  });
+
+  it('filters escrow operations health by reason and opens a selected case directly', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 5,
+            jobsNeedingAttention: 2,
+            matchedJobs: 2,
+            openDisputeJobs: 1,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            createEscrowHealthReport().jobs[0],
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-1',
+              title: 'Failed relay job',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 1,
+              },
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          filters: {
+            reason: 'failed_execution',
+            limit: 25,
+          },
+          summary: {
+            totalJobs: 5,
+            jobsNeedingAttention: 2,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-1',
+              title: 'Failed relay job',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 1,
+              },
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+            },
+          ],
+        }),
+      );
+    mockedAdminApi.getAudit.mockResolvedValue(createAuditBundle());
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operator backlog')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Failed executions' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Loaded 1 jobs for failed executions.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(
+      2,
+      'admin-access-token-123',
+      {
+        reason: 'failed_execution',
+      },
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open case job-failure-1' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Disputed implementation' }),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.getAudit).toHaveBeenCalledWith('job-failure-1');
   });
 
   it(
