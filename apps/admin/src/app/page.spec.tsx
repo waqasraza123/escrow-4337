@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuditBundle,
   createEoaWallet,
+  createEscrowHealthReport,
   createResolvedAuditBundle,
   createRuntimeProfile,
   createSessionTokens,
@@ -28,6 +29,7 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     refresh: vi.fn(),
     logout: vi.fn(),
     me: vi.fn(),
+    getEscrowHealth: vi.fn(),
     createWalletChallenge: vi.fn(),
     verifyWalletChallenge: vi.fn(),
     getAudit: vi.fn(),
@@ -46,6 +48,7 @@ describe('admin page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedAdminApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
   });
 
   it('renders the public-only operator scope shell before any lookup', async () => {
@@ -276,6 +279,28 @@ describe('admin page', () => {
       },
       'admin-access-token-123',
     );
+  });
+
+  it('loads escrow operations health when the authenticated operator controls the arbitrator wallet', async () => {
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Loaded 1 jobs requiring operator attention.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenCalledWith(
+      'admin-access-token-123',
+    );
+    expect(screen.getByText('Operator backlog')).toBeInTheDocument();
+    expect(screen.getByText('Open dispute')).toBeInTheDocument();
   });
 
   it(

@@ -23,6 +23,7 @@ import {
   type AuditBundle,
   type CaseExportArtifact,
   type CaseExportFormat,
+  type EscrowHealthReport,
   type RuntimeProfile,
   type SessionTokens,
   type UserProfile,
@@ -119,6 +120,19 @@ function getTimelineToneClassName(
   }
 }
 
+function getOperationsReasonLabel(
+  reason: EscrowHealthReport['jobs'][number]['reasons'][number],
+) {
+  switch (reason) {
+    case 'failed_execution':
+      return 'Failed execution';
+    case 'open_dispute':
+      return 'Open dispute';
+    case 'stale_job':
+      return 'Stale job';
+  }
+}
+
 export function OperatorConsole() {
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
@@ -135,9 +149,11 @@ export function OperatorConsole() {
   const [linkLabel, setLinkLabel] = useState('');
   const [linkChainId, setLinkChainId] = useState('84532');
   const [walletSignature, setWalletSignature] = useState('');
+  const [escrowHealth, setEscrowHealth] = useState<EscrowHealthReport | null>(null);
   const [startState, setStartState] = useState<AsyncState>(createIdleState());
   const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
   const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
+  const [healthState, setHealthState] = useState<AsyncState>(createIdleState());
   const [walletActionState, setWalletActionState] = useState<AsyncState>(
     createIdleState(),
   );
@@ -318,6 +334,8 @@ export function OperatorConsole() {
     setRefreshToken(null);
     setProfile(null);
     setChallenge(null);
+    setEscrowHealth(null);
+    setHealthState(createIdleState());
     setWalletSignature('');
     writeSession(null);
   }
@@ -431,6 +449,22 @@ export function OperatorConsole() {
   );
 
   useEffect(() => {
+    if (!accessToken) {
+      setEscrowHealth(null);
+      setHealthState(createIdleState());
+      return;
+    }
+
+    if (!controlsArbitratorWallet) {
+      setEscrowHealth(null);
+      setHealthState(createIdleState());
+      return;
+    }
+
+    void loadEscrowHealth(accessToken);
+  }, [accessToken, controlsArbitratorWallet]);
+
+  useEffect(() => {
     setResolutionMilestoneIndex((current) => {
       if (
         current !== null &&
@@ -442,6 +476,27 @@ export function OperatorConsole() {
       return disputedMilestoneCards[0]?.milestoneIndex ?? null;
     });
   }, [disputedMilestoneCards]);
+
+  async function loadEscrowHealth(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setHealthState(createWorkingState('Loading escrow operations health...'));
+
+    try {
+      const report = await adminApi.getEscrowHealth(token);
+      setEscrowHealth(report);
+      setHealthState(
+        createSuccessState(
+          `Loaded ${report.summary.jobsNeedingAttention} jobs requiring operator attention.`,
+        ),
+      );
+    } catch (error) {
+      setEscrowHealth(null);
+      setHealthState(createErrorState(error, 'Failed to load escrow operations health'));
+    }
+  }
 
   async function handleResolveMilestone() {
     if (
@@ -777,6 +832,118 @@ export function OperatorConsole() {
                 </p>
               </article>
             )}
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>Operations</p>
+              <h2>Escrow operations health</h2>
+            </div>
+            {controlsArbitratorWallet ? (
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => void loadEscrowHealth()}
+              >
+                Refresh operations
+              </button>
+            ) : null}
+          </header>
+          <div className={styles.summaryGrid}>
+            <article>
+              <span className={styles.metaLabel}>Jobs needing attention</span>
+              <strong>{escrowHealth?.summary.jobsNeedingAttention ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Open disputes</span>
+              <strong>{escrowHealth?.summary.openDisputeJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Failed execution jobs</span>
+              <strong>{escrowHealth?.summary.failedExecutionJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Stale jobs</span>
+              <strong>{escrowHealth?.summary.staleJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Tracked jobs</span>
+              <strong>{escrowHealth?.summary.totalJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Stale threshold</span>
+              <strong>
+                {escrowHealth
+                  ? `${escrowHealth.thresholds.staleJobHours} hours`
+                  : 'Unavailable'}
+              </strong>
+            </article>
+          </div>
+          <div className={styles.stack}>
+            <StatusNotice message={healthState.message} messageClassName={styles.stateText} />
+            {!accessToken ? (
+              <article className={styles.boundaryCard}>
+                <strong>Authenticate first</strong>
+                <p className={styles.stateText}>
+                  Operations visibility is only available to the authenticated operator path.
+                </p>
+              </article>
+            ) : !arbitratorAddress ? (
+              <article className={styles.boundaryCard}>
+                <strong>Runtime profile missing arbitrator wallet</strong>
+                <p className={styles.stateText}>
+                  The backend did not expose the configured arbitrator wallet, so
+                  operator-wide escrow health cannot be authorized yet.
+                </p>
+              </article>
+            ) : !controlsArbitratorWallet ? (
+              <article className={styles.boundaryCard}>
+                <strong>Link the configured arbitrator wallet to unlock operations health</strong>
+                <p className={styles.stateText}>
+                  The current operator session must control {arbitratorAddress} before
+                  the backend will expose cross-job attention items.
+                </p>
+              </article>
+            ) : escrowHealth && escrowHealth.jobs.length > 0 ? (
+              escrowHealth.jobs.map((job) => (
+                <article key={job.jobId} className={styles.timelineCard}>
+                  <div className={styles.timelineHead}>
+                    <strong>{job.title}</strong>
+                    <span>{job.status}</span>
+                  </div>
+                  <p className={styles.stateText}>
+                    {job.reasons.map(getOperationsReasonLabel).join(' · ')}
+                  </p>
+                  <small>{`Job ${job.jobId} · Updated ${formatTimestamp(job.updatedAt)}`}</small>
+                  <small>{`Latest activity ${formatTimestamp(job.latestActivityAt)}`}</small>
+                  <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</small>
+                  {job.staleForMs !== null ? (
+                    <small>{`Stale for ${Math.floor(job.staleForMs / 3_600_000)}h`}</small>
+                  ) : null}
+                  {job.latestFailedExecution ? (
+                    <code>
+                      {`${job.latestFailedExecution.action} failed${
+                        job.latestFailedExecution.failureCode
+                          ? ` (${job.latestFailedExecution.failureCode})`
+                          : ''
+                      }${
+                        job.latestFailedExecution.failureMessage
+                          ? `: ${job.latestFailedExecution.failureMessage}`
+                          : ''
+                      }`}
+                    </code>
+                  ) : null}
+                </article>
+              ))
+            ) : controlsArbitratorWallet && escrowHealth ? (
+              <EmptyStateCard
+                title="No jobs currently need attention"
+                message="The backend did not report any open disputes, failed execution jobs, or stale active jobs."
+                className={styles.emptyCard}
+              />
+            ) : null}
           </div>
         </section>
       </div>

@@ -1,23 +1,199 @@
-import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { expect, test, type Download, type Locator, type Page } from '@playwright/test';
 import {
+  describeDeployedRuntimeAlignment,
   getRuntimeProfileLabel,
   readDeployedProfileConfig,
+  type RuntimeProfileResponse,
 } from './deployed-profile';
 
-type RuntimeProfileResponse = {
-  profile: 'local-mock' | 'mixed' | 'deployment-like';
-  environment: {
-    persistenceDriver: 'postgres' | 'file';
-  };
-  providers: {
-    emailMode: 'mock' | 'relay';
-    smartAccountMode: 'mock' | 'relay';
-    escrowMode: 'mock' | 'relay';
-  };
-  warnings: string[];
-};
+type BrowserRuntimeProfileProbe =
+  | {
+      ok: true;
+      status: number;
+      runtimeProfile: RuntimeProfileResponse;
+      message: '';
+    }
+  | {
+      ok: false;
+      status: number | null;
+      runtimeProfile: null;
+      message: string;
+    };
 
 const deployed = readDeployedProfileConfig();
+
+type ExportProbe = {
+  artifact: 'job-history' | 'dispute-case';
+  format: 'json' | 'csv';
+  buttonName: string;
+  successMessage: string;
+  fileNamePattern: RegExp;
+  requiredText: string;
+};
+
+function runtimePanel(page: Page) {
+  return page.locator('section').filter({
+    has: page.getByRole('heading', { name: 'Backend profile validation' }),
+  });
+}
+
+function summaryValue(panel: Locator, label: string) {
+  return panel
+    .locator('article')
+    .filter({
+      has: panel.locator('span', { hasText: label }),
+    })
+    .locator('strong');
+}
+
+async function probeBrowserRuntimeProfile(
+  page: Page,
+  apiBaseUrl: string,
+): Promise<BrowserRuntimeProfileProbe> {
+  return page.evaluate(async (baseUrl) => {
+    async function readErrorMessage(response: Response) {
+      const text = await response.text();
+      if (!text) {
+        return `Request failed with ${response.status}`;
+      }
+
+      try {
+        const body = JSON.parse(text) as {
+          message?: string | string[];
+          error?: string;
+        };
+        if (Array.isArray(body.message)) {
+          return body.message.join(', ');
+        }
+
+        return body.message || body.error || text;
+      } catch {
+        return text;
+      }
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/operations/runtime-profile`, {
+        headers: {
+          accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          status: response.status,
+          runtimeProfile: null,
+          message: await readErrorMessage(response),
+        };
+      }
+
+      return {
+        ok: true,
+        status: response.status,
+        runtimeProfile: (await response.json()) as RuntimeProfileResponse,
+        message: '',
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: null,
+        runtimeProfile: null,
+        message: error instanceof Error ? error.message : 'Failed to fetch',
+      };
+    }
+  }, apiBaseUrl);
+}
+
+async function expectRuntimeValidationPanel(page: Page, apiBaseUrl: string) {
+  const panel = runtimePanel(page);
+  const browserRuntimeProfile = await probeBrowserRuntimeProfile(page, apiBaseUrl);
+  const currentOrigin = new URL(page.url()).origin;
+  const runtimeAlignment = describeDeployedRuntimeAlignment(
+    apiBaseUrl,
+    currentOrigin,
+    browserRuntimeProfile.runtimeProfile,
+  );
+
+  await expect(summaryValue(panel, 'Frontend origin')).toHaveText(currentOrigin);
+  await expect(summaryValue(panel, 'CORS readiness')).toHaveText(
+    runtimeAlignment.corsLabel,
+  );
+  await expect(summaryValue(panel, 'API transport')).toHaveText(
+    runtimeAlignment.transportLabel,
+  );
+  await expect(summaryValue(panel, 'Persistence')).toHaveText(
+    runtimeAlignment.persistenceLabel,
+  );
+  await expect(summaryValue(panel, 'Trust proxy')).toHaveText(
+    runtimeAlignment.trustProxyLabel,
+  );
+  await expect(summaryValue(panel, 'Allowed origins')).toHaveText(
+    runtimeAlignment.corsOriginsLabel,
+  );
+  await expect(panel.getByText(runtimeAlignment.corsMessage, { exact: true })).toBeVisible();
+  await expect(
+    panel.getByText(runtimeAlignment.transportMessage, { exact: true }),
+  ).toBeVisible();
+
+  if (!browserRuntimeProfile.ok) {
+    await expect(summaryValue(panel, 'Profile')).toHaveText('Unavailable');
+    await expect(summaryValue(panel, 'Providers')).toHaveText('Unknown');
+    await expect(panel.getByText(browserRuntimeProfile.message, { exact: true })).toBeVisible();
+    await expect(panel.getByText('Validation warning')).toHaveCount(0);
+    return;
+  }
+
+  await expect(summaryValue(panel, 'Profile')).toHaveText(
+    getRuntimeProfileLabel(browserRuntimeProfile.runtimeProfile.profile),
+  );
+  await expect(summaryValue(panel, 'Providers')).toHaveText(
+    `${browserRuntimeProfile.runtimeProfile.providers.emailMode}/${browserRuntimeProfile.runtimeProfile.providers.smartAccountMode}/${browserRuntimeProfile.runtimeProfile.providers.escrowMode}`,
+  );
+  await expect(
+    panel.getByText(browserRuntimeProfile.runtimeProfile.summary, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(panel.getByText('Validation warning')).toHaveCount(
+    browserRuntimeProfile.runtimeProfile.warnings.length,
+  );
+
+  for (const warning of browserRuntimeProfile.runtimeProfile.warnings) {
+    await expect(panel.getByText(warning, { exact: true })).toBeVisible();
+  }
+}
+
+async function readDownloadText(download: Download) {
+  const filePath = await download.path();
+
+  if (!filePath) {
+    throw new Error('Playwright did not persist the downloaded file.');
+  }
+
+  return readFile(filePath, 'utf8');
+}
+
+async function expectExportDownload(page: Page, probe: ExportProbe) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: probe.buttonName }).click(),
+  ]);
+
+  await expect(page.getByText(probe.successMessage, { exact: true })).toBeVisible();
+  expect(download.suggestedFilename()).toMatch(probe.fileNamePattern);
+
+  const content = await readDownloadText(download);
+  expect(content).toContain(probe.requiredText);
+
+  if (probe.format === 'json') {
+    expect(content).toContain(`"artifact":"${probe.artifact}"`);
+    return;
+  }
+
+  expect(content).toContain('job_id,job_title,artifact');
+}
 
 test('deployed runtime-profile endpoint reports the expected backend posture', async ({
   request,
@@ -58,17 +234,7 @@ test('web console surfaces the expected deployed API target and runtime posture'
   ).toBeVisible();
   await expect(page.getByText(deployed.apiBaseUrl, { exact: true })).toBeVisible();
 
-  const runtimePanel = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Backend profile validation' }),
-  });
-
-  await expect(
-    runtimePanel.getByText(getRuntimeProfileLabel(deployed.expectedProfile), {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(runtimePanel.getByText('Current origin allowed').first()).toBeVisible();
-  await expect(runtimePanel.getByText('HTTPS target').first()).toBeVisible();
+  await expectRuntimeValidationPanel(page, deployed.apiBaseUrl);
 });
 
 test('admin console surfaces the expected deployed API target and runtime posture', async ({
@@ -83,20 +249,13 @@ test('admin console surfaces the expected deployed API target and runtime postur
   ).toBeVisible();
   await expect(page.getByText(deployed.apiBaseUrl, { exact: true })).toBeVisible();
 
-  const runtimePanel = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Backend profile validation' }),
-  });
-
-  await expect(
-    runtimePanel.getByText(getRuntimeProfileLabel(deployed.expectedProfile), {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(runtimePanel.getByText('Current origin allowed').first()).toBeVisible();
-  await expect(runtimePanel.getByText('HTTPS target').first()).toBeVisible();
+  await expectRuntimeValidationPanel(page, deployed.apiBaseUrl);
 });
 
-test('admin can load the configured deployed audit bundle', async ({ page, request }) => {
+test('admin can load the configured deployed audit bundle and download exports', async ({
+  page,
+  request,
+}) => {
   test.skip(
     !deployed.auditJobId,
     'PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID is required for deployed public-audit lookup validation.',
@@ -113,4 +272,51 @@ test('admin can load the configured deployed audit bundle', async ({ page, reque
 
   await expect(page.getByText(deployed.auditJobId!, { exact: true })).toBeVisible();
   await expect(page.getByText('Operator case loaded.')).toBeVisible();
+
+  const probes: ExportProbe[] = [
+    {
+      artifact: 'job-history',
+      format: 'json',
+      buttonName: 'Export job history JSON',
+      successMessage: 'Downloaded job-history JSON export.',
+      fileNamePattern: new RegExp(
+        `^escrow-${deployed.auditJobId!}-job-history-.*\\.json$`,
+      ),
+      requiredText: deployed.auditJobId!,
+    },
+    {
+      artifact: 'job-history',
+      format: 'csv',
+      buttonName: 'Export job history CSV',
+      successMessage: 'Downloaded job-history CSV export.',
+      fileNamePattern: new RegExp(
+        `^escrow-${deployed.auditJobId!}-job-history-.*\\.csv$`,
+      ),
+      requiredText: deployed.auditJobId!,
+    },
+    {
+      artifact: 'dispute-case',
+      format: 'json',
+      buttonName: 'Export dispute case JSON',
+      successMessage: 'Downloaded dispute-case JSON export.',
+      fileNamePattern: new RegExp(
+        `^escrow-${deployed.auditJobId!}-dispute-case-.*\\.json$`,
+      ),
+      requiredText: deployed.auditJobId!,
+    },
+    {
+      artifact: 'dispute-case',
+      format: 'csv',
+      buttonName: 'Export dispute case CSV',
+      successMessage: 'Downloaded dispute-case CSV export.',
+      fileNamePattern: new RegExp(
+        `^escrow-${deployed.auditJobId!}-dispute-case-.*\\.csv$`,
+      ),
+      requiredText: deployed.auditJobId!,
+    },
+  ];
+
+  for (const probe of probes) {
+    await expectExportDownload(page, probe);
+  }
 });

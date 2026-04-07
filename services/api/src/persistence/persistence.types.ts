@@ -43,6 +43,7 @@ export interface SessionsRepository {
 export interface EscrowRepository {
   create(job: EscrowJobRecord): Promise<void>;
   getById(jobId: string): Promise<EscrowJobRecord | null>;
+  listAll(): Promise<EscrowJobRecord[]>;
   listByParticipantAddresses(addresses: string[]): Promise<EscrowJobRecord[]>;
   save(job: EscrowJobRecord): Promise<void>;
 }

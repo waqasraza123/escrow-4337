@@ -283,6 +283,14 @@ export class FileEscrowRepository implements EscrowRepository {
     });
   }
 
+  async listAll() {
+    return this.store.read((data) =>
+      Object.values(data.escrowJobs)
+        .map((job) => cloneValue(job))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
   async listByParticipantAddresses(addresses: string[]) {
     const normalizedAddresses = new Set(addresses);
 

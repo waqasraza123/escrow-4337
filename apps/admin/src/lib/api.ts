@@ -88,6 +88,47 @@ export type CaseExportArtifact = 'job-history' | 'dispute-case';
 
 export type CaseExportFormat = 'json' | 'csv';
 
+export type EscrowHealthReport = {
+  generatedAt: string;
+  thresholds: {
+    staleJobHours: number;
+    staleJobMs: number;
+  };
+  summary: {
+    totalJobs: number;
+    jobsNeedingAttention: number;
+    openDisputeJobs: number;
+    failedExecutionJobs: number;
+    staleJobs: number;
+  };
+  jobs: Array<{
+    jobId: string;
+    title: string;
+    status: string;
+    updatedAt: number;
+    latestActivityAt: number;
+    staleForMs: number | null;
+    reasons: Array<'failed_execution' | 'open_dispute' | 'stale_job'>;
+    counts: {
+      openDisputes: number;
+      failedExecutions: number;
+    };
+    latestFailedExecution: null | {
+      action: string;
+      submittedAt: number;
+      txHash: string | null;
+      failureCode: string | null;
+      failureMessage: string | null;
+      milestoneIndex: number | null;
+    };
+    onchain: {
+      chainId: number;
+      contractAddress: string;
+      escrowId: string | null;
+    };
+  }>;
+};
+
 export type AuditBundle = {
   bundle: {
     job: {
@@ -179,6 +220,14 @@ export const adminApi = {
   },
   me(accessToken: string) {
     return requestJson<UserProfile>(apiBaseUrl, '/auth/me', { method: 'GET' }, accessToken);
+  },
+  getEscrowHealth(accessToken: string) {
+    return requestJson<EscrowHealthReport>(
+      apiBaseUrl,
+      '/operations/escrow-health',
+      { method: 'GET' },
+      accessToken,
+    );
   },
   createWalletChallenge(
     input: {

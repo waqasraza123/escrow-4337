@@ -118,6 +118,21 @@ describe('web page', () => {
     });
   });
 
+  it('shows truthful runtime diagnostics when the backend profile cannot load', async () => {
+    mockedWebApi.getRuntimeProfile.mockRejectedValue(new Error('Failed to fetch'));
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Runtime profile unavailable').length,
+      ).toBeGreaterThan(0);
+      expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
+      expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
+    });
+  });
+
   it('restores a stored session and renders the selected job workspace', async () => {
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockAuthenticatedConsoleLoad();

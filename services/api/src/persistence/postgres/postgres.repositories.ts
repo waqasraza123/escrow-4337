@@ -1217,6 +1217,116 @@ export class PostgresEscrowRepository implements EscrowRepository {
     });
   }
 
+  async listAll() {
+    return this.db.transaction(async (client) => {
+      const result = await client.query<JobRow>(
+        `
+          SELECT
+            id,
+            title,
+            description,
+            category,
+            terms_json,
+            job_hash,
+            funded_amount,
+            status,
+            created_at_ms,
+            updated_at_ms,
+            chain_id,
+            contract_address,
+            onchain_escrow_id,
+            client_address,
+            worker_address,
+            currency_address
+          FROM escrow_jobs
+          ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
+        `,
+      );
+
+      const jobs = await Promise.all(
+        result.rows.map(async (jobRow) => {
+          const [milestones, audit, executions] = await Promise.all([
+            client.query<MilestoneRow>(
+              `
+                SELECT
+                  milestone_index,
+                  title,
+                  deliverable,
+                  amount,
+                  due_at_ms,
+                  status,
+                  delivered_at_ms,
+                  released_at_ms,
+                  disputed_at_ms,
+                  resolved_at_ms,
+                  delivery_note,
+                  delivery_evidence_urls,
+                  dispute_reason,
+                  resolution_action,
+                  resolution_note
+                FROM escrow_milestones
+                WHERE job_id = $1
+                ORDER BY milestone_index ASC
+              `,
+              [jobRow.id],
+            ),
+            client.query<AuditRow>(
+              `
+                SELECT event_index, type, at_ms, payload
+                FROM escrow_audit_events
+                WHERE job_id = $1
+                ORDER BY event_index ASC
+              `,
+              [jobRow.id],
+            ),
+            client.query<ExecutionRow>(
+              `
+                SELECT
+                  execution_id,
+                  action,
+                  actor_address,
+                  chain_id,
+                  contract_address,
+                  tx_hash,
+                  status,
+                  block_number,
+                  submitted_at_ms,
+                  confirmed_at_ms,
+                  milestone_index,
+                  escrow_id,
+                  failure_code,
+                  failure_message
+                FROM escrow_executions
+                WHERE job_id = $1
+                ORDER BY submitted_at_ms ASC, execution_id ASC
+              `,
+              [jobRow.id],
+            ),
+          ]);
+
+          return {
+            id: jobRow.id,
+            title: jobRow.title,
+            description: jobRow.description,
+            category: jobRow.category,
+            termsJSON: jobRow.terms_json,
+            jobHash: jobRow.job_hash,
+            fundedAmount: jobRow.funded_amount,
+            status: jobRow.status,
+            createdAt: Number(jobRow.created_at_ms),
+            updatedAt: Number(jobRow.updated_at_ms),
+            milestones: milestones.rows.map(mapMilestone),
+            audit: audit.rows.map(mapAudit),
+            onchain: mapOnchain(jobRow),
+            executions: executions.rows.map(mapExecution),
+          } satisfies EscrowJobRecord;
+        }),
+      );
+
+      return jobs;
+    });
+  }
+
   async listByParticipantAddresses(addresses: string[]) {
     if (addresses.length === 0) {
       return [];

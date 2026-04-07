@@ -14,9 +14,10 @@ export type RuntimeAlignmentDiagnostics = {
     | 'Current origin allowed'
     | 'Origin blocked'
     | 'CORS not configured'
+    | 'Runtime profile unavailable'
     | 'Origin unavailable';
   corsMessage: string;
-  persistenceLabel: 'Postgres' | 'File';
+  persistenceLabel: 'Postgres' | 'File' | 'Unknown';
   trustProxyLabel: string;
   corsOriginsLabel: string;
 };
@@ -60,11 +61,14 @@ export function describeRuntimeAlignment(
   if (!normalizedCurrentOrigin) {
     corsLabel = 'Origin unavailable';
     corsMessage = 'Frontend origin is not available in this environment yet.';
-  } else if (!runtimeProfile || normalizedCorsOrigins.length === 0) {
+  } else if (!runtimeProfile) {
+    corsLabel = 'Runtime profile unavailable';
+    corsMessage =
+      'Backend runtime profile could not be loaded from the browser. Check API reachability, transport safety, and CORS policy.';
+  } else if (normalizedCorsOrigins.length === 0) {
     corsLabel = 'CORS not configured';
-    corsMessage = runtimeProfile
-      ? 'Backend CORS allowlist is empty, so separate frontend origins may fail.'
-      : 'Backend runtime profile has not loaded yet.';
+    corsMessage =
+      'Backend CORS allowlist is empty, so separate frontend origins may fail.';
   } else if (normalizedCorsOrigins.includes(normalizedCurrentOrigin)) {
     corsLabel = 'Current origin allowed';
     corsMessage =
@@ -81,9 +85,16 @@ export function describeRuntimeAlignment(
     transportMessage,
     corsLabel,
     corsMessage,
-    persistenceLabel:
-      runtimeProfile?.environment.persistenceDriver === 'file' ? 'File' : 'Postgres',
-    trustProxyLabel: runtimeProfile?.environment.trustProxyRaw || 'Not configured',
-    corsOriginsLabel: normalizedCorsOrigins.join(', ') || 'None configured',
+    persistenceLabel: !runtimeProfile
+      ? 'Unknown'
+      : runtimeProfile.environment.persistenceDriver === 'file'
+        ? 'File'
+        : 'Postgres',
+    trustProxyLabel: runtimeProfile
+      ? runtimeProfile.environment.trustProxyRaw || 'Not configured'
+      : 'Unavailable',
+    corsOriginsLabel: runtimeProfile
+      ? normalizedCorsOrigins.join(', ') || 'None configured'
+      : 'Unavailable',
   };
 }

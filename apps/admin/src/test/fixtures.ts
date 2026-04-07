@@ -1,5 +1,6 @@
 import type {
   AuditBundle,
+  EscrowHealthReport,
   RuntimeProfile,
   SessionTokens,
   UserProfile,
@@ -83,6 +84,47 @@ export function createRuntimeProfile(
     },
     warnings: [
       'Escrow execution is using mock mode, so lifecycle mutations are not exercising deployed contract relay infrastructure.',
+    ],
+    ...overrides,
+  };
+}
+
+export function createEscrowHealthReport(
+  overrides: Partial<EscrowHealthReport> = {},
+): EscrowHealthReport {
+  return {
+    generatedAt: '2026-04-07T00:00:00.000Z',
+    thresholds: {
+      staleJobHours: 72,
+      staleJobMs: 259_200_000,
+    },
+    summary: {
+      totalJobs: 4,
+      jobsNeedingAttention: 1,
+      openDisputeJobs: 1,
+      failedExecutionJobs: 0,
+      staleJobs: 0,
+    },
+    jobs: [
+      {
+        jobId: 'job-ops-1',
+        title: 'Operator backlog',
+        status: 'disputed',
+        updatedAt: 500,
+        latestActivityAt: 500,
+        staleForMs: null,
+        reasons: ['open_dispute'],
+        counts: {
+          openDisputes: 1,
+          failedExecutions: 0,
+        },
+        latestFailedExecution: null,
+        onchain: {
+          chainId: 84532,
+          contractAddress: '0xcontract',
+          escrowId: 'escrow-ops-1',
+        },
+      },
     ],
     ...overrides,
   };
