@@ -102,10 +102,7 @@ function attentionPriority(reasons: EscrowAttentionReason[]) {
   return 3;
 }
 
-function isJobCurrentlyStale(
-  job: EscrowJobRecord,
-  staleCutoff: number,
-) {
+function isJobCurrentlyStale(job: EscrowJobRecord, staleCutoff: number) {
   if (job.status === 'completed' || job.status === 'resolved') {
     return false;
   }

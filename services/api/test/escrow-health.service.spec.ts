@@ -338,7 +338,9 @@ describe('EscrowHealthService', () => {
       ...execution,
       submittedAt: 10_000,
       confirmedAt:
-        typeof execution.confirmedAt === 'number' ? 10_100 : execution.confirmedAt,
+        typeof execution.confirmedAt === 'number'
+          ? 10_100
+          : execution.confirmedAt,
     }));
     await escrowRepository.save(staleRecord);
 
