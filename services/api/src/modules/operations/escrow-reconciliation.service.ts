@@ -133,7 +133,10 @@ export class EscrowReconciliationService {
 
     const confirmedFunding = confirmedExecutions(job, 'fund_job').length;
     const hasFundingAudit = hasAuditEvent(job, 'job.funded');
-    if (job.fundedAmount !== null && (confirmedFunding === 0 || !hasFundingAudit)) {
+    if (
+      job.fundedAmount !== null &&
+      (confirmedFunding === 0 || !hasFundingAudit)
+    ) {
       pushIssue({
         code: 'funding_state_mismatch',
         severity: confirmedFunding === 0 ? 'critical' : 'warning',
@@ -146,7 +149,10 @@ export class EscrowReconciliationService {
       });
     }
 
-    if (job.fundedAmount === null && (confirmedFunding > 0 || hasFundingAudit)) {
+    if (
+      job.fundedAmount === null &&
+      (confirmedFunding > 0 || hasFundingAudit)
+    ) {
       pushIssue({
         code: 'funding_state_mismatch',
         severity: 'critical',
@@ -163,12 +169,16 @@ export class EscrowReconciliationService {
       pushIssue({
         code: 'duplicate_confirmed_execution',
         severity: 'critical',
-        summary: 'Funding has multiple confirmed executions in the job timeline.',
+        summary:
+          'Funding has multiple confirmed executions in the job timeline.',
         detail: `Expected at most one confirmed fund_job execution but found ${confirmedFunding}.`,
       });
     }
 
-    const confirmedMilestoneSetup = confirmedExecutions(job, 'set_milestones').length;
+    const confirmedMilestoneSetup = confirmedExecutions(
+      job,
+      'set_milestones',
+    ).length;
     const hasMilestoneSetupAudit = hasAuditEvent(job, 'job.milestones_set');
     if (
       job.milestones.length > 0 &&
@@ -192,7 +202,8 @@ export class EscrowReconciliationService {
       pushIssue({
         code: 'duplicate_confirmed_execution',
         severity: 'critical',
-        summary: 'Milestone setup has multiple confirmed executions in the timeline.',
+        summary:
+          'Milestone setup has multiple confirmed executions in the timeline.',
         detail: `Expected at most one confirmed set_milestones execution but found ${confirmedMilestoneSetup}.`,
       });
     }
@@ -210,7 +221,11 @@ export class EscrowReconciliationService {
           index,
         );
 
-        if (!milestone.deliveredAt || deliveryExecutions === 0 || !hasDeliveryAudit) {
+        if (
+          !milestone.deliveredAt ||
+          deliveryExecutions === 0 ||
+          !hasDeliveryAudit
+        ) {
           pushIssue({
             code: 'milestone_state_mismatch',
             severity: deliveryExecutions === 0 ? 'critical' : 'warning',
@@ -239,7 +254,11 @@ export class EscrowReconciliationService {
         ).length;
         const hasDisputeAudit = hasAuditEvent(job, 'milestone.disputed', index);
 
-        if (!milestone.disputedAt || disputeExecutions === 0 || !hasDisputeAudit) {
+        if (
+          !milestone.disputedAt ||
+          disputeExecutions === 0 ||
+          !hasDisputeAudit
+        ) {
           pushIssue({
             code: 'milestone_state_mismatch',
             severity: disputeExecutions === 0 ? 'critical' : 'warning',
