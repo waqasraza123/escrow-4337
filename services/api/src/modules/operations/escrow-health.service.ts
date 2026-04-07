@@ -1,4 +1,10 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
@@ -12,6 +18,7 @@ import type {
   EscrowAttentionReason,
   EscrowHealthJob,
   EscrowHealthReport,
+  EscrowStaleWorkflowMutationResponse,
 } from './escrow-health.types';
 import { OperationsConfigService } from './operations.config';
 
@@ -95,6 +102,17 @@ function attentionPriority(reasons: EscrowAttentionReason[]) {
   return 3;
 }
 
+function isJobCurrentlyStale(
+  job: EscrowJobRecord,
+  staleCutoff: number,
+) {
+  if (job.status === 'completed' || job.status === 'resolved') {
+    return false;
+  }
+
+  return latestActivityAt(job) <= staleCutoff;
+}
+
 @Injectable()
 export class EscrowHealthService {
   constructor(
@@ -171,6 +189,71 @@ export class EscrowHealthService {
     };
   }
 
+  async claimStaleJob(
+    userId: string,
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    now = Date.now(),
+  ): Promise<EscrowStaleWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+
+    if (!isJobCurrentlyStale(job, staleCutoff)) {
+      throw new ConflictException('Job is not currently stale');
+    }
+
+    const existingWorkflow = job.operations.staleWorkflow;
+    if (existingWorkflow && existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Stale workflow is already claimed by another operator',
+      );
+    }
+
+    job.operations.staleWorkflow = {
+      claimedByUserId: user.id,
+      claimedByEmail: user.email,
+      claimedAt: existingWorkflow?.claimedAt ?? now,
+      note: input.note?.trim() || existingWorkflow?.note,
+      updatedAt: now,
+    };
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(job, staleCutoff, now),
+    };
+  }
+
+  async releaseStaleJob(
+    userId: string,
+    jobId: string,
+    now = Date.now(),
+  ): Promise<EscrowStaleWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const existingWorkflow = job.operations.staleWorkflow;
+
+    if (!existingWorkflow) {
+      throw new ConflictException('Stale workflow is not currently claimed');
+    }
+
+    if (existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Only the current stale-workflow owner can release the claim',
+      );
+    }
+
+    job.operations.staleWorkflow = null;
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(job, staleCutoff, now),
+    };
+  }
+
   private buildJobSummary(
     job: EscrowJobRecord,
     staleCutoff: number,
@@ -216,6 +299,15 @@ export class EscrowHealthService {
         openDisputes,
         failedExecutions,
       },
+      staleWorkflow: job.operations.staleWorkflow
+        ? {
+            claimedByUserId: job.operations.staleWorkflow.claimedByUserId,
+            claimedByEmail: job.operations.staleWorkflow.claimedByEmail,
+            claimedAt: job.operations.staleWorkflow.claimedAt,
+            note: job.operations.staleWorkflow.note ?? null,
+            updatedAt: job.operations.staleWorkflow.updatedAt,
+          }
+        : null,
       latestFailedExecution: latestFailedExecution(job.executions),
       onchain: {
         chainId: job.onchain.chainId,
@@ -236,5 +328,16 @@ export class EscrowHealthService {
         'Authenticated user must control the configured arbitrator wallet',
       );
     }
+
+    return user;
+  }
+
+  private async requireJob(jobId: string) {
+    const job = await this.escrowRepository.getById(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    return job;
   }
 }

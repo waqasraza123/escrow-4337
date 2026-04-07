@@ -18,6 +18,13 @@ export type EscrowHealthJob = {
     openDisputes: number;
     failedExecutions: number;
   };
+  staleWorkflow: null | {
+    claimedByUserId: string;
+    claimedByEmail: string;
+    claimedAt: number;
+    note: string | null;
+    updatedAt: number;
+  };
   latestFailedExecution: null | {
     action: EscrowContractAction;
     submittedAt: number;
@@ -31,6 +38,10 @@ export type EscrowHealthJob = {
     contractAddress: string;
     escrowId: string | null;
   };
+};
+
+export type EscrowStaleWorkflowMutationResponse = {
+  job: EscrowHealthJob;
 };
 
 export type EscrowHealthReport = {

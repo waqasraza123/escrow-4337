@@ -10,6 +10,7 @@ import type {
   EscrowJobRecord,
   EscrowMilestoneRecord,
   EscrowOnchainState,
+  EscrowStaleWorkflowRecord,
 } from '../../modules/escrow/escrow.types';
 import type { UserRecord } from '../../modules/users/users.types';
 import type {
@@ -114,6 +115,9 @@ type JobRow = QueryResultRow & {
   client_address: string;
   worker_address: string;
   currency_address: string;
+  operations_json: {
+    staleWorkflow?: EscrowStaleWorkflowRecord | null;
+  } | null;
 };
 
 type MilestoneRow = QueryResultRow & {
@@ -276,6 +280,12 @@ function mapOnchain(row: JobRow): EscrowOnchainState {
   };
 }
 
+function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
+  return {
+    staleWorkflow: row.operations_json?.staleWorkflow ?? null,
+  };
+}
+
 function mapMilestone(row: MilestoneRow): EscrowMilestoneRecord {
   return {
     title: row.title,
@@ -344,7 +354,8 @@ async function replaceEscrowAggregate(
         onchain_escrow_id,
         client_address,
         worker_address,
-        currency_address
+        currency_address,
+        operations_json
       )
       VALUES (
         $1,
@@ -362,7 +373,8 @@ async function replaceEscrowAggregate(
         $13,
         $14,
         $15,
-        $16
+        $16,
+        $17::jsonb
       )
       ON CONFLICT (id) DO UPDATE
       SET
@@ -379,7 +391,8 @@ async function replaceEscrowAggregate(
         onchain_escrow_id = EXCLUDED.onchain_escrow_id,
         client_address = EXCLUDED.client_address,
         worker_address = EXCLUDED.worker_address,
-        currency_address = EXCLUDED.currency_address
+        currency_address = EXCLUDED.currency_address,
+        operations_json = EXCLUDED.operations_json
     `,
     [
       job.id,
@@ -398,6 +411,7 @@ async function replaceEscrowAggregate(
       job.onchain.clientAddress,
       job.onchain.workerAddress,
       job.onchain.currencyAddress,
+      JSON.stringify(job.operations),
     ],
   );
 
@@ -1127,7 +1141,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             onchain_escrow_id,
             client_address,
             worker_address,
-            currency_address
+            currency_address,
+            operations_json
           FROM escrow_jobs
           WHERE id = $1
           LIMIT 1
@@ -1212,6 +1227,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
         milestones: milestoneResult.rows.map(mapMilestone),
         audit: auditResult.rows.map(mapAudit),
         onchain: mapOnchain(jobRow),
+        operations: mapOperations(jobRow),
         executions: executionResult.rows.map(mapExecution),
       } satisfies EscrowJobRecord;
     });
@@ -1237,7 +1253,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             onchain_escrow_id,
             client_address,
             worker_address,
-            currency_address
+            currency_address,
+            operations_json
           FROM escrow_jobs
           ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
         `,
@@ -1317,6 +1334,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             updatedAt: Number(jobRow.updated_at_ms),
             milestones: milestones.rows.map(mapMilestone),
             audit: audit.rows.map(mapAudit),
+            operations: mapOperations(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),
           } satisfies EscrowJobRecord;
@@ -1351,7 +1369,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             onchain_escrow_id,
             client_address,
             worker_address,
-            currency_address
+            currency_address,
+            operations_json
           FROM escrow_jobs
           WHERE client_address = ANY($1::text[]) OR worker_address = ANY($1::text[])
           ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
@@ -1433,6 +1452,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             updatedAt: Number(jobRow.updated_at_ms),
             milestones: milestones.rows.map(mapMilestone),
             audit: audit.rows.map(mapAudit),
+            operations: mapOperations(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),
           } satisfies EscrowJobRecord;

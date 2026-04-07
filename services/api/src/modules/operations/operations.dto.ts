@@ -9,4 +9,14 @@ export const escrowHealthQuerySchema = z
   })
   .strict();
 
+export const claimStaleJobSchema = z
+  .object({
+    note: z.string().trim().min(1).max(5000).optional(),
+  })
+  .strict();
+
+export const releaseStaleJobSchema = z.object({}).strict();
+
 export type EscrowHealthQueryDto = z.infer<typeof escrowHealthQuerySchema>;
+export type ClaimStaleJobDto = z.infer<typeof claimStaleJobSchema>;
+export type ReleaseStaleJobDto = z.infer<typeof releaseStaleJobSchema>;

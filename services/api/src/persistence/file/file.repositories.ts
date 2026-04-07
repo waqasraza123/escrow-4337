@@ -3,7 +3,10 @@ import type {
   OtpRequestThrottleRecord,
   SessionRecord,
 } from '../../modules/auth/auth.types';
-import type { EscrowJobRecord } from '../../modules/escrow/escrow.types';
+import type {
+  EscrowJobRecord,
+  EscrowStaleWorkflowRecord,
+} from '../../modules/escrow/escrow.types';
 import type {
   EoaUserWalletRecord,
   SmartAccountUserWalletRecord,
@@ -23,6 +26,23 @@ import { FilePersistenceStore } from './file-persistence.store';
 
 function cloneValue<T>(value: T): T {
   return structuredClone(value);
+}
+
+function normalizeEscrowJobRecord(
+  job:
+    | EscrowJobRecord
+    | (Omit<EscrowJobRecord, 'operations'> & {
+        operations?: {
+          staleWorkflow?: EscrowStaleWorkflowRecord | null;
+        };
+      }),
+): EscrowJobRecord {
+  return {
+    ...job,
+    operations: {
+      staleWorkflow: job.operations?.staleWorkflow ?? null,
+    },
+  };
 }
 
 function normalizeEmail(email: string) {
@@ -272,21 +292,21 @@ export class FileEscrowRepository implements EscrowRepository {
 
   async create(job: EscrowJobRecord) {
     await this.store.write((data) => {
-      data.escrowJobs[job.id] = cloneValue(job);
+      data.escrowJobs[job.id] = cloneValue(normalizeEscrowJobRecord(job));
     });
   }
 
   async getById(jobId: string) {
     return this.store.read((data) => {
       const job = data.escrowJobs[jobId];
-      return job ? cloneValue(job) : null;
+      return job ? cloneValue(normalizeEscrowJobRecord(job)) : null;
     });
   }
 
   async listAll() {
     return this.store.read((data) =>
       Object.values(data.escrowJobs)
-        .map((job) => cloneValue(job))
+        .map((job) => cloneValue(normalizeEscrowJobRecord(job)))
         .sort((left, right) => right.updatedAt - left.updatedAt),
     );
   }
@@ -301,14 +321,14 @@ export class FileEscrowRepository implements EscrowRepository {
             normalizedAddresses.has(job.onchain.clientAddress) ||
             normalizedAddresses.has(job.onchain.workerAddress),
         )
-        .map((job) => cloneValue(job))
+        .map((job) => cloneValue(normalizeEscrowJobRecord(job)))
         .sort((left, right) => right.updatedAt - left.updatedAt),
     );
   }
 
   async save(job: EscrowJobRecord) {
     await this.store.write((data) => {
-      data.escrowJobs[job.id] = cloneValue(job);
+      data.escrowJobs[job.id] = cloneValue(normalizeEscrowJobRecord(job));
     });
   }
 }

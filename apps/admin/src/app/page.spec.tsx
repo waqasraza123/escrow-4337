@@ -30,6 +30,8 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     logout: vi.fn(),
     me: vi.fn(),
     getEscrowHealth: vi.fn(),
+    claimStaleJob: vi.fn(),
+    releaseStaleJob: vi.fn(),
     createWalletChallenge: vi.fn(),
     verifyWalletChallenge: vi.fn(),
     getAudit: vi.fn(),
@@ -417,6 +419,164 @@ describe('admin page', () => {
     });
 
     expect(mockedAdminApi.getAudit).toHaveBeenCalledWith('job-failure-1');
+  });
+
+  it('lets the current operator claim and release a stale job workflow', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          filters: {
+            reason: null,
+            limit: 25,
+          },
+          summary: {
+            totalJobs: 3,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 0,
+            staleJobs: 1,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-stale-1',
+              title: 'Stale operator review',
+              status: 'funded',
+              reasons: ['stale_job'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 0,
+              },
+              staleForMs: 86_400_000,
+              staleWorkflow: null,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          filters: {
+            reason: null,
+            limit: 25,
+          },
+          summary: {
+            totalJobs: 3,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 0,
+            staleJobs: 1,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-stale-1',
+              title: 'Stale operator review',
+              status: 'funded',
+              reasons: ['stale_job'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 0,
+              },
+              staleForMs: 86_400_000,
+              staleWorkflow: {
+                claimedByUserId: 'operator-user-1',
+                claimedByEmail: 'operator@example.com',
+                claimedAt: 500,
+                updatedAt: 510,
+                note: 'Waiting on worker response.',
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          filters: {
+            reason: null,
+            limit: 25,
+          },
+          summary: {
+            totalJobs: 3,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 0,
+            staleJobs: 1,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-stale-1',
+              title: 'Stale operator review',
+              status: 'funded',
+              reasons: ['stale_job'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 0,
+              },
+              staleForMs: 86_400_000,
+              staleWorkflow: null,
+            },
+          ],
+        }),
+      );
+    mockedAdminApi.claimStaleJob.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-stale-1',
+      },
+    });
+    mockedAdminApi.releaseStaleJob.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-stale-1',
+      },
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Stale operator review')).toBeInTheDocument();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText(
+        'Document why the job is stale, what is blocked, and what you will do next.',
+      ),
+      'Waiting on worker response.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Claim stale job' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Loaded 1 jobs for all attention.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.claimStaleJob).toHaveBeenCalledWith(
+      'job-stale-1',
+      {
+        note: 'Waiting on worker response.',
+      },
+      'admin-access-token-123',
+    );
+    expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Release stale claim' }));
+
+    await waitFor(() => {
+      expect(mockedAdminApi.releaseStaleJob).toHaveBeenCalledWith(
+        'job-stale-1',
+        'admin-access-token-123',
+      );
+    });
   });
 
   it(

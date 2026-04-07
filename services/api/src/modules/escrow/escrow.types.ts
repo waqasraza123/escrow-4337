@@ -120,6 +120,14 @@ export type EscrowExecutionRecord = {
   failureMessage?: string;
 };
 
+export type EscrowStaleWorkflowRecord = {
+  claimedByUserId: string;
+  claimedByEmail: string;
+  claimedAt: number;
+  note?: string;
+  updatedAt: number;
+};
+
 export type EscrowJobRecord = {
   id: string;
   title: string;
@@ -133,6 +141,9 @@ export type EscrowJobRecord = {
   updatedAt: number;
   milestones: EscrowMilestoneRecord[];
   audit: EscrowAuditEvent[];
+  operations: {
+    staleWorkflow: EscrowStaleWorkflowRecord | null;
+  };
   onchain: EscrowOnchainState;
   executions: EscrowExecutionRecord[];
 };

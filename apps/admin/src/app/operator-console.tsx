@@ -169,6 +169,12 @@ export function OperatorConsole() {
   const [escrowHealth, setEscrowHealth] = useState<EscrowHealthReport | null>(null);
   const [healthReasonFilter, setHealthReasonFilter] =
     useState<OperationsReasonFilter>('all');
+  const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [staleWorkflowStates, setStaleWorkflowStates] = useState<
+    Record<string, AsyncState>
+  >({});
   const [startState, setStartState] = useState<AsyncState>(createIdleState());
   const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
   const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
@@ -355,6 +361,8 @@ export function OperatorConsole() {
     setChallenge(null);
     setEscrowHealth(null);
     setHealthState(createIdleState());
+    setStaleWorkflowDrafts({});
+    setStaleWorkflowStates({});
     setWalletSignature('');
     writeSession(null);
   }
@@ -471,17 +479,41 @@ export function OperatorConsole() {
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setStaleWorkflowDrafts({});
+      setStaleWorkflowStates({});
       return;
     }
 
     if (!controlsArbitratorWallet) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setStaleWorkflowDrafts({});
+      setStaleWorkflowStates({});
       return;
     }
 
     void loadEscrowHealth(accessToken, healthReasonFilter);
   }, [accessToken, controlsArbitratorWallet, healthReasonFilter]);
+
+  useEffect(() => {
+    if (!escrowHealth) {
+      return;
+    }
+
+    setStaleWorkflowDrafts((current) => {
+      const next = { ...current };
+
+      for (const job of escrowHealth.jobs) {
+        if (!job.reasons.includes('stale_job')) {
+          continue;
+        }
+
+        next[job.jobId] = current[job.jobId] ?? job.staleWorkflow?.note ?? '';
+      }
+
+      return next;
+    });
+  }, [escrowHealth]);
 
   useEffect(() => {
     setResolutionMilestoneIndex((current) => {
@@ -519,6 +551,69 @@ export function OperatorConsole() {
     } catch (error) {
       setEscrowHealth(null);
       setHealthState(createErrorState(error, 'Failed to load escrow operations health'));
+    }
+  }
+
+  function setStaleWorkflowState(jobId: string, nextState: AsyncState) {
+    setStaleWorkflowStates((current) => ({
+      ...current,
+      [jobId]: nextState,
+    }));
+  }
+
+  async function handleClaimStaleJob(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setStaleWorkflowState(
+      jobId,
+      createWorkingState('Claiming stale job workflow...'),
+    );
+
+    try {
+      await adminApi.claimStaleJob(
+        jobId,
+        {
+          note: staleWorkflowDrafts[jobId]?.trim() || undefined,
+        },
+        accessToken,
+      );
+      setStaleWorkflowState(
+        jobId,
+        createSuccessState('Stale job workflow claimed.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setStaleWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to claim stale job workflow'),
+      );
+    }
+  }
+
+  async function handleReleaseStaleJob(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setStaleWorkflowState(
+      jobId,
+      createWorkingState('Releasing stale job workflow...'),
+    );
+
+    try {
+      await adminApi.releaseStaleJob(jobId, accessToken);
+      setStaleWorkflowState(
+        jobId,
+        createSuccessState('Stale job workflow released.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setStaleWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to release stale job workflow'),
+      );
     }
   }
 
@@ -960,43 +1055,108 @@ export function OperatorConsole() {
             )}
             {controlsArbitratorWallet && escrowHealth && escrowHealth.jobs.length > 0 ? (
               escrowHealth.jobs.map((job) => (
-                <article key={job.jobId} className={styles.timelineCard}>
-                  <div className={styles.timelineHead}>
-                    <strong>{job.title}</strong>
-                    <span>{job.status}</span>
-                  </div>
-                  <p className={styles.stateText}>
-                    {job.reasons.map(getOperationsReasonLabel).join(' · ')}
-                  </p>
-                  <small>{`Job ${job.jobId} · Updated ${formatTimestamp(job.updatedAt)}`}</small>
-                  <small>{`Latest activity ${formatTimestamp(job.latestActivityAt)}`}</small>
-                  <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</small>
-                  {job.staleForMs !== null ? (
-                    <small>{`Stale for ${Math.floor(job.staleForMs / 3_600_000)}h`}</small>
-                  ) : null}
-                  {job.latestFailedExecution ? (
-                    <code>
-                      {`${job.latestFailedExecution.action} failed${
-                        job.latestFailedExecution.failureCode
-                          ? ` (${job.latestFailedExecution.failureCode})`
-                          : ''
-                      }${
-                        job.latestFailedExecution.failureMessage
-                          ? `: ${job.latestFailedExecution.failureMessage}`
-                          : ''
-                      }`}
-                    </code>
-                  ) : null}
-                  <div className={styles.inlineActions}>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void handleLookup(job.jobId)}
-                    >
-                      {`Open case ${job.jobId}`}
-                    </button>
-                  </div>
-                </article>
+                (() => {
+                  const isStaleJob = job.reasons.includes('stale_job');
+                  const staleWorkflow = job.staleWorkflow;
+                  const claimedByCurrentOperator =
+                    staleWorkflow?.claimedByUserId === profile?.id;
+
+                  return (
+                    <article key={job.jobId} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{job.title}</strong>
+                        <span>{job.status}</span>
+                      </div>
+                      <p className={styles.stateText}>
+                        {job.reasons.map(getOperationsReasonLabel).join(' · ')}
+                      </p>
+                      <small>{`Job ${job.jobId} · Updated ${formatTimestamp(job.updatedAt)}`}</small>
+                      <small>{`Latest activity ${formatTimestamp(job.latestActivityAt)}`}</small>
+                      <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</small>
+                      {job.staleForMs !== null ? (
+                        <small>{`Stale for ${Math.floor(job.staleForMs / 3_600_000)}h`}</small>
+                      ) : null}
+                      {job.latestFailedExecution ? (
+                        <code>
+                          {`${job.latestFailedExecution.action} failed${
+                            job.latestFailedExecution.failureCode
+                              ? ` (${job.latestFailedExecution.failureCode})`
+                              : ''
+                          }${
+                            job.latestFailedExecution.failureMessage
+                              ? `: ${job.latestFailedExecution.failureMessage}`
+                              : ''
+                          }`}
+                        </code>
+                      ) : null}
+                      {isStaleJob ? (
+                        <article className={styles.boundaryCard}>
+                          <strong>
+                            {staleWorkflow
+                              ? `Claimed by ${staleWorkflow.claimedByEmail}`
+                              : 'No operator currently owns this stale job'}
+                          </strong>
+                          <p className={styles.stateText}>
+                            {staleWorkflow
+                              ? `Claimed ${formatTimestamp(staleWorkflow.claimedAt)} and updated ${formatTimestamp(
+                                  staleWorkflow.updatedAt,
+                                )}.`
+                              : 'Claim this stale job to record ownership and preserve remediation notes.'}
+                          </p>
+                          <label className={styles.field}>
+                            <span>Stale remediation note</span>
+                            <textarea
+                              rows={3}
+                              value={staleWorkflowDrafts[job.jobId] ?? ''}
+                              onChange={(event) =>
+                                setStaleWorkflowDrafts((current) => ({
+                                  ...current,
+                                  [job.jobId]: event.target.value,
+                                }))
+                              }
+                              placeholder="Document why the job is stale, what is blocked, and what you will do next."
+                              disabled={Boolean(
+                                staleWorkflow && !claimedByCurrentOperator,
+                              )}
+                            />
+                          </label>
+                          <div className={styles.inlineActions}>
+                            {!staleWorkflow || claimedByCurrentOperator ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleClaimStaleJob(job.jobId)}
+                              >
+                                {staleWorkflow ? 'Save stale note' : 'Claim stale job'}
+                              </button>
+                            ) : null}
+                            {staleWorkflow && claimedByCurrentOperator ? (
+                              <button
+                                type="button"
+                                className={styles.secondaryButton}
+                                onClick={() => void handleReleaseStaleJob(job.jobId)}
+                              >
+                                Release stale claim
+                              </button>
+                            ) : null}
+                          </div>
+                          <StatusNotice
+                            message={staleWorkflowStates[job.jobId]?.message}
+                            messageClassName={styles.stateText}
+                          />
+                        </article>
+                      ) : null}
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => void handleLookup(job.jobId)}
+                        >
+                          {`Open case ${job.jobId}`}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })()
               ))
             ) : controlsArbitratorWallet && escrowHealth ? (
               <EmptyStateCard

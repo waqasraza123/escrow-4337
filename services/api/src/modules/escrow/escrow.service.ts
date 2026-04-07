@@ -168,6 +168,9 @@ export class EscrowService {
       updatedAt: createdJob.confirmedAt,
       milestones: [],
       audit: [],
+      operations: {
+        staleWorkflow: null,
+      },
       onchain: {
         chainId: createdJob.chainId,
         contractAddress: createdJob.contractAddress,

@@ -222,6 +222,7 @@ describe('EscrowHealthService', () => {
         openDisputes: 0,
         failedExecutions: 0,
       },
+      staleWorkflow: null,
     });
     expect(report.jobs[2]?.staleForMs).toBe(99_989_900);
   });
@@ -308,6 +309,69 @@ describe('EscrowHealthService', () => {
     await expect(
       escrowHealthService.getReport(nonOperatorUserId, {}, 100_000_000),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('claims and releases stale job workflows for the current operator', async () => {
+    const reportNow = 100_000_000;
+
+    const staleJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Stale claim target',
+      description: 'Needs explicit operator ownership.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const staleRecord = await escrowRepository.getById(staleJob.jobId);
+    if (!staleRecord) {
+      throw new Error('Expected stale job record to exist');
+    }
+    staleRecord.createdAt = 10_000;
+    staleRecord.updatedAt = 10_000;
+    staleRecord.audit = staleRecord.audit.map((event) => ({
+      ...event,
+      at: 10_000,
+    }));
+    staleRecord.executions = staleRecord.executions.map((execution) => ({
+      ...execution,
+      submittedAt: 10_000,
+      confirmedAt:
+        typeof execution.confirmedAt === 'number' ? 10_100 : execution.confirmedAt,
+    }));
+    await escrowRepository.save(staleRecord);
+
+    const claimed = await escrowHealthService.claimStaleJob(
+      arbitratorUserId,
+      staleJob.jobId,
+      {
+        note: 'Waiting for client response.',
+      },
+      reportNow,
+    );
+
+    expect(claimed.job.staleWorkflow).toMatchObject({
+      claimedByEmail: 'arbitrator@example.com',
+      note: 'Waiting for client response.',
+    });
+
+    const persistedClaim = await escrowRepository.getById(staleJob.jobId);
+    expect(persistedClaim?.operations.staleWorkflow).toMatchObject({
+      claimedByUserId: arbitratorUserId,
+      claimedByEmail: 'arbitrator@example.com',
+      note: 'Waiting for client response.',
+    });
+
+    const released = await escrowHealthService.releaseStaleJob(
+      arbitratorUserId,
+      staleJob.jobId,
+      reportNow,
+    );
+
+    expect(released.job.staleWorkflow).toBeNull();
+    const persistedRelease = await escrowRepository.getById(staleJob.jobId);
+    expect(persistedRelease?.operations.staleWorkflow).toBeNull();
   });
 });
 

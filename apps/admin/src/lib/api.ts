@@ -120,6 +120,13 @@ export type EscrowHealthReport = {
       openDisputes: number;
       failedExecutions: number;
     };
+    staleWorkflow: null | {
+      claimedByUserId: string;
+      claimedByEmail: string;
+      claimedAt: number;
+      note: string | null;
+      updatedAt: number;
+    };
     latestFailedExecution: null | {
       action: string;
       submittedAt: number;
@@ -248,6 +255,38 @@ export const adminApi = {
       apiBaseUrl,
       `/operations/escrow-health${queryString ? `?${queryString}` : ''}`,
       { method: 'GET' },
+      accessToken,
+    );
+  },
+  claimStaleJob(
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/stale-claim`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  releaseStaleJob(jobId: string, accessToken: string) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/stale-release`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
       accessToken,
     );
   },
