@@ -231,12 +231,7 @@ describe('EscrowHealthService', () => {
 
     const reportNow = 100_000_000;
 
-    for (const title of [
-      'Dispute A',
-      'Dispute B',
-      'Dispute C',
-      'Failure A',
-    ]) {
+    for (const title of ['Dispute A', 'Dispute B', 'Dispute C', 'Failure A']) {
       const createdJob = await escrowService.createJob(clientUserId, {
         workerAddress,
         currencyAddress,
@@ -304,9 +299,9 @@ describe('EscrowHealthService', () => {
       staleJobs: 0,
     });
     expect(filtered.jobs).toHaveLength(2);
-    expect(filtered.jobs.every((job) => job.reasons.includes('open_dispute'))).toBe(
-      true,
-    );
+    expect(
+      filtered.jobs.every((job) => job.reasons.includes('open_dispute')),
+    ).toBe(true);
   });
 
   it('rejects users that do not control the configured arbitrator wallet', async () => {
