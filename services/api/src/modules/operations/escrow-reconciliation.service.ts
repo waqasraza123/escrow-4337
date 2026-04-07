@@ -194,7 +194,8 @@ export class EscrowReconciliationService {
             pushIssue({
               code: 'timeline_transition_mismatch',
               severity: 'warning',
-              summary: 'The audit timeline contains duplicate job.created events.',
+              summary:
+                'The audit timeline contains duplicate job.created events.',
               detail:
                 'Reconciliation replay expects job.created to appear at most once.',
             });
@@ -220,7 +221,8 @@ export class EscrowReconciliationService {
             pushIssue({
               code: 'timeline_transition_mismatch',
               severity: 'warning',
-              summary: 'The audit timeline contains duplicate job.funded events.',
+              summary:
+                'The audit timeline contains duplicate job.funded events.',
               detail:
                 'Replay expects funding to be applied once per escrow job aggregate.',
             });
