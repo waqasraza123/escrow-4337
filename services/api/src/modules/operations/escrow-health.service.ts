@@ -196,10 +196,7 @@ function inferFailureGuidance(
   const severity: EscrowFailureGuidance['severity'] =
     failedExecutions >= 3 ? 'critical' : 'warning';
 
-  if (
-    latestSignal.includes('paymaster') ||
-    latestSignal.includes('sponsor')
-  ) {
+  if (latestSignal.includes('paymaster') || latestSignal.includes('sponsor')) {
     return {
       severity,
       responsibleSurface: 'paymaster_or_sponsor',
@@ -240,7 +237,8 @@ function inferFailureGuidance(
       severity,
       responsibleSurface: 'bundler',
       retryPosture: 'hold_for_configuration_change',
-      summary: 'Bundler or simulation validation is rejecting the execution payload.',
+      summary:
+        'Bundler or simulation validation is rejecting the execution payload.',
       recommendedActions: [
         'Review bundler validation output for failing calldata or gas assumptions.',
         'Confirm smart-account, entry-point, and chain configuration are correct.',
@@ -464,7 +462,8 @@ export class EscrowHealthService {
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
     const guidance = inferFailureGuidance(
-      job.executions.filter((execution) => execution.status === 'failed').length,
+      job.executions.filter((execution) => execution.status === 'failed')
+        .length,
       failedExecutionDiagnostics,
     );
     const existingWorkflow = job.operations.executionFailureWorkflow;
