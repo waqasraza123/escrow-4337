@@ -22,9 +22,11 @@ import type {
   EscrowFailedExecutionSummary,
   EscrowHealthJob,
   EscrowHealthReport,
+  EscrowReconciliationIssue,
   EscrowStaleWorkflowMutationResponse,
 } from './escrow-health.types';
 import { OperationsConfigService } from './operations.config';
+import { EscrowReconciliationService } from './escrow-reconciliation.service';
 
 type EscrowHealthReportOptions = {
   reason?: EscrowAttentionReason;
@@ -303,6 +305,7 @@ function inferFailureGuidance(
 function sortReasons(reasons: Set<EscrowAttentionReason>) {
   const order: EscrowAttentionReason[] = [
     'open_dispute',
+    'reconciliation_drift',
     'failed_execution',
     'stale_job',
   ];
@@ -319,11 +322,23 @@ function attentionPriority(reasons: EscrowAttentionReason[]) {
     return 1;
   }
 
-  if (reasons.includes('stale_job')) {
+  if (reasons.includes('reconciliation_drift')) {
     return 2;
   }
 
-  return 3;
+  if (reasons.includes('stale_job')) {
+    return 3;
+  }
+
+  return 4;
+}
+
+function highestReconciliationSeverity(
+  issues: EscrowReconciliationIssue[],
+): 'warning' | 'critical' {
+  return issues.some((issue) => issue.severity === 'critical')
+    ? 'critical'
+    : 'warning';
 }
 
 function isJobCurrentlyStale(job: EscrowJobRecord, staleCutoff: number) {
@@ -342,6 +357,7 @@ export class EscrowHealthService {
     private readonly usersService: UsersService,
     private readonly escrowContractConfig: EscrowContractConfigService,
     private readonly operationsConfig: OperationsConfigService,
+    private readonly reconciliationService: EscrowReconciliationService,
   ) {}
 
   async getReport(
@@ -398,6 +414,9 @@ export class EscrowHealthService {
         matchedJobs: matchedJobs.length,
         openDisputeJobs: matchedJobs.filter((job) =>
           job.reasons.includes('open_dispute'),
+        ).length,
+        reconciliationDriftJobs: matchedJobs.filter((job) =>
+          job.reasons.includes('reconciliation_drift'),
         ).length,
         failedExecutionJobs: matchedJobs.filter((job) =>
           job.reasons.includes('failed_execution'),
@@ -676,6 +695,7 @@ export class EscrowHealthService {
     const failedExecutions = job.executions.filter(
       (execution) => execution.status === 'failed',
     ).length;
+    const reconciliationIssues = this.reconciliationService.reconcile(job);
     const failureGuidance = failedExecutionDiagnostics
       ? inferFailureGuidance(failedExecutions, failedExecutionDiagnostics)
       : null;
@@ -687,6 +707,10 @@ export class EscrowHealthService {
 
     if (failedExecutions > 0) {
       reasons.add('failed_execution');
+    }
+
+    if (reconciliationIssues.length > 0) {
+      reasons.add('reconciliation_drift');
     }
 
     if (
@@ -747,6 +771,15 @@ export class EscrowHealthService {
         failedExecutionDiagnostics?.recentFailures[0] ?? null,
       failedExecutionDiagnostics,
       failureGuidance,
+      reconciliation:
+        reconciliationIssues.length > 0
+          ? {
+              issueCount: reconciliationIssues.length,
+              highestSeverity:
+                highestReconciliationSeverity(reconciliationIssues),
+              issues: reconciliationIssues,
+            }
+          : null,
       onchain: {
         chainId: job.onchain.chainId,
         contractAddress: job.onchain.contractAddress,

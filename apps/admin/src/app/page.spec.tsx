@@ -312,6 +312,154 @@ describe('admin page', () => {
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
   });
 
+  it('renders reconciliation drift findings and filters that backlog reason explicitly', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            reconciliationDriftJobs: 1,
+            failedExecutionJobs: 0,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-drift-1',
+              title: 'State drift case',
+              status: 'funded',
+              reasons: ['reconciliation_drift'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 0,
+              },
+              latestFailedExecution: null,
+              failedExecutionDiagnostics: null,
+              failureGuidance: null,
+              reconciliation: {
+                issueCount: 2,
+                highestSeverity: 'critical',
+                issues: [
+                  {
+                    code: 'funding_state_mismatch',
+                    severity: 'critical',
+                    summary:
+                      'Funding was confirmed in the timeline but the aggregate funded amount is empty.',
+                    detail:
+                      'Reconciliation found 1 confirmed funding execution and a job.funded audit event while fundedAmount is null.',
+                  },
+                  {
+                    code: 'job_status_mismatch',
+                    severity: 'critical',
+                    summary:
+                      'Job status is funded but the persisted milestone state implies draft.',
+                    detail:
+                      'The aggregate status no longer matches the state derived from milestone outcomes and funding posture.',
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          filters: {
+            reason: 'reconciliation_drift',
+            limit: 25,
+          },
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            reconciliationDriftJobs: 1,
+            failedExecutionJobs: 0,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-drift-1',
+              title: 'State drift case',
+              status: 'funded',
+              reasons: ['reconciliation_drift'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 0,
+              },
+              latestFailedExecution: null,
+              failedExecutionDiagnostics: null,
+              failureGuidance: null,
+              reconciliation: {
+                issueCount: 2,
+                highestSeverity: 'critical',
+                issues: [
+                  {
+                    code: 'funding_state_mismatch',
+                    severity: 'critical',
+                    summary:
+                      'Funding was confirmed in the timeline but the aggregate funded amount is empty.',
+                    detail:
+                      'Reconciliation found 1 confirmed funding execution and a job.funded audit event while fundedAmount is null.',
+                  },
+                  {
+                    code: 'job_status_mismatch',
+                    severity: 'critical',
+                    summary:
+                      'Job status is funded but the persisted milestone state implies draft.',
+                    detail:
+                      'The aggregate status no longer matches the state derived from milestone outcomes and funding posture.',
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      );
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('State drift case')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Highest severity: Critical/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Funding was confirmed in the timeline but the aggregate funded amount is empty/,
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reconciliation drift' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Loaded 1 jobs for reconciliation drift.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(
+      2,
+      'admin-access-token-123',
+      {
+        reason: 'reconciliation_drift',
+      },
+    );
+  });
+
   it('filters escrow operations health by reason and opens a selected case directly', async () => {
     const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, createSessionTokens());
@@ -326,6 +474,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 2,
             matchedJobs: 2,
             openDisputeJobs: 1,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -428,6 +577,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 2,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -586,6 +736,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 0,
             staleJobs: 1,
           },
@@ -617,6 +768,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 0,
             staleJobs: 1,
           },
@@ -654,6 +806,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 0,
             staleJobs: 1,
           },
@@ -740,6 +893,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -820,6 +974,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -909,6 +1064,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -998,6 +1154,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },
@@ -1087,6 +1244,7 @@ describe('admin page', () => {
             jobsNeedingAttention: 1,
             matchedJobs: 1,
             openDisputeJobs: 0,
+            reconciliationDriftJobs: 0,
             failedExecutionJobs: 1,
             staleJobs: 0,
           },

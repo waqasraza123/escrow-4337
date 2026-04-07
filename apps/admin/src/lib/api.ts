@@ -91,7 +91,12 @@ export type CaseExportFormat = 'json' | 'csv';
 export type EscrowHealthReport = {
   generatedAt: string;
   filters: {
-    reason: 'failed_execution' | 'open_dispute' | 'stale_job' | null;
+    reason:
+      | 'failed_execution'
+      | 'open_dispute'
+      | 'reconciliation_drift'
+      | 'stale_job'
+      | null;
     limit: number;
   };
   thresholds: {
@@ -105,6 +110,7 @@ export type EscrowHealthReport = {
     jobsNeedingAttention: number;
     matchedJobs: number;
     openDisputeJobs: number;
+    reconciliationDriftJobs: number;
     failedExecutionJobs: number;
     staleJobs: number;
   };
@@ -115,7 +121,9 @@ export type EscrowHealthReport = {
     updatedAt: number;
     latestActivityAt: number;
     staleForMs: number | null;
-    reasons: Array<'failed_execution' | 'open_dispute' | 'stale_job'>;
+    reasons: Array<
+      'failed_execution' | 'open_dispute' | 'reconciliation_drift' | 'stale_job'
+    >;
     counts: {
       openDisputes: number;
       failedExecutions: number;
@@ -181,6 +189,21 @@ export type EscrowHealthReport = {
         | 'hold_for_configuration_change';
       summary: string;
       recommendedActions: string[];
+    };
+    reconciliation: null | {
+      issueCount: number;
+      highestSeverity: 'warning' | 'critical';
+      issues: Array<{
+        code:
+          | 'duplicate_confirmed_execution'
+          | 'funding_state_mismatch'
+          | 'job_status_mismatch'
+          | 'milestone_state_mismatch'
+          | 'missing_create_confirmation';
+        severity: 'warning' | 'critical';
+        summary: string;
+        detail: string | null;
+      }>;
     };
     onchain: {
       chainId: number;
@@ -285,7 +308,11 @@ export const adminApi = {
   getEscrowHealth(
     accessToken: string,
     options?: {
-      reason?: 'failed_execution' | 'open_dispute' | 'stale_job';
+      reason?:
+        | 'failed_execution'
+        | 'open_dispute'
+        | 'reconciliation_drift'
+        | 'stale_job';
       limit?: number;
     },
   ) {

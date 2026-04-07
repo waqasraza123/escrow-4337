@@ -7,6 +7,7 @@ import type {
 export type EscrowAttentionReason =
   | 'failed_execution'
   | 'open_dispute'
+  | 'reconciliation_drift'
   | 'stale_job';
 
 export type EscrowFailedExecutionSummary = {
@@ -33,6 +34,18 @@ export type EscrowFailureGuidance = {
     | 'hold_for_configuration_change';
   summary: string;
   recommendedActions: string[];
+};
+
+export type EscrowReconciliationIssue = {
+  code:
+    | 'duplicate_confirmed_execution'
+    | 'funding_state_mismatch'
+    | 'job_status_mismatch'
+    | 'milestone_state_mismatch'
+    | 'missing_create_confirmation';
+  severity: 'warning' | 'critical';
+  summary: string;
+  detail: string | null;
 };
 
 export type EscrowHealthJob = {
@@ -80,6 +93,11 @@ export type EscrowHealthJob = {
     recentFailures: EscrowFailedExecutionSummary[];
   };
   failureGuidance: EscrowFailureGuidance | null;
+  reconciliation: null | {
+    issueCount: number;
+    highestSeverity: 'warning' | 'critical';
+    issues: EscrowReconciliationIssue[];
+  };
   onchain: {
     chainId: number;
     contractAddress: string;
@@ -112,6 +130,7 @@ export type EscrowHealthReport = {
     jobsNeedingAttention: number;
     matchedJobs: number;
     openDisputeJobs: number;
+    reconciliationDriftJobs: number;
     failedExecutionJobs: number;
     staleJobs: number;
   };

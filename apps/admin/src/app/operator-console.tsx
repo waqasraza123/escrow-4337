@@ -128,6 +128,8 @@ function getOperationsReasonLabel(
       return 'Failed execution';
     case 'open_dispute':
       return 'Open dispute';
+    case 'reconciliation_drift':
+      return 'Reconciliation drift';
     case 'stale_job':
       return 'Stale job';
   }
@@ -149,8 +151,19 @@ function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
       return 'Failed executions';
     case 'open_dispute':
       return 'Open disputes';
+    case 'reconciliation_drift':
+      return 'Reconciliation drift';
     case 'stale_job':
       return 'Stale jobs';
+  }
+}
+
+function getReconciliationSeverityLabel(severity: 'warning' | 'critical') {
+  switch (severity) {
+    case 'warning':
+      return 'Warning';
+    case 'critical':
+      return 'Critical';
   }
 }
 
@@ -1312,7 +1325,13 @@ export function OperatorConsole() {
             ) : (
               <div className={styles.suggestionRow}>
                 {(
-                  ['all', 'open_dispute', 'failed_execution', 'stale_job'] as const
+                  [
+                    'all',
+                    'open_dispute',
+                    'reconciliation_drift',
+                    'failed_execution',
+                    'stale_job',
+                  ] as const
                 ).map((reason) => (
                   <button
                     key={reason}
@@ -1335,6 +1354,7 @@ export function OperatorConsole() {
                   const failedExecutionDiagnostics =
                     job.failedExecutionDiagnostics;
                   const failureGuidance = job.failureGuidance;
+                  const reconciliation = job.reconciliation;
                   const failureClaimedByCurrentOperator =
                     executionFailureWorkflow?.claimedByUserId === profile?.id;
                   const claimedByCurrentOperator =
@@ -1367,6 +1387,34 @@ export function OperatorConsole() {
                               : ''
                           }`}
                         </code>
+                      ) : null}
+                      {reconciliation ? (
+                        <article className={styles.boundaryCard}>
+                          <strong>
+                            {`Reconciliation drift: ${reconciliation.issueCount} issue${
+                              reconciliation.issueCount === 1 ? '' : 's'
+                            }`}
+                          </strong>
+                          <p className={styles.stateText}>
+                            {`Highest severity: ${getReconciliationSeverityLabel(
+                              reconciliation.highestSeverity,
+                            )}. This signal is derived from persisted audit and execution history, not chain indexing.`}
+                          </p>
+                          <div className={styles.stack}>
+                            {reconciliation.issues.map((issue, index) => (
+                              <div key={`${job.jobId}-reconciliation-${index}`}>
+                                <small>
+                                  {`${getReconciliationSeverityLabel(
+                                    issue.severity,
+                                  )}: ${issue.summary}`}
+                                </small>
+                                {issue.detail ? (
+                                  <small>{issue.detail}</small>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </article>
                       ) : null}
                       {failedExecutionDiagnostics ? (
                         <article

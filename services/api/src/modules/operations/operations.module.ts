@@ -10,6 +10,7 @@ import { DeploymentValidationService } from './deployment-validation.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { OperationsConfigService } from './operations.config';
 import { OperationsController } from './operations.controller';
+import { EscrowReconciliationService } from './escrow-reconciliation.service';
 import { RuntimeProfileService } from './runtime-profile.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
   providers: [
     AuthConfigService,
     DeploymentValidationService,
+    EscrowReconciliationService,
     OperationsConfigService,
     EscrowHealthService,
     RuntimeProfileService,
@@ -32,6 +34,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
   exports: [
     DeploymentValidationService,
     EscrowHealthService,
+    EscrowReconciliationService,
     RuntimeProfileService,
   ],
 })

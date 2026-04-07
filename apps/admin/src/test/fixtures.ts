@@ -109,6 +109,7 @@ export function createEscrowHealthReport(
       jobsNeedingAttention: 1,
       matchedJobs: 1,
       openDisputeJobs: 1,
+      reconciliationDriftJobs: 0,
       failedExecutionJobs: 0,
       staleJobs: 0,
     },
@@ -130,6 +131,7 @@ export function createEscrowHealthReport(
         latestFailedExecution: null,
         failedExecutionDiagnostics: null,
         failureGuidance: null,
+        reconciliation: null,
         onchain: {
           chainId: 84532,
           contractAddress: '0xcontract',

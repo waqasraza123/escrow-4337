@@ -213,6 +213,7 @@ describe('EscrowHealthService', () => {
       jobsNeedingAttention: 3,
       matchedJobs: 3,
       openDisputeJobs: 1,
+      reconciliationDriftJobs: 0,
       failedExecutionJobs: 1,
       staleJobs: 1,
     });
@@ -380,6 +381,7 @@ describe('EscrowHealthService', () => {
       jobsNeedingAttention: 4,
       matchedJobs: 3,
       openDisputeJobs: 3,
+      reconciliationDriftJobs: 3,
       failedExecutionJobs: 0,
       staleJobs: 0,
     });
@@ -387,6 +389,62 @@ describe('EscrowHealthService', () => {
     expect(
       filtered.jobs.every((job) => job.reasons.includes('open_dispute')),
     ).toBe(true);
+  });
+
+  it('surfaces reconciliation drift when aggregate state diverges from the persisted timeline', async () => {
+    const driftedJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Timeline drift job',
+      description: 'Should surface reconciliation findings.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const driftedRecord = await escrowRepository.getById(driftedJob.jobId);
+    if (!driftedRecord) {
+      throw new Error('Expected drifted job record to exist');
+    }
+
+    driftedRecord.fundedAmount = '100';
+    driftedRecord.status = 'funded';
+    driftedRecord.updatedAt = 400_000;
+    await escrowRepository.save(driftedRecord);
+
+    const report = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {
+        reason: 'reconciliation_drift',
+      },
+      500_000,
+    );
+
+    expect(report.filters).toEqual({
+      reason: 'reconciliation_drift',
+      limit: 25,
+    });
+    expect(report.summary).toEqual({
+      totalJobs: 1,
+      jobsNeedingAttention: 1,
+      matchedJobs: 1,
+      openDisputeJobs: 0,
+      reconciliationDriftJobs: 1,
+      failedExecutionJobs: 0,
+      staleJobs: 0,
+    });
+    expect(report.jobs[0]).toMatchObject({
+      title: 'Timeline drift job',
+      reasons: ['reconciliation_drift'],
+      reconciliation: {
+        issueCount: 1,
+        highestSeverity: 'critical',
+      },
+    });
+    expect(report.jobs[0]?.reconciliation?.issues[0]).toMatchObject({
+      code: 'funding_state_mismatch',
+      severity: 'critical',
+    });
   });
 
   it('rejects users that do not control the configured arbitrator wallet', async () => {
