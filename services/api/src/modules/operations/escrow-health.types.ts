@@ -137,6 +137,41 @@ export type EscrowExecutionFailureWorkflowMutationResponse = {
   job: EscrowHealthJob;
 };
 
+export type EscrowJobHistoryImportReport = {
+  importedAt: string;
+  document: {
+    schemaVersion: 1;
+    artifact: 'job-history';
+    exportedAt: string;
+    jobId: string;
+    title: string;
+  };
+  normalization: {
+    auditEvents: number;
+    confirmedExecutions: number;
+    failedExecutions: number;
+    auditWasReordered: boolean;
+    executionWasReordered: boolean;
+  };
+  importedReconciliation: EscrowReconciliationReport | null;
+  localComparison: {
+    localJobFound: boolean;
+    aggregateMatches: boolean;
+    timelineDigestMatches: boolean | null;
+    localStatus: JobStatus | null;
+    importedStatus: JobStatus;
+    localFundedAmount: string | null;
+    importedFundedAmount: string | null;
+    localMilestoneCount: number | null;
+    importedMilestoneCount: number;
+    mismatchedMilestones: Array<{
+      index: number;
+      localStatus: MilestoneStatus | null;
+      importedStatus: MilestoneStatus | null;
+    }>;
+  };
+};
+
 export type EscrowHealthReport = {
   generatedAt: string;
   filters: {

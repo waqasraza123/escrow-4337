@@ -51,6 +51,12 @@ export const updateExecutionFailureWorkflowSchema = z
   })
   .strict();
 
+export const importJobHistorySchema = z
+  .object({
+    documentJson: z.string().trim().min(1).max(1_000_000),
+  })
+  .strict();
+
 export const releaseStaleJobSchema = z.object({}).strict();
 export const releaseExecutionFailureWorkflowSchema = z.object({}).strict();
 
@@ -65,6 +71,7 @@ export type AcknowledgeExecutionFailureWorkflowDto = z.infer<
 export type UpdateExecutionFailureWorkflowDto = z.infer<
   typeof updateExecutionFailureWorkflowSchema
 >;
+export type ImportJobHistoryDto = z.infer<typeof importJobHistorySchema>;
 export type ReleaseStaleJobDto = z.infer<typeof releaseStaleJobSchema>;
 export type ReleaseExecutionFailureWorkflowDto = z.infer<
   typeof releaseExecutionFailureWorkflowSchema

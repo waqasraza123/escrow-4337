@@ -24,6 +24,7 @@ import {
   type CaseExportArtifact,
   type CaseExportFormat,
   type EscrowHealthReport,
+  type EscrowJobHistoryImportReport,
   type RuntimeProfile,
   type SessionTokens,
   type UserProfile,
@@ -171,6 +172,10 @@ function formatReconciliationValue(value: string | null) {
   return value ?? 'null';
 }
 
+function formatBooleanSummary(value: boolean) {
+  return value ? 'Yes' : 'No';
+}
+
 function formatFailureBreakdown(
   items: Array<{
     count: number;
@@ -289,6 +294,9 @@ export function OperatorConsole() {
   const [failureWorkflowStates, setFailureWorkflowStates] = useState<
     Record<string, AsyncState>
   >({});
+  const [reconciliationImportJson, setReconciliationImportJson] = useState('');
+  const [reconciliationImportReport, setReconciliationImportReport] =
+    useState<EscrowJobHistoryImportReport | null>(null);
   const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<
     Record<string, string>
   >({});
@@ -299,6 +307,9 @@ export function OperatorConsole() {
   const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
   const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
   const [healthState, setHealthState] = useState<AsyncState>(createIdleState());
+  const [reconciliationImportState, setReconciliationImportState] = useState<AsyncState>(
+    createIdleState(),
+  );
   const [walletActionState, setWalletActionState] = useState<AsyncState>(
     createIdleState(),
   );
@@ -481,6 +492,9 @@ export function OperatorConsole() {
     setChallenge(null);
     setEscrowHealth(null);
     setHealthState(createIdleState());
+    setReconciliationImportReport(null);
+    setReconciliationImportState(createIdleState());
+    setReconciliationImportJson('');
     setFailureWorkflowDrafts({});
     setFailureWorkflowStatuses({});
     setFailureWorkflowStates({});
@@ -602,6 +616,8 @@ export function OperatorConsole() {
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setReconciliationImportReport(null);
+      setReconciliationImportState(createIdleState());
       setFailureWorkflowDrafts({});
       setFailureWorkflowStatuses({});
       setFailureWorkflowStates({});
@@ -613,6 +629,8 @@ export function OperatorConsole() {
     if (!controlsArbitratorWallet) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setReconciliationImportReport(null);
+      setReconciliationImportState(createIdleState());
       setFailureWorkflowDrafts({});
       setFailureWorkflowStatuses({});
       setFailureWorkflowStates({});
@@ -712,6 +730,45 @@ export function OperatorConsole() {
     } catch (error) {
       setEscrowHealth(null);
       setHealthState(createErrorState(error, 'Failed to load escrow operations health'));
+    }
+  }
+
+  async function handleImportJobHistoryReconciliation() {
+    if (!accessToken) {
+      return;
+    }
+
+    const documentJson = reconciliationImportJson.trim();
+    if (!documentJson) {
+      setReconciliationImportState(
+        createErrorState(
+          new Error('Missing job-history JSON'),
+          'Paste a job-history JSON export before importing.',
+        ),
+      );
+      return;
+    }
+
+    setReconciliationImportState(
+      createWorkingState('Importing job-history reconciliation preview...'),
+    );
+
+    try {
+      const report = await adminApi.importJobHistoryReconciliation(
+        documentJson,
+        accessToken,
+      );
+      setReconciliationImportReport(report);
+      setReconciliationImportState(
+        createSuccessState(
+          `Imported job-history preview for ${report.document.jobId}.`,
+        ),
+      );
+    } catch (error) {
+      setReconciliationImportReport(null);
+      setReconciliationImportState(
+        createErrorState(error, 'Failed to import job-history reconciliation'),
+      );
     }
   }
 
@@ -1327,26 +1384,132 @@ export function OperatorConsole() {
                 </p>
               </article>
             ) : (
-              <div className={styles.suggestionRow}>
-                {(
-                  [
-                    'all',
-                    'open_dispute',
-                    'reconciliation_drift',
-                    'failed_execution',
-                    'stale_job',
-                  ] as const
-                ).map((reason) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    className={styles.suggestionChip}
-                    onClick={() => setHealthReasonFilter(reason)}
-                  >
-                    {getOperationsReasonFilterLabel(reason)}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className={styles.suggestionRow}>
+                  {(
+                    [
+                      'all',
+                      'open_dispute',
+                      'reconciliation_drift',
+                      'failed_execution',
+                      'stale_job',
+                    ] as const
+                  ).map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      className={styles.suggestionChip}
+                      onClick={() => setHealthReasonFilter(reason)}
+                    >
+                      {getOperationsReasonFilterLabel(reason)}
+                    </button>
+                  ))}
+                </div>
+                <article className={styles.boundaryCard}>
+                  <strong>Import job-history reconciliation</strong>
+                  <p className={styles.stateText}>
+                    Paste a `job-history` JSON export to normalize its timeline, replay
+                    the imported state, and compare it against the local persisted job.
+                  </p>
+                  <label className={styles.field}>
+                    <span>Job-history JSON</span>
+                    <textarea
+                      rows={6}
+                      value={reconciliationImportJson}
+                      onChange={(event) =>
+                        setReconciliationImportJson(event.target.value)
+                      }
+                      placeholder="Paste a job-history JSON export to preview replay-backed reconciliation."
+                    />
+                  </label>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() => void handleImportJobHistoryReconciliation()}
+                    >
+                      Preview job-history import
+                    </button>
+                  </div>
+                  <StatusNotice
+                    message={reconciliationImportState.message}
+                    messageClassName={styles.stateText}
+                  />
+                  {reconciliationImportReport ? (
+                    <div className={styles.stack}>
+                      <small>
+                        {`Imported ${reconciliationImportReport.document.title} (${reconciliationImportReport.document.jobId}) exported ${reconciliationImportReport.document.exportedAt}.`}
+                      </small>
+                      <small>
+                        {`Normalization: ${reconciliationImportReport.normalization.auditEvents} audit events · ${reconciliationImportReport.normalization.confirmedExecutions} confirmed executions · ${reconciliationImportReport.normalization.failedExecutions} failed executions · audit reordered ${formatBooleanSummary(
+                          reconciliationImportReport.normalization.auditWasReordered,
+                        )} · executions reordered ${formatBooleanSummary(
+                          reconciliationImportReport.normalization.executionWasReordered,
+                        )}.`}
+                      </small>
+                      <small>
+                        {reconciliationImportReport.localComparison.localJobFound
+                          ? `Local comparison: status ${reconciliationImportReport.localComparison.localStatus} -> ${reconciliationImportReport.localComparison.importedStatus} · funded ${formatReconciliationValue(
+                              reconciliationImportReport.localComparison.localFundedAmount,
+                            )} -> ${formatReconciliationValue(
+                              reconciliationImportReport.localComparison.importedFundedAmount,
+                            )} · aggregate match ${formatBooleanSummary(
+                              reconciliationImportReport.localComparison.aggregateMatches,
+                            )} · timeline digest match ${formatBooleanSummary(
+                              reconciliationImportReport.localComparison.timelineDigestMatches ===
+                                true,
+                            )}.`
+                          : 'Local comparison: no persisted local job matched the imported job id.'}
+                      </small>
+                      {reconciliationImportReport.localComparison.mismatchedMilestones
+                        .length > 0 ? (
+                        <div className={styles.stack}>
+                          {reconciliationImportReport.localComparison.mismatchedMilestones.map(
+                            (milestone) => (
+                              <small
+                                key={`import-mismatch-${milestone.index}`}
+                              >
+                                {`Imported milestone ${milestone.index + 1}: local ${formatReconciliationValue(
+                                  milestone.localStatus,
+                                )} -> imported ${formatReconciliationValue(
+                                  milestone.importedStatus,
+                                )}`}
+                              </small>
+                            ),
+                          )}
+                        </div>
+                      ) : null}
+                      {reconciliationImportReport.importedReconciliation ? (
+                        <div className={styles.stack}>
+                          <small>
+                            {`Imported replay drift: ${reconciliationImportReport.importedReconciliation.issueCount} issue${
+                              reconciliationImportReport.importedReconciliation
+                                .issueCount === 1
+                                ? ''
+                                : 's'
+                            } · severity ${getReconciliationSeverityLabel(
+                              reconciliationImportReport.importedReconciliation
+                                .highestSeverity,
+                            )}.`}
+                          </small>
+                          {reconciliationImportReport.importedReconciliation.issues.map(
+                            (issue, index) => (
+                              <small key={`import-issue-${index}`}>
+                                {`${getReconciliationSeverityLabel(
+                                  issue.severity,
+                                )}: ${issue.summary}`}
+                              </small>
+                            ),
+                          )}
+                        </div>
+                      ) : (
+                        <small>
+                          Imported replay produced no reconciliation issues.
+                        </small>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+              </>
             )}
             {controlsArbitratorWallet && escrowHealth && escrowHealth.jobs.length > 0 ? (
               escrowHealth.jobs.map((job) => (

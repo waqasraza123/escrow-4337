@@ -11,6 +11,7 @@ import { User, type ReqUser } from '../../common/decorators/user.decorator';
 import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { EscrowHealthService } from './escrow-health.service';
+import { EscrowHistoryImportService } from './escrow-history-import.service';
 import * as operationsDto from './operations.dto';
 import { RuntimeProfileService } from './runtime-profile.service';
 
@@ -19,6 +20,7 @@ export class OperationsController {
   constructor(
     private readonly runtimeProfile: RuntimeProfileService,
     private readonly escrowHealth: EscrowHealthService,
+    private readonly escrowHistoryImport: EscrowHistoryImportService,
   ) {}
 
   @Get('runtime-profile')
@@ -34,6 +36,16 @@ export class OperationsController {
     query: operationsDto.EscrowHealthQueryDto,
   ) {
     return this.escrowHealth.getReport(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('reconciliation/job-history-import')
+  importJobHistory(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(operationsDto.importJobHistorySchema))
+    body: operationsDto.ImportJobHistoryDto,
+  ) {
+    return this.escrowHistoryImport.importJobHistory(user.id, body);
   }
 
   @UseGuards(AuthGuard)

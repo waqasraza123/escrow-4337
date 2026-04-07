@@ -8,6 +8,7 @@ import { PersistenceModule } from '../../persistence/persistence.module';
 import { SmartAccountModule } from '../wallet/provisioning/smart-account.module';
 import { DeploymentValidationService } from './deployment-validation.service';
 import { EscrowHealthService } from './escrow-health.service';
+import { EscrowHistoryImportService } from './escrow-history-import.service';
 import { OperationsConfigService } from './operations.config';
 import { OperationsController } from './operations.controller';
 import { EscrowReconciliationService } from './escrow-reconciliation.service';
@@ -27,6 +28,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
     AuthConfigService,
     DeploymentValidationService,
     EscrowReconciliationService,
+    EscrowHistoryImportService,
     OperationsConfigService,
     EscrowHealthService,
     RuntimeProfileService,
@@ -34,6 +36,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
   exports: [
     DeploymentValidationService,
     EscrowHealthService,
+    EscrowHistoryImportService,
     EscrowReconciliationService,
     RuntimeProfileService,
   ],

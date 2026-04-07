@@ -241,6 +241,41 @@ export type EscrowHealthReport = {
   }>;
 };
 
+export type EscrowJobHistoryImportReport = {
+  importedAt: string;
+  document: {
+    schemaVersion: 1;
+    artifact: 'job-history';
+    exportedAt: string;
+    jobId: string;
+    title: string;
+  };
+  normalization: {
+    auditEvents: number;
+    confirmedExecutions: number;
+    failedExecutions: number;
+    auditWasReordered: boolean;
+    executionWasReordered: boolean;
+  };
+  importedReconciliation: EscrowHealthReport['jobs'][number]['reconciliation'];
+  localComparison: {
+    localJobFound: boolean;
+    aggregateMatches: boolean;
+    timelineDigestMatches: boolean | null;
+    localStatus: string | null;
+    importedStatus: string;
+    localFundedAmount: string | null;
+    importedFundedAmount: string | null;
+    localMilestoneCount: number | null;
+    importedMilestoneCount: number;
+    mismatchedMilestones: Array<{
+      index: number;
+      localStatus: string | null;
+      importedStatus: string | null;
+    }>;
+  };
+};
+
 export type AuditBundle = {
   bundle: {
     job: {
@@ -357,6 +392,17 @@ export const adminApi = {
       apiBaseUrl,
       `/operations/escrow-health${queryString ? `?${queryString}` : ''}`,
       { method: 'GET' },
+      accessToken,
+    );
+  },
+  importJobHistoryReconciliation(documentJson: string, accessToken: string) {
+    return requestJson<EscrowJobHistoryImportReport>(
+      apiBaseUrl,
+      '/operations/reconciliation/job-history-import',
+      {
+        method: 'POST',
+        body: JSON.stringify({ documentJson }),
+      },
       accessToken,
     );
   },

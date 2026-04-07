@@ -30,6 +30,7 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     logout: vi.fn(),
     me: vi.fn(),
     getEscrowHealth: vi.fn(),
+    importJobHistoryReconciliation: vi.fn(),
     claimExecutionFailureWorkflow: vi.fn(),
     acknowledgeExecutionFailures: vi.fn(),
     updateExecutionFailureWorkflow: vi.fn(),
@@ -310,6 +311,125 @@ describe('admin page', () => {
     );
     expect(screen.getByText('Operator backlog')).toBeInTheDocument();
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
+  });
+
+  it('imports a job-history export and previews replay reconciliation against local state', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.importJobHistoryReconciliation.mockResolvedValue({
+      importedAt: '2026-04-07T00:00:00.000Z',
+      document: {
+        schemaVersion: 1,
+        artifact: 'job-history',
+        exportedAt: '2026-04-07T00:00:00.000Z',
+        jobId: 'job-import-1',
+        title: 'Imported drift case',
+      },
+      normalization: {
+        auditEvents: 4,
+        confirmedExecutions: 3,
+        failedExecutions: 1,
+        auditWasReordered: true,
+        executionWasReordered: false,
+      },
+      importedReconciliation: {
+        issueCount: 1,
+        highestSeverity: 'critical',
+        sourceCounts: {
+          auditEvents: 4,
+          confirmedExecutions: 3,
+          failedExecutions: 1,
+        },
+        projection: {
+          aggregateStatus: 'funded',
+          projectedStatus: 'in_progress',
+          aggregateFundedAmount: '100',
+          projectedFundedAmount: '100',
+          mismatchedMilestones: [
+            {
+              index: 0,
+              aggregateStatus: 'pending',
+              projectedStatus: 'delivered',
+              lastAuditType: 'milestone.delivered',
+              lastAuditAt: 600,
+            },
+          ],
+        },
+        issues: [
+          {
+            code: 'milestone_state_mismatch',
+            severity: 'critical',
+            summary: 'Milestone replay diverges from aggregate state on 1 milestone.',
+            detail: 'Mismatched milestones: 1(pending -> delivered).',
+          },
+        ],
+      },
+      localComparison: {
+        localJobFound: true,
+        aggregateMatches: false,
+        timelineDigestMatches: false,
+        localStatus: 'funded',
+        importedStatus: 'funded',
+        localFundedAmount: '100',
+        importedFundedAmount: '100',
+        localMilestoneCount: 1,
+        importedMilestoneCount: 1,
+        mismatchedMilestones: [
+          {
+            index: 0,
+            localStatus: 'pending',
+            importedStatus: 'delivered',
+          },
+        ],
+      },
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operator backlog')).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByPlaceholderText(
+        'Paste a job-history JSON export to preview replay-backed reconciliation.',
+      ),
+    );
+    await user.paste('{"artifact":"job-history"}');
+    await user.click(
+      screen.getByRole('button', { name: 'Preview job-history import' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Imported job-history preview for job-import-1.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.importJobHistoryReconciliation).toHaveBeenCalledWith(
+      '{"artifact":"job-history"}',
+      'admin-access-token-123',
+    );
+    expect(
+      screen.getByText(
+        /Normalization: 4 audit events · 3 confirmed executions · 1 failed executions · audit reordered Yes · executions reordered No/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Local comparison: status funded -> funded · funded 100 -> 100 · aggregate match No · timeline digest match No/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Imported milestone 1: local pending -> imported delivered/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Imported replay drift: 1 issue · severity Critical/),
+    ).toBeInTheDocument();
   });
 
   it('renders reconciliation drift findings and filters that backlog reason explicitly', async () => {
