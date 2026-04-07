@@ -16,6 +16,7 @@ import type {
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
 import type {
   EscrowAttentionReason,
+  EscrowFailedExecutionSummary,
   EscrowHealthJob,
   EscrowHealthReport,
   EscrowStaleWorkflowMutationResponse,
@@ -52,27 +53,109 @@ function latestActivityAt(job: EscrowJobRecord) {
   return Math.max(...times);
 }
 
-function latestFailedExecution(executions: EscrowExecutionRecord[]) {
-  const failures = executions.filter(
-    (execution) => execution.status === 'failed',
-  );
+function failureTimestamp(execution: EscrowExecutionRecord) {
+  return execution.confirmedAt ?? execution.submittedAt;
+}
+
+function compareFailuresDescending(
+  left: EscrowExecutionRecord,
+  right: EscrowExecutionRecord,
+) {
+  return failureTimestamp(right) - failureTimestamp(left);
+}
+
+function summarizeFailedExecution(
+  execution: EscrowExecutionRecord,
+): EscrowFailedExecutionSummary {
+  return {
+    action: execution.action,
+    submittedAt: execution.submittedAt,
+    txHash: execution.txHash ?? null,
+    failureCode: execution.failureCode ?? null,
+    failureMessage: execution.failureMessage ?? null,
+    milestoneIndex: execution.milestoneIndex ?? null,
+  };
+}
+
+function buildFailedExecutionDiagnostics(executions: EscrowExecutionRecord[]) {
+  const failures = executions
+    .filter((execution) => execution.status === 'failed')
+    .sort(compareFailuresDescending);
   if (failures.length === 0) {
     return null;
   }
 
-  const latestFailure = failures.sort(
-    (left, right) =>
-      (right.confirmedAt ?? right.submittedAt) -
-      (left.confirmedAt ?? left.submittedAt),
-  )[0];
+  const actionCounts = new Map<
+    EscrowExecutionRecord['action'],
+    {
+      count: number;
+      latestAt: number;
+    }
+  >();
+  const failureCodeCounts = new Map<
+    string,
+    {
+      failureCode: string | null;
+      count: number;
+      latestAt: number;
+      latestMessage: string | null;
+    }
+  >();
+
+  for (const failure of failures) {
+    const at = failureTimestamp(failure);
+    const existingAction = actionCounts.get(failure.action);
+    actionCounts.set(failure.action, {
+      count: (existingAction?.count ?? 0) + 1,
+      latestAt: existingAction?.latestAt ?? at,
+    });
+
+    const failureCode = failure.failureCode ?? null;
+    const failureKey = failureCode ?? '__unknown__';
+    const existingFailureCode = failureCodeCounts.get(failureKey);
+    failureCodeCounts.set(failureKey, {
+      failureCode,
+      count: (existingFailureCode?.count ?? 0) + 1,
+      latestAt: existingFailureCode?.latestAt ?? at,
+      latestMessage:
+        existingFailureCode?.latestMessage ?? failure.failureMessage ?? null,
+    });
+  }
 
   return {
-    action: latestFailure.action,
-    submittedAt: latestFailure.submittedAt,
-    txHash: latestFailure.txHash ?? null,
-    failureCode: latestFailure.failureCode ?? null,
-    failureMessage: latestFailure.failureMessage ?? null,
-    milestoneIndex: latestFailure.milestoneIndex ?? null,
+    firstFailureAt: failureTimestamp(failures[failures.length - 1]),
+    latestFailureAt: failureTimestamp(failures[0]),
+    actionBreakdown: Array.from(actionCounts.entries())
+      .map(([action, value]) => ({
+        action,
+        count: value.count,
+        latestAt: value.latestAt,
+      }))
+      .sort(
+        (left, right) =>
+          right.count - left.count ||
+          right.latestAt - left.latestAt ||
+          left.action.localeCompare(right.action),
+      )
+      .slice(0, 3)
+      .map(({ action, count }) => ({
+        action,
+        count,
+      })),
+    failureCodeBreakdown: Array.from(failureCodeCounts.values())
+      .sort(
+        (left, right) =>
+          right.count - left.count ||
+          right.latestAt - left.latestAt ||
+          (left.failureCode ?? '').localeCompare(right.failureCode ?? ''),
+      )
+      .slice(0, 3)
+      .map(({ failureCode, count, latestMessage }) => ({
+        failureCode,
+        count,
+        latestMessage,
+      })),
+    recentFailures: failures.slice(0, 3).map(summarizeFailedExecution),
   };
 }
 
@@ -257,6 +340,9 @@ export class EscrowHealthService {
     now: number,
   ): EscrowHealthJob {
     const latestActivity = latestActivityAt(job);
+    const failedExecutionDiagnostics = buildFailedExecutionDiagnostics(
+      job.executions,
+    );
     const openDisputes = job.milestones.filter(
       (milestone) => milestone.status === 'disputed',
     ).length;
@@ -305,7 +391,9 @@ export class EscrowHealthService {
             updatedAt: job.operations.staleWorkflow.updatedAt,
           }
         : null,
-      latestFailedExecution: latestFailedExecution(job.executions),
+      latestFailedExecution:
+        failedExecutionDiagnostics?.recentFailures[0] ?? null,
+      failedExecutionDiagnostics,
       onchain: {
         chainId: job.onchain.chainId,
         contractAddress: job.onchain.contractAddress,

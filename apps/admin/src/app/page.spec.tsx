@@ -345,6 +345,58 @@ describe('admin page', () => {
                 failureMessage: 'Rejected',
                 milestoneIndex: null,
               },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 620,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                  {
+                    action: 'set_milestones',
+                    count: 1,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                  {
+                    failureCode: null,
+                    count: 1,
+                    latestMessage: 'Provider timeout',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'set_milestones',
+                    submittedAt: 620,
+                    txHash: null,
+                    failureCode: null,
+                    failureMessage: 'Provider timeout',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
             },
           ],
         }),
@@ -382,6 +434,58 @@ describe('admin page', () => {
                 failureMessage: 'Rejected',
                 milestoneIndex: null,
               },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 620,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                  {
+                    action: 'set_milestones',
+                    count: 1,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                  {
+                    failureCode: null,
+                    count: 1,
+                    latestMessage: 'Provider timeout',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'set_milestones',
+                    submittedAt: 620,
+                    txHash: null,
+                    failureCode: null,
+                    failureMessage: 'Provider timeout',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
             },
           ],
         }),
@@ -401,6 +505,16 @@ describe('admin page', () => {
         screen.getByText('Loaded 1 jobs for failed executions.'),
       ).toBeInTheDocument();
     });
+
+    expect(
+      screen.getByText('Actions: fund_job x2, set_milestones x1'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Codes: relay_rejected x2, unknown x1'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Provider timeout/),
+    ).toBeInTheDocument();
 
     expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(
       2,

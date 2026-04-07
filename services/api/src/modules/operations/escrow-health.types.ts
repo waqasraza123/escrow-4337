@@ -6,6 +6,15 @@ export type EscrowAttentionReason =
   | 'open_dispute'
   | 'stale_job';
 
+export type EscrowFailedExecutionSummary = {
+  action: EscrowContractAction;
+  submittedAt: number;
+  txHash: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  milestoneIndex: number | null;
+};
+
 export type EscrowHealthJob = {
   jobId: string;
   title: string;
@@ -25,13 +34,20 @@ export type EscrowHealthJob = {
     note: string | null;
     updatedAt: number;
   };
-  latestFailedExecution: null | {
-    action: EscrowContractAction;
-    submittedAt: number;
-    txHash: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    milestoneIndex: number | null;
+  latestFailedExecution: EscrowFailedExecutionSummary | null;
+  failedExecutionDiagnostics: null | {
+    firstFailureAt: number;
+    latestFailureAt: number;
+    actionBreakdown: Array<{
+      action: EscrowContractAction;
+      count: number;
+    }>;
+    failureCodeBreakdown: Array<{
+      failureCode: string | null;
+      count: number;
+      latestMessage: string | null;
+    }>;
+    recentFailures: EscrowFailedExecutionSummary[];
   };
   onchain: {
     chainId: number;

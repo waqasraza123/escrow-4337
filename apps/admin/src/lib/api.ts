@@ -135,6 +135,27 @@ export type EscrowHealthReport = {
       failureMessage: string | null;
       milestoneIndex: number | null;
     };
+    failedExecutionDiagnostics: null | {
+      firstFailureAt: number;
+      latestFailureAt: number;
+      actionBreakdown: Array<{
+        action: string;
+        count: number;
+      }>;
+      failureCodeBreakdown: Array<{
+        failureCode: string | null;
+        count: number;
+        latestMessage: string | null;
+      }>;
+      recentFailures: Array<{
+        action: string;
+        submittedAt: number;
+        txHash: string | null;
+        failureCode: string | null;
+        failureMessage: string | null;
+        milestoneIndex: number | null;
+      }>;
+    };
     onchain: {
       chainId: number;
       contractAddress: string;

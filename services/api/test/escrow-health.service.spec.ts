@@ -166,6 +166,32 @@ describe('EscrowHealthService', () => {
       failureCode: 'relay_rejected',
       failureMessage: 'Bundler rejected the request',
     });
+    failedRecord.executions.push({
+      id: 'failed-execution-2',
+      action: 'fund_job',
+      actorAddress: clientSmartAccountAddress,
+      chainId: 84532,
+      contractAddress: currencyAddress,
+      status: 'failed',
+      submittedAt: 910_000,
+      milestoneIndex: undefined,
+      escrowId: failedRecord.onchain.escrowId ?? undefined,
+      failureCode: 'relay_rejected',
+      failureMessage: 'Relay rejected the retry',
+    });
+    failedRecord.executions.push({
+      id: 'failed-execution-3',
+      action: 'set_milestones',
+      actorAddress: clientSmartAccountAddress,
+      chainId: 84532,
+      contractAddress: currencyAddress,
+      status: 'failed',
+      submittedAt: 920_000,
+      milestoneIndex: undefined,
+      escrowId: failedRecord.onchain.escrowId ?? undefined,
+      failureCode: undefined,
+      failureMessage: 'Provider timeout',
+    });
     failedRecord.updatedAt = 900_000;
     await escrowRepository.save(failedRecord);
 
@@ -208,13 +234,65 @@ describe('EscrowHealthService', () => {
       reasons: ['failed_execution'],
       counts: {
         openDisputes: 0,
-        failedExecutions: 1,
+        failedExecutions: 3,
       },
       latestFailedExecution: {
-        action: 'fund_job',
-        failureCode: 'relay_rejected',
+        action: 'set_milestones',
+        failureCode: null,
+      },
+      failedExecutionDiagnostics: {
+        firstFailureAt: 900_000,
+        latestFailureAt: 920_000,
+        actionBreakdown: [
+          {
+            action: 'fund_job',
+            count: 2,
+          },
+          {
+            action: 'set_milestones',
+            count: 1,
+          },
+        ],
+        failureCodeBreakdown: [
+          {
+            failureCode: 'relay_rejected',
+            count: 2,
+            latestMessage: 'Relay rejected the retry',
+          },
+          {
+            failureCode: null,
+            count: 1,
+            latestMessage: 'Provider timeout',
+          },
+        ],
       },
     });
+    expect(report.jobs[1]?.failedExecutionDiagnostics?.recentFailures).toEqual([
+      {
+        action: 'set_milestones',
+        submittedAt: 920_000,
+        txHash: null,
+        failureCode: null,
+        failureMessage: 'Provider timeout',
+        milestoneIndex: null,
+      },
+      {
+        action: 'fund_job',
+        submittedAt: 910_000,
+        txHash: null,
+        failureCode: 'relay_rejected',
+        failureMessage: 'Relay rejected the retry',
+        milestoneIndex: null,
+      },
+      {
+        action: 'fund_job',
+        submittedAt: 900_000,
+        txHash: '0xfail',
+        failureCode: 'relay_rejected',
+        failureMessage: 'Bundler rejected the request',
+        milestoneIndex: null,
+      },
+    ]);
     expect(report.jobs[2]).toMatchObject({
       title: 'Stale draft job',
       reasons: ['stale_job'],

@@ -150,6 +150,19 @@ function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
   }
 }
 
+function formatFailureBreakdown(
+  items: Array<{
+    count: number;
+    label: string;
+  }>,
+) {
+  return items.map((item) => `${item.label} x${item.count}`).join(', ');
+}
+
+function formatFailureCodeLabel(failureCode: string | null) {
+  return failureCode ?? 'unknown';
+}
+
 export function OperatorConsole() {
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
@@ -1058,6 +1071,8 @@ export function OperatorConsole() {
                 (() => {
                   const isStaleJob = job.reasons.includes('stale_job');
                   const staleWorkflow = job.staleWorkflow;
+                  const failedExecutionDiagnostics =
+                    job.failedExecutionDiagnostics;
                   const claimedByCurrentOperator =
                     staleWorkflow?.claimedByUserId === profile?.id;
 
@@ -1088,6 +1103,69 @@ export function OperatorConsole() {
                               : ''
                           }`}
                         </code>
+                      ) : null}
+                      {failedExecutionDiagnostics ? (
+                        <article
+                          className={`${styles.boundaryCard} ${styles.executionFailure}`}
+                        >
+                          <strong>{`Failure pressure: ${job.counts.failedExecutions} failed attempt${
+                            job.counts.failedExecutions === 1 ? '' : 's'
+                          }`}</strong>
+                          <p className={styles.stateText}>
+                            {`First failure ${formatTimestamp(
+                              failedExecutionDiagnostics.firstFailureAt,
+                            )} · Latest failure ${formatTimestamp(
+                              failedExecutionDiagnostics.latestFailureAt,
+                            )}.`}
+                          </p>
+                          <small>
+                            {`Actions: ${formatFailureBreakdown(
+                              failedExecutionDiagnostics.actionBreakdown.map(
+                                (entry) => ({
+                                  label: entry.action,
+                                  count: entry.count,
+                                }),
+                              ),
+                            )}`}
+                          </small>
+                          <small>
+                            {`Codes: ${formatFailureBreakdown(
+                              failedExecutionDiagnostics.failureCodeBreakdown.map(
+                                (entry) => ({
+                                  label: formatFailureCodeLabel(entry.failureCode),
+                                  count: entry.count,
+                                }),
+                              ),
+                            )}`}
+                          </small>
+                          <div className={styles.stack}>
+                            {failedExecutionDiagnostics.recentFailures.map(
+                              (failure, index) => (
+                                <code key={`${job.jobId}-failure-${index}`}>
+                                  {`#${index + 1} ${failure.action} at ${formatTimestamp(
+                                    failure.submittedAt,
+                                  )}${
+                                    failure.milestoneIndex !== null
+                                      ? ` · milestone ${failure.milestoneIndex + 1}`
+                                      : ''
+                                  }${
+                                    failure.failureCode
+                                      ? ` · ${failure.failureCode}`
+                                      : ''
+                                  }${
+                                    failure.failureMessage
+                                      ? ` · ${failure.failureMessage}`
+                                      : ''
+                                  }${
+                                    failure.txHash
+                                      ? ` · ${previewHash(failure.txHash)}`
+                                      : ''
+                                  }`}
+                                </code>
+                              ),
+                            )}
+                          </div>
+                        </article>
                       ) : null}
                       {isStaleJob ? (
                         <article className={styles.boundaryCard}>
