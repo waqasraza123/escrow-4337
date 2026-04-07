@@ -6,6 +6,7 @@ import type {
 } from '../../modules/auth/auth.types';
 import type {
   EscrowAuditEvent,
+  EscrowExecutionFailureWorkflowRecord,
   EscrowExecutionRecord,
   EscrowJobRecord,
   EscrowMilestoneRecord,
@@ -116,6 +117,7 @@ type JobRow = QueryResultRow & {
   worker_address: string;
   currency_address: string;
   operations_json: {
+    executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow?: EscrowStaleWorkflowRecord | null;
   } | null;
 };
@@ -282,6 +284,8 @@ function mapOnchain(row: JobRow): EscrowOnchainState {
 
 function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
   return {
+    executionFailureWorkflow:
+      row.operations_json?.executionFailureWorkflow ?? null,
     staleWorkflow: row.operations_json?.staleWorkflow ?? null,
   };
 }

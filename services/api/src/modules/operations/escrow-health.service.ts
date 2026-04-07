@@ -16,6 +16,7 @@ import type {
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
 import type {
   EscrowAttentionReason,
+  EscrowExecutionFailureWorkflowMutationResponse,
   EscrowFailedExecutionSummary,
   EscrowHealthJob,
   EscrowHealthReport,
@@ -306,6 +307,126 @@ export class EscrowHealthService {
     };
   }
 
+  async claimExecutionFailureWorkflow(
+    userId: string,
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    now = Date.now(),
+  ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const existingWorkflow = job.operations.executionFailureWorkflow;
+
+    if (existingWorkflow && existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Execution-failure workflow is already claimed by another operator',
+      );
+    }
+
+    job.operations.executionFailureWorkflow = {
+      claimedByUserId: user.id,
+      claimedByEmail: user.email,
+      claimedAt: existingWorkflow?.claimedAt ?? now,
+      acknowledgedFailureAt: existingWorkflow?.acknowledgedFailureAt,
+      note: input.note?.trim() || existingWorkflow?.note,
+      updatedAt: now,
+    };
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(
+        job,
+        staleCutoff,
+        now,
+        failedExecutionDiagnostics,
+      ),
+    };
+  }
+
+  async acknowledgeExecutionFailures(
+    userId: string,
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    now = Date.now(),
+  ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const existingWorkflow = job.operations.executionFailureWorkflow;
+
+    if (!existingWorkflow) {
+      throw new ConflictException(
+        'Execution-failure workflow must be claimed before acknowledgement',
+      );
+    }
+
+    if (existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Only the current execution-failure owner can acknowledge failures',
+      );
+    }
+
+    job.operations.executionFailureWorkflow = {
+      ...existingWorkflow,
+      acknowledgedFailureAt: failedExecutionDiagnostics.latestFailureAt,
+      note: input.note?.trim() || existingWorkflow.note,
+      updatedAt: now,
+    };
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(
+        job,
+        staleCutoff,
+        now,
+        failedExecutionDiagnostics,
+      ),
+    };
+  }
+
+  async releaseExecutionFailureWorkflow(
+    userId: string,
+    jobId: string,
+    now = Date.now(),
+  ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const existingWorkflow = job.operations.executionFailureWorkflow;
+
+    if (!existingWorkflow) {
+      throw new ConflictException(
+        'Execution-failure workflow is not currently claimed',
+      );
+    }
+
+    if (existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Only the current execution-failure owner can release the claim',
+      );
+    }
+
+    job.operations.executionFailureWorkflow = null;
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(
+        job,
+        staleCutoff,
+        now,
+        failedExecutionDiagnostics,
+      ),
+    };
+  }
+
   async releaseStaleJob(
     userId: string,
     jobId: string,
@@ -338,11 +459,9 @@ export class EscrowHealthService {
     job: EscrowJobRecord,
     staleCutoff: number,
     now: number,
+    failedExecutionDiagnostics = buildFailedExecutionDiagnostics(job.executions),
   ): EscrowHealthJob {
     const latestActivity = latestActivityAt(job);
-    const failedExecutionDiagnostics = buildFailedExecutionDiagnostics(
-      job.executions,
-    );
     const openDisputes = job.milestones.filter(
       (milestone) => milestone.status === 'disputed',
     ).length;
@@ -382,6 +501,24 @@ export class EscrowHealthService {
         openDisputes,
         failedExecutions,
       },
+      executionFailureWorkflow:
+        job.operations.executionFailureWorkflow && failedExecutionDiagnostics
+          ? {
+              claimedByUserId:
+                job.operations.executionFailureWorkflow.claimedByUserId,
+              claimedByEmail:
+                job.operations.executionFailureWorkflow.claimedByEmail,
+              claimedAt: job.operations.executionFailureWorkflow.claimedAt,
+              acknowledgedFailureAt:
+                job.operations.executionFailureWorkflow.acknowledgedFailureAt ??
+                null,
+              note: job.operations.executionFailureWorkflow.note ?? null,
+              updatedAt: job.operations.executionFailureWorkflow.updatedAt,
+              latestFailureNeedsAcknowledgement:
+                (job.operations.executionFailureWorkflow.acknowledgedFailureAt ??
+                  0) < failedExecutionDiagnostics.latestFailureAt,
+            }
+          : null,
       staleWorkflow: job.operations.staleWorkflow
         ? {
             claimedByUserId: job.operations.staleWorkflow.claimedByUserId,
@@ -415,6 +552,15 @@ export class EscrowHealthService {
     }
 
     return user;
+  }
+
+  private requireFailedExecutionDiagnostics(job: EscrowJobRecord) {
+    const diagnostics = buildFailedExecutionDiagnostics(job.executions);
+    if (!diagnostics) {
+      throw new ConflictException('Job does not currently have failed executions');
+    }
+
+    return diagnostics;
   }
 
   private async requireJob(jobId: string) {

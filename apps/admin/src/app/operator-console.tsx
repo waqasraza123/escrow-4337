@@ -163,6 +163,26 @@ function formatFailureCodeLabel(failureCode: string | null) {
   return failureCode ?? 'unknown';
 }
 
+function getFailureAcknowledgementMessage(
+  workflow: NonNullable<
+    EscrowHealthReport['jobs'][number]['executionFailureWorkflow']
+  >,
+) {
+  if (workflow.acknowledgedFailureAt === null) {
+    return 'Latest failures are not yet acknowledged.';
+  }
+
+  if (workflow.latestFailureNeedsAcknowledgement) {
+    return `Acknowledged through ${formatTimestamp(
+      workflow.acknowledgedFailureAt,
+    )}. A newer failure now requires operator follow-up.`;
+  }
+
+  return `Acknowledged through the latest failure at ${formatTimestamp(
+    workflow.acknowledgedFailureAt,
+  )}.`;
+}
+
 export function OperatorConsole() {
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
@@ -182,6 +202,12 @@ export function OperatorConsole() {
   const [escrowHealth, setEscrowHealth] = useState<EscrowHealthReport | null>(null);
   const [healthReasonFilter, setHealthReasonFilter] =
     useState<OperationsReasonFilter>('all');
+  const [failureWorkflowDrafts, setFailureWorkflowDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [failureWorkflowStates, setFailureWorkflowStates] = useState<
+    Record<string, AsyncState>
+  >({});
   const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<
     Record<string, string>
   >({});
@@ -374,6 +400,8 @@ export function OperatorConsole() {
     setChallenge(null);
     setEscrowHealth(null);
     setHealthState(createIdleState());
+    setFailureWorkflowDrafts({});
+    setFailureWorkflowStates({});
     setStaleWorkflowDrafts({});
     setStaleWorkflowStates({});
     setWalletSignature('');
@@ -492,6 +520,8 @@ export function OperatorConsole() {
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setFailureWorkflowDrafts({});
+      setFailureWorkflowStates({});
       setStaleWorkflowDrafts({});
       setStaleWorkflowStates({});
       return;
@@ -500,6 +530,8 @@ export function OperatorConsole() {
     if (!controlsArbitratorWallet) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setFailureWorkflowDrafts({});
+      setFailureWorkflowStates({});
       setStaleWorkflowDrafts({});
       setStaleWorkflowStates({});
       return;
@@ -512,6 +544,21 @@ export function OperatorConsole() {
     if (!escrowHealth) {
       return;
     }
+
+    setFailureWorkflowDrafts((current) => {
+      const next = { ...current };
+
+      for (const job of escrowHealth.jobs) {
+        if (!job.reasons.includes('failed_execution')) {
+          continue;
+        }
+
+        next[job.jobId] =
+          current[job.jobId] ?? job.executionFailureWorkflow?.note ?? '';
+      }
+
+      return next;
+    });
 
     setStaleWorkflowDrafts((current) => {
       const next = { ...current };
@@ -572,6 +619,100 @@ export function OperatorConsole() {
       ...current,
       [jobId]: nextState,
     }));
+  }
+
+  function setFailureWorkflowState(jobId: string, nextState: AsyncState) {
+    setFailureWorkflowStates((current) => ({
+      ...current,
+      [jobId]: nextState,
+    }));
+  }
+
+  async function handleClaimExecutionFailureWorkflow(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setFailureWorkflowState(
+      jobId,
+      createWorkingState('Claiming execution-failure workflow...'),
+    );
+
+    try {
+      await adminApi.claimExecutionFailureWorkflow(
+        jobId,
+        {
+          note: failureWorkflowDrafts[jobId]?.trim() || undefined,
+        },
+        accessToken,
+      );
+      setFailureWorkflowState(
+        jobId,
+        createSuccessState('Execution-failure workflow claimed.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setFailureWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to claim execution-failure workflow'),
+      );
+    }
+  }
+
+  async function handleAcknowledgeExecutionFailures(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setFailureWorkflowState(
+      jobId,
+      createWorkingState('Acknowledging latest execution failures...'),
+    );
+
+    try {
+      await adminApi.acknowledgeExecutionFailures(
+        jobId,
+        {
+          note: failureWorkflowDrafts[jobId]?.trim() || undefined,
+        },
+        accessToken,
+      );
+      setFailureWorkflowState(
+        jobId,
+        createSuccessState('Latest execution failures acknowledged.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setFailureWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to acknowledge execution failures'),
+      );
+    }
+  }
+
+  async function handleReleaseExecutionFailureWorkflow(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setFailureWorkflowState(
+      jobId,
+      createWorkingState('Releasing execution-failure workflow...'),
+    );
+
+    try {
+      await adminApi.releaseExecutionFailureWorkflow(jobId, accessToken);
+      setFailureWorkflowState(
+        jobId,
+        createSuccessState('Execution-failure workflow released.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setFailureWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to release execution-failure workflow'),
+      );
+    }
   }
 
   async function handleClaimStaleJob(jobId: string) {
@@ -1070,9 +1211,13 @@ export function OperatorConsole() {
               escrowHealth.jobs.map((job) => (
                 (() => {
                   const isStaleJob = job.reasons.includes('stale_job');
+                  const isFailedJob = job.reasons.includes('failed_execution');
+                  const executionFailureWorkflow = job.executionFailureWorkflow;
                   const staleWorkflow = job.staleWorkflow;
                   const failedExecutionDiagnostics =
                     job.failedExecutionDiagnostics;
+                  const failureClaimedByCurrentOperator =
+                    executionFailureWorkflow?.claimedByUserId === profile?.id;
                   const claimedByCurrentOperator =
                     staleWorkflow?.claimedByUserId === profile?.id;
 
@@ -1138,6 +1283,92 @@ export function OperatorConsole() {
                               ),
                             )}`}
                           </small>
+                          {isFailedJob ? (
+                            <>
+                              <strong>
+                                {executionFailureWorkflow
+                                  ? `Claimed by ${executionFailureWorkflow.claimedByEmail}`
+                                  : 'No operator currently owns this execution-failure workflow'}
+                              </strong>
+                              <p className={styles.stateText}>
+                                {executionFailureWorkflow
+                                  ? `Claimed ${formatTimestamp(
+                                      executionFailureWorkflow.claimedAt,
+                                    )} and updated ${formatTimestamp(
+                                      executionFailureWorkflow.updatedAt,
+                                    )}. ${getFailureAcknowledgementMessage(
+                                      executionFailureWorkflow,
+                                    )}`
+                                  : 'Claim this failure workflow to track remediation and acknowledge the latest known failure set.'}
+                              </p>
+                              <label className={styles.field}>
+                                <span>Failure remediation note</span>
+                                <textarea
+                                  rows={3}
+                                  value={failureWorkflowDrafts[job.jobId] ?? ''}
+                                  onChange={(event) =>
+                                    setFailureWorkflowDrafts((current) => ({
+                                      ...current,
+                                      [job.jobId]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Document the failure pattern, likely cause, next retry posture, or external dependency blocker."
+                                  disabled={Boolean(
+                                    executionFailureWorkflow &&
+                                      !failureClaimedByCurrentOperator,
+                                  )}
+                                />
+                              </label>
+                              <div className={styles.inlineActions}>
+                                {!executionFailureWorkflow ||
+                                failureClaimedByCurrentOperator ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleClaimExecutionFailureWorkflow(
+                                        job.jobId,
+                                      )
+                                    }
+                                  >
+                                    {executionFailureWorkflow
+                                      ? 'Save failure note'
+                                      : 'Claim failure workflow'}
+                                  </button>
+                                ) : null}
+                                {executionFailureWorkflow &&
+                                failureClaimedByCurrentOperator ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleAcknowledgeExecutionFailures(
+                                        job.jobId,
+                                      )
+                                    }
+                                  >
+                                    Acknowledge latest failures
+                                  </button>
+                                ) : null}
+                                {executionFailureWorkflow &&
+                                failureClaimedByCurrentOperator ? (
+                                  <button
+                                    type="button"
+                                    className={styles.secondaryButton}
+                                    onClick={() =>
+                                      void handleReleaseExecutionFailureWorkflow(
+                                        job.jobId,
+                                      )
+                                    }
+                                  >
+                                    Release failure claim
+                                  </button>
+                                ) : null}
+                              </div>
+                              <StatusNotice
+                                message={failureWorkflowStates[job.jobId]?.message}
+                                messageClassName={styles.stateText}
+                              />
+                            </>
+                          ) : null}
                           <div className={styles.stack}>
                             {failedExecutionDiagnostics.recentFailures.map(
                               (failure, index) => (

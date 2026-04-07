@@ -15,8 +15,30 @@ export const claimStaleJobSchema = z
   })
   .strict();
 
+export const claimExecutionFailureWorkflowSchema = z
+  .object({
+    note: z.string().trim().min(1).max(5000).optional(),
+  })
+  .strict();
+
+export const acknowledgeExecutionFailureWorkflowSchema = z
+  .object({
+    note: z.string().trim().min(1).max(5000).optional(),
+  })
+  .strict();
+
 export const releaseStaleJobSchema = z.object({}).strict();
+export const releaseExecutionFailureWorkflowSchema = z.object({}).strict();
 
 export type EscrowHealthQueryDto = z.infer<typeof escrowHealthQuerySchema>;
 export type ClaimStaleJobDto = z.infer<typeof claimStaleJobSchema>;
+export type ClaimExecutionFailureWorkflowDto = z.infer<
+  typeof claimExecutionFailureWorkflowSchema
+>;
+export type AcknowledgeExecutionFailureWorkflowDto = z.infer<
+  typeof acknowledgeExecutionFailureWorkflowSchema
+>;
 export type ReleaseStaleJobDto = z.infer<typeof releaseStaleJobSchema>;
+export type ReleaseExecutionFailureWorkflowDto = z.infer<
+  typeof releaseExecutionFailureWorkflowSchema
+>;

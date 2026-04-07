@@ -4,6 +4,7 @@ import type {
   SessionRecord,
 } from '../../modules/auth/auth.types';
 import type {
+  EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
   EscrowStaleWorkflowRecord,
 } from '../../modules/escrow/escrow.types';
@@ -33,6 +34,9 @@ function normalizeEscrowJobRecord(
     | EscrowJobRecord
     | (Omit<EscrowJobRecord, 'operations'> & {
         operations?: {
+          executionFailureWorkflow?:
+            | EscrowExecutionFailureWorkflowRecord
+            | null;
           staleWorkflow?: EscrowStaleWorkflowRecord | null;
         };
       }),
@@ -40,6 +44,8 @@ function normalizeEscrowJobRecord(
   return {
     ...job,
     operations: {
+      executionFailureWorkflow:
+        job.operations?.executionFailureWorkflow ?? null,
       staleWorkflow: job.operations?.staleWorkflow ?? null,
     },
   };

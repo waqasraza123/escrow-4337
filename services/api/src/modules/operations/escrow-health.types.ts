@@ -27,6 +27,15 @@ export type EscrowHealthJob = {
     openDisputes: number;
     failedExecutions: number;
   };
+  executionFailureWorkflow: null | {
+    claimedByUserId: string;
+    claimedByEmail: string;
+    claimedAt: number;
+    acknowledgedFailureAt: number | null;
+    note: string | null;
+    updatedAt: number;
+    latestFailureNeedsAcknowledgement: boolean;
+  };
   staleWorkflow: null | {
     claimedByUserId: string;
     claimedByEmail: string;
@@ -57,6 +66,10 @@ export type EscrowHealthJob = {
 };
 
 export type EscrowStaleWorkflowMutationResponse = {
+  job: EscrowHealthJob;
+};
+
+export type EscrowExecutionFailureWorkflowMutationResponse = {
   job: EscrowHealthJob;
 };
 

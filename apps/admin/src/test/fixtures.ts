@@ -125,6 +125,7 @@ export function createEscrowHealthReport(
           openDisputes: 1,
           failedExecutions: 0,
         },
+        executionFailureWorkflow: null,
         staleWorkflow: null,
         latestFailedExecution: null,
         failedExecutionDiagnostics: null,

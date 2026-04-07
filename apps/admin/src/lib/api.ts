@@ -120,6 +120,15 @@ export type EscrowHealthReport = {
       openDisputes: number;
       failedExecutions: number;
     };
+    executionFailureWorkflow: null | {
+      claimedByUserId: string;
+      claimedByEmail: string;
+      claimedAt: number;
+      acknowledgedFailureAt: number | null;
+      note: string | null;
+      updatedAt: number;
+      latestFailureNeedsAcknowledgement: boolean;
+    };
     staleWorkflow: null | {
       claimedByUserId: string;
       claimedByEmail: string;
@@ -298,12 +307,63 @@ export const adminApi = {
       accessToken,
     );
   },
+  claimExecutionFailureWorkflow(
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/failure-claim`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  acknowledgeExecutionFailures(
+    jobId: string,
+    input: {
+      note?: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/failure-acknowledge`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
   releaseStaleJob(jobId: string, accessToken: string) {
     return requestJson<{
       job: EscrowHealthReport['jobs'][number];
     }>(
       apiBaseUrl,
       `/operations/escrow-health/${encodeURIComponent(jobId)}/stale-release`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  releaseExecutionFailureWorkflow(jobId: string, accessToken: string) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/failure-release`,
       {
         method: 'POST',
         body: JSON.stringify({}),

@@ -236,6 +236,7 @@ describe('EscrowHealthService', () => {
         openDisputes: 0,
         failedExecutions: 3,
       },
+      executionFailureWorkflow: null,
       latestFailedExecution: {
         action: 'set_milestones',
         failureCode: null,
@@ -452,6 +453,131 @@ describe('EscrowHealthService', () => {
     expect(released.job.staleWorkflow).toBeNull();
     const persistedRelease = await escrowRepository.getById(staleJob.jobId);
     expect(persistedRelease?.operations.staleWorkflow).toBeNull();
+  });
+
+  it('claims, acknowledges, and releases execution-failure workflows for the current operator', async () => {
+    const reportNow = 100_000_000;
+
+    const failedJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Retry-needed job',
+      description: 'Needs an operator-managed failure workflow.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const failedRecord = await escrowRepository.getById(failedJob.jobId);
+    if (!failedRecord) {
+      throw new Error('Expected failed job record to exist');
+    }
+    failedRecord.executions.push({
+      id: 'failure-claim-1',
+      action: 'fund_job',
+      actorAddress: clientSmartAccountAddress,
+      chainId: 84532,
+      contractAddress: currencyAddress,
+      status: 'failed',
+      submittedAt: 800_000,
+      failureCode: 'relay_rejected',
+      failureMessage: 'Retry rejected',
+    });
+    failedRecord.executions.push({
+      id: 'failure-claim-2',
+      action: 'set_milestones',
+      actorAddress: clientSmartAccountAddress,
+      chainId: 84532,
+      contractAddress: currencyAddress,
+      status: 'failed',
+      submittedAt: 850_000,
+      failureCode: undefined,
+      failureMessage: 'Provider timeout',
+    });
+    failedRecord.updatedAt = 850_000;
+    await escrowRepository.save(failedRecord);
+
+    const claimed = await escrowHealthService.claimExecutionFailureWorkflow(
+      arbitratorUserId,
+      failedJob.jobId,
+      {
+        note: 'Investigating relay posture.',
+      },
+      reportNow,
+    );
+
+    expect(claimed.job.executionFailureWorkflow).toMatchObject({
+      claimedByUserId: arbitratorUserId,
+      claimedByEmail: 'arbitrator@example.com',
+      note: 'Investigating relay posture.',
+      acknowledgedFailureAt: null,
+      latestFailureNeedsAcknowledgement: true,
+    });
+
+    const acknowledged = await escrowHealthService.acknowledgeExecutionFailures(
+      arbitratorUserId,
+      failedJob.jobId,
+      {
+        note: 'Acknowledged after checking provider health.',
+      },
+      reportNow,
+    );
+
+    expect(acknowledged.job.executionFailureWorkflow).toMatchObject({
+      note: 'Acknowledged after checking provider health.',
+      acknowledgedFailureAt: 850_000,
+      latestFailureNeedsAcknowledgement: false,
+    });
+
+    const persistedAcknowledged = await escrowRepository.getById(failedJob.jobId);
+    expect(
+      persistedAcknowledged?.operations.executionFailureWorkflow,
+    ).toMatchObject({
+      claimedByUserId: arbitratorUserId,
+      acknowledgedFailureAt: 850_000,
+      note: 'Acknowledged after checking provider health.',
+    });
+
+    if (!persistedAcknowledged) {
+      throw new Error('Expected acknowledged job record to exist');
+    }
+    persistedAcknowledged.executions.push({
+      id: 'failure-claim-3',
+      action: 'fund_job',
+      actorAddress: clientSmartAccountAddress,
+      chainId: 84532,
+      contractAddress: currencyAddress,
+      status: 'failed',
+      submittedAt: 900_000,
+      failureCode: 'relay_rejected',
+      failureMessage: 'Retry rejected again',
+    });
+    persistedAcknowledged.updatedAt = 900_000;
+    await escrowRepository.save(persistedAcknowledged);
+
+    const report = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {
+        reason: 'failed_execution',
+      },
+      reportNow,
+    );
+
+    expect(report.jobs[0]?.executionFailureWorkflow).toMatchObject({
+      acknowledgedFailureAt: 850_000,
+      latestFailureNeedsAcknowledgement: true,
+    });
+
+    const released =
+      await escrowHealthService.releaseExecutionFailureWorkflow(
+        arbitratorUserId,
+        failedJob.jobId,
+        reportNow,
+      );
+
+    expect(released.job.executionFailureWorkflow).toBeNull();
+    const persistedRelease = await escrowRepository.getById(failedJob.jobId);
+    expect(persistedRelease?.operations.executionFailureWorkflow).toBeNull();
   });
 });
 

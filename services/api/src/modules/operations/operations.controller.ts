@@ -48,6 +48,44 @@ export class OperationsController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('escrow-health/:jobId/failure-claim')
+  claimExecutionFailureWorkflow(
+    @User() user: ReqUser,
+    @Param('jobId') jobId: string,
+    @Body(
+      new ZodValidationPipe(
+        operationsDto.claimExecutionFailureWorkflowSchema,
+      ),
+    )
+    body: operationsDto.ClaimExecutionFailureWorkflowDto,
+  ) {
+    return this.escrowHealth.claimExecutionFailureWorkflow(
+      user.id,
+      jobId,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('escrow-health/:jobId/failure-acknowledge')
+  acknowledgeExecutionFailures(
+    @User() user: ReqUser,
+    @Param('jobId') jobId: string,
+    @Body(
+      new ZodValidationPipe(
+        operationsDto.acknowledgeExecutionFailureWorkflowSchema,
+      ),
+    )
+    body: operationsDto.AcknowledgeExecutionFailureWorkflowDto,
+  ) {
+    return this.escrowHealth.acknowledgeExecutionFailures(
+      user.id,
+      jobId,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
   @Post('escrow-health/:jobId/stale-release')
   releaseStaleJob(
     @User() user: ReqUser,
@@ -57,5 +95,21 @@ export class OperationsController {
   ) {
     void body;
     return this.escrowHealth.releaseStaleJob(user.id, jobId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('escrow-health/:jobId/failure-release')
+  releaseExecutionFailureWorkflow(
+    @User() user: ReqUser,
+    @Param('jobId') jobId: string,
+    @Body(
+      new ZodValidationPipe(
+        operationsDto.releaseExecutionFailureWorkflowSchema,
+      ),
+    )
+    body: operationsDto.ReleaseExecutionFailureWorkflowDto,
+  ) {
+    void body;
+    return this.escrowHealth.releaseExecutionFailureWorkflow(user.id, jobId);
   }
 }

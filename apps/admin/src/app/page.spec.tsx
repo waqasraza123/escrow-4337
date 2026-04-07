@@ -30,6 +30,9 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     logout: vi.fn(),
     me: vi.fn(),
     getEscrowHealth: vi.fn(),
+    claimExecutionFailureWorkflow: vi.fn(),
+    acknowledgeExecutionFailures: vi.fn(),
+    releaseExecutionFailureWorkflow: vi.fn(),
     claimStaleJob: vi.fn(),
     releaseStaleJob: vi.fn(),
     createWalletChallenge: vi.fn(),
@@ -690,6 +693,392 @@ describe('admin page', () => {
         'job-stale-1',
         'admin-access-token-123',
       );
+    });
+  });
+
+  it('lets the current operator claim, acknowledge, and release an execution-failure workflow', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-ops-1',
+              title: 'Failure remediation target',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 2,
+              },
+              executionFailureWorkflow: null,
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 600,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-ops-1',
+              title: 'Failure remediation target',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 2,
+              },
+              executionFailureWorkflow: {
+                claimedByUserId: 'operator-user-1',
+                claimedByEmail: 'operator@example.com',
+                claimedAt: 500,
+                acknowledgedFailureAt: null,
+                note: 'Investigating relay posture.',
+                updatedAt: 510,
+                latestFailureNeedsAcknowledgement: true,
+              },
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 600,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-ops-1',
+              title: 'Failure remediation target',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 2,
+              },
+              executionFailureWorkflow: {
+                claimedByUserId: 'operator-user-1',
+                claimedByEmail: 'operator@example.com',
+                claimedAt: 500,
+                acknowledgedFailureAt: 600,
+                note: 'Acknowledged after relay check.',
+                updatedAt: 520,
+                latestFailureNeedsAcknowledgement: false,
+              },
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 600,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-ops-1',
+              title: 'Failure remediation target',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 2,
+              },
+              executionFailureWorkflow: null,
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 600,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      );
+    mockedAdminApi.claimExecutionFailureWorkflow.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-failure-ops-1',
+      },
+    });
+    mockedAdminApi.acknowledgeExecutionFailures.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-failure-ops-1',
+      },
+    });
+    mockedAdminApi.releaseExecutionFailureWorkflow.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-failure-ops-1',
+      },
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failure remediation target')).toBeInTheDocument();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText(
+        'Document the failure pattern, likely cause, next retry posture, or external dependency blocker.',
+      ),
+      'Investigating relay posture.',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Claim failure workflow' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.claimExecutionFailureWorkflow).toHaveBeenCalledWith(
+      'job-failure-ops-1',
+      {
+        note: 'Investigating relay posture.',
+      },
+      'admin-access-token-123',
+    );
+
+    await user.clear(
+      screen.getByPlaceholderText(
+        'Document the failure pattern, likely cause, next retry posture, or external dependency blocker.',
+      ),
+    );
+    await user.type(
+      screen.getByPlaceholderText(
+        'Document the failure pattern, likely cause, next retry posture, or external dependency blocker.',
+      ),
+      'Acknowledged after relay check.',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Acknowledge latest failures' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Acknowledged through the latest failure at/),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.acknowledgeExecutionFailures).toHaveBeenCalledWith(
+      'job-failure-ops-1',
+      {
+        note: 'Acknowledged after relay check.',
+      },
+      'admin-access-token-123',
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Release failure claim' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        mockedAdminApi.releaseExecutionFailureWorkflow,
+      ).toHaveBeenCalledWith('job-failure-ops-1', 'admin-access-token-123');
     });
   });
 

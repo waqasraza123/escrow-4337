@@ -169,6 +169,7 @@ export class EscrowService {
       milestones: [],
       audit: [],
       operations: {
+        executionFailureWorkflow: null,
         staleWorkflow: null,
       },
       onchain: {
