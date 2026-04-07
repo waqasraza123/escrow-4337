@@ -1,7 +1,9 @@
 import type { EscrowContractAction } from '../escrow/onchain/escrow-contract.types';
 import type {
+  EscrowAuditEvent,
   EscrowFailureRemediationStatus,
   JobStatus,
+  MilestoneStatus,
 } from '../escrow/escrow.types';
 
 export type EscrowAttentionReason =
@@ -42,10 +44,36 @@ export type EscrowReconciliationIssue = {
     | 'funding_state_mismatch'
     | 'job_status_mismatch'
     | 'milestone_state_mismatch'
-    | 'missing_create_confirmation';
+    | 'missing_create_confirmation'
+    | 'timeline_reference_mismatch'
+    | 'timeline_transition_mismatch';
   severity: 'warning' | 'critical';
   summary: string;
   detail: string | null;
+};
+
+export type EscrowReconciliationReport = {
+  issueCount: number;
+  highestSeverity: 'warning' | 'critical';
+  sourceCounts: {
+    auditEvents: number;
+    confirmedExecutions: number;
+    failedExecutions: number;
+  };
+  projection: {
+    aggregateStatus: JobStatus;
+    projectedStatus: JobStatus;
+    aggregateFundedAmount: string | null;
+    projectedFundedAmount: string | null;
+    mismatchedMilestones: Array<{
+      index: number;
+      aggregateStatus: MilestoneStatus | null;
+      projectedStatus: MilestoneStatus | null;
+      lastAuditType: EscrowAuditEvent['type'] | null;
+      lastAuditAt: number | null;
+    }>;
+  };
+  issues: EscrowReconciliationIssue[];
 };
 
 export type EscrowHealthJob = {
@@ -93,11 +121,7 @@ export type EscrowHealthJob = {
     recentFailures: EscrowFailedExecutionSummary[];
   };
   failureGuidance: EscrowFailureGuidance | null;
-  reconciliation: null | {
-    issueCount: number;
-    highestSeverity: 'warning' | 'critical';
-    issues: EscrowReconciliationIssue[];
-  };
+  reconciliation: EscrowReconciliationReport | null;
   onchain: {
     chainId: number;
     contractAddress: string;

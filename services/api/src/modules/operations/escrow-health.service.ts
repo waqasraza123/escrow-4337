@@ -22,7 +22,6 @@ import type {
   EscrowFailedExecutionSummary,
   EscrowHealthJob,
   EscrowHealthReport,
-  EscrowReconciliationIssue,
   EscrowStaleWorkflowMutationResponse,
 } from './escrow-health.types';
 import { OperationsConfigService } from './operations.config';
@@ -331,14 +330,6 @@ function attentionPriority(reasons: EscrowAttentionReason[]) {
   }
 
   return 4;
-}
-
-function highestReconciliationSeverity(
-  issues: EscrowReconciliationIssue[],
-): 'warning' | 'critical' {
-  return issues.some((issue) => issue.severity === 'critical')
-    ? 'critical'
-    : 'warning';
 }
 
 function isJobCurrentlyStale(job: EscrowJobRecord, staleCutoff: number) {
@@ -695,7 +686,7 @@ export class EscrowHealthService {
     const failedExecutions = job.executions.filter(
       (execution) => execution.status === 'failed',
     ).length;
-    const reconciliationIssues = this.reconciliationService.reconcile(job);
+    const reconciliation = this.reconciliationService.buildReport(job);
     const failureGuidance = failedExecutionDiagnostics
       ? inferFailureGuidance(failedExecutions, failedExecutionDiagnostics)
       : null;
@@ -709,7 +700,7 @@ export class EscrowHealthService {
       reasons.add('failed_execution');
     }
 
-    if (reconciliationIssues.length > 0) {
+    if (reconciliation) {
       reasons.add('reconciliation_drift');
     }
 
@@ -771,15 +762,7 @@ export class EscrowHealthService {
         failedExecutionDiagnostics?.recentFailures[0] ?? null,
       failedExecutionDiagnostics,
       failureGuidance,
-      reconciliation:
-        reconciliationIssues.length > 0
-          ? {
-              issueCount: reconciliationIssues.length,
-              highestSeverity:
-                highestReconciliationSeverity(reconciliationIssues),
-              issues: reconciliationIssues,
-            }
-          : null,
+      reconciliation,
       onchain: {
         chainId: job.onchain.chainId,
         contractAddress: job.onchain.contractAddress,

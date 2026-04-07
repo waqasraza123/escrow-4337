@@ -193,13 +193,41 @@ export type EscrowHealthReport = {
     reconciliation: null | {
       issueCount: number;
       highestSeverity: 'warning' | 'critical';
+      sourceCounts: {
+        auditEvents: number;
+        confirmedExecutions: number;
+        failedExecutions: number;
+      };
+      projection: {
+        aggregateStatus: string;
+        projectedStatus: string;
+        aggregateFundedAmount: string | null;
+        projectedFundedAmount: string | null;
+        mismatchedMilestones: Array<{
+          index: number;
+          aggregateStatus: string | null;
+          projectedStatus: string | null;
+          lastAuditType:
+            | 'job.created'
+            | 'job.funded'
+            | 'job.milestones_set'
+            | 'milestone.delivered'
+            | 'milestone.released'
+            | 'milestone.disputed'
+            | 'milestone.resolved'
+            | null;
+          lastAuditAt: number | null;
+        }>;
+      };
       issues: Array<{
         code:
           | 'duplicate_confirmed_execution'
           | 'funding_state_mismatch'
           | 'job_status_mismatch'
           | 'milestone_state_mismatch'
-          | 'missing_create_confirmation';
+          | 'missing_create_confirmation'
+          | 'timeline_reference_mismatch'
+          | 'timeline_transition_mismatch';
         severity: 'warning' | 'critical';
         summary: string;
         detail: string | null;

@@ -437,14 +437,95 @@ describe('EscrowHealthService', () => {
       title: 'Timeline drift job',
       reasons: ['reconciliation_drift'],
       reconciliation: {
-        issueCount: 1,
+        issueCount: 3,
         highestSeverity: 'critical',
+        sourceCounts: {
+          auditEvents: 1,
+          confirmedExecutions: 1,
+          failedExecutions: 0,
+        },
+        projection: {
+          aggregateStatus: 'funded',
+          projectedStatus: 'draft',
+          aggregateFundedAmount: '100',
+          projectedFundedAmount: null,
+        },
       },
     });
     expect(report.jobs[0]?.reconciliation?.issues[0]).toMatchObject({
       code: 'funding_state_mismatch',
       severity: 'critical',
     });
+  });
+
+  it('surfaces timeline transition drift when replay encounters an impossible audit sequence', async () => {
+    const createdJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Impossible audit ordering',
+      description: 'Replay should flag invalid milestone transitions.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    await escrowService.fundJob(clientUserId, createdJob.jobId, {
+      amount: '50',
+    });
+    await escrowService.setMilestones(clientUserId, createdJob.jobId, {
+      milestones: [
+        {
+          title: 'Only milestone',
+          deliverable: 'Work item',
+          amount: '50',
+        },
+      ],
+    });
+
+    const record = await escrowRepository.getById(createdJob.jobId);
+    if (!record) {
+      throw new Error('Expected impossible-audit job record to exist');
+    }
+
+    record.audit.push({
+      type: 'milestone.released',
+      at: 70_000,
+      payload: {
+        jobId: createdJob.jobId,
+        milestoneIndex: 0,
+      },
+    });
+    record.updatedAt = 70_000;
+    await escrowRepository.save(record);
+
+    const report = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {
+        reason: 'reconciliation_drift',
+      },
+      100_000,
+    );
+
+    expect(report.summary).toMatchObject({
+      reconciliationDriftJobs: 1,
+      matchedJobs: 1,
+    });
+    expect(report.jobs[0]?.title).toBe('Impossible audit ordering');
+    expect(report.jobs[0]?.reconciliation?.projection).toMatchObject({
+      aggregateStatus: 'funded',
+      projectedStatus: 'funded',
+      aggregateFundedAmount: '50',
+      projectedFundedAmount: '50',
+    });
+    expect(report.jobs[0]?.reconciliation?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'timeline_transition_mismatch',
+          severity: 'critical',
+        }),
+      ]),
+    );
   });
 
   it('rejects users that do not control the configured arbitrator wallet', async () => {

@@ -347,6 +347,18 @@ describe('admin page', () => {
               reconciliation: {
                 issueCount: 2,
                 highestSeverity: 'critical',
+                sourceCounts: {
+                  auditEvents: 3,
+                  confirmedExecutions: 2,
+                  failedExecutions: 0,
+                },
+                projection: {
+                  aggregateStatus: 'funded',
+                  projectedStatus: 'draft',
+                  aggregateFundedAmount: null,
+                  projectedFundedAmount: '100',
+                  mismatchedMilestones: [],
+                },
                 issues: [
                   {
                     code: 'funding_state_mismatch',
@@ -402,6 +414,18 @@ describe('admin page', () => {
               reconciliation: {
                 issueCount: 2,
                 highestSeverity: 'critical',
+                sourceCounts: {
+                  auditEvents: 3,
+                  confirmedExecutions: 2,
+                  failedExecutions: 0,
+                },
+                projection: {
+                  aggregateStatus: 'funded',
+                  projectedStatus: 'draft',
+                  aggregateFundedAmount: null,
+                  projectedFundedAmount: '100',
+                  mismatchedMilestones: [],
+                },
                 issues: [
                   {
                     code: 'funding_state_mismatch',
@@ -434,6 +458,12 @@ describe('admin page', () => {
 
     expect(
       screen.getByText(/Highest severity: Critical/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Timeline sources: 3 audit events · 2 confirmed executions · 0 failed executions/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Replay: status funded -> draft · funded null -> 100/),
     ).toBeInTheDocument();
     expect(
       screen.getByText(

@@ -1,11 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  EscrowAuditEvent,
   EscrowExecutionRecord,
   EscrowJobRecord,
+  EscrowMilestoneRecord,
   JobStatus,
   MilestoneStatus,
 } from '../escrow/escrow.types';
-import type { EscrowReconciliationIssue } from './escrow-health.types';
+import type {
+  EscrowReconciliationIssue,
+  EscrowReconciliationReport,
+} from './escrow-health.types';
+
+type MismatchedMilestone =
+  EscrowReconciliationReport['projection']['mismatchedMilestones'][number];
+
+type ReplayMilestoneState = {
+  status: MilestoneStatus | null;
+  lastAuditAt: number | null;
+  lastAuditType: EscrowAuditEvent['type'] | null;
+  deliveredAt: number | null;
+  disputedAt: number | null;
+  releasedAt: number | null;
+  resolvedAt: number | null;
+  resolutionAction: 'release' | 'refund' | null;
+};
 
 function confirmedExecutions(
   job: EscrowJobRecord,
@@ -24,7 +43,7 @@ function confirmedExecutions(
 
 function hasAuditEvent(
   job: EscrowJobRecord,
-  type: EscrowJobRecord['audit'][number]['type'],
+  type: EscrowAuditEvent['type'],
   milestoneIndex?: number,
   resolutionAction?: 'release' | 'refund',
 ) {
@@ -54,8 +73,11 @@ function hasAuditEvent(
   });
 }
 
-function deriveExpectedJobStatus(job: EscrowJobRecord): JobStatus {
-  const milestoneStatuses = job.milestones.map((milestone) => milestone.status);
+function deriveExpectedJobStatus(
+  milestones: Array<Pick<EscrowMilestoneRecord, 'status'>>,
+  fundedAmount: string | null,
+): JobStatus {
+  const milestoneStatuses = milestones.map((milestone) => milestone.status);
 
   if (milestoneStatuses.includes('disputed')) {
     return 'disputed';
@@ -82,7 +104,7 @@ function deriveExpectedJobStatus(job: EscrowJobRecord): JobStatus {
     return 'in_progress';
   }
 
-  if (job.fundedAmount !== null) {
+  if (fundedAmount !== null) {
     return 'funded';
   }
 
@@ -102,13 +124,243 @@ function requiresDeliveredEvidence(status: MilestoneStatus) {
   );
 }
 
+function latestMilestoneSetCount(audit: EscrowAuditEvent[]) {
+  const latest = [...audit]
+    .reverse()
+    .find((event) => event.type === 'job.milestones_set');
+
+  return latest?.type === 'job.milestones_set' ? latest.payload.count : null;
+}
+
+function createReplayMilestoneState(): ReplayMilestoneState {
+  return {
+    status: 'pending',
+    lastAuditAt: null,
+    lastAuditType: null,
+    deliveredAt: null,
+    disputedAt: null,
+    releasedAt: null,
+    resolvedAt: null,
+    resolutionAction: null,
+  };
+}
+
+function highestReconciliationSeverity(
+  issues: EscrowReconciliationIssue[],
+): 'warning' | 'critical' {
+  return issues.some((issue) => issue.severity === 'critical')
+    ? 'critical'
+    : 'warning';
+}
+
 @Injectable()
 export class EscrowReconciliationService {
-  reconcile(job: EscrowJobRecord): EscrowReconciliationIssue[] {
+  buildReport(job: EscrowJobRecord): EscrowReconciliationReport | null {
     const issues: EscrowReconciliationIssue[] = [];
+    const seenIssueKeys = new Set<string>();
     const pushIssue = (issue: EscrowReconciliationIssue) => {
+      const key = `${issue.code}:${issue.summary}`;
+      if (seenIssueKeys.has(key)) {
+        return;
+      }
+
+      seenIssueKeys.add(key);
       issues.push(issue);
     };
+
+    const projectedMilestoneCount =
+      latestMilestoneSetCount(job.audit) ?? job.milestones.length;
+    const projectedMilestones = Array.from(
+      { length: projectedMilestoneCount },
+      () => createReplayMilestoneState(),
+    );
+    const sortedAudit = job.audit
+      .map((event, index) => ({
+        event,
+        index,
+      }))
+      .sort(
+        (left, right) =>
+          left.event.at - right.event.at || left.index - right.index,
+      );
+    let replayCreatedAt: number | null = null;
+    let replayFundedAmount: string | null = null;
+    let replayMilestonesConfigured = false;
+
+    for (const { event } of sortedAudit) {
+      switch (event.type) {
+        case 'job.created': {
+          if (replayCreatedAt !== null) {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'warning',
+              summary: 'The audit timeline contains duplicate job.created events.',
+              detail:
+                'Reconciliation replay expects job.created to appear at most once.',
+            });
+            break;
+          }
+
+          replayCreatedAt = event.at;
+          break;
+        }
+        case 'job.funded': {
+          if (replayCreatedAt === null) {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'critical',
+              summary:
+                'The audit timeline funds the job before the create event is visible.',
+              detail:
+                'Replay encountered job.funded before job.created, so the persisted audit order is inconsistent.',
+            });
+          }
+
+          if (replayFundedAmount !== null) {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'warning',
+              summary: 'The audit timeline contains duplicate job.funded events.',
+              detail:
+                'Replay expects funding to be applied once per escrow job aggregate.',
+            });
+            break;
+          }
+
+          replayFundedAmount = event.payload.amount;
+          break;
+        }
+        case 'job.milestones_set': {
+          if (replayFundedAmount === null) {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'critical',
+              summary:
+                'The audit timeline configures milestones before funding is visible.',
+              detail:
+                'Replay encountered job.milestones_set before job.funded.',
+            });
+          }
+
+          if (replayMilestonesConfigured) {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'warning',
+              summary:
+                'The audit timeline contains multiple milestone setup events.',
+              detail:
+                'Replay expects milestone configuration to happen once per job.',
+            });
+          }
+
+          replayMilestonesConfigured = true;
+          if (event.payload.count > projectedMilestones.length) {
+            projectedMilestones.push(
+              ...Array.from(
+                { length: event.payload.count - projectedMilestones.length },
+                () => createReplayMilestoneState(),
+              ),
+            );
+          }
+          break;
+        }
+        case 'milestone.delivered':
+        case 'milestone.released':
+        case 'milestone.disputed':
+        case 'milestone.resolved': {
+          const milestone = projectedMilestones[event.payload.milestoneIndex];
+          if (!milestone) {
+            pushIssue({
+              code: 'timeline_reference_mismatch',
+              severity: 'critical',
+              summary: `Audit event ${event.type} references milestone ${
+                event.payload.milestoneIndex + 1
+              } outside the projected milestone range.`,
+              detail:
+                'Replay could not map this audit entry to a configured milestone index.',
+            });
+            break;
+          }
+
+          const invalidTransition = (summary: string, detail: string) => {
+            pushIssue({
+              code: 'timeline_transition_mismatch',
+              severity: 'critical',
+              summary,
+              detail,
+            });
+          };
+
+          switch (event.type) {
+            case 'milestone.delivered': {
+              if (milestone.status !== 'pending') {
+                invalidTransition(
+                  `Milestone ${event.payload.milestoneIndex + 1} is delivered from ${milestone.status ?? 'unknown'} state in the audit replay.`,
+                  'Replay expects milestone.delivered to transition from pending.',
+                );
+                break;
+              }
+
+              milestone.status = 'delivered';
+              milestone.deliveredAt = event.at;
+              milestone.lastAuditAt = event.at;
+              milestone.lastAuditType = event.type;
+              break;
+            }
+            case 'milestone.released': {
+              if (milestone.status !== 'delivered') {
+                invalidTransition(
+                  `Milestone ${event.payload.milestoneIndex + 1} is released from ${milestone.status ?? 'unknown'} state in the audit replay.`,
+                  'Replay expects milestone.released to transition from delivered.',
+                );
+                break;
+              }
+
+              milestone.status = 'released';
+              milestone.releasedAt = event.at;
+              milestone.lastAuditAt = event.at;
+              milestone.lastAuditType = event.type;
+              break;
+            }
+            case 'milestone.disputed': {
+              if (milestone.status !== 'delivered') {
+                invalidTransition(
+                  `Milestone ${event.payload.milestoneIndex + 1} is disputed from ${milestone.status ?? 'unknown'} state in the audit replay.`,
+                  'Replay expects milestone.disputed to transition from delivered.',
+                );
+                break;
+              }
+
+              milestone.status = 'disputed';
+              milestone.disputedAt = event.at;
+              milestone.lastAuditAt = event.at;
+              milestone.lastAuditType = event.type;
+              break;
+            }
+            case 'milestone.resolved': {
+              if (milestone.status !== 'disputed') {
+                invalidTransition(
+                  `Milestone ${event.payload.milestoneIndex + 1} is resolved from ${milestone.status ?? 'unknown'} state in the audit replay.`,
+                  'Replay expects milestone.resolved to transition from disputed.',
+                );
+                break;
+              }
+
+              milestone.status =
+                event.payload.action === 'release' ? 'released' : 'refunded';
+              milestone.resolvedAt = event.at;
+              milestone.resolutionAction = event.payload.action;
+              milestone.lastAuditAt = event.at;
+              milestone.lastAuditType = event.type;
+              if (event.payload.action === 'release') {
+                milestone.releasedAt = event.at;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
 
     if (confirmedExecutions(job, 'create_job').length === 0) {
       pushIssue({
@@ -120,14 +372,77 @@ export class EscrowReconciliationService {
       });
     }
 
-    const expectedStatus = deriveExpectedJobStatus(job);
-    if (job.status !== expectedStatus) {
+    const replayJobStatus = deriveExpectedJobStatus(
+      projectedMilestones
+        .filter((milestone) => milestone.status !== null)
+        .map((milestone) => ({
+          status: milestone.status!,
+        })),
+      replayFundedAmount,
+    );
+
+    if (job.status !== replayJobStatus) {
       pushIssue({
         code: 'job_status_mismatch',
         severity: 'critical',
-        summary: `Job status is ${job.status} but the persisted milestone state implies ${expectedStatus}.`,
+        summary: `Job status is ${job.status} but replay projects ${replayJobStatus}.`,
         detail:
-          'The aggregate status no longer matches the state derived from milestone outcomes and funding posture.',
+          'The aggregate status no longer matches the status derived from the persisted audit replay.',
+      });
+    }
+
+    if (job.fundedAmount !== replayFundedAmount) {
+      pushIssue({
+        code: 'funding_state_mismatch',
+        severity:
+          job.fundedAmount === null || replayFundedAmount === null
+            ? 'critical'
+            : 'warning',
+        summary: `Funded amount is ${job.fundedAmount ?? 'null'} but replay projects ${
+          replayFundedAmount ?? 'null'
+        }.`,
+        detail:
+          'The aggregate funding posture diverges from the amount derived from the persisted audit replay.',
+      });
+    }
+
+    const mismatchedMilestones: MismatchedMilestone[] = [];
+    for (
+      let index = 0;
+      index < Math.max(job.milestones.length, projectedMilestones.length);
+      index += 1
+    ) {
+      const aggregateStatus = job.milestones[index]?.status ?? null;
+      const projectedStatus = projectedMilestones[index]?.status ?? null;
+      if (aggregateStatus === projectedStatus) {
+        continue;
+      }
+
+      mismatchedMilestones.push({
+        index,
+        aggregateStatus,
+        projectedStatus,
+        lastAuditType: projectedMilestones[index]?.lastAuditType ?? null,
+        lastAuditAt: projectedMilestones[index]?.lastAuditAt ?? null,
+      });
+    }
+
+    if (mismatchedMilestones.length > 0) {
+      pushIssue({
+        code: 'milestone_state_mismatch',
+        severity: 'critical',
+        summary: `Milestone replay diverges from aggregate state on ${
+          mismatchedMilestones.length
+        } milestone${mismatchedMilestones.length === 1 ? '' : 's'}.`,
+        detail: `Mismatched milestones: ${mismatchedMilestones
+          .slice(0, 5)
+          .map(
+            (milestone) =>
+              `${milestone.index + 1}(${milestone.aggregateStatus ?? 'null'} -> ${
+                milestone.projectedStatus ?? 'null'
+              })`,
+          )
+          .join(', ')}.`,
       });
     }
 
@@ -394,13 +709,39 @@ export class EscrowReconciliationService {
       }
     }
 
-    return issues
+    const sortedIssues = issues
       .sort(
         (left, right) =>
           Number(right.severity === 'critical') -
             Number(left.severity === 'critical') ||
           left.summary.localeCompare(right.summary),
       )
-      .slice(0, 5);
+      .slice(0, 7);
+
+    if (sortedIssues.length === 0) {
+      return null;
+    }
+
+    return {
+      issueCount: sortedIssues.length,
+      highestSeverity: highestReconciliationSeverity(sortedIssues),
+      sourceCounts: {
+        auditEvents: job.audit.length,
+        confirmedExecutions: job.executions.filter(
+          (execution) => execution.status === 'confirmed',
+        ).length,
+        failedExecutions: job.executions.filter(
+          (execution) => execution.status === 'failed',
+        ).length,
+      },
+      projection: {
+        aggregateStatus: job.status,
+        projectedStatus: replayJobStatus,
+        aggregateFundedAmount: job.fundedAmount,
+        projectedFundedAmount: replayFundedAmount,
+        mismatchedMilestones: mismatchedMilestones.slice(0, 5),
+      },
+      issues: sortedIssues,
+    };
   }
 }

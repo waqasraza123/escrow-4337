@@ -167,6 +167,10 @@ function getReconciliationSeverityLabel(severity: 'warning' | 'critical') {
   }
 }
 
+function formatReconciliationValue(value: string | null) {
+  return value ?? 'null';
+}
+
 function formatFailureBreakdown(
   items: Array<{
     count: number;
@@ -1400,6 +1404,55 @@ export function OperatorConsole() {
                               reconciliation.highestSeverity,
                             )}. This signal is derived from persisted audit and execution history, not chain indexing.`}
                           </p>
+                          <small>
+                            {`Timeline sources: ${reconciliation.sourceCounts.auditEvents} audit event${
+                              reconciliation.sourceCounts.auditEvents === 1
+                                ? ''
+                                : 's'
+                            } · ${reconciliation.sourceCounts.confirmedExecutions} confirmed execution${
+                              reconciliation.sourceCounts.confirmedExecutions === 1
+                                ? ''
+                                : 's'
+                            } · ${reconciliation.sourceCounts.failedExecutions} failed execution${
+                              reconciliation.sourceCounts.failedExecutions === 1
+                                ? ''
+                                : 's'
+                            }`}
+                          </small>
+                          <small>
+                            {`Replay: status ${reconciliation.projection.aggregateStatus} -> ${reconciliation.projection.projectedStatus} · funded ${
+                              formatReconciliationValue(
+                                reconciliation.projection.aggregateFundedAmount,
+                              )
+                            } -> ${formatReconciliationValue(
+                              reconciliation.projection.projectedFundedAmount,
+                            )}`}
+                          </small>
+                          {reconciliation.projection.mismatchedMilestones.length > 0 ? (
+                            <div className={styles.stack}>
+                              {reconciliation.projection.mismatchedMilestones.map(
+                                (milestone) => (
+                                  <small
+                                    key={`${job.jobId}-reconciliation-milestone-${milestone.index}`}
+                                  >
+                                    {`Milestone ${
+                                      milestone.index + 1
+                                    }: ${formatReconciliationValue(
+                                      milestone.aggregateStatus,
+                                    )} -> ${formatReconciliationValue(
+                                      milestone.projectedStatus,
+                                    )}${
+                                      milestone.lastAuditType
+                                        ? ` after ${milestone.lastAuditType} at ${formatTimestamp(
+                                            milestone.lastAuditAt ?? 0,
+                                          )}`
+                                        : ''
+                                    }`}
+                                  </small>
+                                ),
+                              )}
+                            </div>
+                          ) : null}
                           <div className={styles.stack}>
                             {reconciliation.issues.map((issue, index) => (
                               <div key={`${job.jobId}-reconciliation-${index}`}>
