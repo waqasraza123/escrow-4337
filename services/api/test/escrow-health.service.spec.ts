@@ -529,7 +529,9 @@ describe('EscrowHealthService', () => {
       latestFailureNeedsAcknowledgement: false,
     });
 
-    const persistedAcknowledged = await escrowRepository.getById(failedJob.jobId);
+    const persistedAcknowledged = await escrowRepository.getById(
+      failedJob.jobId,
+    );
     expect(
       persistedAcknowledged?.operations.executionFailureWorkflow,
     ).toMatchObject({
@@ -568,12 +570,11 @@ describe('EscrowHealthService', () => {
       latestFailureNeedsAcknowledgement: true,
     });
 
-    const released =
-      await escrowHealthService.releaseExecutionFailureWorkflow(
-        arbitratorUserId,
-        failedJob.jobId,
-        reportNow,
-      );
+    const released = await escrowHealthService.releaseExecutionFailureWorkflow(
+      arbitratorUserId,
+      failedJob.jobId,
+      reportNow,
+    );
 
     expect(released.job.executionFailureWorkflow).toBeNull();
     const persistedRelease = await escrowRepository.getById(failedJob.jobId);

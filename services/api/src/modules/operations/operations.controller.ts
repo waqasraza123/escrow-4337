@@ -53,9 +53,7 @@ export class OperationsController {
     @User() user: ReqUser,
     @Param('jobId') jobId: string,
     @Body(
-      new ZodValidationPipe(
-        operationsDto.claimExecutionFailureWorkflowSchema,
-      ),
+      new ZodValidationPipe(operationsDto.claimExecutionFailureWorkflowSchema),
     )
     body: operationsDto.ClaimExecutionFailureWorkflowDto,
   ) {
@@ -78,11 +76,7 @@ export class OperationsController {
     )
     body: operationsDto.AcknowledgeExecutionFailureWorkflowDto,
   ) {
-    return this.escrowHealth.acknowledgeExecutionFailures(
-      user.id,
-      jobId,
-      body,
-    );
+    return this.escrowHealth.acknowledgeExecutionFailures(user.id, jobId, body);
   }
 
   @UseGuards(AuthGuard)

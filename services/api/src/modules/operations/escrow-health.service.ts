@@ -318,7 +318,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
-    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const failedExecutionDiagnostics =
+      this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
 
     if (existingWorkflow && existingWorkflow.claimedByUserId !== user.id) {
@@ -358,7 +359,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
-    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const failedExecutionDiagnostics =
+      this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
 
     if (!existingWorkflow) {
@@ -399,7 +401,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
-    const failedExecutionDiagnostics = this.requireFailedExecutionDiagnostics(job);
+    const failedExecutionDiagnostics =
+      this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
 
     if (!existingWorkflow) {
@@ -459,7 +462,9 @@ export class EscrowHealthService {
     job: EscrowJobRecord,
     staleCutoff: number,
     now: number,
-    failedExecutionDiagnostics = buildFailedExecutionDiagnostics(job.executions),
+    failedExecutionDiagnostics = buildFailedExecutionDiagnostics(
+      job.executions,
+    ),
   ): EscrowHealthJob {
     const latestActivity = latestActivityAt(job);
     const openDisputes = job.milestones.filter(
@@ -515,8 +520,9 @@ export class EscrowHealthService {
               note: job.operations.executionFailureWorkflow.note ?? null,
               updatedAt: job.operations.executionFailureWorkflow.updatedAt,
               latestFailureNeedsAcknowledgement:
-                (job.operations.executionFailureWorkflow.acknowledgedFailureAt ??
-                  0) < failedExecutionDiagnostics.latestFailureAt,
+                (job.operations.executionFailureWorkflow
+                  .acknowledgedFailureAt ?? 0) <
+                failedExecutionDiagnostics.latestFailureAt,
             }
           : null,
       staleWorkflow: job.operations.staleWorkflow
@@ -557,7 +563,9 @@ export class EscrowHealthService {
   private requireFailedExecutionDiagnostics(job: EscrowJobRecord) {
     const diagnostics = buildFailedExecutionDiagnostics(job.executions);
     if (!diagnostics) {
-      throw new ConflictException('Job does not currently have failed executions');
+      throw new ConflictException(
+        'Job does not currently have failed executions',
+      );
     }
 
     return diagnostics;

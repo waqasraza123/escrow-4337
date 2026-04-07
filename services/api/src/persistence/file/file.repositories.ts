@@ -34,9 +34,7 @@ function normalizeEscrowJobRecord(
     | EscrowJobRecord
     | (Omit<EscrowJobRecord, 'operations'> & {
         operations?: {
-          executionFailureWorkflow?:
-            | EscrowExecutionFailureWorkflowRecord
-            | null;
+          executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
           staleWorkflow?: EscrowStaleWorkflowRecord | null;
         };
       }),
