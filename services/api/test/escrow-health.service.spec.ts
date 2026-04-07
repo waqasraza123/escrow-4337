@@ -267,6 +267,11 @@ describe('EscrowHealthService', () => {
           },
         ],
       },
+      failureGuidance: {
+        severity: 'critical',
+        responsibleSurface: 'rpc_or_provider',
+        retryPosture: 'safe_after_review',
+      },
     });
     expect(report.jobs[1]?.failedExecutionDiagnostics?.recentFailures).toEqual([
       {
@@ -509,9 +514,25 @@ describe('EscrowHealthService', () => {
     expect(claimed.job.executionFailureWorkflow).toMatchObject({
       claimedByUserId: arbitratorUserId,
       claimedByEmail: 'arbitrator@example.com',
+      status: 'investigating',
       note: 'Investigating relay posture.',
       acknowledgedFailureAt: null,
       latestFailureNeedsAcknowledgement: true,
+    });
+
+    const updated = await escrowHealthService.updateExecutionFailureWorkflow(
+      arbitratorUserId,
+      failedJob.jobId,
+      {
+        note: 'Ready to retry after provider review.',
+        status: 'ready_to_retry',
+      },
+      reportNow,
+    );
+
+    expect(updated.job.executionFailureWorkflow).toMatchObject({
+      status: 'ready_to_retry',
+      note: 'Ready to retry after provider review.',
     });
 
     const acknowledged = await escrowHealthService.acknowledgeExecutionFailures(
@@ -519,11 +540,13 @@ describe('EscrowHealthService', () => {
       failedJob.jobId,
       {
         note: 'Acknowledged after checking provider health.',
+        status: 'monitoring',
       },
       reportNow,
     );
 
     expect(acknowledged.job.executionFailureWorkflow).toMatchObject({
+      status: 'monitoring',
       note: 'Acknowledged after checking provider health.',
       acknowledgedFailureAt: 850_000,
       latestFailureNeedsAcknowledgement: false,
@@ -536,6 +559,7 @@ describe('EscrowHealthService', () => {
       persistedAcknowledged?.operations.executionFailureWorkflow,
     ).toMatchObject({
       claimedByUserId: arbitratorUserId,
+      status: 'monitoring',
       acknowledgedFailureAt: 850_000,
       note: 'Acknowledged after checking provider health.',
     });
@@ -566,8 +590,13 @@ describe('EscrowHealthService', () => {
     );
 
     expect(report.jobs[0]?.executionFailureWorkflow).toMatchObject({
+      status: 'monitoring',
       acknowledgedFailureAt: 850_000,
       latestFailureNeedsAcknowledgement: true,
+    });
+    expect(report.jobs[0]?.failureGuidance).toMatchObject({
+      responsibleSurface: 'wallet_relay',
+      retryPosture: 'wait_for_external_fix',
     });
 
     const released = await escrowHealthService.releaseExecutionFailureWorkflow(

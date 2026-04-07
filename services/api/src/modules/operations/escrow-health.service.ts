@@ -10,12 +10,14 @@ import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
 import { UsersService } from '../users/users.service';
 import type {
+  EscrowFailureRemediationStatus,
   EscrowExecutionRecord,
   EscrowJobRecord,
 } from '../escrow/escrow.types';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
 import type {
   EscrowAttentionReason,
+  EscrowFailureGuidance,
   EscrowExecutionFailureWorkflowMutationResponse,
   EscrowFailedExecutionSummary,
   EscrowHealthJob,
@@ -157,6 +159,146 @@ function buildFailedExecutionDiagnostics(executions: EscrowExecutionRecord[]) {
         latestMessage,
       })),
     recentFailures: failures.slice(0, 3).map(summarizeFailedExecution),
+  };
+}
+
+function normalizeFailureWorkflowStatus(
+  status?: EscrowFailureRemediationStatus,
+): EscrowFailureRemediationStatus {
+  switch (status) {
+    case 'blocked_external':
+    case 'monitoring':
+    case 'ready_to_retry':
+      return status;
+    case 'investigating':
+    default:
+      return 'investigating';
+  }
+}
+
+function defaultFailureWorkflowStatus(
+  guidance: EscrowFailureGuidance,
+): EscrowFailureRemediationStatus {
+  return guidance.retryPosture === 'wait_for_external_fix'
+    ? 'blocked_external'
+    : 'investigating';
+}
+
+function inferFailureGuidance(
+  failedExecutions: number,
+  diagnostics: NonNullable<ReturnType<typeof buildFailedExecutionDiagnostics>>,
+): EscrowFailureGuidance {
+  const latestFailure = diagnostics.recentFailures[0];
+  const latestSignal = `${latestFailure?.failureCode ?? ''} ${
+    latestFailure?.failureMessage ?? ''
+  }`.toLowerCase();
+
+  const severity: EscrowFailureGuidance['severity'] =
+    failedExecutions >= 3 ? 'critical' : 'warning';
+
+  if (
+    latestSignal.includes('paymaster') ||
+    latestSignal.includes('sponsor')
+  ) {
+    return {
+      severity,
+      responsibleSurface: 'paymaster_or_sponsor',
+      retryPosture: 'wait_for_external_fix',
+      summary: 'Sponsorship or paymaster infrastructure is blocking execution.',
+      recommendedActions: [
+        'Verify sponsor or paymaster health, quota, and account balance.',
+        'Retry only after sponsorship capacity or policy is restored.',
+        'Check provider logs for the rejected sponsorship decision.',
+      ],
+    };
+  }
+
+  if (
+    latestSignal.includes('relay') ||
+    latestSignal.includes('bundler rejected')
+  ) {
+    return {
+      severity,
+      responsibleSurface: 'wallet_relay',
+      retryPosture: 'wait_for_external_fix',
+      summary: 'The relay path is rejecting or dropping the execution request.',
+      recommendedActions: [
+        'Inspect relay request logs and provider-side rejection details.',
+        'Confirm the payload still matches current on-chain job state.',
+        'Retry only after the relay issue or rejection reason is understood.',
+      ],
+    };
+  }
+
+  if (
+    latestSignal.includes('bundler') ||
+    latestSignal.includes('simulation') ||
+    latestSignal.includes('validation') ||
+    latestSignal.includes('entrypoint')
+  ) {
+    return {
+      severity,
+      responsibleSurface: 'bundler',
+      retryPosture: 'hold_for_configuration_change',
+      summary: 'Bundler or simulation validation is rejecting the execution payload.',
+      recommendedActions: [
+        'Review bundler validation output for failing calldata or gas assumptions.',
+        'Confirm smart-account, entry-point, and chain configuration are correct.',
+        'Only retry after the failing validation condition is resolved.',
+      ],
+    };
+  }
+
+  if (
+    latestSignal.includes('timeout') ||
+    latestSignal.includes('network') ||
+    latestSignal.includes('rpc') ||
+    latestSignal.includes('unavailable')
+  ) {
+    return {
+      severity,
+      responsibleSurface: 'rpc_or_provider',
+      retryPosture: 'safe_after_review',
+      summary: 'Network or provider instability interrupted execution.',
+      recommendedActions: [
+        'Check RPC and upstream provider health before retrying.',
+        'Confirm the last known job state is unchanged.',
+        'Retry after provider health stabilizes and monitoring is in place.',
+      ],
+    };
+  }
+
+  if (
+    latestSignal.includes('allowance') ||
+    latestSignal.includes('insufficient') ||
+    latestSignal.includes('missing') ||
+    latestSignal.includes('invalid')
+  ) {
+    return {
+      severity,
+      responsibleSurface: 'operator_input',
+      retryPosture: 'hold_for_configuration_change',
+      summary:
+        'The failure pattern suggests missing prerequisites or invalid execution input.',
+      recommendedActions: [
+        'Validate wallet funding, approvals, and job preconditions.',
+        'Check whether the requested action still matches the persisted job state.',
+        'Retry only after the missing prerequisite or invalid input is corrected.',
+      ],
+    };
+  }
+
+  return {
+    severity,
+    responsibleSurface: 'unknown',
+    retryPosture: 'hold_for_configuration_change',
+    summary:
+      'The failure pattern is not yet classified; operator investigation is required before retry.',
+    recommendedActions: [
+      'Review provider logs and the recent failed attempts for a shared signal.',
+      'Verify current escrow state before attempting another mutation.',
+      'Document the likely cause in the workflow note before retrying.',
+    ],
   };
 }
 
@@ -312,6 +454,7 @@ export class EscrowHealthService {
     jobId: string,
     input: {
       note?: string;
+      status?: EscrowFailureRemediationStatus;
     },
     now = Date.now(),
   ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
@@ -320,6 +463,10 @@ export class EscrowHealthService {
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
+    const guidance = inferFailureGuidance(
+      job.executions.filter((execution) => execution.status === 'failed').length,
+      failedExecutionDiagnostics,
+    );
     const existingWorkflow = job.operations.executionFailureWorkflow;
 
     if (existingWorkflow && existingWorkflow.claimedByUserId !== user.id) {
@@ -332,6 +479,11 @@ export class EscrowHealthService {
       claimedByUserId: user.id,
       claimedByEmail: user.email,
       claimedAt: existingWorkflow?.claimedAt ?? now,
+      status: normalizeFailureWorkflowStatus(
+        input.status ??
+          existingWorkflow?.status ??
+          defaultFailureWorkflowStatus(guidance),
+      ),
       acknowledgedFailureAt: existingWorkflow?.acknowledgedFailureAt,
       note: input.note?.trim() || existingWorkflow?.note,
       updatedAt: now,
@@ -353,6 +505,7 @@ export class EscrowHealthService {
     jobId: string,
     input: {
       note?: string;
+      status?: EscrowFailureRemediationStatus;
     },
     now = Date.now(),
   ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
@@ -377,6 +530,9 @@ export class EscrowHealthService {
 
     job.operations.executionFailureWorkflow = {
       ...existingWorkflow,
+      status: normalizeFailureWorkflowStatus(
+        input.status ?? existingWorkflow.status,
+      ),
       acknowledgedFailureAt: failedExecutionDiagnostics.latestFailureAt,
       note: input.note?.trim() || existingWorkflow.note,
       updatedAt: now,
@@ -418,6 +574,54 @@ export class EscrowHealthService {
     }
 
     job.operations.executionFailureWorkflow = null;
+    await this.escrowRepository.save(job);
+
+    return {
+      job: this.buildJobSummary(
+        job,
+        staleCutoff,
+        now,
+        failedExecutionDiagnostics,
+      ),
+    };
+  }
+
+  async updateExecutionFailureWorkflow(
+    userId: string,
+    jobId: string,
+    input: {
+      note?: string;
+      status?: EscrowFailureRemediationStatus;
+    },
+    now = Date.now(),
+  ): Promise<EscrowExecutionFailureWorkflowMutationResponse> {
+    const user = await this.requireOperatorAccess(userId);
+    const job = await this.requireJob(jobId);
+    const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const failedExecutionDiagnostics =
+      this.requireFailedExecutionDiagnostics(job);
+    const existingWorkflow = job.operations.executionFailureWorkflow;
+
+    if (!existingWorkflow) {
+      throw new ConflictException(
+        'Execution-failure workflow must be claimed before it can be updated',
+      );
+    }
+
+    if (existingWorkflow.claimedByUserId !== user.id) {
+      throw new ConflictException(
+        'Only the current execution-failure owner can update the workflow',
+      );
+    }
+
+    job.operations.executionFailureWorkflow = {
+      ...existingWorkflow,
+      status: normalizeFailureWorkflowStatus(
+        input.status ?? existingWorkflow.status,
+      ),
+      note: input.note?.trim() || existingWorkflow.note,
+      updatedAt: now,
+    };
     await this.escrowRepository.save(job);
 
     return {
@@ -473,6 +677,9 @@ export class EscrowHealthService {
     const failedExecutions = job.executions.filter(
       (execution) => execution.status === 'failed',
     ).length;
+    const failureGuidance = failedExecutionDiagnostics
+      ? inferFailureGuidance(failedExecutions, failedExecutionDiagnostics)
+      : null;
     const reasons = new Set<EscrowAttentionReason>();
 
     if (openDisputes > 0) {
@@ -514,6 +721,9 @@ export class EscrowHealthService {
               claimedByEmail:
                 job.operations.executionFailureWorkflow.claimedByEmail,
               claimedAt: job.operations.executionFailureWorkflow.claimedAt,
+              status: normalizeFailureWorkflowStatus(
+                job.operations.executionFailureWorkflow.status,
+              ),
               acknowledgedFailureAt:
                 job.operations.executionFailureWorkflow.acknowledgedFailureAt ??
                 null,
@@ -537,6 +747,7 @@ export class EscrowHealthService {
       latestFailedExecution:
         failedExecutionDiagnostics?.recentFailures[0] ?? null,
       failedExecutionDiagnostics,
+      failureGuidance,
       onchain: {
         chainId: job.onchain.chainId,
         contractAddress: job.onchain.contractAddress,

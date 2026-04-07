@@ -1,5 +1,8 @@
 import type { EscrowContractAction } from '../escrow/onchain/escrow-contract.types';
-import type { JobStatus } from '../escrow/escrow.types';
+import type {
+  EscrowFailureRemediationStatus,
+  JobStatus,
+} from '../escrow/escrow.types';
 
 export type EscrowAttentionReason =
   | 'failed_execution'
@@ -13,6 +16,23 @@ export type EscrowFailedExecutionSummary = {
   failureCode: string | null;
   failureMessage: string | null;
   milestoneIndex: number | null;
+};
+
+export type EscrowFailureGuidance = {
+  severity: 'warning' | 'critical';
+  responsibleSurface:
+    | 'wallet_relay'
+    | 'bundler'
+    | 'paymaster_or_sponsor'
+    | 'rpc_or_provider'
+    | 'operator_input'
+    | 'unknown';
+  retryPosture:
+    | 'safe_after_review'
+    | 'wait_for_external_fix'
+    | 'hold_for_configuration_change';
+  summary: string;
+  recommendedActions: string[];
 };
 
 export type EscrowHealthJob = {
@@ -31,6 +51,7 @@ export type EscrowHealthJob = {
     claimedByUserId: string;
     claimedByEmail: string;
     claimedAt: number;
+    status: EscrowFailureRemediationStatus;
     acknowledgedFailureAt: number | null;
     note: string | null;
     updatedAt: number;
@@ -58,6 +79,7 @@ export type EscrowHealthJob = {
     }>;
     recentFailures: EscrowFailedExecutionSummary[];
   };
+  failureGuidance: EscrowFailureGuidance | null;
   onchain: {
     chainId: number;
     contractAddress: string;

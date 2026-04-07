@@ -4,6 +4,7 @@ import type {
   SessionRecord,
 } from '../../modules/auth/auth.types';
 import type {
+  EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
   EscrowStaleWorkflowRecord,
@@ -29,6 +30,20 @@ function cloneValue<T>(value: T): T {
   return structuredClone(value);
 }
 
+function normalizeFailureWorkflowStatus(
+  status?: EscrowFailureRemediationStatus,
+): EscrowFailureRemediationStatus {
+  switch (status) {
+    case 'blocked_external':
+    case 'monitoring':
+    case 'ready_to_retry':
+      return status;
+    case 'investigating':
+    default:
+      return 'investigating';
+  }
+}
+
 function normalizeEscrowJobRecord(
   job:
     | EscrowJobRecord
@@ -42,8 +57,14 @@ function normalizeEscrowJobRecord(
   return {
     ...job,
     operations: {
-      executionFailureWorkflow:
-        job.operations?.executionFailureWorkflow ?? null,
+      executionFailureWorkflow: job.operations?.executionFailureWorkflow
+        ? {
+            ...job.operations.executionFailureWorkflow,
+            status: normalizeFailureWorkflowStatus(
+              job.operations.executionFailureWorkflow.status,
+            ),
+          }
+        : null,
       staleWorkflow: job.operations?.staleWorkflow ?? null,
     },
   };

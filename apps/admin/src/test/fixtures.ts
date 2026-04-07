@@ -129,6 +129,7 @@ export function createEscrowHealthReport(
         staleWorkflow: null,
         latestFailedExecution: null,
         failedExecutionDiagnostics: null,
+        failureGuidance: null,
         onchain: {
           chainId: 84532,
           contractAddress: '0xcontract',

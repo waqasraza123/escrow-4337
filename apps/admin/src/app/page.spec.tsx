@@ -32,6 +32,7 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     getEscrowHealth: vi.fn(),
     claimExecutionFailureWorkflow: vi.fn(),
     acknowledgeExecutionFailures: vi.fn(),
+    updateExecutionFailureWorkflow: vi.fn(),
     releaseExecutionFailureWorkflow: vi.fn(),
     claimStaleJob: vi.fn(),
     releaseStaleJob: vi.fn(),
@@ -340,6 +341,7 @@ describe('admin page', () => {
                 openDisputes: 0,
                 failedExecutions: 1,
               },
+              executionFailureWorkflow: null,
               latestFailedExecution: {
                 action: 'fund_job',
                 submittedAt: 600,
@@ -398,6 +400,17 @@ describe('admin page', () => {
                     failureMessage: 'Initial rejection',
                     milestoneIndex: null,
                   },
+                ],
+              },
+              failureGuidance: {
+                severity: 'critical',
+                responsibleSurface: 'rpc_or_provider',
+                retryPosture: 'safe_after_review',
+                summary: 'Network or provider instability interrupted execution.',
+                recommendedActions: [
+                  'Check RPC and upstream provider health before retrying.',
+                  'Confirm the last known job state is unchanged.',
+                  'Retry after provider health stabilizes and monitoring is in place.',
                 ],
               },
             },
@@ -429,6 +442,7 @@ describe('admin page', () => {
                 openDisputes: 0,
                 failedExecutions: 1,
               },
+              executionFailureWorkflow: null,
               latestFailedExecution: {
                 action: 'fund_job',
                 submittedAt: 600,
@@ -489,6 +503,17 @@ describe('admin page', () => {
                   },
                 ],
               },
+              failureGuidance: {
+                severity: 'critical',
+                responsibleSurface: 'rpc_or_provider',
+                retryPosture: 'safe_after_review',
+                summary: 'Network or provider instability interrupted execution.',
+                recommendedActions: [
+                  'Check RPC and upstream provider health before retrying.',
+                  'Confirm the last known job state is unchanged.',
+                  'Retry after provider health stabilizes and monitoring is in place.',
+                ],
+              },
             },
           ],
         }),
@@ -514,6 +539,11 @@ describe('admin page', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText('Codes: relay_rejected x2, unknown x1'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Surface: RPC or provider · Retry posture: Safe after review · Severity: critical',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Provider timeout/),
@@ -768,6 +798,17 @@ describe('admin page', () => {
                   },
                 ],
               },
+              failureGuidance: {
+                severity: 'warning',
+                responsibleSurface: 'wallet_relay',
+                retryPosture: 'wait_for_external_fix',
+                summary: 'The relay path is rejecting or dropping the execution request.',
+                recommendedActions: [
+                  'Inspect relay request logs and provider-side rejection details.',
+                  'Confirm the payload still matches current on-chain job state.',
+                  'Retry only after the relay issue or rejection reason is understood.',
+                ],
+              },
             },
           ],
         }),
@@ -797,6 +838,7 @@ describe('admin page', () => {
                 claimedByUserId: 'operator-user-1',
                 claimedByEmail: 'operator@example.com',
                 claimedAt: 500,
+                status: 'investigating',
                 acknowledgedFailureAt: null,
                 note: 'Investigating relay posture.',
                 updatedAt: 510,
@@ -845,6 +887,17 @@ describe('admin page', () => {
                   },
                 ],
               },
+              failureGuidance: {
+                severity: 'warning',
+                responsibleSurface: 'wallet_relay',
+                retryPosture: 'wait_for_external_fix',
+                summary: 'The relay path is rejecting or dropping the execution request.',
+                recommendedActions: [
+                  'Inspect relay request logs and provider-side rejection details.',
+                  'Confirm the payload still matches current on-chain job state.',
+                  'Retry only after the relay issue or rejection reason is understood.',
+                ],
+              },
             },
           ],
         }),
@@ -874,6 +927,96 @@ describe('admin page', () => {
                 claimedByUserId: 'operator-user-1',
                 claimedByEmail: 'operator@example.com',
                 claimedAt: 500,
+                status: 'ready_to_retry',
+                acknowledgedFailureAt: null,
+                note: 'Ready after relay review.',
+                updatedAt: 515,
+                latestFailureNeedsAcknowledgement: true,
+              },
+              latestFailedExecution: {
+                action: 'fund_job',
+                submittedAt: 600,
+                txHash: null,
+                failureCode: 'relay_rejected',
+                failureMessage: 'Rejected',
+                milestoneIndex: null,
+              },
+              failedExecutionDiagnostics: {
+                firstFailureAt: 550,
+                latestFailureAt: 600,
+                actionBreakdown: [
+                  {
+                    action: 'fund_job',
+                    count: 2,
+                  },
+                ],
+                failureCodeBreakdown: [
+                  {
+                    failureCode: 'relay_rejected',
+                    count: 2,
+                    latestMessage: 'Rejected',
+                  },
+                ],
+                recentFailures: [
+                  {
+                    action: 'fund_job',
+                    submittedAt: 600,
+                    txHash: null,
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Rejected',
+                    milestoneIndex: null,
+                  },
+                  {
+                    action: 'fund_job',
+                    submittedAt: 550,
+                    txHash: '0xfail',
+                    failureCode: 'relay_rejected',
+                    failureMessage: 'Initial rejection',
+                    milestoneIndex: null,
+                  },
+                ],
+              },
+              failureGuidance: {
+                severity: 'warning',
+                responsibleSurface: 'wallet_relay',
+                retryPosture: 'wait_for_external_fix',
+                summary: 'The relay path is rejecting or dropping the execution request.',
+                recommendedActions: [
+                  'Inspect relay request logs and provider-side rejection details.',
+                  'Confirm the payload still matches current on-chain job state.',
+                  'Retry only after the relay issue or rejection reason is understood.',
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createEscrowHealthReport({
+          summary: {
+            totalJobs: 2,
+            jobsNeedingAttention: 1,
+            matchedJobs: 1,
+            openDisputeJobs: 0,
+            failedExecutionJobs: 1,
+            staleJobs: 0,
+          },
+          jobs: [
+            {
+              ...createEscrowHealthReport().jobs[0],
+              jobId: 'job-failure-ops-1',
+              title: 'Failure remediation target',
+              status: 'funded',
+              reasons: ['failed_execution'],
+              counts: {
+                openDisputes: 0,
+                failedExecutions: 2,
+              },
+              executionFailureWorkflow: {
+                claimedByUserId: 'operator-user-1',
+                claimedByEmail: 'operator@example.com',
+                claimedAt: 500,
+                status: 'ready_to_retry',
                 acknowledgedFailureAt: 600,
                 note: 'Acknowledged after relay check.',
                 updatedAt: 520,
@@ -920,6 +1063,17 @@ describe('admin page', () => {
                     failureMessage: 'Initial rejection',
                     milestoneIndex: null,
                   },
+                ],
+              },
+              failureGuidance: {
+                severity: 'warning',
+                responsibleSurface: 'wallet_relay',
+                retryPosture: 'wait_for_external_fix',
+                summary: 'The relay path is rejecting or dropping the execution request.',
+                recommendedActions: [
+                  'Inspect relay request logs and provider-side rejection details.',
+                  'Confirm the payload still matches current on-chain job state.',
+                  'Retry only after the relay issue or rejection reason is understood.',
                 ],
               },
             },
@@ -991,6 +1145,17 @@ describe('admin page', () => {
                   },
                 ],
               },
+              failureGuidance: {
+                severity: 'warning',
+                responsibleSurface: 'wallet_relay',
+                retryPosture: 'wait_for_external_fix',
+                summary: 'The relay path is rejecting or dropping the execution request.',
+                recommendedActions: [
+                  'Inspect relay request logs and provider-side rejection details.',
+                  'Confirm the payload still matches current on-chain job state.',
+                  'Retry only after the relay issue or rejection reason is understood.',
+                ],
+              },
             },
           ],
         }),
@@ -1002,6 +1167,12 @@ describe('admin page', () => {
       },
     });
     mockedAdminApi.acknowledgeExecutionFailures.mockResolvedValue({
+      job: {
+        ...createEscrowHealthReport().jobs[0],
+        jobId: 'job-failure-ops-1',
+      },
+    });
+    mockedAdminApi.updateExecutionFailureWorkflow.mockResolvedValue({
       job: {
         ...createEscrowHealthReport().jobs[0],
         jobId: 'job-failure-ops-1',
@@ -1038,6 +1209,41 @@ describe('admin page', () => {
       'job-failure-ops-1',
       {
         note: 'Investigating relay posture.',
+        status: 'blocked_external',
+      },
+      'admin-access-token-123',
+    );
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Failure workflow status' }),
+      'ready_to_retry',
+    );
+    await user.clear(
+      screen.getByPlaceholderText(
+        'Document the failure pattern, likely cause, next retry posture, or external dependency blocker.',
+      ),
+    );
+    await user.type(
+      screen.getByPlaceholderText(
+        'Document the failure pattern, likely cause, next retry posture, or external dependency blocker.',
+      ),
+      'Ready after relay review.',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Save failure workflow' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Status: Ready to retry\./),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.updateExecutionFailureWorkflow).toHaveBeenCalledWith(
+      'job-failure-ops-1',
+      {
+        note: 'Ready after relay review.',
+        status: 'ready_to_retry',
       },
       'admin-access-token-123',
     );
@@ -1067,6 +1273,7 @@ describe('admin page', () => {
       'job-failure-ops-1',
       {
         note: 'Acknowledged after relay check.',
+        status: 'ready_to_retry',
       },
       'admin-access-token-123',
     );

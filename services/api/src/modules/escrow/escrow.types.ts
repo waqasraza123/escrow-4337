@@ -128,10 +128,17 @@ export type EscrowStaleWorkflowRecord = {
   updatedAt: number;
 };
 
+export type EscrowFailureRemediationStatus =
+  | 'investigating'
+  | 'blocked_external'
+  | 'ready_to_retry'
+  | 'monitoring';
+
 export type EscrowExecutionFailureWorkflowRecord = {
   claimedByUserId: string;
   claimedByEmail: string;
   claimedAt: number;
+  status: EscrowFailureRemediationStatus;
   acknowledgedFailureAt?: number;
   note?: string;
   updatedAt: number;

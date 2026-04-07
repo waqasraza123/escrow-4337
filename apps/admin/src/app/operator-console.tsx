@@ -137,6 +137,10 @@ type OperationsReasonFilter =
   | 'all'
   | EscrowHealthReport['jobs'][number]['reasons'][number];
 
+type FailureWorkflowStatus = NonNullable<
+  EscrowHealthReport['jobs'][number]['executionFailureWorkflow']
+>['status'];
+
 function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
   switch (reason) {
     case 'all':
@@ -161,6 +165,63 @@ function formatFailureBreakdown(
 
 function formatFailureCodeLabel(failureCode: string | null) {
   return failureCode ?? 'unknown';
+}
+
+function getFailureGuidanceSurfaceLabel(
+  surface: NonNullable<
+    EscrowHealthReport['jobs'][number]['failureGuidance']
+  >['responsibleSurface'],
+) {
+  switch (surface) {
+    case 'wallet_relay':
+      return 'Wallet relay';
+    case 'bundler':
+      return 'Bundler';
+    case 'paymaster_or_sponsor':
+      return 'Paymaster or sponsor';
+    case 'rpc_or_provider':
+      return 'RPC or provider';
+    case 'operator_input':
+      return 'Operator input';
+    case 'unknown':
+      return 'Unknown surface';
+  }
+}
+
+function getFailureRetryPostureLabel(
+  posture: NonNullable<
+    EscrowHealthReport['jobs'][number]['failureGuidance']
+  >['retryPosture'],
+) {
+  switch (posture) {
+    case 'safe_after_review':
+      return 'Safe after review';
+    case 'wait_for_external_fix':
+      return 'Wait for external fix';
+    case 'hold_for_configuration_change':
+      return 'Hold for configuration change';
+  }
+}
+
+function getFailureWorkflowStatusLabel(status: FailureWorkflowStatus) {
+  switch (status) {
+    case 'investigating':
+      return 'Investigating';
+    case 'blocked_external':
+      return 'Blocked externally';
+    case 'ready_to_retry':
+      return 'Ready to retry';
+    case 'monitoring':
+      return 'Monitoring';
+  }
+}
+
+function defaultFailureWorkflowStatus(
+  guidance: EscrowHealthReport['jobs'][number]['failureGuidance'],
+): FailureWorkflowStatus {
+  return guidance?.retryPosture === 'wait_for_external_fix'
+    ? 'blocked_external'
+    : 'investigating';
 }
 
 function getFailureAcknowledgementMessage(
@@ -204,6 +265,9 @@ export function OperatorConsole() {
     useState<OperationsReasonFilter>('all');
   const [failureWorkflowDrafts, setFailureWorkflowDrafts] = useState<
     Record<string, string>
+  >({});
+  const [failureWorkflowStatuses, setFailureWorkflowStatuses] = useState<
+    Record<string, FailureWorkflowStatus>
   >({});
   const [failureWorkflowStates, setFailureWorkflowStates] = useState<
     Record<string, AsyncState>
@@ -401,6 +465,7 @@ export function OperatorConsole() {
     setEscrowHealth(null);
     setHealthState(createIdleState());
     setFailureWorkflowDrafts({});
+    setFailureWorkflowStatuses({});
     setFailureWorkflowStates({});
     setStaleWorkflowDrafts({});
     setStaleWorkflowStates({});
@@ -521,6 +586,7 @@ export function OperatorConsole() {
       setEscrowHealth(null);
       setHealthState(createIdleState());
       setFailureWorkflowDrafts({});
+      setFailureWorkflowStatuses({});
       setFailureWorkflowStates({});
       setStaleWorkflowDrafts({});
       setStaleWorkflowStates({});
@@ -531,6 +597,7 @@ export function OperatorConsole() {
       setEscrowHealth(null);
       setHealthState(createIdleState());
       setFailureWorkflowDrafts({});
+      setFailureWorkflowStatuses({});
       setFailureWorkflowStates({});
       setStaleWorkflowDrafts({});
       setStaleWorkflowStates({});
@@ -555,6 +622,23 @@ export function OperatorConsole() {
 
         next[job.jobId] =
           current[job.jobId] ?? job.executionFailureWorkflow?.note ?? '';
+      }
+
+      return next;
+    });
+
+    setFailureWorkflowStatuses((current) => {
+      const next = { ...current };
+
+      for (const job of escrowHealth.jobs) {
+        if (!job.reasons.includes('failed_execution')) {
+          continue;
+        }
+
+        next[job.jobId] =
+          current[job.jobId] ??
+          job.executionFailureWorkflow?.status ??
+          defaultFailureWorkflowStatus(job.failureGuidance);
       }
 
       return next;
@@ -643,6 +727,7 @@ export function OperatorConsole() {
         jobId,
         {
           note: failureWorkflowDrafts[jobId]?.trim() || undefined,
+          status: failureWorkflowStatuses[jobId],
         },
         accessToken,
       );
@@ -674,6 +759,7 @@ export function OperatorConsole() {
         jobId,
         {
           note: failureWorkflowDrafts[jobId]?.trim() || undefined,
+          status: failureWorkflowStatuses[jobId],
         },
         accessToken,
       );
@@ -711,6 +797,38 @@ export function OperatorConsole() {
       setFailureWorkflowState(
         jobId,
         createErrorState(error, 'Failed to release execution-failure workflow'),
+      );
+    }
+  }
+
+  async function handleUpdateExecutionFailureWorkflow(jobId: string) {
+    if (!accessToken) {
+      return;
+    }
+
+    setFailureWorkflowState(
+      jobId,
+      createWorkingState('Saving execution-failure workflow...'),
+    );
+
+    try {
+      await adminApi.updateExecutionFailureWorkflow(
+        jobId,
+        {
+          note: failureWorkflowDrafts[jobId]?.trim() || undefined,
+          status: failureWorkflowStatuses[jobId],
+        },
+        accessToken,
+      );
+      setFailureWorkflowState(
+        jobId,
+        createSuccessState('Execution-failure workflow saved.'),
+      );
+      await loadEscrowHealth(accessToken, healthReasonFilter);
+    } catch (error) {
+      setFailureWorkflowState(
+        jobId,
+        createErrorState(error, 'Failed to save execution-failure workflow'),
       );
     }
   }
@@ -1216,6 +1334,7 @@ export function OperatorConsole() {
                   const staleWorkflow = job.staleWorkflow;
                   const failedExecutionDiagnostics =
                     job.failedExecutionDiagnostics;
+                  const failureGuidance = job.failureGuidance;
                   const failureClaimedByCurrentOperator =
                     executionFailureWorkflow?.claimedByUserId === profile?.id;
                   const claimedByCurrentOperator =
@@ -1263,6 +1382,25 @@ export function OperatorConsole() {
                               failedExecutionDiagnostics.latestFailureAt,
                             )}.`}
                           </p>
+                          {failureGuidance ? (
+                            <>
+                              <small>
+                                {`Guidance: ${failureGuidance.summary}`}
+                              </small>
+                              <small>
+                                {`Surface: ${getFailureGuidanceSurfaceLabel(
+                                  failureGuidance.responsibleSurface,
+                                )} · Retry posture: ${getFailureRetryPostureLabel(
+                                  failureGuidance.retryPosture,
+                                )} · Severity: ${failureGuidance.severity}`}
+                              </small>
+                              <small>
+                                {`Next steps: ${failureGuidance.recommendedActions.join(
+                                  ' · ',
+                                )}`}
+                              </small>
+                            </>
+                          ) : null}
                           <small>
                             {`Actions: ${formatFailureBreakdown(
                               failedExecutionDiagnostics.actionBreakdown.map(
@@ -1296,11 +1434,46 @@ export function OperatorConsole() {
                                       executionFailureWorkflow.claimedAt,
                                     )} and updated ${formatTimestamp(
                                       executionFailureWorkflow.updatedAt,
+                                    )}. Status: ${getFailureWorkflowStatusLabel(
+                                      executionFailureWorkflow.status,
                                     )}. ${getFailureAcknowledgementMessage(
                                       executionFailureWorkflow,
                                     )}`
                                   : 'Claim this failure workflow to track remediation and acknowledge the latest known failure set.'}
                               </p>
+                              <label className={styles.field}>
+                                <span>Failure workflow status</span>
+                                <select
+                                  value={
+                                    failureWorkflowStatuses[job.jobId] ??
+                                    defaultFailureWorkflowStatus(failureGuidance)
+                                  }
+                                  onChange={(event) =>
+                                    setFailureWorkflowStatuses((current) => ({
+                                      ...current,
+                                      [job.jobId]:
+                                        event.target.value as FailureWorkflowStatus,
+                                    }))
+                                  }
+                                  disabled={Boolean(
+                                    executionFailureWorkflow &&
+                                      !failureClaimedByCurrentOperator,
+                                  )}
+                                >
+                                  {(
+                                    [
+                                      'investigating',
+                                      'blocked_external',
+                                      'ready_to_retry',
+                                      'monitoring',
+                                    ] as const
+                                  ).map((status) => (
+                                    <option key={status} value={status}>
+                                      {getFailureWorkflowStatusLabel(status)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
                               <label className={styles.field}>
                                 <span>Failure remediation note</span>
                                 <textarea
@@ -1325,13 +1498,17 @@ export function OperatorConsole() {
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      void handleClaimExecutionFailureWorkflow(
-                                        job.jobId,
-                                      )
+                                      executionFailureWorkflow
+                                        ? void handleUpdateExecutionFailureWorkflow(
+                                            job.jobId,
+                                          )
+                                        : void handleClaimExecutionFailureWorkflow(
+                                            job.jobId,
+                                          )
                                     }
                                   >
                                     {executionFailureWorkflow
-                                      ? 'Save failure note'
+                                      ? 'Save failure workflow'
                                       : 'Claim failure workflow'}
                                   </button>
                                 ) : null}

@@ -124,6 +124,7 @@ export type EscrowHealthReport = {
       claimedByUserId: string;
       claimedByEmail: string;
       claimedAt: number;
+      status: 'investigating' | 'blocked_external' | 'ready_to_retry' | 'monitoring';
       acknowledgedFailureAt: number | null;
       note: string | null;
       updatedAt: number;
@@ -164,6 +165,22 @@ export type EscrowHealthReport = {
         failureMessage: string | null;
         milestoneIndex: number | null;
       }>;
+    };
+    failureGuidance: null | {
+      severity: 'warning' | 'critical';
+      responsibleSurface:
+        | 'wallet_relay'
+        | 'bundler'
+        | 'paymaster_or_sponsor'
+        | 'rpc_or_provider'
+        | 'operator_input'
+        | 'unknown';
+      retryPosture:
+        | 'safe_after_review'
+        | 'wait_for_external_fix'
+        | 'hold_for_configuration_change';
+      summary: string;
+      recommendedActions: string[];
     };
     onchain: {
       chainId: number;
@@ -311,6 +328,7 @@ export const adminApi = {
     jobId: string,
     input: {
       note?: string;
+      status?: 'investigating' | 'blocked_external' | 'ready_to_retry' | 'monitoring';
     },
     accessToken: string,
   ) {
@@ -330,6 +348,7 @@ export const adminApi = {
     jobId: string,
     input: {
       note?: string;
+      status?: 'investigating' | 'blocked_external' | 'ready_to_retry' | 'monitoring';
     },
     accessToken: string,
   ) {
@@ -338,6 +357,26 @@ export const adminApi = {
     }>(
       apiBaseUrl,
       `/operations/escrow-health/${encodeURIComponent(jobId)}/failure-acknowledge`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateExecutionFailureWorkflow(
+    jobId: string,
+    input: {
+      note?: string;
+      status?: 'investigating' | 'blocked_external' | 'ready_to_retry' | 'monitoring';
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      job: EscrowHealthReport['jobs'][number];
+    }>(
+      apiBaseUrl,
+      `/operations/escrow-health/${encodeURIComponent(jobId)}/failure-update`,
       {
         method: 'POST',
         body: JSON.stringify(input),

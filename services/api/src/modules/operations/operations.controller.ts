@@ -80,6 +80,23 @@ export class OperationsController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('escrow-health/:jobId/failure-update')
+  updateExecutionFailureWorkflow(
+    @User() user: ReqUser,
+    @Param('jobId') jobId: string,
+    @Body(
+      new ZodValidationPipe(operationsDto.updateExecutionFailureWorkflowSchema),
+    )
+    body: operationsDto.UpdateExecutionFailureWorkflowDto,
+  ) {
+    return this.escrowHealth.updateExecutionFailureWorkflow(
+      user.id,
+      jobId,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
   @Post('escrow-health/:jobId/stale-release')
   releaseStaleJob(
     @User() user: ReqUser,

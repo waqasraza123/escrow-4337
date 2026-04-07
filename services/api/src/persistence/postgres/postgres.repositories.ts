@@ -6,6 +6,7 @@ import type {
 } from '../../modules/auth/auth.types';
 import type {
   EscrowAuditEvent,
+  EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowExecutionRecord,
   EscrowJobRecord,
@@ -282,10 +283,30 @@ function mapOnchain(row: JobRow): EscrowOnchainState {
   };
 }
 
+function normalizeFailureWorkflowStatus(
+  status?: EscrowFailureRemediationStatus,
+): EscrowFailureRemediationStatus {
+  switch (status) {
+    case 'blocked_external':
+    case 'monitoring':
+    case 'ready_to_retry':
+      return status;
+    case 'investigating':
+    default:
+      return 'investigating';
+  }
+}
+
 function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
   return {
-    executionFailureWorkflow:
-      row.operations_json?.executionFailureWorkflow ?? null,
+    executionFailureWorkflow: row.operations_json?.executionFailureWorkflow
+      ? {
+          ...row.operations_json.executionFailureWorkflow,
+          status: normalizeFailureWorkflowStatus(
+            row.operations_json.executionFailureWorkflow.status,
+          ),
+        }
+      : null,
     staleWorkflow: row.operations_json?.staleWorkflow ?? null,
   };
 }
