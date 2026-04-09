@@ -152,14 +152,15 @@ describe('EscrowChainSyncService', () => {
       },
       2_000_000_000_000,
     );
+    const getLogsCall = mockChainProvider.getLogs.mock.calls[0]?.[0];
 
-    expect(mockChainProvider.getLogs).toHaveBeenCalledWith({
+    expect(getLogsCall).toMatchObject({
       contractAddress: job.onchain.contractAddress,
       escrowId: job.onchain.escrowId,
       fromBlock: 0,
       toBlock: 80,
-      eventTopics: expect.any(Array),
     });
+    expect(Array.isArray(getLogsCall?.eventTopics)).toBe(true);
     expect(report.mode).toBe('preview');
     expect(report.range).toMatchObject({
       fromBlock: 0,
@@ -364,17 +365,19 @@ describe('EscrowChainSyncService', () => {
     const quietJob = await createDeliveredJob();
     const disputedRecord = await requireJob(disputedJob.jobId);
 
-    mockChainProvider.getLogs.mockImplementation(async ({ escrowId }) => {
+    mockChainProvider.getLogs.mockImplementation(({ escrowId }) => {
       if (escrowId === disputedRecord.onchain.escrowId) {
-        return buildDeliveredChainLogs(disputedRecord).concat(
-          createChainLog(
-            'DisputeOpened',
-            [disputedRecord.onchain.escrowId, 0, createBytes32('ee')],
-            {
-              logIndex: 4,
-              txHash:
-                '0x0000000000000000000000000000000000000000000000000000000000000035',
-            },
+        return Promise.resolve(
+          buildDeliveredChainLogs(disputedRecord).concat(
+            createChainLog(
+              'DisputeOpened',
+              [disputedRecord.onchain.escrowId, 0, createBytes32('ee')],
+              {
+                logIndex: 4,
+                txHash:
+                  '0x0000000000000000000000000000000000000000000000000000000000000035',
+              },
+            ),
           ),
         );
       }
@@ -428,9 +431,9 @@ describe('EscrowChainSyncService', () => {
     );
     await escrowRepository.save(firstRecord);
 
-    mockChainProvider.getLogs.mockImplementation(async ({ escrowId }) => {
+    mockChainProvider.getLogs.mockImplementation(({ escrowId }) => {
       if (escrowId === firstRecord.onchain.escrowId) {
-        return buildDeliveredChainLogs(firstRecord);
+        return Promise.resolve(buildDeliveredChainLogs(firstRecord));
       }
       if (escrowId === secondRecord.onchain.escrowId) {
         throw new Error('RPC request timed out');
@@ -525,12 +528,12 @@ describe('EscrowChainSyncService', () => {
     await escrowRepository.save(middleRecord);
     await escrowRepository.save(newestRecord);
 
-    mockChainProvider.getLogs.mockImplementation(async ({ escrowId }) => {
+    mockChainProvider.getLogs.mockImplementation(({ escrowId }) => {
       if (escrowId === newestRecord.onchain.escrowId) {
-        return buildDeliveredChainLogs(newestRecord);
+        return Promise.resolve(buildDeliveredChainLogs(newestRecord));
       }
       if (escrowId === middleRecord.onchain.escrowId) {
-        return buildDeliveredChainLogs(middleRecord);
+        return Promise.resolve(buildDeliveredChainLogs(middleRecord));
       }
 
       throw new Error(`Unexpected escrow id ${escrowId} in runner batch sync`);
@@ -566,7 +569,7 @@ describe('EscrowChainSyncService', () => {
       newestJob.jobId,
       middleJob.jobId,
     ]);
-    expect(mockChainProvider.getLogs).toHaveBeenCalledTimes(2);
+    expect(mockChainProvider.getLogs.mock.calls).toHaveLength(2);
     expect(persistedNewest.audit.map((event) => event.type)).toEqual([
       'job.created',
       'job.funded',

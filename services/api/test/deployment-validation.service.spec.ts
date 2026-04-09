@@ -172,22 +172,21 @@ describe('DeploymentValidationService', () => {
 
     const service = createService(allMigrationsAppliedQuery());
     const report = await service.runValidation();
+    const chainSyncCheck = report.checks.find(
+      (check) => check.id === 'chain-sync-daemon-config',
+    );
 
     expect(report.ok).toBe(false);
-    expect(
-      report.checks.find((check) => check.id === 'chain-sync-daemon-config'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'failed',
-        summary:
-          'Recurring chain-sync daemon deployment posture is misconfigured.',
-        metadata: expect.objectContaining({
-          required: true,
-          rpcConfigured: false,
-          alertingConfigured: false,
-        }),
-      }),
+    expect(chainSyncCheck).toBeDefined();
+    expect(chainSyncCheck?.status).toBe('failed');
+    expect(chainSyncCheck?.summary).toBe(
+      'Recurring chain-sync daemon deployment posture is misconfigured.',
     );
+    expect(chainSyncCheck?.metadata).toMatchObject({
+      required: true,
+      rpcConfigured: false,
+      alertingConfigured: false,
+    });
   });
 
   it('allows a zero-cost local development profile to validate runtime configuration', () => {

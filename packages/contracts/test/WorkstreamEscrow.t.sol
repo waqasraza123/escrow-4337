@@ -7,8 +7,14 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract USDCMock is ERC20 {
     constructor() ERC20("USD Coin", "USDC") {}
-    function decimals() public pure override returns (uint8) { return 6; }
-    function mint(address to, uint256 amt) external { _mint(to, amt); }
+
+    function decimals() public pure override returns (uint8) {
+        return 6;
+    }
+
+    function mint(address to, uint256 amt) external {
+        _mint(to, amt);
+    }
 }
 
 contract WorkstreamEscrowTest is Test {
@@ -21,8 +27,8 @@ contract WorkstreamEscrowTest is Test {
     address worker;
 
     function setUp() public {
-        owner  = makeAddr("owner");
-        arb    = makeAddr("arbitrator");
+        owner = makeAddr("owner");
+        arb = makeAddr("arbitrator");
         client = makeAddr("client");
         worker = makeAddr("worker");
         vm.prank(owner);
@@ -113,5 +119,69 @@ contract WorkstreamEscrowTest is Test {
         vm.prank(client);
         escrow.refundRemainder(id);
         assertEq(usdc.balanceOf(client) - c0, 200_000000);
+    }
+
+    function test_only_arbitrator_can_resolve_dispute() public {
+        uint256 id = _setupJob();
+
+        vm.startPrank(client);
+        usdc.approve(address(escrow), 500_000000);
+        escrow.fund(id, 500_000000);
+        escrow.openDispute(id, 1, keccak256("reason"));
+        vm.stopPrank();
+
+        vm.prank(worker);
+        vm.expectRevert(WorkstreamEscrow.NotArbitrator.selector);
+        escrow.resolve(id, 1, 5000);
+    }
+
+    function test_only_client_can_release_or_refund() public {
+        uint256 id = _setupJob();
+
+        vm.startPrank(client);
+        usdc.approve(address(escrow), 700_000000);
+        escrow.fund(id, 700_000000);
+        vm.stopPrank();
+
+        vm.prank(worker);
+        escrow.deliver(id, 0, keccak256("cid0"));
+
+        vm.prank(worker);
+        vm.expectRevert(WorkstreamEscrow.NotClient.selector);
+        escrow.release(id, 0);
+
+        vm.prank(worker);
+        vm.expectRevert(WorkstreamEscrow.NotClient.selector);
+        escrow.refundRemainder(id);
+    }
+
+    function test_resolution_conserves_funds_after_partial_release_and_dispute() public {
+        uint256 id = _setupJob();
+
+        vm.startPrank(client);
+        usdc.approve(address(escrow), 700_000000);
+        escrow.fund(id, 700_000000);
+        vm.stopPrank();
+
+        vm.prank(worker);
+        escrow.deliver(id, 0, keccak256("cid0"));
+
+        vm.prank(client);
+        escrow.release(id, 0);
+
+        vm.prank(client);
+        escrow.openDispute(id, 1, keccak256("reason"));
+
+        uint256 totalBeforeResolve = usdc.balanceOf(client) + usdc.balanceOf(worker) + usdc.balanceOf(address(escrow));
+
+        vm.prank(arb);
+        escrow.resolve(id, 1, 2500);
+
+        uint256 totalAfterResolve = usdc.balanceOf(client) + usdc.balanceOf(worker) + usdc.balanceOf(address(escrow));
+
+        assertEq(totalAfterResolve, totalBeforeResolve);
+        assertEq(usdc.balanceOf(worker), 450_000000);
+        assertEq(usdc.balanceOf(client), 350_000000);
+        assertEq(usdc.balanceOf(address(escrow)), 200_000000);
     }
 }

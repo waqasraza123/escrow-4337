@@ -29,7 +29,7 @@ export class EscrowChainSyncRunLockService {
       return {
         acquired: true,
         provider: 'local',
-        release: async () => undefined,
+        release: () => Promise.resolve(),
       };
     }
 

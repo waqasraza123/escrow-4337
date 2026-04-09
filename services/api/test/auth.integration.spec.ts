@@ -238,4 +238,55 @@ describe('Auth integration', () => {
     expect(exception.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
     expect(exception.message).toBe('Too many requests');
   });
+
+  it('retains an OTP verification lock after the auth module is recreated', async () => {
+    await moduleFixture.close();
+    process.env.AUTH_OTP_VERIFY_MAX_ATTEMPTS = '2';
+    process.env.AUTH_OTP_LOCK_SEC = '3600';
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [AuthModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue(emailService)
+      .compile();
+
+    authService = moduleFixture.get(AuthService);
+
+    const email = 'locked@example.com';
+    await authService.start({ email }, '127.0.0.1');
+
+    await expect(
+      authService.verify({
+        email,
+        code: '000000',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    await expect(
+      authService.verify({
+        email,
+        code: '111111',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    const issuedCode = sentOtps[0]?.code ?? '';
+    await moduleFixture.close();
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [AuthModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue(emailService)
+      .compile();
+
+    authService = moduleFixture.get(AuthService);
+
+    await expect(
+      authService.verify({
+        email,
+        code: issuedCode,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
 });

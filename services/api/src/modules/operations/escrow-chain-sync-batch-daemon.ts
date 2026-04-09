@@ -180,7 +180,7 @@ export class EscrowChainSyncBatchDaemon {
         : {
             acquired: true,
             provider: 'local',
-            release: async () => undefined,
+            release: () => Promise.resolve(),
           };
 
       const permitCheckedAtMs = this.now();

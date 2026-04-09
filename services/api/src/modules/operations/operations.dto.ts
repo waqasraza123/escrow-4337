@@ -115,7 +115,9 @@ export type UpdateExecutionFailureWorkflowDto = z.infer<
   typeof updateExecutionFailureWorkflowSchema
 >;
 export type ImportJobHistoryDto = z.infer<typeof importJobHistorySchema>;
-export type SyncEscrowChainAuditDto = z.infer<typeof syncEscrowChainAuditSchema>;
+export type SyncEscrowChainAuditDto = z.infer<
+  typeof syncEscrowChainAuditSchema
+>;
 export type SyncEscrowChainAuditBatchDto = z.infer<
   typeof syncEscrowChainAuditBatchSchema
 >;

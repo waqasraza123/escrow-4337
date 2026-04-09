@@ -60,9 +60,20 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
     error UnderFunded();
     error NothingToRefund();
 
-    modifier onlyClient(uint256 id){ if (msg.sender != jobs[id].client) revert NotClient(); _; }
-    modifier onlyWorker(uint256 id){ if (msg.sender != jobs[id].worker) revert NotWorker(); _; }
-    modifier onlyArb(){ if (msg.sender != arbitrator) revert NotArbitrator(); _; }
+    modifier onlyClient(uint256 id) {
+        if (msg.sender != jobs[id].client) revert NotClient();
+        _;
+    }
+
+    modifier onlyWorker(uint256 id) {
+        if (msg.sender != jobs[id].worker) revert NotWorker();
+        _;
+    }
+
+    modifier onlyArb() {
+        if (msg.sender != arbitrator) revert NotArbitrator();
+        _;
+    }
 
     constructor(address initialOwner, address initialArbitrator) Ownable(initialOwner) {
         arbitrator = initialArbitrator;
@@ -73,12 +84,15 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         arbitrator = next;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
 
-    function createJob(address worker, address currency, bytes32 jobHash)
-        external whenNotPaused returns (uint256 id)
-    {
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function createJob(address worker, address currency, bytes32 jobHash) external whenNotPaused returns (uint256 id) {
         require(worker != address(0) && currency != address(0), "zero addr");
         id = ++nextEscrowId;
         Job storage j = jobs[id];
@@ -91,9 +105,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit JobCreated(id, msg.sender, jobHash);
     }
 
-    function fund(uint256 id, uint256 amount)
-        external nonReentrant onlyClient(id) whenNotPaused
-    {
+    function fund(uint256 id, uint256 amount) external nonReentrant onlyClient(id) whenNotPaused {
         Job storage j = jobs[id];
         if (!j.active) revert NotActive();
         IERC20(j.currency).safeTransferFrom(msg.sender, address(this), amount);
@@ -101,9 +113,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit EscrowFunded(id, amount, j.currency);
     }
 
-    function setMilestones(uint256 id, Milestone[] calldata m)
-        external onlyClient(id) whenNotPaused
-    {
+    function setMilestones(uint256 id, Milestone[] calldata m) external onlyClient(id) whenNotPaused {
         if (milestoneCount[id] != 0) revert MilestonesAlreadySet();
         require(m.length > 0, "no milestones");
         uint256 total;
@@ -123,9 +133,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit MilestonesSet(id, m.length);
     }
 
-    function deliver(uint256 id, uint256 mid, bytes32 deliverableHash)
-        external onlyWorker(id) whenNotPaused
-    {
+    function deliver(uint256 id, uint256 mid, bytes32 deliverableHash) external onlyWorker(id) whenNotPaused {
         if (mid >= milestoneCount[id]) revert InvalidMilestone();
         Milestone storage ms = milestones[id][mid];
         if (ms.delivered) revert AlreadyDelivered();
@@ -134,9 +142,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit MilestoneDelivered(id, mid, deliverableHash);
     }
 
-    function release(uint256 id, uint256 mid)
-        external nonReentrant onlyClient(id) whenNotPaused
-    {
+    function release(uint256 id, uint256 mid) external nonReentrant onlyClient(id) whenNotPaused {
         if (mid >= milestoneCount[id]) revert InvalidMilestone();
         Job storage j = jobs[id];
         Milestone storage ms = milestones[id][mid];
@@ -152,9 +158,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit MilestoneReleased(id, mid, amt);
     }
 
-    function openDispute(uint256 id, uint256 mid, bytes32 reasonHash)
-        external whenNotPaused
-    {
+    function openDispute(uint256 id, uint256 mid, bytes32 reasonHash) external whenNotPaused {
         if (mid >= milestoneCount[id]) revert InvalidMilestone();
         Job storage j = jobs[id];
         require(msg.sender == j.client || msg.sender == j.worker, "parties only");
@@ -166,9 +170,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit DisputeOpened(id, mid, reasonHash);
     }
 
-    function resolve(uint256 id, uint256 mid, uint16 splitBpsClient)
-        external nonReentrant onlyArb whenNotPaused
-    {
+    function resolve(uint256 id, uint256 mid, uint16 splitBpsClient) external nonReentrant onlyArb whenNotPaused {
         if (mid >= milestoneCount[id]) revert InvalidMilestone();
         require(splitBpsClient <= 10_000, "bps");
         Job storage j = jobs[id];
@@ -188,9 +190,7 @@ contract WorkstreamEscrow is Ownable, ReentrancyGuard, Pausable {
         emit DisputeResolved(id, mid, splitBpsClient);
     }
 
-    function refundRemainder(uint256 id)
-        external nonReentrant onlyClient(id)
-    {
+    function refundRemainder(uint256 id) external nonReentrant onlyClient(id) {
         Job storage j = jobs[id];
         uint256 required = jobs[id].total - releasedAmount[id];
         if (j.funded <= required) revert NothingToRefund();

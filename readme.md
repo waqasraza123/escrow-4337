@@ -188,6 +188,7 @@ cd packages/contracts && forge test
 
 Important repo truths:
 
+- `pnpm verify:ci` is the canonical non-mutating local and CI verification entrypoint.
 - `pnpm typecheck` is meaningful and currently green.
 - `pnpm lint` is meaningful and currently green.
 - `pnpm test` is meaningful and currently backend-heavy rather than product-complete.
@@ -210,6 +211,9 @@ The implementation sequence is documented in [docs/EXECUTION_GUIDE.md](/Users/mc
 - [docs/project-state.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/project-state.md): durable project memory
 - [docs/ARCHITECTURE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md): system boundaries and target direction
 - [docs/EXECUTION_GUIDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md): step-by-step completion roadmap
+- [docs/ENVIRONMENT_MATRIX.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ENVIRONMENT_MATRIX.md): local, staging, and production deployment expectations
+- [docs/DEPLOYMENT_RUNBOOK.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/DEPLOYMENT_RUNBOOK.md): rollout, smoke, and rollback contract
+- [docs/SECURITY_REVIEW.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/SECURITY_REVIEW.md): focused Phase 7 security review
 - [docs/FRONTEND_PLAN.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/FRONTEND_PLAN.md): detailed frontend sequencing for `apps/web` and `apps/admin`
 - [CLAUDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CLAUDE.md): AI assistant working guide
 - [CONTRIBUTING.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CONTRIBUTING.md): contribution expectations

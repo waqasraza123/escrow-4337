@@ -65,7 +65,7 @@ describe('EscrowChainSyncDaemonStatusService', () => {
 
     const status = await service.getStatus();
     const raw = await readFile(
-      process.env.OPERATIONS_ESCROW_BATCH_SYNC_STATUS_FILE!,
+      process.env.OPERATIONS_ESCROW_BATCH_SYNC_STATUS_FILE,
       'utf8',
     );
 

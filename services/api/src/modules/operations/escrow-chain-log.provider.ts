@@ -66,7 +66,9 @@ export class JsonRpcEscrowChainLogProvider implements EscrowChainLogProvider {
   async getBlockTimestamp(blockNumber: number) {
     const block = await this.getProvider().getBlock(blockNumber);
     if (!block) {
-      throw new Error(`Block ${blockNumber} is unavailable from the configured RPC`);
+      throw new Error(
+        `Block ${blockNumber} is unavailable from the configured RPC`,
+      );
     }
 
     return block.timestamp * 1000;

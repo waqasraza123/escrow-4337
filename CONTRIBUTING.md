@@ -19,8 +19,7 @@ If you are resuming active work in a local checkout, also read `docs/_local/curr
 ```bash
 pnpm install
 pnpm setup:githooks
-pnpm typecheck
-pnpm lint
+pnpm verify:ci
 ```
 
 `pnpm install` also runs the repo `prepare` hook, which applies the versioned Git hook path at `.githooks`.
@@ -48,11 +47,14 @@ Run the smallest relevant checks first.
 Typical checks:
 
 ```bash
+pnpm verify:ci
 pnpm typecheck
 pnpm lint
+pnpm build
+pnpm exec playwright test --list
 pnpm --filter @escrow4334/compliance build
 pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit
-cd packages/contracts && forge test
+pnpm contracts:check
 ```
 
 Do not claim repo health beyond the commands you actually ran.
@@ -63,12 +65,14 @@ This repo uses a versioned Git pre-push hook at `.githooks/pre-push`.
 
 - Normal `git push` runs `scripts/verify-push.sh` through the Git pre-push hook.
 - Pushes are blocked if `pnpm build` fails.
+- `pnpm verify:ci` is the full non-mutating local and CI verification entrypoint.
 - The shared verifier can be run manually with `pnpm verify:push`.
 - The explicit AI-friendly wrapper command is `pnpm safe-push`.
 
 Typical usage:
 
 ```bash
+pnpm verify:ci
 pnpm verify:push
 pnpm safe-push
 pnpm safe-push -- origin your-branch

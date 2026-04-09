@@ -92,11 +92,12 @@ describe('EscrowChainSyncBatchDaemon', () => {
       worker: createWorker(),
       intervalMs: 1_000,
       runOnStart: true,
-      acquireRunPermit: async () => ({
-        acquired: false,
-        provider: 'postgres_advisory',
-        reason: 'lock_unavailable',
-      }),
+      acquireRunPermit: () =>
+        Promise.resolve({
+          acquired: false,
+          provider: 'postgres_advisory',
+          reason: 'lock_unavailable' as const,
+        }),
       runBatchBackfill,
       log,
       overrideLimit: null,

@@ -202,7 +202,7 @@ async function main() {
             console.error(error);
             process.exitCode = 1;
           })
-          .finally(async () => {
+          .finally(() => {
             process.off('SIGINT', handleSigint);
             process.off('SIGTERM', handleSigterm);
             // eslint-disable-next-line no-console
@@ -213,8 +213,18 @@ async function main() {
                 signal,
               }),
             );
-            await app.close();
-            resolve();
+
+            void app.close().then(
+              () => {
+                resolve();
+              },
+              (error) => {
+                // eslint-disable-next-line no-console
+                console.error(error);
+                process.exitCode = 1;
+                resolve();
+              },
+            );
           });
       };
 

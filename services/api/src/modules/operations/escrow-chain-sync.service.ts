@@ -8,7 +8,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { utils } from 'ethers';
+import { BigNumber, utils } from 'ethers';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
@@ -112,6 +112,42 @@ function formatMinorUnits(amountMinorUnits: string) {
 
 function cloneJob(job: EscrowJobRecord): EscrowJobRecord {
   return structuredClone(job);
+}
+
+function readParsedStringArg(args: utils.Result, key: string) {
+  const value: unknown = args[key];
+  if (typeof value !== 'string') {
+    throw new Error(`Expected chain event argument ${key} to be a string.`);
+  }
+  return value;
+}
+
+function readParsedIntegerArg(args: utils.Result, key: string) {
+  const value: unknown = args[key];
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return Number.parseInt(value, 10);
+  }
+  if (BigNumber.isBigNumber(value)) {
+    return value.toNumber();
+  }
+  throw new Error(`Expected chain event argument ${key} to be an integer.`);
+}
+
+function readParsedNumberishStringArg(args: utils.Result, key: string) {
+  const value: unknown = args[key];
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (BigNumber.isBigNumber(value)) {
+    return value.toString();
+  }
+  throw new Error(`Expected chain event argument ${key} to be numeric.`);
 }
 
 function summarizeChainSyncRecord(
@@ -556,8 +592,13 @@ export class EscrowChainSyncService {
 
       switch (parsed.name) {
         case 'JobCreated': {
-          const clientAddress = normalizeEvmAddress(parsed.args.client);
-          const jobHash = parsed.args.jobHash.toLowerCase();
+          const clientAddress = normalizeEvmAddress(
+            readParsedStringArg(parsed.args, 'client'),
+          );
+          const jobHash = readParsedStringArg(
+            parsed.args,
+            'jobHash',
+          ).toLowerCase();
           if (
             clientAddress !==
             normalizeEvmAddress(localJob.onchain.clientAddress)
@@ -603,7 +644,9 @@ export class EscrowChainSyncService {
           break;
         }
         case 'EscrowFunded': {
-          const currencyAddress = normalizeEvmAddress(parsed.args.currency);
+          const currencyAddress = normalizeEvmAddress(
+            readParsedStringArg(parsed.args, 'currency'),
+          );
           if (
             currencyAddress !==
             normalizeEvmAddress(localJob.onchain.currencyAddress)
@@ -627,7 +670,9 @@ export class EscrowChainSyncService {
               at: fallbackAt,
               payload: {
                 jobId: localJob.id,
-                amount: formatMinorUnits(parsed.args.amount.toString()),
+                amount: formatMinorUnits(
+                  readParsedNumberishStringArg(parsed.args, 'amount'),
+                ),
               },
             },
             fallbackAt,
@@ -643,7 +688,7 @@ export class EscrowChainSyncService {
               at: fallbackAt,
               payload: {
                 jobId: localJob.id,
-                count: parsed.args.count.toNumber(),
+                count: readParsedIntegerArg(parsed.args, 'count'),
               },
             },
             fallbackAt,
@@ -658,7 +703,7 @@ export class EscrowChainSyncService {
               at: fallbackAt,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: parsed.args.mid.toNumber(),
+                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
               },
             },
             fallbackAt,
@@ -673,7 +718,7 @@ export class EscrowChainSyncService {
               at: fallbackAt,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: parsed.args.mid.toNumber(),
+                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
               },
             },
             fallbackAt,
@@ -688,7 +733,7 @@ export class EscrowChainSyncService {
               at: fallbackAt,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: parsed.args.mid.toNumber(),
+                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
               },
             },
             fallbackAt,
@@ -697,7 +742,10 @@ export class EscrowChainSyncService {
           });
           break;
         case 'DisputeResolved': {
-          const splitBpsClient = Number(parsed.args.splitBpsClient);
+          const splitBpsClient = readParsedIntegerArg(
+            parsed.args,
+            'splitBpsClient',
+          );
           let action: 'release' | 'refund' | null = null;
           if (splitBpsClient === 0) {
             action = 'release';
@@ -722,7 +770,7 @@ export class EscrowChainSyncService {
                 at: fallbackAt,
                 payload: {
                   jobId: localJob.id,
-                  milestoneIndex: parsed.args.mid.toNumber(),
+                  milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
                   action,
                 },
               },
@@ -823,8 +871,7 @@ export class EscrowChainSyncService {
       },
     };
 
-    const jobForMetadata =
-      applied ? chainDerivedJob : cloneJob(localJob);
+    const jobForMetadata = applied ? chainDerivedJob : cloneJob(localJob);
     jobForMetadata.operations.chainSync = summarizeChainSyncRecord(report);
     await this.escrowRepository.save(jobForMetadata);
 

@@ -24,12 +24,8 @@ describe('escrow-chain-sync-daemon-health-cli', () => {
   });
 
   it('applies the requested failure threshold', () => {
-    expect(
-      shouldFailHealth({ status: 'warning' }, 'warning'),
-    ).toBeTruthy();
-    expect(
-      shouldFailHealth({ status: 'warning' }, 'critical'),
-    ).toBeFalsy();
+    expect(shouldFailHealth({ status: 'warning' }, 'warning')).toBeTruthy();
+    expect(shouldFailHealth({ status: 'warning' }, 'critical')).toBeFalsy();
     expect(shouldFailHealth({ status: 'failed' }, 'critical')).toBeTruthy();
     expect(shouldFailHealth({ status: 'failed' }, 'never')).toBeFalsy();
   });

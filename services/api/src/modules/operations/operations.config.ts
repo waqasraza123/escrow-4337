@@ -14,13 +14,13 @@ export class OperationsConfigService {
 
   get escrowBatchSyncDaemonAlertWebhookUrl() {
     return process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL?.trim()
-      ? process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL!.trim()
+      ? process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL.trim()
       : null;
   }
 
   get escrowBatchSyncDaemonAlertWebhookBearerToken() {
     return process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_BEARER_TOKEN?.trim()
-      ? process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_BEARER_TOKEN!.trim()
+      ? process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_BEARER_TOKEN.trim()
       : null;
   }
 
@@ -33,9 +33,8 @@ export class OperationsConfigService {
 
   get escrowBatchSyncDaemonAlertMinSeverity() {
     const raw =
-      process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_MIN_SEVERITY
-        ?.trim()
-        .toLowerCase() ?? 'critical';
+      process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_MIN_SEVERITY?.trim().toLowerCase() ??
+      'critical';
 
     return raw === 'warning' ? 'warning' : 'critical';
   }
@@ -53,9 +52,8 @@ export class OperationsConfigService {
 
   get escrowBatchSyncDaemonAlertSendRecovery() {
     const raw =
-      process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_SEND_RECOVERY
-        ?.trim()
-        .toLowerCase() ?? 'true';
+      process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_SEND_RECOVERY?.trim().toLowerCase() ??
+      'true';
     return raw !== '0' && raw !== 'false' && raw !== 'no';
   }
 
@@ -74,9 +72,8 @@ export class OperationsConfigService {
   }
 
   get escrowBatchSyncDaemonRequired() {
-    const raw = process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED
-      ?.trim()
-      .toLowerCase();
+    const raw =
+      process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED?.trim().toLowerCase();
     return raw === '1' || raw === 'true' || raw === 'yes';
   }
 

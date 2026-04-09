@@ -1,0 +1,15 @@
+.git
+.github
+.turbo
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+infra/postgres/.env
+services/api/.env
+services/api/.env.local
+apps/web/.env
+apps/admin/.env

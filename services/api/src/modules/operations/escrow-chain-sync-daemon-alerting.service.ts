@@ -163,7 +163,8 @@ export class EscrowChainSyncDaemonAlertingService {
       if (!state?.activeAlertFingerprint) {
         return {
           action: 'suppress',
-          reason: report.status === 'ok' ? 'no_active_alert' : 'below_threshold',
+          reason:
+            report.status === 'ok' ? 'no_active_alert' : 'below_threshold',
           event: null,
           severity: null,
           fingerprint: null,
@@ -245,7 +246,11 @@ export class EscrowChainSyncDaemonAlertingService {
     status: EscrowChainSyncDaemonHealthReport['status'],
   ): EscrowChainSyncDaemonAlertSeverity | null {
     const severity =
-      status === 'failed' ? 'critical' : status === 'warning' ? 'warning' : null;
+      status === 'failed'
+        ? 'critical'
+        : status === 'warning'
+          ? 'warning'
+          : null;
     if (!severity) {
       return null;
     }
@@ -284,7 +289,8 @@ export class EscrowChainSyncDaemonAlertingService {
                   report.daemon.heartbeat.consecutiveFailures,
                 consecutiveSkips: report.daemon.heartbeat.consecutiveSkips,
                 lastErrorMessage: report.daemon.heartbeat.lastErrorMessage,
-                currentRunStartedAt: report.daemon.currentRun?.startedAt ?? null,
+                currentRunStartedAt:
+                  report.daemon.currentRun?.startedAt ?? null,
               }
             : null,
         }),

@@ -58,11 +58,7 @@ export class EscrowChainSyncDaemonDeploymentService {
 
     return {
       status:
-        issues.length > 0
-          ? 'failed'
-          : warnings.length > 0
-            ? 'warning'
-            : 'ok',
+        issues.length > 0 ? 'failed' : warnings.length > 0 ? 'warning' : 'ok',
       summary: buildSummary(required, issues, warnings),
       required,
       rpcConfigured,
@@ -94,11 +90,7 @@ export class EscrowChainSyncDaemonDeploymentService {
   }
 }
 
-function buildSummary(
-  required: boolean,
-  issues: string[],
-  warnings: string[],
-) {
+function buildSummary(required: boolean, issues: string[], warnings: string[]) {
   if (issues.length > 0) {
     return 'Recurring chain-sync daemon deployment posture is misconfigured.';
   }

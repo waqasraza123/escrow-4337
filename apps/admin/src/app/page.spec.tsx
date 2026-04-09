@@ -277,6 +277,29 @@ describe('admin page', () => {
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
   });
 
+  it('keeps privileged operator workflows blocked when the session does not control the arbitrator wallet', async () => {
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('3'))]),
+    );
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Link the configured arbitrator wallet to unlock operations health'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Operator resolution remains blocked until the configured arbitrator wallet is linked.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.getEscrowHealth).not.toHaveBeenCalled();
+    expect(mockedAdminApi.getEscrowChainSyncDaemonHealth).not.toHaveBeenCalled();
+  });
+
   it('imports a job-history export and previews replay reconciliation against local state', async () => {
     const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, createSessionTokens());

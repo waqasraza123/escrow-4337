@@ -470,7 +470,8 @@ describe('EscrowHealthService', () => {
       workerAddress,
       currencyAddress,
       title: 'Backlogged chain sync',
-      description: 'Recurring chain sync has not produced a healthy recent snapshot.',
+      description:
+        'Recurring chain sync has not produced a healthy recent snapshot.',
       category: 'software-development',
       termsJSON: {
         currency: 'USDC',

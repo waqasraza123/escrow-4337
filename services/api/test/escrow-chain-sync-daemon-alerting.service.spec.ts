@@ -50,8 +50,14 @@ describe('EscrowChainSyncDaemonAlertingService', () => {
     ]);
     const service = createService(monitoring);
 
-    const first = await service.dispatchAlert({}, Date.parse('2026-04-09T00:00:00.000Z'));
-    const second = await service.dispatchAlert({}, Date.parse('2026-04-09T00:05:00.000Z'));
+    const first = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:00:00.000Z'),
+    );
+    const second = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:05:00.000Z'),
+    );
 
     expect(first.notification).toMatchObject({
       configured: true,
@@ -80,8 +86,14 @@ describe('EscrowChainSyncDaemonAlertingService', () => {
     ]);
     const service = createService(monitoring);
 
-    const first = await service.dispatchAlert({}, Date.parse('2026-04-09T00:00:00.000Z'));
-    const second = await service.dispatchAlert({}, Date.parse('2026-04-09T00:10:00.000Z'));
+    const first = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:00:00.000Z'),
+    );
+    const second = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:10:00.000Z'),
+    );
 
     expect(first.notification.event).toBe('alert');
     expect(second.notification).toMatchObject({
@@ -131,8 +143,14 @@ describe('EscrowChainSyncDaemonAlertingService', () => {
     ]);
     const service = createService(monitoring);
 
-    const first = await service.dispatchAlert({}, Date.parse('2026-04-09T00:00:00.000Z'));
-    const second = await service.dispatchAlert({}, Date.parse('2026-04-09T00:10:00.000Z'));
+    const first = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:00:00.000Z'),
+    );
+    const second = await service.dispatchAlert(
+      {},
+      Date.parse('2026-04-09T00:10:00.000Z'),
+    );
 
     expect(first.notification.event).toBe('alert');
     expect(second.notification).toMatchObject({
@@ -167,7 +185,9 @@ describe('EscrowChainSyncDaemonAlertingService', () => {
     return {
       getReport: jest
         .fn()
-        .mockImplementation(async () => reports.shift() ?? createOkReport()),
+        .mockImplementation(() =>
+          Promise.resolve(reports.shift() ?? createOkReport()),
+        ),
     } as unknown as EscrowChainSyncDaemonMonitoringService;
   }
 });

@@ -32,6 +32,7 @@ High-priority areas include:
 - Never commit secrets, private keys, or production credentials.
 - Use environment-scoped secrets for CI and deployment.
 - Remove accidental secret commits immediately and rotate exposed credentials.
+- Use [docs/SECURITY_REVIEW.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/SECURITY_REVIEW.md) as the focused Phase 7 review artifact for contracts, auth, wallet, and admin boundaries.
 
 ## Disclosure Expectations
 

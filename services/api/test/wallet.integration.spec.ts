@@ -183,6 +183,58 @@ describe('Wallet integration', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('rejects verifying a persisted challenge after the configured SIWE domain changes', async () => {
+    const user = await usersService.getOrCreateByEmail(
+      'domain-mismatch@example.com',
+    );
+    const signer = Wallet.createRandom();
+    const challenge = await walletService.createLinkWalletChallenge(user.id, {
+      address: signer.address,
+      walletKind: 'eoa',
+      chainId: 1,
+    });
+    const signature = await signer.signMessage(challenge.message);
+
+    await moduleFixture.close();
+    process.env.WALLET_SIWE_DOMAIN = 'api.changed.local';
+
+    moduleFixture = await Test.createTestingModule({
+      imports: [WalletModule],
+    }).compile();
+
+    walletService = moduleFixture.get(WalletService);
+    usersService = moduleFixture.get(UsersService);
+
+    await expect(
+      walletService.verifyLinkWallet(user.id, {
+        challengeId: challenge.challengeId,
+        message: challenge.message,
+        signature,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects signatures that do not recover the challenged owner address', async () => {
+    const user = await usersService.getOrCreateByEmail(
+      'ownership-mismatch@example.com',
+    );
+    const expectedOwner = Wallet.createRandom();
+    const unexpectedSigner = Wallet.createRandom();
+    const challenge = await walletService.createLinkWalletChallenge(user.id, {
+      address: expectedOwner.address,
+      walletKind: 'eoa',
+      chainId: 1,
+    });
+
+    await expect(
+      walletService.verifyLinkWallet(user.id, {
+        challengeId: challenge.challengeId,
+        message: challenge.message,
+        signature: await unexpectedSigner.signMessage(challenge.message),
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('rejects linking a wallet that is already owned by another user', async () => {
     const firstUser =
       await usersService.getOrCreateByEmail('first@example.com');
@@ -295,6 +347,17 @@ describe('Wallet integration', () => {
         setAsDefault: true,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects smart-account provisioning for an unlinked owner address', async () => {
+    const user = await usersService.getOrCreateByEmail('unlinked@example.com');
+
+    await expect(
+      walletService.provisionSmartAccount(user.id, {
+        ownerAddress: Wallet.createRandom().address,
+        setAsDefault: false,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('returns an explicit unsponsored decision when gas sponsorship is disabled', async () => {

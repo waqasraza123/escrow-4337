@@ -14,9 +14,13 @@ export class EscrowChainSyncDaemonMonitoringService {
     private readonly operationsConfig: OperationsConfigService,
   ) {}
 
-  async getReport(now = Date.now()): Promise<EscrowChainSyncDaemonHealthReport> {
+  async getReport(
+    now = Date.now(),
+  ): Promise<EscrowChainSyncDaemonHealthReport> {
     const daemon = await this.daemonStatusService.getStatus();
-    const issues = daemon ? this.evaluateDaemon(daemon, now) : this.missingDaemon();
+    const issues = daemon
+      ? this.evaluateDaemon(daemon, now)
+      : this.missingDaemon();
     const status = highestStatus(issues);
 
     return {
@@ -26,7 +30,8 @@ export class EscrowChainSyncDaemonMonitoringService {
       required: this.operationsConfig.escrowBatchSyncDaemonRequired,
       summary: buildSummary(status, daemon, issues),
       thresholds: {
-        maxHeartbeatAgeMs: this.operationsConfig.escrowBatchSyncDaemonMaxHeartbeatAgeMs,
+        maxHeartbeatAgeMs:
+          this.operationsConfig.escrowBatchSyncDaemonMaxHeartbeatAgeMs,
         maxCurrentRunAgeMs:
           this.operationsConfig.escrowBatchSyncDaemonMaxCurrentRunAgeMs,
         maxConsecutiveFailures:
@@ -95,7 +100,8 @@ export class EscrowChainSyncDaemonMonitoringService {
         issues.push({
           code: 'run_stalled',
           severity: 'critical',
-          summary: 'The recurring chain-sync daemon appears stalled in an active run.',
+          summary:
+            'The recurring chain-sync daemon appears stalled in an active run.',
           detail: `The current run started at ${daemon.currentRun.startedAt} and has been active for ${currentRunAgeMs}ms, which exceeds the configured max of ${this.operationsConfig.escrowBatchSyncDaemonMaxCurrentRunAgeMs}ms.`,
         });
       }
@@ -108,7 +114,8 @@ export class EscrowChainSyncDaemonMonitoringService {
       issues.push({
         code: 'consecutive_failures',
         severity: 'critical',
-        summary: 'The recurring chain-sync daemon has exceeded the consecutive failure threshold.',
+        summary:
+          'The recurring chain-sync daemon has exceeded the consecutive failure threshold.',
         detail: `The daemon recorded ${daemon.heartbeat.consecutiveFailures} consecutive failures, exceeding the configured max of ${this.operationsConfig.escrowBatchSyncDaemonMaxConsecutiveFailures}.`,
       });
     } else if (daemon.heartbeat.lastRunOutcome === 'failed') {
@@ -127,7 +134,8 @@ export class EscrowChainSyncDaemonMonitoringService {
       issues.push({
         code: 'consecutive_skips',
         severity: 'warning',
-        summary: 'The recurring chain-sync daemon has exceeded the consecutive skip threshold.',
+        summary:
+          'The recurring chain-sync daemon has exceeded the consecutive skip threshold.',
         detail: `The daemon recorded ${daemon.heartbeat.consecutiveSkips} consecutive skipped runs, exceeding the configured max of ${this.operationsConfig.escrowBatchSyncDaemonMaxConsecutiveSkips}.`,
       });
     }
@@ -159,5 +167,7 @@ function buildSummary(
     return 'Recurring chain-sync daemon status is unavailable.';
   }
 
-  return issues[0]?.summary ?? 'Recurring chain-sync daemon requires attention.';
+  return (
+    issues[0]?.summary ?? 'Recurring chain-sync daemon requires attention.'
+  );
 }

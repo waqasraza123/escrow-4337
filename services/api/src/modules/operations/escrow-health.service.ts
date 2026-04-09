@@ -358,8 +358,7 @@ function buildChainSyncStatus(
   if (!chainSync) {
     const activityAt = latestActivityAt(job);
     return {
-      status:
-        activityAt <= backlogCutoff ? 'stale' : 'pending_initial_sync',
+      status: activityAt <= backlogCutoff ? 'stale' : 'pending_initial_sync',
       staleForMs: activityAt <= backlogCutoff ? now - activityAt : null,
       lastAttemptedAt: null,
       lastSuccessfulAt: null,
@@ -465,7 +464,8 @@ export class EscrowHealthService {
         limit: normalizedLimit,
       },
       thresholds: {
-        chainSyncBacklogHours: this.operationsConfig.escrowChainSyncBacklogHours,
+        chainSyncBacklogHours:
+          this.operationsConfig.escrowChainSyncBacklogHours,
         chainSyncBacklogMs: this.operationsConfig.escrowChainSyncBacklogMs,
         staleJobHours: this.operationsConfig.escrowStaleJobHours,
         staleJobMs: this.operationsConfig.escrowStaleJobMs,
@@ -798,7 +798,11 @@ export class EscrowHealthService {
       reasons.add('reconciliation_drift');
     }
 
-    if (chainSync && chainSync.status !== 'healthy' && chainSync.status !== 'pending_initial_sync') {
+    if (
+      chainSync &&
+      chainSync.status !== 'healthy' &&
+      chainSync.status !== 'pending_initial_sync'
+    ) {
       reasons.add('chain_sync_backlog');
     }
 
