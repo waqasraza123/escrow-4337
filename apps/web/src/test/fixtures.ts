@@ -251,7 +251,7 @@ export function createCreateJobResponse(overrides: {
 export function createRuntimeProfile(
   overrides: Partial<RuntimeProfile> = {},
 ): RuntimeProfile {
-  return {
+  const base: RuntimeProfile = {
     generatedAt: '2026-04-06T00:00:00.000Z',
     profile: 'local-mock',
     summary:
@@ -272,9 +272,61 @@ export function createRuntimeProfile(
       resolutionAuthority: 'linked_arbitrator_wallet',
       exportSupport: true,
     },
+    operations: {
+      chainSyncDaemon: {
+        status: 'ok',
+        summary:
+          'Recurring chain-sync daemon is optional in this environment.',
+        required: false,
+        rpcConfigured: false,
+        persistDefault: false,
+        intervalSeconds: 300,
+        runOnStart: true,
+        lockProvider: 'postgres_advisory',
+        alertingConfigured: false,
+        alertMinSeverity: 'critical',
+        alertSendRecovery: true,
+        alertResendIntervalSeconds: 3600,
+        thresholds: {
+          maxHeartbeatAgeSeconds: 900,
+          maxCurrentRunAgeSeconds: 1800,
+          maxConsecutiveFailures: 3,
+          maxConsecutiveSkips: 6,
+        },
+        issues: [],
+        warnings: [],
+      },
+    },
     warnings: [
       'Escrow execution is using mock mode, so lifecycle mutations are not exercising deployed contract relay infrastructure.',
     ],
+  };
+
+  return {
+    ...base,
     ...overrides,
+    environment: {
+      ...base.environment,
+      ...overrides.environment,
+    },
+    providers: {
+      ...base.providers,
+      ...overrides.providers,
+    },
+    operator: {
+      ...base.operator,
+      ...overrides.operator,
+    },
+    operations: {
+      chainSyncDaemon: {
+        ...base.operations.chainSyncDaemon,
+        ...overrides.operations?.chainSyncDaemon,
+        thresholds: {
+          ...base.operations.chainSyncDaemon.thresholds,
+          ...overrides.operations?.chainSyncDaemon?.thresholds,
+        },
+      },
+    },
+    warnings: overrides.warnings ?? base.warnings,
   };
 }

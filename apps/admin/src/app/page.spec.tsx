@@ -1,9 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  renderApp,
-  seedJsonStorage,
-} from '@escrow4334/frontend-core/testing';
+import { renderApp, seedJsonStorage } from '@escrow4334/frontend-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuditBundle,
@@ -30,7 +27,10 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     logout: vi.fn(),
     me: vi.fn(),
     getEscrowHealth: vi.fn(),
+    getEscrowChainSyncDaemonHealth: vi.fn(),
     importJobHistoryReconciliation: vi.fn(),
+    syncEscrowChainAudit: vi.fn(),
+    syncEscrowChainAuditBatch: vi.fn(),
     claimExecutionFailureWorkflow: vi.fn(),
     acknowledgeExecutionFailures: vi.fn(),
     updateExecutionFailureWorkflow: vi.fn(),
@@ -56,6 +56,7 @@ describe('admin page', () => {
     vi.clearAllMocks();
     mockedAdminApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
     mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.getEscrowChainSyncDaemonHealth.mockResolvedValue(null);
   });
 
   it('renders the public-only operator scope shell before any lookup', async () => {
@@ -86,9 +87,7 @@ describe('admin page', () => {
     renderApp(<Home />);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByText('Runtime profile unavailable').length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText('Runtime profile unavailable').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
       expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
@@ -102,13 +101,8 @@ describe('admin page', () => {
 
     renderApp(<Home />);
 
-    await user.type(
-      screen.getByPlaceholderText('Paste a job UUID'),
-      'job-123',
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Load public bundle' }),
-    );
+    await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-123');
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Disputed implementation' })).toBeInTheDocument();
@@ -120,9 +114,7 @@ describe('admin page', () => {
     expect(window.localStorage.getItem(lookupHistoryStorageKey)).toBe(
       JSON.stringify(['job-123', 'job-legacy']),
     );
-    expect(
-      screen.getByRole('button', { name: 'Export job history JSON' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export job history JSON' })).toBeInTheDocument();
   });
 
   it('surfaces a validation error when lookup is submitted without a job id', async () => {
@@ -130,9 +122,7 @@ describe('admin page', () => {
 
     renderApp(<Home />);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Load public bundle' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     expect(
       screen.getByText('Provide a job id before loading the public audit bundle.'),
@@ -146,13 +136,8 @@ describe('admin page', () => {
 
     renderApp(<Home />);
 
-    await user.type(
-      screen.getByPlaceholderText('Paste a job UUID'),
-      'missing-job',
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Load public bundle' }),
-    );
+    await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'missing-job');
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     await waitFor(() => {
       expect(screen.getByText('Bundle not found')).toBeInTheDocument();
@@ -174,9 +159,7 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'job-suggested' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Disputed implementation' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Disputed implementation' })).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole('button', { name: 'Reload case' }));
@@ -195,18 +178,11 @@ describe('admin page', () => {
 
     renderApp(<Home />);
 
-    await user.type(
-      screen.getByPlaceholderText('Paste a job UUID'),
-      'job-quiet',
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Load public bundle' }),
-    );
+    await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-quiet');
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Healthy implementation' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Healthy implementation' })).toBeInTheDocument();
     });
 
     expect(screen.getAllByText('No active disputes').length).toBeGreaterThan(0);
@@ -224,12 +200,8 @@ describe('admin page', () => {
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockedAdminApi.me
       .mockResolvedValueOnce(createUserProfile())
-      .mockResolvedValueOnce(
-        createUserProfile([createEoaWallet(createHexAddress('2'))]),
-      );
-    mockedAdminApi.createWalletChallenge.mockResolvedValue(
-      createWalletLinkChallenge(),
-    );
+      .mockResolvedValueOnce(createUserProfile([createEoaWallet(createHexAddress('2'))]));
+    mockedAdminApi.createWalletChallenge.mockResolvedValue(createWalletLinkChallenge());
     mockedAdminApi.verifyWalletChallenge.mockResolvedValue({
       defaultExecutionWalletAddress: null,
       wallets: [createEoaWallet(createHexAddress('2'))],
@@ -241,10 +213,7 @@ describe('admin page', () => {
       expect(screen.getByText('operator@example.com')).toBeInTheDocument();
     });
 
-    await user.type(
-      screen.getByRole('textbox', { name: 'EOA address' }),
-      createHexAddress('2'),
-    );
+    await user.type(screen.getByRole('textbox', { name: 'EOA address' }), createHexAddress('2'));
     await user.click(screen.getByRole('button', { name: 'Create SIWE challenge' }));
 
     await waitFor(() => {
@@ -298,17 +267,12 @@ describe('admin page', () => {
     renderApp(<Home />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Loaded 1 jobs for all attention.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Loaded 1 jobs for all attention.')).toBeInTheDocument();
     });
 
-    expect(mockedAdminApi.getEscrowHealth).toHaveBeenCalledWith(
-      'admin-access-token-123',
-      {
-        reason: undefined,
-      },
-    );
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenCalledWith('admin-access-token-123', {
+      reason: undefined,
+    });
     expect(screen.getByText('Operator backlog')).toBeInTheDocument();
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
   });
@@ -400,9 +364,7 @@ describe('admin page', () => {
       ),
     );
     await user.paste('{"artifact":"job-history"}');
-    await user.click(
-      screen.getByRole('button', { name: 'Preview job-history import' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Preview job-history import' }));
 
     await waitFor(() => {
       expect(
@@ -430,6 +392,357 @@ describe('admin page', () => {
     expect(
       screen.getByText(/Imported replay drift: 1 issue · severity Critical/),
     ).toBeInTheDocument();
+  });
+
+  it('previews chain-derived audit sync and surfaces persistence posture', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.syncEscrowChainAudit.mockResolvedValue({
+      syncedAt: '2026-04-08T00:00:00.000Z',
+      mode: 'preview',
+      job: {
+        jobId: 'job-chain-1',
+        title: 'Chain repair case',
+        chainId: 84532,
+        contractAddress: '0xcontract',
+        escrowId: '1',
+      },
+      range: {
+        fromBlock: 120,
+        toBlock: 140,
+        latestBlock: 160,
+        lookbackBlocks: 20,
+      },
+      normalization: {
+        fetchedLogs: 5,
+        duplicateLogs: 1,
+        uniqueLogs: 4,
+        auditEvents: 4,
+        auditChanged: true,
+      },
+      issues: [
+        {
+          code: 'unsupported_partial_resolution',
+          severity: 'critical',
+          summary:
+            'The onchain dispute resolution uses a partial client split that the persisted audit model cannot represent.',
+          detail: null,
+          blockNumber: 140,
+          txHash: '0xpartial',
+        },
+      ],
+      chainReconciliation: null,
+      localComparison: {
+        aggregateMatches: true,
+        auditDigestMatches: false,
+        localStatus: 'disputed',
+        chainDerivedStatus: 'disputed',
+        localFundedAmount: '100',
+        chainDerivedFundedAmount: '100',
+        localAuditEvents: 3,
+        chainAuditEvents: 4,
+        mismatchedMilestones: [],
+      },
+      persistence: {
+        requested: true,
+        applied: false,
+        blocked: true,
+        blockedReason:
+          'Critical ingestion issues must be resolved before persisting chain-derived audit state.',
+      },
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operator backlog')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText('Paste a persisted job UUID'), 'job-chain-1');
+    await user.type(screen.getByPlaceholderText('Optional lower bound'), '120');
+    await user.type(screen.getByPlaceholderText('Optional upper bound'), '140');
+    await user.click(screen.getByRole('button', { name: 'Persist chain audit' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Chain audit sync for job-chain-1 found blocking issues.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.syncEscrowChainAudit).toHaveBeenCalledWith(
+      {
+        jobId: 'job-chain-1',
+        fromBlock: 120,
+        toBlock: 140,
+        persist: true,
+      },
+      'admin-access-token-123',
+    );
+    expect(
+      screen.getByText(
+        /Normalization: 5 fetched logs · 1 duplicates ignored · 4 unique logs · 4 derived audit events · audit changed Yes/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Persistence requested: applied No · blocked Yes · Critical ingestion issues must be resolved before persisting chain-derived audit state\./,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Critical: The onchain dispute resolution uses a partial client split that the persisted audit model cannot represent\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('runs batch chain-audit sync and surfaces partial-failure summary', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.syncEscrowChainAuditBatch.mockResolvedValue({
+      startedAt: '2026-04-08T00:00:00.000Z',
+      completedAt: '2026-04-08T00:00:05.000Z',
+      mode: 'persisted',
+      filters: {
+        scope: 'attention',
+        reason: 'open_dispute',
+        limit: 10,
+      },
+      selection: {
+        totalJobs: 3,
+        matchedJobs: 2,
+        selectedJobs: 2,
+      },
+      summary: {
+        processedJobs: 1,
+        cleanJobs: 0,
+        changedJobs: 1,
+        persistedJobs: 1,
+        blockedJobs: 0,
+        failedJobs: 1,
+        criticalIssueJobs: 0,
+      },
+      jobs: [
+        {
+          jobId: 'job-batch-1',
+          title: 'Batch repaired dispute',
+          outcome: 'persisted',
+          changed: true,
+          persisted: true,
+          blocked: false,
+          issueCount: 0,
+          criticalIssueCount: 0,
+          reconciliationIssueCount: 0,
+          errorMessage: null,
+          sync: null,
+        },
+        {
+          jobId: 'job-batch-2',
+          title: 'Batch failed dispute',
+          outcome: 'failed',
+          changed: false,
+          persisted: false,
+          blocked: false,
+          issueCount: 0,
+          criticalIssueCount: 0,
+          reconciliationIssueCount: 0,
+          errorMessage: 'RPC request timed out',
+          sync: null,
+        },
+      ],
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operator backlog')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Reason filter' }),
+      'open_dispute',
+    );
+    await user.click(screen.getByRole('button', { name: 'Persist batch chain sync' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Batch chain sync completed with 1 failed jobs.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockedAdminApi.syncEscrowChainAuditBatch).toHaveBeenCalledWith(
+      {
+        scope: 'attention',
+        reason: 'open_dispute',
+        limit: 10,
+        persist: true,
+      },
+      'admin-access-token-123',
+    );
+    expect(screen.getByText(/Selection: 2 selected \/ 2 matched \/ 3 total\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Summary: 1 processed · 0 clean · 1 changed · 1 persisted · 0 blocked · 1 failed · 0 with critical issues\./,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Batch repaired dispute \(job-batch-1\): Persisted · issues 0 · critical 0/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Batch failed dispute \(job-batch-2\): Failed · issues 0 · critical 0 · RPC request timed out/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows recurring chain-sync daemon status and recent run history', async () => {
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.getEscrowChainSyncDaemonHealth.mockResolvedValue({
+      generatedAt: '2026-04-08T00:00:31.000Z',
+      ok: true,
+      status: 'ok',
+      required: true,
+      summary: 'Recurring chain-sync daemon is healthy.',
+      thresholds: {
+        maxHeartbeatAgeMs: 900000,
+        maxCurrentRunAgeMs: 1800000,
+        maxConsecutiveFailures: 3,
+        maxConsecutiveSkips: 6,
+      },
+      issues: [],
+      daemon: {
+        updatedAt: '2026-04-08T00:00:30.000Z',
+        worker: {
+          workerId: 'host-a:1234',
+          hostname: 'host-a',
+          pid: 1234,
+          state: 'idle',
+          intervalMs: 300000,
+          runOnStart: true,
+          overrideLimit: null,
+          overridePersist: true,
+          startedAt: '2026-04-08T00:00:00.000Z',
+          stoppedAt: null,
+        },
+        heartbeat: {
+          lastHeartbeatAt: '2026-04-08T00:00:30.000Z',
+          lastRunStartedAt: '2026-04-08T00:00:20.000Z',
+          lastRunCompletedAt: '2026-04-08T00:00:30.000Z',
+          lastRunOutcome: 'completed',
+          consecutiveFailures: 0,
+          consecutiveSkips: 1,
+          lastErrorMessage: null,
+        },
+        currentRun: null,
+        lastRun: {
+          startedAt: '2026-04-08T00:00:20.000Z',
+          completedAt: '2026-04-08T00:00:30.000Z',
+          durationMs: 10000,
+          outcome: 'completed',
+          workerId: 'host-a:1234',
+          lockProvider: 'postgres_advisory',
+          mode: 'persisted',
+          filters: {
+            scope: 'all',
+            reason: null,
+            limit: 25,
+          },
+          selection: {
+            totalJobs: 3,
+            matchedJobs: 3,
+            selectedJobs: 3,
+          },
+          summary: {
+            processedJobs: 3,
+            cleanJobs: 1,
+            changedJobs: 2,
+            persistedJobs: 2,
+            blockedJobs: 0,
+            failedJobs: 0,
+            criticalIssueJobs: 0,
+          },
+          errorMessage: null,
+          skipReason: null,
+        },
+        recentRuns: [
+          {
+            startedAt: '2026-04-08T00:00:20.000Z',
+            completedAt: '2026-04-08T00:00:30.000Z',
+            durationMs: 10000,
+            outcome: 'completed',
+            workerId: 'host-a:1234',
+            lockProvider: 'postgres_advisory',
+            mode: 'persisted',
+            filters: {
+              scope: 'all',
+              reason: null,
+              limit: 25,
+            },
+            selection: {
+              totalJobs: 3,
+              matchedJobs: 3,
+              selectedJobs: 3,
+            },
+            summary: {
+              processedJobs: 3,
+              cleanJobs: 1,
+              changedJobs: 2,
+              persistedJobs: 2,
+              blockedJobs: 0,
+              failedJobs: 0,
+              criticalIssueJobs: 0,
+            },
+            errorMessage: null,
+            skipReason: null,
+          },
+          {
+            startedAt: '2026-04-08T00:00:10.000Z',
+            completedAt: '2026-04-08T00:00:10.100Z',
+            durationMs: 100,
+            outcome: 'skipped',
+            workerId: 'host-b:4567',
+            lockProvider: 'postgres_advisory',
+            mode: null,
+            filters: null,
+            selection: null,
+            summary: null,
+            errorMessage: null,
+            skipReason: 'lock_unavailable',
+          },
+        ],
+      },
+    });
+
+    renderApp(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Recurring chain-sync daemon')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Worker: host-a:1234/)).toBeInTheDocument();
+      expect(screen.getByText(/interval 300s/)).toBeInTheDocument();
+      expect(screen.getByText(/run on start Yes\./)).toBeInTheDocument();
+      expect(screen.getByText(/Heartbeat:/)).toBeInTheDocument();
+      expect(screen.getByText(/last outcome Completed/)).toBeInTheDocument();
+      expect(screen.getByText(/consecutive failures 0/)).toBeInTheDocument();
+      expect(screen.getByText(/consecutive skips 1\./)).toBeInTheDocument();
+      expect(screen.getByText(/Last run: Completed/)).toBeInTheDocument();
+      expect(screen.getByText(/lock Postgres advisory lock\./)).toBeInTheDocument();
+      expect(screen.getByText(/Completed · .* · 10000ms · host-a:1234 · processed 3/)).toBeInTheDocument();
+      expect(screen.getByText(/Skipped · .* · 100ms · host-b:4567 · lock_unavailable/)).toBeInTheDocument();
+    });
   });
 
   it('renders reconciliation drift findings and filters that backlog reason explicitly', async () => {
@@ -576,11 +889,11 @@ describe('admin page', () => {
       expect(screen.getByText('State drift case')).toBeInTheDocument();
     });
 
+    expect(screen.getByText(/Highest severity: Critical/)).toBeInTheDocument();
     expect(
-      screen.getByText(/Highest severity: Critical/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Timeline sources: 3 audit events · 2 confirmed executions · 0 failed executions/),
+      screen.getByText(
+        /Timeline sources: 3 audit events · 2 confirmed executions · 0 failed executions/,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Replay: status funded -> draft · funded null -> 100/),
@@ -591,23 +904,15 @@ describe('admin page', () => {
       ),
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole('button', { name: 'Reconciliation drift' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Reconciliation drift' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Loaded 1 jobs for reconciliation drift.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Loaded 1 jobs for reconciliation drift.')).toBeInTheDocument();
     });
 
-    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(
-      2,
-      'admin-access-token-123',
-      {
-        reason: 'reconciliation_drift',
-      },
-    );
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(2, 'admin-access-token-123', {
+      reason: 'reconciliation_drift',
+    });
   });
 
   it('filters escrow operations health by reason and opens a selected case directly', async () => {
@@ -829,40 +1134,26 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Failed executions' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Loaded 1 jobs for failed executions.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Loaded 1 jobs for failed executions.')).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByText('Actions: fund_job x2, set_milestones x1'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Codes: relay_rejected x2, unknown x1'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Actions: fund_job x2, set_milestones x1')).toBeInTheDocument();
+    expect(screen.getByText('Codes: relay_rejected x2, unknown x1')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Surface: RPC or provider · Retry posture: Safe after review · Severity: critical',
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Provider timeout/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Provider timeout/)).toBeInTheDocument();
 
-    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(
-      2,
-      'admin-access-token-123',
-      {
-        reason: 'failed_execution',
-      },
-    );
+    expect(mockedAdminApi.getEscrowHealth).toHaveBeenNthCalledWith(2, 'admin-access-token-123', {
+      reason: 'failed_execution',
+    });
 
     await user.click(screen.getByRole('button', { name: 'Open case job-failure-1' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Disputed implementation' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Disputed implementation' })).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.getAudit).toHaveBeenCalledWith('job-failure-1');
@@ -1005,9 +1296,7 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Claim stale job' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Loaded 1 jobs for all attention.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Loaded 1 jobs for all attention.')).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.claimStaleJob).toHaveBeenCalledWith(
@@ -1505,9 +1794,7 @@ describe('admin page', () => {
       ),
       'Investigating relay posture.',
     );
-    await user.click(
-      screen.getByRole('button', { name: 'Claim failure workflow' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Claim failure workflow' }));
 
     await waitFor(() => {
       expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
@@ -1537,14 +1824,10 @@ describe('admin page', () => {
       ),
       'Ready after relay review.',
     );
-    await user.click(
-      screen.getByRole('button', { name: 'Save failure workflow' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Save failure workflow' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Status: Ready to retry\./),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Status: Ready to retry\./)).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.updateExecutionFailureWorkflow).toHaveBeenCalledWith(
@@ -1567,14 +1850,10 @@ describe('admin page', () => {
       ),
       'Acknowledged after relay check.',
     );
-    await user.click(
-      screen.getByRole('button', { name: 'Acknowledge latest failures' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Acknowledge latest failures' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Acknowledged through the latest failure at/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Acknowledged through the latest failure at/)).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.acknowledgeExecutionFailures).toHaveBeenCalledWith(
@@ -1586,20 +1865,17 @@ describe('admin page', () => {
       'admin-access-token-123',
     );
 
-    await user.click(
-      screen.getByRole('button', { name: 'Release failure claim' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Release failure claim' }));
 
     await waitFor(() => {
-      expect(
-        mockedAdminApi.releaseExecutionFailureWorkflow,
-      ).toHaveBeenCalledWith('job-failure-ops-1', 'admin-access-token-123');
+      expect(mockedAdminApi.releaseExecutionFailureWorkflow).toHaveBeenCalledWith(
+        'job-failure-ops-1',
+        'admin-access-token-123',
+      );
     });
   });
 
-  it(
-    'resolves a disputed milestone when the authenticated operator controls the arbitrator wallet',
-    async () => {
+  it('resolves a disputed milestone when the authenticated operator controls the arbitrator wallet', async () => {
     const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockedAdminApi.me.mockResolvedValue(
@@ -1626,9 +1902,7 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Disputed implementation' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Disputed implementation' })).toBeInTheDocument();
     });
 
     await user.selectOptions(
@@ -1639,9 +1913,7 @@ describe('admin page', () => {
       screen.getByRole('textbox', { name: 'Resolution note' }),
       'Release after operator review.',
     );
-    await user.click(
-      screen.getByRole('button', { name: 'Resolve disputed milestone' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Resolve disputed milestone' }));
 
     await waitFor(() => {
       expect(screen.getAllByText('No active disputes').length).toBeGreaterThan(0);
@@ -1656,9 +1928,7 @@ describe('admin page', () => {
       },
       'admin-access-token-123',
     );
-    },
-    10_000,
-  );
+  }, 10_000);
 
   it('downloads operator export artifacts from the loaded public bundle', async () => {
     const user = userEvent.setup();
@@ -1686,14 +1956,10 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Disputed implementation' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Disputed implementation' })).toBeInTheDocument();
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Export dispute case CSV' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Export dispute case CSV' }));
 
     await waitFor(() => {
       expect(mockedAdminApi.downloadCaseExport).toHaveBeenCalledWith(
@@ -1701,9 +1967,7 @@ describe('admin page', () => {
         'dispute-case',
         'csv',
       );
-      expect(
-        screen.getByText('Downloaded dispute-case CSV export.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Downloaded dispute-case CSV export.')).toBeInTheDocument();
     });
 
     expect(clickSpy).toHaveBeenCalledTimes(1);

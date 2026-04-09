@@ -8,6 +8,8 @@ import { PersistenceConfigService } from '../../persistence/persistence.config';
 import { PostgresDatabaseService } from '../../persistence/postgres/postgres-database.service';
 import { inspectMigrationStatus } from '../../persistence/postgres/migrations';
 import { SmartAccountConfigService } from '../wallet/provisioning/smart-account.config';
+import { EscrowChainSyncDaemonDeploymentService } from './escrow-chain-sync-daemon-deployment.service';
+import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daemon-monitoring.service';
 import type {
   DeploymentCheck,
   DeploymentValidationReport,
@@ -30,6 +32,8 @@ export class DeploymentValidationService {
     private readonly persistenceConfig: PersistenceConfigService,
     private readonly postgres: PostgresDatabaseService,
     private readonly smartAccountConfig: SmartAccountConfigService,
+    private readonly daemonDeployment: EscrowChainSyncDaemonDeploymentService,
+    private readonly daemonMonitoring: EscrowChainSyncDaemonMonitoringService,
   ) {}
 
   assertRuntimeConfiguration() {
@@ -97,6 +101,7 @@ export class DeploymentValidationService {
         () => this.checkEscrowRelay(),
       ),
     );
+    checks.push(await this.checkChainSyncDaemon());
 
     return {
       generatedAt: new Date().toISOString(),
@@ -109,6 +114,62 @@ export class DeploymentValidationService {
           readTrustProxyValue(process.env.NEST_API_TRUST_PROXY) ?? null,
       },
       checks,
+    };
+  }
+
+  private async checkChainSyncDaemon(): Promise<DeploymentCheck> {
+    const report = await this.daemonMonitoring.getReport();
+    const primaryIssue = report.issues[0];
+
+    if (report.status === 'ok') {
+      return {
+        id: 'chain-sync-daemon',
+        status: 'ok',
+        summary: report.summary,
+        metadata: {
+          required: report.required,
+        },
+      };
+    }
+
+    return {
+      id: 'chain-sync-daemon',
+      status: report.status === 'failed' ? 'failed' : 'warning',
+      summary: report.summary,
+      details: primaryIssue?.detail ?? undefined,
+      metadata: {
+        required: report.required,
+        issueCodes: report.issues.map((issue) => issue.code),
+      },
+    };
+  }
+
+  private checkChainSyncDaemonConfiguration(): DeploymentCheck {
+    const posture = this.daemonDeployment.getPosture();
+
+    return {
+      id: 'chain-sync-daemon-config',
+      status: posture.status,
+      summary: posture.summary,
+      details:
+        posture.issues[0] ??
+        posture.warnings[0] ??
+        'Recurring chain-sync daemon configuration is aligned with the current environment.',
+      metadata: {
+        required: posture.required,
+        rpcConfigured: posture.rpcConfigured,
+        persistDefault: posture.persistDefault,
+        intervalSeconds: posture.intervalSeconds,
+        runOnStart: posture.runOnStart,
+        lockProvider: posture.lockProvider,
+        alertingConfigured: posture.alertingConfigured,
+        alertMinSeverity: posture.alertMinSeverity,
+        alertSendRecovery: posture.alertSendRecovery,
+        alertResendIntervalSeconds: posture.alertResendIntervalSeconds,
+        thresholds: posture.thresholds,
+        issues: posture.issues,
+        warnings: posture.warnings,
+      },
     };
   }
 
@@ -322,6 +383,8 @@ export class DeploymentValidationService {
         parsed: parsedTrustProxy ?? null,
       },
     });
+
+    checks.push(this.checkChainSyncDaemonConfiguration());
 
     return checks;
   }

@@ -23,6 +23,10 @@ import {
   type AuditBundle,
   type CaseExportArtifact,
   type CaseExportFormat,
+  type EscrowChainSyncBatchReport,
+  type EscrowChainSyncDaemonHealthReport,
+  type EscrowChainSyncDaemonStatus,
+  type EscrowChainSyncReport,
   type EscrowHealthReport,
   type EscrowJobHistoryImportReport,
   type RuntimeProfile,
@@ -106,9 +110,7 @@ function getMilestonePostureClassName(posture: 'stable' | 'review' | 'resolved')
   }
 }
 
-function getTimelineToneClassName(
-  tone: 'neutral' | 'warning' | 'critical' | 'success',
-) {
+function getTimelineToneClassName(tone: 'neutral' | 'warning' | 'critical' | 'success') {
   switch (tone) {
     case 'neutral':
       return styles.timelineNeutral;
@@ -121,10 +123,10 @@ function getTimelineToneClassName(
   }
 }
 
-function getOperationsReasonLabel(
-  reason: EscrowHealthReport['jobs'][number]['reasons'][number],
-) {
+function getOperationsReasonLabel(reason: EscrowHealthReport['jobs'][number]['reasons'][number]) {
   switch (reason) {
+    case 'chain_sync_backlog':
+      return 'Chain sync backlog';
     case 'failed_execution':
       return 'Failed execution';
     case 'open_dispute':
@@ -136,9 +138,7 @@ function getOperationsReasonLabel(
   }
 }
 
-type OperationsReasonFilter =
-  | 'all'
-  | EscrowHealthReport['jobs'][number]['reasons'][number];
+type OperationsReasonFilter = 'all' | EscrowHealthReport['jobs'][number]['reasons'][number];
 
 type FailureWorkflowStatus = NonNullable<
   EscrowHealthReport['jobs'][number]['executionFailureWorkflow']
@@ -148,6 +148,8 @@ function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
   switch (reason) {
     case 'all':
       return 'All attention';
+    case 'chain_sync_backlog':
+      return 'Chain sync backlog';
     case 'failed_execution':
       return 'Failed executions';
     case 'open_dispute':
@@ -156,6 +158,21 @@ function getOperationsReasonFilterLabel(reason: OperationsReasonFilter) {
       return 'Reconciliation drift';
     case 'stale_job':
       return 'Stale jobs';
+  }
+}
+
+function getChainSyncCoverageLabel(
+  status: NonNullable<EscrowHealthReport['jobs'][number]['chainSync']>['status'],
+) {
+  switch (status) {
+    case 'pending_initial_sync':
+      return 'Pending initial sync';
+    case 'healthy':
+      return 'Healthy';
+    case 'stale':
+      return 'Stale';
+    case 'failing':
+      return 'Failing';
   }
 }
 
@@ -176,6 +193,82 @@ function formatBooleanSummary(value: boolean) {
   return value ? 'Yes' : 'No';
 }
 
+function getChainSyncModeLabel(mode: EscrowChainSyncReport['mode']) {
+  switch (mode) {
+    case 'persisted':
+      return 'Persisted';
+    case 'preview':
+      return 'Preview';
+  }
+}
+
+function getChainSyncBatchOutcomeLabel(
+  outcome: EscrowChainSyncBatchReport['jobs'][number]['outcome'],
+) {
+  switch (outcome) {
+    case 'blocked':
+      return 'Blocked';
+    case 'changed':
+      return 'Changed';
+    case 'clean':
+      return 'Clean';
+    case 'failed':
+      return 'Failed';
+    case 'persisted':
+      return 'Persisted';
+  }
+}
+
+function getChainSyncDaemonStateLabel(state: EscrowChainSyncDaemonStatus['worker']['state']) {
+  switch (state) {
+    case 'idle':
+      return 'Idle';
+    case 'running':
+      return 'Running';
+    case 'stopped':
+      return 'Stopped';
+  }
+}
+
+function getChainSyncDaemonOutcomeLabel(
+  outcome: NonNullable<EscrowChainSyncDaemonStatus['lastRun']>['outcome'],
+) {
+  switch (outcome) {
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    case 'skipped':
+      return 'Skipped';
+  }
+}
+
+function getChainSyncDaemonLockProviderLabel(
+  provider: NonNullable<EscrowChainSyncDaemonStatus['lastRun']>['lockProvider'],
+) {
+  switch (provider) {
+    case 'local':
+      return 'Local';
+    case 'postgres_advisory':
+      return 'Postgres advisory lock';
+    case null:
+      return 'Unavailable';
+  }
+}
+
+function getChainSyncDaemonHealthStatusLabel(
+  status: EscrowChainSyncDaemonHealthReport['status'],
+) {
+  switch (status) {
+    case 'ok':
+      return 'Healthy';
+    case 'warning':
+      return 'Warning';
+    case 'failed':
+      return 'Critical';
+  }
+}
+
 function formatFailureBreakdown(
   items: Array<{
     count: number;
@@ -190,9 +283,7 @@ function formatFailureCodeLabel(failureCode: string | null) {
 }
 
 function getFailureGuidanceSurfaceLabel(
-  surface: NonNullable<
-    EscrowHealthReport['jobs'][number]['failureGuidance']
-  >['responsibleSurface'],
+  surface: NonNullable<EscrowHealthReport['jobs'][number]['failureGuidance']>['responsibleSurface'],
 ) {
   switch (surface) {
     case 'wallet_relay':
@@ -211,9 +302,7 @@ function getFailureGuidanceSurfaceLabel(
 }
 
 function getFailureRetryPostureLabel(
-  posture: NonNullable<
-    EscrowHealthReport['jobs'][number]['failureGuidance']
-  >['retryPosture'],
+  posture: NonNullable<EscrowHealthReport['jobs'][number]['failureGuidance']>['retryPosture'],
 ) {
   switch (posture) {
     case 'safe_after_review':
@@ -241,15 +330,11 @@ function getFailureWorkflowStatusLabel(status: FailureWorkflowStatus) {
 function defaultFailureWorkflowStatus(
   guidance: EscrowHealthReport['jobs'][number]['failureGuidance'],
 ): FailureWorkflowStatus {
-  return guidance?.retryPosture === 'wait_for_external_fix'
-    ? 'blocked_external'
-    : 'investigating';
+  return guidance?.retryPosture === 'wait_for_external_fix' ? 'blocked_external' : 'investigating';
 }
 
 function getFailureAcknowledgementMessage(
-  workflow: NonNullable<
-    EscrowHealthReport['jobs'][number]['executionFailureWorkflow']
-  >,
+  workflow: NonNullable<EscrowHealthReport['jobs'][number]['executionFailureWorkflow']>,
 ) {
   if (workflow.acknowledgedFailureAt === null) {
     return 'Latest failures are not yet acknowledged.';
@@ -283,46 +368,44 @@ export function OperatorConsole() {
   const [linkChainId, setLinkChainId] = useState('84532');
   const [walletSignature, setWalletSignature] = useState('');
   const [escrowHealth, setEscrowHealth] = useState<EscrowHealthReport | null>(null);
-  const [healthReasonFilter, setHealthReasonFilter] =
-    useState<OperationsReasonFilter>('all');
-  const [failureWorkflowDrafts, setFailureWorkflowDrafts] = useState<
-    Record<string, string>
-  >({});
+  const [healthReasonFilter, setHealthReasonFilter] = useState<OperationsReasonFilter>('all');
+  const [failureWorkflowDrafts, setFailureWorkflowDrafts] = useState<Record<string, string>>({});
   const [failureWorkflowStatuses, setFailureWorkflowStatuses] = useState<
     Record<string, FailureWorkflowStatus>
   >({});
-  const [failureWorkflowStates, setFailureWorkflowStates] = useState<
-    Record<string, AsyncState>
-  >({});
+  const [failureWorkflowStates, setFailureWorkflowStates] = useState<Record<string, AsyncState>>(
+    {},
+  );
   const [reconciliationImportJson, setReconciliationImportJson] = useState('');
   const [reconciliationImportReport, setReconciliationImportReport] =
     useState<EscrowJobHistoryImportReport | null>(null);
-  const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<
-    Record<string, string>
-  >({});
-  const [staleWorkflowStates, setStaleWorkflowStates] = useState<
-    Record<string, AsyncState>
-  >({});
+  const [chainSyncJobId, setChainSyncJobId] = useState('');
+  const [chainSyncFromBlock, setChainSyncFromBlock] = useState('');
+  const [chainSyncToBlock, setChainSyncToBlock] = useState('');
+  const [chainSyncReport, setChainSyncReport] = useState<EscrowChainSyncReport | null>(null);
+  const [chainSyncBatchScope, setChainSyncBatchScope] = useState<'all' | 'attention'>('attention');
+  const [chainSyncBatchReason, setChainSyncBatchReason] = useState<OperationsReasonFilter>('all');
+  const [chainSyncBatchLimit, setChainSyncBatchLimit] = useState('10');
+  const [chainSyncBatchReport, setChainSyncBatchReport] =
+    useState<EscrowChainSyncBatchReport | null>(null);
+  const [chainSyncDaemonHealth, setChainSyncDaemonHealth] =
+    useState<EscrowChainSyncDaemonHealthReport | null>(null);
+  const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<Record<string, string>>({});
+  const [staleWorkflowStates, setStaleWorkflowStates] = useState<Record<string, AsyncState>>({});
   const [startState, setStartState] = useState<AsyncState>(createIdleState());
   const [verifyState, setVerifyState] = useState<AsyncState>(createIdleState());
   const [sessionState, setSessionState] = useState<AsyncState>(createIdleState());
   const [healthState, setHealthState] = useState<AsyncState>(createIdleState());
-  const [reconciliationImportState, setReconciliationImportState] = useState<AsyncState>(
-    createIdleState(),
-  );
-  const [walletActionState, setWalletActionState] = useState<AsyncState>(
-    createIdleState(),
-  );
-  const [resolutionState, setResolutionState] = useState<AsyncState>(
-    createIdleState(),
-  );
+  const [reconciliationImportState, setReconciliationImportState] =
+    useState<AsyncState>(createIdleState());
+  const [chainSyncState, setChainSyncState] = useState<AsyncState>(createIdleState());
+  const [chainSyncBatchState, setChainSyncBatchState] = useState<AsyncState>(createIdleState());
+  const [chainSyncDaemonState, setChainSyncDaemonState] = useState<AsyncState>(createIdleState());
+  const [walletActionState, setWalletActionState] = useState<AsyncState>(createIdleState());
+  const [resolutionState, setResolutionState] = useState<AsyncState>(createIdleState());
   const [exportState, setExportState] = useState<AsyncState>(createIdleState());
-  const [resolutionMilestoneIndex, setResolutionMilestoneIndex] = useState<number | null>(
-    null,
-  );
-  const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>(
-    'release',
-  );
+  const [resolutionMilestoneIndex, setResolutionMilestoneIndex] = useState<number | null>(null);
+  const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>('release');
   const [resolutionNote, setResolutionNote] = useState('');
   const [state, setState] = useState<AsyncState>(createIdleState());
 
@@ -390,12 +473,7 @@ export function OperatorConsole() {
   async function handleLookup(nextJobId = jobId) {
     const normalizedJobId = nextJobId.trim();
     if (!normalizedJobId) {
-      setState(
-        createErrorState(
-          null,
-          'Provide a job id before loading the public audit bundle.',
-        ),
-      );
+      setState(createErrorState(null, 'Provide a job id before loading the public audit bundle.'));
       return false;
     }
 
@@ -429,9 +507,7 @@ export function OperatorConsole() {
     try {
       await adminApi.startAuth(authEmail);
       setStartState(
-        createSuccessState(
-          'OTP issued. Check your configured mail inbox or relay logs.',
-        ),
+        createSuccessState('OTP issued. Check your configured mail inbox or relay logs.'),
       );
     } catch (error) {
       setStartState(createErrorState(error, 'Failed to start operator auth'));
@@ -450,9 +526,7 @@ export function OperatorConsole() {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
       });
-      setVerifyState(
-        createSuccessState('Operator session established. Loading profile state...'),
-      );
+      setVerifyState(createSuccessState('Operator session established. Loading profile state...'));
     } catch (error) {
       setVerifyState(createErrorState(error, 'Failed to verify operator session'));
     }
@@ -492,6 +566,8 @@ export function OperatorConsole() {
     setChallenge(null);
     setEscrowHealth(null);
     setHealthState(createIdleState());
+    setChainSyncDaemonHealth(null);
+    setChainSyncDaemonState(createIdleState());
     setReconciliationImportReport(null);
     setReconciliationImportState(createIdleState());
     setReconciliationImportJson('');
@@ -561,10 +637,7 @@ export function OperatorConsole() {
     }
   }
 
-  const caseBrief = useMemo(
-    () => (audit ? buildCaseBrief(audit.bundle) : null),
-    [audit],
-  );
+  const caseBrief = useMemo(() => (audit ? buildCaseBrief(audit.bundle) : null), [audit]);
   const milestoneReviewCards = useMemo(
     () => (audit ? buildMilestoneReviewCards(audit.bundle.job) : []),
     [audit],
@@ -604,9 +677,7 @@ export function OperatorConsole() {
   );
   const selectedResolutionCard = useMemo(
     () =>
-      disputedMilestoneCards.find(
-        (card) => card.milestoneIndex === resolutionMilestoneIndex,
-      ) ??
+      disputedMilestoneCards.find((card) => card.milestoneIndex === resolutionMilestoneIndex) ??
       disputedMilestoneCards[0] ??
       null,
     [disputedMilestoneCards, resolutionMilestoneIndex],
@@ -616,6 +687,8 @@ export function OperatorConsole() {
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setChainSyncDaemonHealth(null);
+      setChainSyncDaemonState(createIdleState());
       setReconciliationImportReport(null);
       setReconciliationImportState(createIdleState());
       setFailureWorkflowDrafts({});
@@ -629,6 +702,8 @@ export function OperatorConsole() {
     if (!controlsArbitratorWallet) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setChainSyncDaemonHealth(null);
+      setChainSyncDaemonState(createIdleState());
       setReconciliationImportReport(null);
       setReconciliationImportState(createIdleState());
       setFailureWorkflowDrafts({});
@@ -640,6 +715,7 @@ export function OperatorConsole() {
     }
 
     void loadEscrowHealth(accessToken, healthReasonFilter);
+    void loadChainSyncDaemonStatus(accessToken);
   }, [accessToken, controlsArbitratorWallet, healthReasonFilter]);
 
   useEffect(() => {
@@ -655,8 +731,7 @@ export function OperatorConsole() {
           continue;
         }
 
-        next[job.jobId] =
-          current[job.jobId] ?? job.executionFailureWorkflow?.note ?? '';
+        next[job.jobId] = current[job.jobId] ?? job.executionFailureWorkflow?.note ?? '';
       }
 
       return next;
@@ -733,6 +808,31 @@ export function OperatorConsole() {
     }
   }
 
+  async function loadChainSyncDaemonStatus(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setChainSyncDaemonState(createWorkingState('Loading recurring chain-sync daemon status...'));
+
+    try {
+      const status = await adminApi.getEscrowChainSyncDaemonHealth(token);
+      setChainSyncDaemonHealth(status);
+      setChainSyncDaemonState(
+        createSuccessState(
+          `Loaded daemon health: ${getChainSyncDaemonHealthStatusLabel(
+            status.status,
+          ).toLowerCase()}.`,
+        ),
+      );
+    } catch (error) {
+      setChainSyncDaemonHealth(null);
+      setChainSyncDaemonState(
+        createErrorState(error, 'Failed to load recurring chain-sync daemon status'),
+      );
+    }
+  }
+
   async function handleImportJobHistoryReconciliation() {
     if (!accessToken) {
       return;
@@ -754,21 +854,146 @@ export function OperatorConsole() {
     );
 
     try {
-      const report = await adminApi.importJobHistoryReconciliation(
-        documentJson,
-        accessToken,
-      );
+      const report = await adminApi.importJobHistoryReconciliation(documentJson, accessToken);
       setReconciliationImportReport(report);
       setReconciliationImportState(
-        createSuccessState(
-          `Imported job-history preview for ${report.document.jobId}.`,
-        ),
+        createSuccessState(`Imported job-history preview for ${report.document.jobId}.`),
       );
     } catch (error) {
       setReconciliationImportReport(null);
       setReconciliationImportState(
         createErrorState(error, 'Failed to import job-history reconciliation'),
       );
+    }
+  }
+
+  async function handleChainAuditSync(persist: boolean) {
+    if (!accessToken) {
+      return;
+    }
+
+    const nextJobId = chainSyncJobId.trim();
+    if (!nextJobId) {
+      setChainSyncState(
+        createErrorState(
+          new Error('Missing job id'),
+          'Provide a job id before scanning chain audit history.',
+        ),
+      );
+      return;
+    }
+
+    const parseOptionalBlock = (value: string, fieldLabel: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new Error(`${fieldLabel} must be a non-negative integer`);
+      }
+      return parsed;
+    };
+
+    let fromBlock: number | undefined;
+    let toBlock: number | undefined;
+    try {
+      fromBlock = parseOptionalBlock(chainSyncFromBlock, 'From block');
+      toBlock = parseOptionalBlock(chainSyncToBlock, 'To block');
+    } catch (error) {
+      setChainSyncState(createErrorState(error, 'Chain sync block bounds are invalid'));
+      return;
+    }
+
+    setChainSyncState(
+      createWorkingState(
+        persist
+          ? 'Scanning and persisting chain-derived audit history...'
+          : 'Scanning chain-derived audit history...',
+      ),
+    );
+
+    try {
+      const report = await adminApi.syncEscrowChainAudit(
+        {
+          jobId: nextJobId,
+          fromBlock,
+          toBlock,
+          persist,
+        },
+        accessToken,
+      );
+      setChainSyncReport(report);
+      setChainSyncState(
+        createSuccessState(
+          report.persistence.requested && report.persistence.applied
+            ? `Persisted chain audit sync for ${report.job.jobId}.`
+            : report.persistence.requested && report.persistence.blocked
+              ? `Chain audit sync for ${report.job.jobId} found blocking issues.`
+              : `Previewed chain audit sync for ${report.job.jobId}.`,
+        ),
+      );
+
+      if (report.persistence.applied) {
+        void loadEscrowHealth(accessToken);
+      }
+    } catch (error) {
+      setChainSyncReport(null);
+      setChainSyncState(createErrorState(error, 'Failed to sync chain-derived audit history'));
+    }
+  }
+
+  async function handleBatchChainAuditSync(persist: boolean) {
+    if (!accessToken) {
+      return;
+    }
+
+    const parsedLimit = Number.parseInt(chainSyncBatchLimit.trim(), 10);
+    if (!Number.isInteger(parsedLimit) || parsedLimit <= 0) {
+      setChainSyncBatchState(
+        createErrorState(new Error('Invalid sync limit'), 'Provide a positive batch sync limit.'),
+      );
+      return;
+    }
+
+    setChainSyncBatchState(
+      createWorkingState(
+        persist
+          ? 'Scanning and persisting chain-derived audit history for a job batch...'
+          : 'Scanning chain-derived audit history for a job batch...',
+      ),
+    );
+
+    try {
+      const report = await adminApi.syncEscrowChainAuditBatch(
+        {
+          scope: chainSyncBatchScope,
+          reason:
+            chainSyncBatchScope === 'attention' && chainSyncBatchReason !== 'all'
+              ? chainSyncBatchReason
+              : undefined,
+          limit: parsedLimit,
+          persist,
+        },
+        accessToken,
+      );
+      setChainSyncBatchReport(report);
+      setChainSyncBatchState(
+        createSuccessState(
+          report.summary.failedJobs > 0
+            ? `Batch chain sync completed with ${report.summary.failedJobs} failed jobs.`
+            : report.summary.persistedJobs > 0
+              ? `Batch chain sync persisted ${report.summary.persistedJobs} jobs.`
+              : `Batch chain sync processed ${report.summary.processedJobs} jobs.`,
+        ),
+      );
+
+      if (report.summary.persistedJobs > 0) {
+        void loadEscrowHealth(accessToken);
+      }
+    } catch (error) {
+      setChainSyncBatchReport(null);
+      setChainSyncBatchState(createErrorState(error, 'Failed to sync chain-derived audit batch'));
     }
   }
 
@@ -791,10 +1016,7 @@ export function OperatorConsole() {
       return;
     }
 
-    setFailureWorkflowState(
-      jobId,
-      createWorkingState('Claiming execution-failure workflow...'),
-    );
+    setFailureWorkflowState(jobId, createWorkingState('Claiming execution-failure workflow...'));
 
     try {
       await adminApi.claimExecutionFailureWorkflow(
@@ -805,10 +1027,7 @@ export function OperatorConsole() {
         },
         accessToken,
       );
-      setFailureWorkflowState(
-        jobId,
-        createSuccessState('Execution-failure workflow claimed.'),
-      );
+      setFailureWorkflowState(jobId, createSuccessState('Execution-failure workflow claimed.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
       setFailureWorkflowState(
@@ -837,10 +1056,7 @@ export function OperatorConsole() {
         },
         accessToken,
       );
-      setFailureWorkflowState(
-        jobId,
-        createSuccessState('Latest execution failures acknowledged.'),
-      );
+      setFailureWorkflowState(jobId, createSuccessState('Latest execution failures acknowledged.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
       setFailureWorkflowState(
@@ -855,17 +1071,11 @@ export function OperatorConsole() {
       return;
     }
 
-    setFailureWorkflowState(
-      jobId,
-      createWorkingState('Releasing execution-failure workflow...'),
-    );
+    setFailureWorkflowState(jobId, createWorkingState('Releasing execution-failure workflow...'));
 
     try {
       await adminApi.releaseExecutionFailureWorkflow(jobId, accessToken);
-      setFailureWorkflowState(
-        jobId,
-        createSuccessState('Execution-failure workflow released.'),
-      );
+      setFailureWorkflowState(jobId, createSuccessState('Execution-failure workflow released.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
       setFailureWorkflowState(
@@ -880,10 +1090,7 @@ export function OperatorConsole() {
       return;
     }
 
-    setFailureWorkflowState(
-      jobId,
-      createWorkingState('Saving execution-failure workflow...'),
-    );
+    setFailureWorkflowState(jobId, createWorkingState('Saving execution-failure workflow...'));
 
     try {
       await adminApi.updateExecutionFailureWorkflow(
@@ -894,10 +1101,7 @@ export function OperatorConsole() {
         },
         accessToken,
       );
-      setFailureWorkflowState(
-        jobId,
-        createSuccessState('Execution-failure workflow saved.'),
-      );
+      setFailureWorkflowState(jobId, createSuccessState('Execution-failure workflow saved.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
       setFailureWorkflowState(
@@ -912,10 +1116,7 @@ export function OperatorConsole() {
       return;
     }
 
-    setStaleWorkflowState(
-      jobId,
-      createWorkingState('Claiming stale job workflow...'),
-    );
+    setStaleWorkflowState(jobId, createWorkingState('Claiming stale job workflow...'));
 
     try {
       await adminApi.claimStaleJob(
@@ -925,16 +1126,10 @@ export function OperatorConsole() {
         },
         accessToken,
       );
-      setStaleWorkflowState(
-        jobId,
-        createSuccessState('Stale job workflow claimed.'),
-      );
+      setStaleWorkflowState(jobId, createSuccessState('Stale job workflow claimed.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
-      setStaleWorkflowState(
-        jobId,
-        createErrorState(error, 'Failed to claim stale job workflow'),
-      );
+      setStaleWorkflowState(jobId, createErrorState(error, 'Failed to claim stale job workflow'));
     }
   }
 
@@ -943,32 +1138,19 @@ export function OperatorConsole() {
       return;
     }
 
-    setStaleWorkflowState(
-      jobId,
-      createWorkingState('Releasing stale job workflow...'),
-    );
+    setStaleWorkflowState(jobId, createWorkingState('Releasing stale job workflow...'));
 
     try {
       await adminApi.releaseStaleJob(jobId, accessToken);
-      setStaleWorkflowState(
-        jobId,
-        createSuccessState('Stale job workflow released.'),
-      );
+      setStaleWorkflowState(jobId, createSuccessState('Stale job workflow released.'));
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
-      setStaleWorkflowState(
-        jobId,
-        createErrorState(error, 'Failed to release stale job workflow'),
-      );
+      setStaleWorkflowState(jobId, createErrorState(error, 'Failed to release stale job workflow'));
     }
   }
 
   async function handleResolveMilestone() {
-    if (
-      !accessToken ||
-      !audit ||
-      selectedResolutionCard === null
-    ) {
+    if (!accessToken || !audit || selectedResolutionCard === null) {
       return;
     }
 
@@ -987,32 +1169,23 @@ export function OperatorConsole() {
       const refreshed = await handleLookup(audit.bundle.job.id);
       setResolutionState(
         refreshed
-          ? createSuccessState(
-              `Resolution submitted via ${previewHash(response.txHash)}.`,
-            )
+          ? createSuccessState(`Resolution submitted via ${previewHash(response.txHash)}.`)
           : createErrorState(
               null,
               'Resolution submitted, but the case could not be refreshed automatically.',
             ),
       );
     } catch (error) {
-      setResolutionState(
-        createErrorState(error, 'Failed to resolve disputed milestone'),
-      );
+      setResolutionState(createErrorState(error, 'Failed to resolve disputed milestone'));
     }
   }
 
-  async function handleDownloadExport(
-    artifact: CaseExportArtifact,
-    format: CaseExportFormat,
-  ) {
+  async function handleDownloadExport(artifact: CaseExportArtifact, format: CaseExportFormat) {
     if (!audit) {
       return;
     }
 
-    setExportState(
-      createWorkingState(`Preparing ${artifact} ${format.toUpperCase()} export...`),
-    );
+    setExportState(createWorkingState(`Preparing ${artifact} ${format.toUpperCase()} export...`));
 
     try {
       const documentToSave = await adminApi.downloadCaseExport(
@@ -1021,11 +1194,7 @@ export function OperatorConsole() {
         format,
       );
       saveDownloadedDocument(documentToSave);
-      setExportState(
-        createSuccessState(
-          `Downloaded ${artifact} ${format.toUpperCase()} export.`,
-        ),
-      );
+      setExportState(createSuccessState(`Downloaded ${artifact} ${format.toUpperCase()} export.`));
     } catch (error) {
       setExportState(createErrorState(error, 'Failed to download case export'));
     }
@@ -1038,10 +1207,9 @@ export function OperatorConsole() {
           <p className={styles.eyebrow}>Operator Console</p>
           <h1>Review disputes and execution issues from the public audit trail.</h1>
           <p className={styles.heroCopy}>
-            This surface stays within the existing public audit endpoint. It is
-            organized around operator tasks: dispute triage, receipt inspection,
-            milestone posture review, and explicit visibility into what still
-            requires backend authorization work.
+            This surface stays within the existing public audit endpoint. It is organized around
+            operator tasks: dispute triage, receipt inspection, milestone posture review, and
+            explicit visibility into what still requires backend authorization work.
           </p>
         </div>
         <div className={styles.heroCard}>
@@ -1052,9 +1220,7 @@ export function OperatorConsole() {
           <div>
             <span className={styles.metaLabel}>Backend profile</span>
             <strong>
-              {runtimeProfile
-                ? getRuntimeProfileLabel(runtimeProfile.profile)
-                : 'Loading'}
+              {runtimeProfile ? getRuntimeProfileLabel(runtimeProfile.profile) : 'Loading'}
             </strong>
           </div>
           <div>
@@ -1080,9 +1246,7 @@ export function OperatorConsole() {
             <article>
               <span className={styles.metaLabel}>Profile</span>
               <strong>
-                {runtimeProfile
-                  ? getRuntimeProfileLabel(runtimeProfile.profile)
-                  : 'Unavailable'}
+                {runtimeProfile ? getRuntimeProfileLabel(runtimeProfile.profile) : 'Unavailable'}
               </strong>
             </article>
             <article>
@@ -1130,9 +1294,7 @@ export function OperatorConsole() {
           </div>
           <div className={styles.stack}>
             <StatusNotice
-              message={
-                runtimeProfile?.summary || runtimeState.message
-              }
+              message={runtimeProfile?.summary || runtimeState.message}
               messageClassName={styles.stateText}
             />
             <article className={styles.boundaryCard}>
@@ -1163,11 +1325,7 @@ export function OperatorConsole() {
                 <button type="button" onClick={handleRefreshSession}>
                   Refresh
                 </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={handleLogout}
-                >
+                <button type="button" className={styles.secondaryButton} onClick={handleLogout}>
                   Logout
                 </button>
               </div>
@@ -1285,7 +1443,8 @@ export function OperatorConsole() {
                       : 'Operator resolution remains blocked until the configured arbitrator wallet is linked.'}
                   </strong>
                   <p className={styles.stateText}>
-                    Required wallet: {arbitratorAddress || 'Unavailable from backend runtime profile.'}
+                    Required wallet:{' '}
+                    {arbitratorAddress || 'Unavailable from backend runtime profile.'}
                   </p>
                 </article>
               </>
@@ -1293,7 +1452,8 @@ export function OperatorConsole() {
               <article className={styles.boundaryCard}>
                 <strong>Authenticate first</strong>
                 <p className={styles.stateText}>
-                  Operator resolution requires an authenticated session plus a linked arbitrator wallet.
+                  Operator resolution requires an authenticated session plus a linked arbitrator
+                  wallet.
                 </p>
               </article>
             )}
@@ -1330,6 +1490,10 @@ export function OperatorConsole() {
               <strong>{escrowHealth?.summary.failedExecutionJobs ?? 'Unavailable'}</strong>
             </article>
             <article>
+              <span className={styles.metaLabel}>Chain sync backlog</span>
+              <strong>{escrowHealth?.summary.chainSyncBacklogJobs ?? 'Unavailable'}</strong>
+            </article>
+            <article>
               <span className={styles.metaLabel}>Stale jobs</span>
               <strong>{escrowHealth?.summary.staleJobs ?? 'Unavailable'}</strong>
             </article>
@@ -1344,17 +1508,21 @@ export function OperatorConsole() {
             <article>
               <span className={styles.metaLabel}>Active filter</span>
               <strong>
+                {escrowHealth ? getOperationsReasonFilterLabel(healthReasonFilter) : 'Unavailable'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Chain sync threshold</span>
+              <strong>
                 {escrowHealth
-                  ? getOperationsReasonFilterLabel(healthReasonFilter)
+                  ? `${escrowHealth.thresholds.chainSyncBacklogHours} hours`
                   : 'Unavailable'}
               </strong>
             </article>
             <article>
               <span className={styles.metaLabel}>Stale threshold</span>
               <strong>
-                {escrowHealth
-                  ? `${escrowHealth.thresholds.staleJobHours} hours`
-                  : 'Unavailable'}
+                {escrowHealth ? `${escrowHealth.thresholds.staleJobHours} hours` : 'Unavailable'}
               </strong>
             </article>
           </div>
@@ -1371,16 +1539,16 @@ export function OperatorConsole() {
               <article className={styles.boundaryCard}>
                 <strong>Runtime profile missing arbitrator wallet</strong>
                 <p className={styles.stateText}>
-                  The backend did not expose the configured arbitrator wallet, so
-                  operator-wide escrow health cannot be authorized yet.
+                  The backend did not expose the configured arbitrator wallet, so operator-wide
+                  escrow health cannot be authorized yet.
                 </p>
               </article>
             ) : !controlsArbitratorWallet ? (
               <article className={styles.boundaryCard}>
                 <strong>Link the configured arbitrator wallet to unlock operations health</strong>
                 <p className={styles.stateText}>
-                  The current operator session must control {arbitratorAddress} before
-                  the backend will expose cross-job attention items.
+                  The current operator session must control {arbitratorAddress} before the backend
+                  will expose cross-job attention items.
                 </p>
               </article>
             ) : (
@@ -1389,6 +1557,7 @@ export function OperatorConsole() {
                   {(
                     [
                       'all',
+                      'chain_sync_backlog',
                       'open_dispute',
                       'reconciliation_drift',
                       'failed_execution',
@@ -1408,17 +1577,15 @@ export function OperatorConsole() {
                 <article className={styles.boundaryCard}>
                   <strong>Import job-history reconciliation</strong>
                   <p className={styles.stateText}>
-                    Paste a `job-history` JSON export to normalize its timeline, replay
-                    the imported state, and compare it against the local persisted job.
+                    Paste a `job-history` JSON export to normalize its timeline, replay the imported
+                    state, and compare it against the local persisted job.
                   </p>
                   <label className={styles.field}>
                     <span>Job-history JSON</span>
                     <textarea
                       rows={6}
                       value={reconciliationImportJson}
-                      onChange={(event) =>
-                        setReconciliationImportJson(event.target.value)
-                      }
+                      onChange={(event) => setReconciliationImportJson(event.target.value)}
                       placeholder="Paste a job-history JSON export to preview replay-backed reconciliation."
                     />
                   </label>
@@ -1460,14 +1627,12 @@ export function OperatorConsole() {
                             )}.`
                           : 'Local comparison: no persisted local job matched the imported job id.'}
                       </small>
-                      {reconciliationImportReport.localComparison.mismatchedMilestones
-                        .length > 0 ? (
+                      {reconciliationImportReport.localComparison.mismatchedMilestones.length >
+                      0 ? (
                         <div className={styles.stack}>
                           {reconciliationImportReport.localComparison.mismatchedMilestones.map(
                             (milestone) => (
-                              <small
-                                key={`import-mismatch-${milestone.index}`}
-                              >
+                              <small key={`import-mismatch-${milestone.index}`}>
                                 {`Imported milestone ${milestone.index + 1}: local ${formatReconciliationValue(
                                   milestone.localStatus,
                                 )} -> imported ${formatReconciliationValue(
@@ -1482,13 +1647,11 @@ export function OperatorConsole() {
                         <div className={styles.stack}>
                           <small>
                             {`Imported replay drift: ${reconciliationImportReport.importedReconciliation.issueCount} issue${
-                              reconciliationImportReport.importedReconciliation
-                                .issueCount === 1
+                              reconciliationImportReport.importedReconciliation.issueCount === 1
                                 ? ''
                                 : 's'
                             } · severity ${getReconciliationSeverityLabel(
-                              reconciliationImportReport.importedReconciliation
-                                .highestSeverity,
+                              reconciliationImportReport.importedReconciliation.highestSeverity,
                             )}.`}
                           </small>
                           {reconciliationImportReport.importedReconciliation.issues.map(
@@ -1502,9 +1665,326 @@ export function OperatorConsole() {
                           )}
                         </div>
                       ) : (
-                        <small>
-                          Imported replay produced no reconciliation issues.
-                        </small>
+                        <small>Imported replay produced no reconciliation issues.</small>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+                <article className={styles.boundaryCard}>
+                  <strong>Sync chain-derived audit</strong>
+                  <p className={styles.stateText}>
+                    Scan escrow contract events for a persisted job, derive the canonical audit
+                    timeline, and optionally persist that timeline when the onchain history is
+                    representable in the current model.
+                  </p>
+                  <div className={styles.fieldGrid}>
+                    <label className={styles.field}>
+                      <span>Job id</span>
+                      <input
+                        value={chainSyncJobId}
+                        onChange={(event) => setChainSyncJobId(event.target.value)}
+                        placeholder="Paste a persisted job UUID"
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span>From block</span>
+                      <input
+                        value={chainSyncFromBlock}
+                        onChange={(event) => setChainSyncFromBlock(event.target.value)}
+                        placeholder="Optional lower bound"
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span>To block</span>
+                      <input
+                        value={chainSyncToBlock}
+                        onChange={(event) => setChainSyncToBlock(event.target.value)}
+                        placeholder="Optional upper bound"
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.inlineActions}>
+                    <button type="button" onClick={() => void handleChainAuditSync(false)}>
+                      Preview chain audit
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleChainAuditSync(true)}
+                    >
+                      Persist chain audit
+                    </button>
+                  </div>
+                  <StatusNotice
+                    message={chainSyncState.message}
+                    messageClassName={styles.stateText}
+                  />
+                  {chainSyncReport ? (
+                    <div className={styles.stack}>
+                      <small>
+                        {`${getChainSyncModeLabel(chainSyncReport.mode)} scan for ${chainSyncReport.job.title} (${chainSyncReport.job.jobId}) on escrow ${chainSyncReport.job.escrowId}.`}
+                      </small>
+                      <small>
+                        {`Block range: ${chainSyncReport.range.fromBlock} -> ${chainSyncReport.range.toBlock} · latest block ${chainSyncReport.range.latestBlock} · default lookback ${chainSyncReport.range.lookbackBlocks}.`}
+                      </small>
+                      <small>
+                        {`Normalization: ${chainSyncReport.normalization.fetchedLogs} fetched logs · ${chainSyncReport.normalization.duplicateLogs} duplicates ignored · ${chainSyncReport.normalization.uniqueLogs} unique logs · ${chainSyncReport.normalization.auditEvents} derived audit events · audit changed ${formatBooleanSummary(
+                          chainSyncReport.normalization.auditChanged,
+                        )}.`}
+                      </small>
+                      <small>
+                        {`Local comparison: status ${chainSyncReport.localComparison.localStatus} -> ${chainSyncReport.localComparison.chainDerivedStatus} · funded ${formatReconciliationValue(
+                          chainSyncReport.localComparison.localFundedAmount,
+                        )} -> ${formatReconciliationValue(
+                          chainSyncReport.localComparison.chainDerivedFundedAmount,
+                        )} · aggregate match ${formatBooleanSummary(
+                          chainSyncReport.localComparison.aggregateMatches,
+                        )} · audit digest match ${formatBooleanSummary(
+                          chainSyncReport.localComparison.auditDigestMatches,
+                        )}.`}
+                      </small>
+                      <small>
+                        {chainSyncReport.persistence.requested
+                          ? `Persistence requested: applied ${formatBooleanSummary(
+                              chainSyncReport.persistence.applied,
+                            )} · blocked ${formatBooleanSummary(
+                              chainSyncReport.persistence.blocked,
+                            )}${chainSyncReport.persistence.blockedReason ? ` · ${chainSyncReport.persistence.blockedReason}` : ''}.`
+                          : 'Persistence requested: No.'}
+                      </small>
+                      {chainSyncReport.localComparison.mismatchedMilestones.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainSyncReport.localComparison.mismatchedMilestones.map((milestone) => (
+                            <small key={`chain-sync-mismatch-${milestone.index}`}>
+                              {`Chain milestone ${milestone.index + 1}: local ${formatReconciliationValue(
+                                milestone.localStatus,
+                              )} -> derived ${formatReconciliationValue(
+                                milestone.chainDerivedStatus,
+                              )}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : null}
+                      {chainSyncReport.issues.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainSyncReport.issues.map((issue, index) => (
+                            <small key={`chain-sync-issue-${index}`}>
+                              {`${getReconciliationSeverityLabel(issue.severity)}: ${issue.summary}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : (
+                        <small>Chain scan produced no ingestion issues.</small>
+                      )}
+                      {chainSyncReport.chainReconciliation ? (
+                        <div className={styles.stack}>
+                          <small>
+                            {`Derived replay drift: ${chainSyncReport.chainReconciliation.issueCount} issue${
+                              chainSyncReport.chainReconciliation.issueCount === 1 ? '' : 's'
+                            } · severity ${getReconciliationSeverityLabel(
+                              chainSyncReport.chainReconciliation.highestSeverity,
+                            )}.`}
+                          </small>
+                          {chainSyncReport.chainReconciliation.issues.map((issue, index) => (
+                            <small key={`chain-sync-reconciliation-${index}`}>
+                              {`${getReconciliationSeverityLabel(
+                                issue.severity,
+                              )}: ${issue.summary}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : (
+                        <small>Derived chain audit produced no reconciliation issues.</small>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+                <article className={styles.boundaryCard}>
+                  <strong>Recurring chain-sync daemon</strong>
+                  <p className={styles.stateText}>
+                    Inspect the latest shared status published by the bounded recurring chain-audit
+                    worker.
+                  </p>
+                  <StatusNotice
+                    message={chainSyncDaemonState.message}
+                    messageClassName={styles.stateText}
+                  />
+                  {chainSyncDaemonHealth ? (
+                    <div className={styles.stack}>
+                      <small>
+                        {`Health: ${getChainSyncDaemonHealthStatusLabel(
+                          chainSyncDaemonHealth.status,
+                        )} · required ${formatBooleanSummary(
+                          chainSyncDaemonHealth.required,
+                        )} · ${chainSyncDaemonHealth.summary}`}
+                      </small>
+                      {chainSyncDaemonHealth.issues.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainSyncDaemonHealth.issues.map((issue, index) => (
+                            <small key={`chain-sync-daemon-issue-${index}`}>
+                              {`${getReconciliationSeverityLabel(issue.severity)}: ${issue.summary}${issue.detail ? ` · ${issue.detail}` : ''}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : null}
+                      {chainSyncDaemonHealth.daemon ? (
+                        <>
+                          <small>
+                            {`Worker: ${chainSyncDaemonHealth.daemon.worker.workerId} · ${getChainSyncDaemonStateLabel(
+                              chainSyncDaemonHealth.daemon.worker.state,
+                            )} · interval ${Math.floor(
+                              chainSyncDaemonHealth.daemon.worker.intervalMs / 1000,
+                            )}s · run on start ${formatBooleanSummary(
+                              chainSyncDaemonHealth.daemon.worker.runOnStart,
+                            )}.`}
+                          </small>
+                          <small>
+                            {`Heartbeat: ${formatTimestamp(
+                              Date.parse(
+                                chainSyncDaemonHealth.daemon.heartbeat.lastHeartbeatAt,
+                              ),
+                            )} · last outcome ${chainSyncDaemonHealth.daemon.heartbeat.lastRunOutcome ? getChainSyncDaemonOutcomeLabel(chainSyncDaemonHealth.daemon.heartbeat.lastRunOutcome) : 'None'} · consecutive failures ${chainSyncDaemonHealth.daemon.heartbeat.consecutiveFailures} · consecutive skips ${chainSyncDaemonHealth.daemon.heartbeat.consecutiveSkips}.`}
+                          </small>
+                          {chainSyncDaemonHealth.daemon.heartbeat.lastErrorMessage ? (
+                            <small>
+                              {`Latest error: ${chainSyncDaemonHealth.daemon.heartbeat.lastErrorMessage}`}
+                            </small>
+                          ) : null}
+                          {chainSyncDaemonHealth.daemon.currentRun ? (
+                            <small>
+                              {`Current run started ${formatTimestamp(
+                                Date.parse(
+                                  chainSyncDaemonHealth.daemon.currentRun.startedAt,
+                                ),
+                              )} · lock ${getChainSyncDaemonLockProviderLabel(
+                                chainSyncDaemonHealth.daemon.currentRun.lockProvider,
+                              )}.`}
+                            </small>
+                          ) : (
+                            <small>No run is currently in flight.</small>
+                          )}
+                          {chainSyncDaemonHealth.daemon.lastRun ? (
+                            <small>
+                              {`Last run: ${getChainSyncDaemonOutcomeLabel(
+                                chainSyncDaemonHealth.daemon.lastRun.outcome,
+                              )} · ${chainSyncDaemonHealth.daemon.lastRun.durationMs}ms · lock ${getChainSyncDaemonLockProviderLabel(
+                                chainSyncDaemonHealth.daemon.lastRun.lockProvider,
+                              )}${chainSyncDaemonHealth.daemon.lastRun.skipReason ? ` · ${chainSyncDaemonHealth.daemon.lastRun.skipReason}` : ''}${chainSyncDaemonHealth.daemon.lastRun.errorMessage ? ` · ${chainSyncDaemonHealth.daemon.lastRun.errorMessage}` : ''}.`}
+                            </small>
+                          ) : (
+                            <small>No daemon run has been published yet.</small>
+                          )}
+                        </>
+                      ) : (
+                        <small>No daemon status snapshot is available.</small>
+                      )}
+                      {chainSyncDaemonHealth.daemon &&
+                      chainSyncDaemonHealth.daemon.recentRuns.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainSyncDaemonHealth.daemon.recentRuns.map((run, index) => (
+                            <small key={`chain-sync-daemon-run-${index}`}>
+                              {`${getChainSyncDaemonOutcomeLabel(run.outcome)} · ${formatTimestamp(
+                                Date.parse(run.completedAt),
+                              )} · ${run.durationMs}ms · ${run.workerId}${run.summary ? ` · processed ${run.summary.processedJobs}` : ''}${run.errorMessage ? ` · ${run.errorMessage}` : ''}${run.skipReason ? ` · ${run.skipReason}` : ''}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </article>
+                <article className={styles.boundaryCard}>
+                  <strong>Batch chain-audit backfill</strong>
+                  <p className={styles.stateText}>
+                    Scan many persisted jobs in one run, tolerate partial failures, and optionally
+                    persist clean chain-derived audit repairs.
+                  </p>
+                  <div className={styles.fieldGrid}>
+                    <label className={styles.field}>
+                      <span>Scope</span>
+                      <select
+                        value={chainSyncBatchScope}
+                        onChange={(event) =>
+                          setChainSyncBatchScope(event.target.value === 'all' ? 'all' : 'attention')
+                        }
+                      >
+                        <option value="attention">Attention backlog</option>
+                        <option value="all">All persisted jobs</option>
+                      </select>
+                    </label>
+                    <label className={styles.field}>
+                      <span>Reason filter</span>
+                      <select
+                        value={chainSyncBatchReason}
+                        onChange={(event) =>
+                          setChainSyncBatchReason(event.target.value as OperationsReasonFilter)
+                        }
+                        disabled={chainSyncBatchScope !== 'attention'}
+                      >
+                        {(
+                          [
+                            'all',
+                            'chain_sync_backlog',
+                            'open_dispute',
+                            'reconciliation_drift',
+                            'failed_execution',
+                            'stale_job',
+                          ] as const
+                        ).map((reason) => (
+                          <option key={reason} value={reason}>
+                            {getOperationsReasonFilterLabel(reason)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.field}>
+                      <span>Limit</span>
+                      <input
+                        value={chainSyncBatchLimit}
+                        onChange={(event) => setChainSyncBatchLimit(event.target.value)}
+                        placeholder="Number of jobs to scan"
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.inlineActions}>
+                    <button type="button" onClick={() => void handleBatchChainAuditSync(false)}>
+                      Preview batch chain sync
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleBatchChainAuditSync(true)}
+                    >
+                      Persist batch chain sync
+                    </button>
+                  </div>
+                  <StatusNotice
+                    message={chainSyncBatchState.message}
+                    messageClassName={styles.stateText}
+                  />
+                  {chainSyncBatchReport ? (
+                    <div className={styles.stack}>
+                      <small>
+                        {`${getChainSyncModeLabel(chainSyncBatchReport.mode)} batch for ${chainSyncBatchReport.filters.scope === 'attention' ? 'attention backlog' : 'all persisted jobs'}${chainSyncBatchReport.filters.reason ? ` · reason ${getOperationsReasonFilterLabel(chainSyncBatchReport.filters.reason)}` : ''} · limit ${chainSyncBatchReport.filters.limit}.`}
+                      </small>
+                      <small>
+                        {`Selection: ${chainSyncBatchReport.selection.selectedJobs} selected / ${chainSyncBatchReport.selection.matchedJobs} matched / ${chainSyncBatchReport.selection.totalJobs} total.`}
+                      </small>
+                      <small>
+                        {`Summary: ${chainSyncBatchReport.summary.processedJobs} processed · ${chainSyncBatchReport.summary.cleanJobs} clean · ${chainSyncBatchReport.summary.changedJobs} changed · ${chainSyncBatchReport.summary.persistedJobs} persisted · ${chainSyncBatchReport.summary.blockedJobs} blocked · ${chainSyncBatchReport.summary.failedJobs} failed · ${chainSyncBatchReport.summary.criticalIssueJobs} with critical issues.`}
+                      </small>
+                      {chainSyncBatchReport.jobs.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainSyncBatchReport.jobs.map((job) => (
+                            <small key={`chain-sync-batch-${job.jobId}`}>
+                              {`${job.title} (${job.jobId}): ${getChainSyncBatchOutcomeLabel(
+                                job.outcome,
+                              )} · issues ${job.issueCount} · critical ${job.criticalIssueCount}${job.errorMessage ? ` · ${job.errorMessage}` : ''}`}
+                            </small>
+                          ))}
+                        </div>
+                      ) : (
+                        <small>No jobs matched the batch sync selection.</small>
                       )}
                     </div>
                   ) : null}
@@ -1512,20 +1992,19 @@ export function OperatorConsole() {
               </>
             )}
             {controlsArbitratorWallet && escrowHealth && escrowHealth.jobs.length > 0 ? (
-              escrowHealth.jobs.map((job) => (
+              escrowHealth.jobs.map((job) =>
                 (() => {
                   const isStaleJob = job.reasons.includes('stale_job');
                   const isFailedJob = job.reasons.includes('failed_execution');
+                  const chainSync = job.chainSync;
                   const executionFailureWorkflow = job.executionFailureWorkflow;
                   const staleWorkflow = job.staleWorkflow;
-                  const failedExecutionDiagnostics =
-                    job.failedExecutionDiagnostics;
+                  const failedExecutionDiagnostics = job.failedExecutionDiagnostics;
                   const failureGuidance = job.failureGuidance;
                   const reconciliation = job.reconciliation;
                   const failureClaimedByCurrentOperator =
                     executionFailureWorkflow?.claimedByUserId === profile?.id;
-                  const claimedByCurrentOperator =
-                    staleWorkflow?.claimedByUserId === profile?.id;
+                  const claimedByCurrentOperator = staleWorkflow?.claimedByUserId === profile?.id;
 
                   return (
                     <article key={job.jobId} className={styles.timelineCard}>
@@ -1538,9 +2017,25 @@ export function OperatorConsole() {
                       </p>
                       <small>{`Job ${job.jobId} · Updated ${formatTimestamp(job.updatedAt)}`}</small>
                       <small>{`Latest activity ${formatTimestamp(job.latestActivityAt)}`}</small>
-                      <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</small>
+                      <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions} · Chain sync backlog ${formatBooleanSummary(job.counts.chainSyncBacklog)}`}</small>
                       {job.staleForMs !== null ? (
                         <small>{`Stale for ${Math.floor(job.staleForMs / 3_600_000)}h`}</small>
+                      ) : null}
+                      {chainSync ? (
+                        <small>
+                          {`Chain sync: ${getChainSyncCoverageLabel(chainSync.status)} · last attempt ${chainSync.lastAttemptedAt ? formatTimestamp(chainSync.lastAttemptedAt) : 'Never'} · last success ${chainSync.lastSuccessfulAt ? formatTimestamp(chainSync.lastSuccessfulAt) : 'Never'} · mode ${chainSync.lastMode ?? 'None'} · outcome ${chainSync.lastOutcome ?? 'None'}`}
+                        </small>
+                      ) : null}
+                      {chainSync?.lastErrorMessage ? (
+                        <small>{`Chain sync error: ${chainSync.lastErrorMessage}`}</small>
+                      ) : null}
+                      {chainSync &&
+                      (chainSync.lastIssueCount > 0 ||
+                        chainSync.lastCriticalIssueCount > 0 ||
+                        chainSync.lastReconciliationIssueCount > 0) ? (
+                        <small>
+                          {`Chain sync findings: ${chainSync.lastIssueCount} total · ${chainSync.lastCriticalIssueCount} critical · ${chainSync.lastReconciliationIssueCount} reconciliation.`}
+                        </small>
                       ) : null}
                       {job.latestFailedExecution ? (
                         <code>
@@ -1569,51 +2064,37 @@ export function OperatorConsole() {
                           </p>
                           <small>
                             {`Timeline sources: ${reconciliation.sourceCounts.auditEvents} audit event${
-                              reconciliation.sourceCounts.auditEvents === 1
-                                ? ''
-                                : 's'
+                              reconciliation.sourceCounts.auditEvents === 1 ? '' : 's'
                             } · ${reconciliation.sourceCounts.confirmedExecutions} confirmed execution${
-                              reconciliation.sourceCounts.confirmedExecutions === 1
-                                ? ''
-                                : 's'
+                              reconciliation.sourceCounts.confirmedExecutions === 1 ? '' : 's'
                             } · ${reconciliation.sourceCounts.failedExecutions} failed execution${
-                              reconciliation.sourceCounts.failedExecutions === 1
-                                ? ''
-                                : 's'
+                              reconciliation.sourceCounts.failedExecutions === 1 ? '' : 's'
                             }`}
                           </small>
                           <small>
-                            {`Replay: status ${reconciliation.projection.aggregateStatus} -> ${reconciliation.projection.projectedStatus} · funded ${
-                              formatReconciliationValue(
-                                reconciliation.projection.aggregateFundedAmount,
-                              )
-                            } -> ${formatReconciliationValue(
+                            {`Replay: status ${reconciliation.projection.aggregateStatus} -> ${reconciliation.projection.projectedStatus} · funded ${formatReconciliationValue(
+                              reconciliation.projection.aggregateFundedAmount,
+                            )} -> ${formatReconciliationValue(
                               reconciliation.projection.projectedFundedAmount,
                             )}`}
                           </small>
                           {reconciliation.projection.mismatchedMilestones.length > 0 ? (
                             <div className={styles.stack}>
-                              {reconciliation.projection.mismatchedMilestones.map(
-                                (milestone) => (
-                                  <small
-                                    key={`${job.jobId}-reconciliation-milestone-${milestone.index}`}
-                                  >
-                                    {`Milestone ${
-                                      milestone.index + 1
-                                    }: ${formatReconciliationValue(
-                                      milestone.aggregateStatus,
-                                    )} -> ${formatReconciliationValue(
-                                      milestone.projectedStatus,
-                                    )}${
-                                      milestone.lastAuditType
-                                        ? ` after ${milestone.lastAuditType} at ${formatTimestamp(
-                                            milestone.lastAuditAt ?? 0,
-                                          )}`
-                                        : ''
-                                    }`}
-                                  </small>
-                                ),
-                              )}
+                              {reconciliation.projection.mismatchedMilestones.map((milestone) => (
+                                <small
+                                  key={`${job.jobId}-reconciliation-milestone-${milestone.index}`}
+                                >
+                                  {`Milestone ${milestone.index + 1}: ${formatReconciliationValue(
+                                    milestone.aggregateStatus,
+                                  )} -> ${formatReconciliationValue(milestone.projectedStatus)}${
+                                    milestone.lastAuditType
+                                      ? ` after ${milestone.lastAuditType} at ${formatTimestamp(
+                                          milestone.lastAuditAt ?? 0,
+                                        )}`
+                                      : ''
+                                  }`}
+                                </small>
+                              ))}
                             </div>
                           ) : null}
                           <div className={styles.stack}>
@@ -1624,18 +2105,14 @@ export function OperatorConsole() {
                                     issue.severity,
                                   )}: ${issue.summary}`}
                                 </small>
-                                {issue.detail ? (
-                                  <small>{issue.detail}</small>
-                                ) : null}
+                                {issue.detail ? <small>{issue.detail}</small> : null}
                               </div>
                             ))}
                           </div>
                         </article>
                       ) : null}
                       {failedExecutionDiagnostics ? (
-                        <article
-                          className={`${styles.boundaryCard} ${styles.executionFailure}`}
-                        >
+                        <article className={`${styles.boundaryCard} ${styles.executionFailure}`}>
                           <strong>{`Failure pressure: ${job.counts.failedExecutions} failed attempt${
                             job.counts.failedExecutions === 1 ? '' : 's'
                           }`}</strong>
@@ -1648,9 +2125,7 @@ export function OperatorConsole() {
                           </p>
                           {failureGuidance ? (
                             <>
-                              <small>
-                                {`Guidance: ${failureGuidance.summary}`}
-                              </small>
+                              <small>{`Guidance: ${failureGuidance.summary}`}</small>
                               <small>
                                 {`Surface: ${getFailureGuidanceSurfaceLabel(
                                   failureGuidance.responsibleSurface,
@@ -1659,30 +2134,24 @@ export function OperatorConsole() {
                                 )} · Severity: ${failureGuidance.severity}`}
                               </small>
                               <small>
-                                {`Next steps: ${failureGuidance.recommendedActions.join(
-                                  ' · ',
-                                )}`}
+                                {`Next steps: ${failureGuidance.recommendedActions.join(' · ')}`}
                               </small>
                             </>
                           ) : null}
                           <small>
                             {`Actions: ${formatFailureBreakdown(
-                              failedExecutionDiagnostics.actionBreakdown.map(
-                                (entry) => ({
-                                  label: entry.action,
-                                  count: entry.count,
-                                }),
-                              ),
+                              failedExecutionDiagnostics.actionBreakdown.map((entry) => ({
+                                label: entry.action,
+                                count: entry.count,
+                              })),
                             )}`}
                           </small>
                           <small>
                             {`Codes: ${formatFailureBreakdown(
-                              failedExecutionDiagnostics.failureCodeBreakdown.map(
-                                (entry) => ({
-                                  label: formatFailureCodeLabel(entry.failureCode),
-                                  count: entry.count,
-                                }),
-                              ),
+                              failedExecutionDiagnostics.failureCodeBreakdown.map((entry) => ({
+                                label: formatFailureCodeLabel(entry.failureCode),
+                                count: entry.count,
+                              })),
                             )}`}
                           </small>
                           {isFailedJob ? (
@@ -1715,13 +2184,11 @@ export function OperatorConsole() {
                                   onChange={(event) =>
                                     setFailureWorkflowStatuses((current) => ({
                                       ...current,
-                                      [job.jobId]:
-                                        event.target.value as FailureWorkflowStatus,
+                                      [job.jobId]: event.target.value as FailureWorkflowStatus,
                                     }))
                                   }
                                   disabled={Boolean(
-                                    executionFailureWorkflow &&
-                                      !failureClaimedByCurrentOperator,
+                                    executionFailureWorkflow && !failureClaimedByCurrentOperator,
                                   )}
                                 >
                                   {(
@@ -1751,24 +2218,18 @@ export function OperatorConsole() {
                                   }
                                   placeholder="Document the failure pattern, likely cause, next retry posture, or external dependency blocker."
                                   disabled={Boolean(
-                                    executionFailureWorkflow &&
-                                      !failureClaimedByCurrentOperator,
+                                    executionFailureWorkflow && !failureClaimedByCurrentOperator,
                                   )}
                                 />
                               </label>
                               <div className={styles.inlineActions}>
-                                {!executionFailureWorkflow ||
-                                failureClaimedByCurrentOperator ? (
+                                {!executionFailureWorkflow || failureClaimedByCurrentOperator ? (
                                   <button
                                     type="button"
                                     onClick={() =>
                                       executionFailureWorkflow
-                                        ? void handleUpdateExecutionFailureWorkflow(
-                                            job.jobId,
-                                          )
-                                        : void handleClaimExecutionFailureWorkflow(
-                                            job.jobId,
-                                          )
+                                        ? void handleUpdateExecutionFailureWorkflow(job.jobId)
+                                        : void handleClaimExecutionFailureWorkflow(job.jobId)
                                     }
                                   >
                                     {executionFailureWorkflow
@@ -1776,28 +2237,22 @@ export function OperatorConsole() {
                                       : 'Claim failure workflow'}
                                   </button>
                                 ) : null}
-                                {executionFailureWorkflow &&
-                                failureClaimedByCurrentOperator ? (
+                                {executionFailureWorkflow && failureClaimedByCurrentOperator ? (
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      void handleAcknowledgeExecutionFailures(
-                                        job.jobId,
-                                      )
+                                      void handleAcknowledgeExecutionFailures(job.jobId)
                                     }
                                   >
                                     Acknowledge latest failures
                                   </button>
                                 ) : null}
-                                {executionFailureWorkflow &&
-                                failureClaimedByCurrentOperator ? (
+                                {executionFailureWorkflow && failureClaimedByCurrentOperator ? (
                                   <button
                                     type="button"
                                     className={styles.secondaryButton}
                                     onClick={() =>
-                                      void handleReleaseExecutionFailureWorkflow(
-                                        job.jobId,
-                                      )
+                                      void handleReleaseExecutionFailureWorkflow(job.jobId)
                                     }
                                   >
                                     Release failure claim
@@ -1811,31 +2266,19 @@ export function OperatorConsole() {
                             </>
                           ) : null}
                           <div className={styles.stack}>
-                            {failedExecutionDiagnostics.recentFailures.map(
-                              (failure, index) => (
-                                <code key={`${job.jobId}-failure-${index}`}>
-                                  {`#${index + 1} ${failure.action} at ${formatTimestamp(
-                                    failure.submittedAt,
-                                  )}${
-                                    failure.milestoneIndex !== null
-                                      ? ` · milestone ${failure.milestoneIndex + 1}`
-                                      : ''
-                                  }${
-                                    failure.failureCode
-                                      ? ` · ${failure.failureCode}`
-                                      : ''
-                                  }${
-                                    failure.failureMessage
-                                      ? ` · ${failure.failureMessage}`
-                                      : ''
-                                  }${
-                                    failure.txHash
-                                      ? ` · ${previewHash(failure.txHash)}`
-                                      : ''
-                                  }`}
-                                </code>
-                              ),
-                            )}
+                            {failedExecutionDiagnostics.recentFailures.map((failure, index) => (
+                              <code key={`${job.jobId}-failure-${index}`}>
+                                {`#${index + 1} ${failure.action} at ${formatTimestamp(
+                                  failure.submittedAt,
+                                )}${
+                                  failure.milestoneIndex !== null
+                                    ? ` · milestone ${failure.milestoneIndex + 1}`
+                                    : ''
+                                }${failure.failureCode ? ` · ${failure.failureCode}` : ''}${
+                                  failure.failureMessage ? ` · ${failure.failureMessage}` : ''
+                                }${failure.txHash ? ` · ${previewHash(failure.txHash)}` : ''}`}
+                              </code>
+                            ))}
                           </div>
                         </article>
                       ) : null}
@@ -1865,9 +2308,7 @@ export function OperatorConsole() {
                                 }))
                               }
                               placeholder="Document why the job is stale, what is blocked, and what you will do next."
-                              disabled={Boolean(
-                                staleWorkflow && !claimedByCurrentOperator,
-                              )}
+                              disabled={Boolean(staleWorkflow && !claimedByCurrentOperator)}
                             />
                           </label>
                           <div className={styles.inlineActions}>
@@ -1906,8 +2347,8 @@ export function OperatorConsole() {
                       </div>
                     </article>
                   );
-                })()
-              ))
+                })(),
+              )
             ) : controlsArbitratorWallet && escrowHealth ? (
               <EmptyStateCard
                 title="No jobs currently need attention"
@@ -2004,10 +2445,7 @@ export function OperatorConsole() {
                 <strong>{formatTimestamp(caseBrief.latestActivityAt)}</strong>
               </article>
             </div>
-            <StatusNotice
-              message={caseBrief.pressureSummary}
-              messageClassName={styles.stateText}
-            />
+            <StatusNotice message={caseBrief.pressureSummary} messageClassName={styles.stateText} />
             <div className={styles.stack}>
               <div className={styles.inlineActions}>
                 <button
@@ -2037,10 +2475,7 @@ export function OperatorConsole() {
                   Export dispute case CSV
                 </button>
               </div>
-              <StatusNotice
-                message={exportState.message}
-                messageClassName={styles.stateText}
-              />
+              <StatusNotice message={exportState.message} messageClassName={styles.stateText} />
               <article className={styles.boundaryCard}>
                 <strong>
                   {runtimeProfile?.operator.exportSupport
@@ -2048,9 +2483,9 @@ export function OperatorConsole() {
                     : 'Runtime profile did not confirm export support'}
                 </strong>
                 <p className={styles.stateText}>
-                  Job-history exports are always available from the public bundle.
-                  Dispute-case exports stay truthful to the current milestone and
-                  receipt posture, even when no active disputes remain.
+                  Job-history exports are always available from the public bundle. Dispute-case
+                  exports stay truthful to the current milestone and receipt posture, even when no
+                  active disputes remain.
                 </p>
               </article>
             </div>
@@ -2103,14 +2538,21 @@ export function OperatorConsole() {
               <div className={styles.stack}>
                 {failedExecutionCards.length > 0 ? (
                   failedExecutionCards.map((card) => (
-                    <article key={card.id} className={`${styles.timelineCard} ${styles.executionFailure}`}>
+                    <article
+                      key={card.id}
+                      className={`${styles.timelineCard} ${styles.executionFailure}`}
+                    >
                       <div className={styles.timelineHead}>
                         <strong>{card.action}</strong>
                         <span>{card.status}</span>
                       </div>
                       <p>{card.summary}</p>
                       <small>{card.detail}</small>
-                      <small>{card.milestoneIndex === undefined ? 'Job-level receipt' : `Milestone ${card.milestoneIndex + 1}`}</small>
+                      <small>
+                        {card.milestoneIndex === undefined
+                          ? 'Job-level receipt'
+                          : `Milestone ${card.milestoneIndex + 1}`}
+                      </small>
                       <small>{card.actorAddress}</small>
                       <small>{previewHash(card.txHash)}</small>
                       <small>{formatTimestamp(card.at)}</small>
@@ -2190,7 +2632,8 @@ export function OperatorConsole() {
                     <article className={styles.boundaryCard}>
                       <strong>Blocked by wallet authority</strong>
                       <p className={styles.stateText}>
-                        The authenticated session does not currently control the configured arbitrator wallet {arbitratorAddress}.
+                        The authenticated session does not currently control the configured
+                        arbitrator wallet {arbitratorAddress}.
                       </p>
                     </article>
                   </>
@@ -2246,7 +2689,8 @@ export function OperatorConsole() {
                     <article className={styles.boundaryCard}>
                       <strong>Resolution authority confirmed</strong>
                       <p className={styles.stateText}>
-                        The session controls the configured arbitrator wallet, so the existing protected resolve endpoint can be used from this console.
+                        The session controls the configured arbitrator wallet, so the existing
+                        protected resolve endpoint can be used from this console.
                       </p>
                     </article>
                   </>
@@ -2273,7 +2717,11 @@ export function OperatorConsole() {
                       </div>
                       <p>{card.summary}</p>
                       <small>{card.detail}</small>
-                      <small>{card.milestoneIndex === undefined ? 'Job-level receipt' : `Milestone ${card.milestoneIndex + 1}`}</small>
+                      <small>
+                        {card.milestoneIndex === undefined
+                          ? 'Job-level receipt'
+                          : `Milestone ${card.milestoneIndex + 1}`}
+                      </small>
                       <small>{card.actorAddress}</small>
                       <small>{previewHash(card.txHash)}</small>
                       <small>{formatTimestamp(card.at)}</small>

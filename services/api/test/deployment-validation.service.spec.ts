@@ -3,7 +3,10 @@ import { join } from 'path';
 import { AuthConfigService } from '../src/modules/auth/auth.config';
 import { EmailConfigService } from '../src/modules/auth/email/email.config';
 import { EscrowContractConfigService } from '../src/modules/escrow/onchain/escrow-contract.config';
+import { EscrowChainSyncDaemonDeploymentService } from '../src/modules/operations/escrow-chain-sync-daemon-deployment.service';
+import { EscrowChainSyncDaemonMonitoringService } from '../src/modules/operations/escrow-chain-sync-daemon-monitoring.service';
 import { DeploymentValidationService } from '../src/modules/operations/deployment-validation.service';
+import { OperationsConfigService } from '../src/modules/operations/operations.config';
 import { PersistenceConfigService } from '../src/persistence/persistence.config';
 import { SmartAccountConfigService } from '../src/modules/wallet/provisioning/smart-account.config';
 
@@ -158,6 +161,35 @@ describe('DeploymentValidationService', () => {
     );
   });
 
+  it('fails deployment validation when required recurring chain-sync orchestration is misconfigured', async () => {
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED = 'true';
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_SCHEDULE_INTERVAL_SEC = '300';
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_HEARTBEAT_AGE_SEC =
+      '300';
+    delete process.env.OPERATIONS_ESCROW_RPC_URL;
+    delete process.env.ESCROW_CHAIN_RPC_URL;
+    delete process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL;
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.checks.find((check) => check.id === 'chain-sync-daemon-config'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        summary:
+          'Recurring chain-sync daemon deployment posture is misconfigured.',
+        metadata: expect.objectContaining({
+          required: true,
+          rpcConfigured: false,
+          alertingConfigured: false,
+        }),
+      }),
+    );
+  });
+
   it('allows a zero-cost local development profile to validate runtime configuration', () => {
     process.env.NODE_ENV = 'development';
     process.env.AUTH_EMAIL_MODE = 'mock';
@@ -188,6 +220,27 @@ describe('DeploymentValidationService', () => {
       new PersistenceConfigService(),
       { query } as never,
       new SmartAccountConfigService(),
+      new EscrowChainSyncDaemonDeploymentService(
+        new OperationsConfigService(),
+        new PersistenceConfigService(),
+      ),
+      {
+        getReport: jest.fn().mockResolvedValue({
+          generatedAt: '2026-04-09T00:00:00.000Z',
+          ok: true,
+          status: 'ok',
+          required: false,
+          summary: 'Recurring chain-sync daemon is healthy on worker worker-1.',
+          thresholds: {
+            maxHeartbeatAgeMs: 900_000,
+            maxCurrentRunAgeMs: 1_800_000,
+            maxConsecutiveFailures: 3,
+            maxConsecutiveSkips: 6,
+          },
+          issues: [],
+          daemon: null,
+        }),
+      } as unknown as EscrowChainSyncDaemonMonitoringService,
     );
   }
 

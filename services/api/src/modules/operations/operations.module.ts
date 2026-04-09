@@ -7,6 +7,17 @@ import { EscrowContractModule } from '../escrow/onchain/escrow-contract.module';
 import { PersistenceModule } from '../../persistence/persistence.module';
 import { SmartAccountModule } from '../wallet/provisioning/smart-account.module';
 import { DeploymentValidationService } from './deployment-validation.service';
+import { EscrowChainSyncDaemonDeploymentService } from './escrow-chain-sync-daemon-deployment.service';
+import {
+  ESCROW_CHAIN_LOG_PROVIDER,
+  JsonRpcEscrowChainLogProvider,
+} from './escrow-chain-log.provider';
+import { EscrowChainSyncService } from './escrow-chain-sync.service';
+import { EscrowChainSyncDaemonStatusService } from './escrow-chain-sync-daemon-status.service';
+import { EscrowChainSyncDaemonAlertStateService } from './escrow-chain-sync-daemon-alert-state.service';
+import { EscrowChainSyncDaemonAlertingService } from './escrow-chain-sync-daemon-alerting.service';
+import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daemon-monitoring.service';
+import { EscrowChainSyncRunLockService } from './escrow-chain-sync-run-lock.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { EscrowHistoryImportService } from './escrow-history-import.service';
 import { OperationsConfigService } from './operations.config';
@@ -27,6 +38,17 @@ import { RuntimeProfileService } from './runtime-profile.service';
   providers: [
     AuthConfigService,
     DeploymentValidationService,
+    EscrowChainSyncDaemonDeploymentService,
+    {
+      provide: ESCROW_CHAIN_LOG_PROVIDER,
+      useClass: JsonRpcEscrowChainLogProvider,
+    },
+    EscrowChainSyncService,
+    EscrowChainSyncDaemonAlertStateService,
+    EscrowChainSyncDaemonAlertingService,
+    EscrowChainSyncDaemonStatusService,
+    EscrowChainSyncDaemonMonitoringService,
+    EscrowChainSyncRunLockService,
     EscrowReconciliationService,
     EscrowHistoryImportService,
     OperationsConfigService,
@@ -35,6 +57,10 @@ import { RuntimeProfileService } from './runtime-profile.service';
   ],
   exports: [
     DeploymentValidationService,
+    EscrowChainSyncService,
+    EscrowChainSyncDaemonDeploymentService,
+    EscrowChainSyncDaemonAlertingService,
+    EscrowChainSyncDaemonMonitoringService,
     EscrowHealthService,
     EscrowHistoryImportService,
     EscrowReconciliationService,

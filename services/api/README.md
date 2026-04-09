@@ -55,6 +55,9 @@ pnpm --filter escrow4334-api test -- --runInBand
 pnpm --filter escrow4334-api db:migrate
 pnpm --filter escrow4334-api db:migrate:status
 pnpm --filter escrow4334-api deployment:validate
+pnpm --filter escrow4334-api chain-sync:batch -- --help
+pnpm --filter escrow4334-api chain-sync:daemon -- --help
+pnpm --filter escrow4334-api chain-sync:daemon:health -- --help
 ```
 
 Contract-execution environment:
@@ -124,6 +127,47 @@ WALLET_SMART_ACCOUNT_BUNDLER_HEALTHCHECK_URL=https://...
 WALLET_SMART_ACCOUNT_PAYMASTER_HEALTHCHECK_URL=https://...
 ESCROW_RELAY_HEALTHCHECK_URL=https://...
 ```
+
+Escrow chain-audit batch runner:
+
+```bash
+OPERATIONS_ESCROW_RPC_URL=https://base-sepolia.example.com
+OPERATIONS_ESCROW_CHAIN_SYNC_BACKLOG_HOURS=6
+OPERATIONS_ESCROW_BATCH_SYNC_LIMIT=25
+OPERATIONS_ESCROW_BATCH_SYNC_PERSIST=false
+pnpm --filter escrow4334-api chain-sync:batch -- --limit 10 --preview
+```
+
+Escrow chain-audit batch daemon:
+
+```bash
+OPERATIONS_ESCROW_RPC_URL=https://base-sepolia.example.com
+OPERATIONS_ESCROW_BATCH_SYNC_LIMIT=25
+OPERATIONS_ESCROW_BATCH_SYNC_PERSIST=true
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED=true
+OPERATIONS_ESCROW_BATCH_SYNC_SCHEDULE_INTERVAL_SEC=300
+OPERATIONS_ESCROW_BATCH_SYNC_SCHEDULE_RUN_ON_START=true
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_LOCK_ID=433704337
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_HEARTBEAT_AGE_SEC=900
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_CURRENT_RUN_AGE_SEC=1800
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_CONSECUTIVE_FAILURES=3
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_CONSECUTIVE_SKIPS=6
+OPERATIONS_ESCROW_BATCH_SYNC_STATUS_FILE=
+OPERATIONS_ESCROW_BATCH_SYNC_STATUS_RECENT_RUNS_LIMIT=10
+OPERATIONS_ESCROW_BATCH_SYNC_ALERT_STATE_FILE=
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL=https://alerts.example.com/escrow-chain-sync
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_BEARER_TOKEN=optional
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_TIMEOUT_MS=5000
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_MIN_SEVERITY=critical
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_RESEND_INTERVAL_SEC=3600
+OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_SEND_RECOVERY=true
+pnpm --filter escrow4334-api chain-sync:daemon -- --wait-first
+pnpm --filter escrow4334-api chain-sync:daemon:health -- --notify --fail-on critical
+```
+
+When `PERSISTENCE_DRIVER=postgres`, the daemon uses a Postgres advisory lock keyed by `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_LOCK_ID` so only one worker replica can own a given run at a time. The daemon also publishes a shared status snapshot with recent runs so protected API consumers can inspect recurring-worker state. The compiled `chain-sync:daemon:health` command evaluates that shared status, supports `--fail-on warning|critical|never`, and can send deduped webhook alerts or recovery notifications through `--notify`. Deployment validation now also checks the recurring-worker posture itself: when `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED=true`, the repo expects an RPC URL, an alert webhook URL, and a heartbeat threshold larger than the schedule interval so healthy workers do not report stale between ticks. File-backed mode keeps the same in-process overlap protection, writes daemon status to `OPERATIONS_ESCROW_BATCH_SYNC_STATUS_FILE`, and persists alert dedupe state to `OPERATIONS_ESCROW_BATCH_SYNC_ALERT_STATE_FILE`, but it does not provide cross-process singleton guarantees.
+
+Operations health now also records per-job chain-sync coverage metadata on each audit sync attempt and exposes `chain_sync_backlog` as an explicit attention reason when the latest sync is stale or failing. Tune that threshold with `OPERATIONS_ESCROW_CHAIN_SYNC_BACKLOG_HOURS`; protected health responses and the admin operator console both surface the resulting backlog count and job-level chain-sync status.
 
 ## Current Module Layout
 

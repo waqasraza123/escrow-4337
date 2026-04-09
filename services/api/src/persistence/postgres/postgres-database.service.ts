@@ -54,6 +54,15 @@ export class PostgresDatabaseService implements OnModuleDestroy {
     }
   }
 
+  async connect() {
+    const pool = this.getPool();
+    if (!pool) {
+      throw new Error('Postgres driver is not enabled');
+    }
+
+    return pool.connect();
+  }
+
   async onModuleDestroy() {
     if (this.pool) {
       await this.pool.end();

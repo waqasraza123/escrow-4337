@@ -304,8 +304,9 @@ function inferFailureGuidance(
 function sortReasons(reasons: Set<EscrowAttentionReason>) {
   const order: EscrowAttentionReason[] = [
     'open_dispute',
-    'reconciliation_drift',
     'failed_execution',
+    'reconciliation_drift',
+    'chain_sync_backlog',
     'stale_job',
   ];
 
@@ -325,11 +326,15 @@ function attentionPriority(reasons: EscrowAttentionReason[]) {
     return 2;
   }
 
-  if (reasons.includes('stale_job')) {
+  if (reasons.includes('chain_sync_backlog')) {
     return 3;
   }
 
-  return 4;
+  if (reasons.includes('stale_job')) {
+    return 4;
+  }
+
+  return 5;
 }
 
 function isJobCurrentlyStale(job: EscrowJobRecord, staleCutoff: number) {
@@ -338,6 +343,68 @@ function isJobCurrentlyStale(job: EscrowJobRecord, staleCutoff: number) {
   }
 
   return latestActivityAt(job) <= staleCutoff;
+}
+
+function buildChainSyncStatus(
+  job: EscrowJobRecord,
+  now: number,
+  backlogCutoff: number,
+): EscrowHealthJob['chainSync'] {
+  if (!job.onchain.escrowId) {
+    return null;
+  }
+
+  const chainSync = job.operations.chainSync;
+  if (!chainSync) {
+    const activityAt = latestActivityAt(job);
+    return {
+      status:
+        activityAt <= backlogCutoff ? 'stale' : 'pending_initial_sync',
+      staleForMs: activityAt <= backlogCutoff ? now - activityAt : null,
+      lastAttemptedAt: null,
+      lastSuccessfulAt: null,
+      lastPersistedAt: null,
+      lastMode: null,
+      lastOutcome: null,
+      lastSyncedBlock: null,
+      lastIssueCount: 0,
+      lastCriticalIssueCount: 0,
+      lastReconciliationIssueCount: 0,
+      lastErrorMessage: null,
+    };
+  }
+
+  const lastSuccessfulAt = chainSync.lastSuccessfulAt ?? null;
+  const staleAnchor = lastSuccessfulAt ?? chainSync.lastAttemptedAt;
+  const isFailing =
+    chainSync.lastOutcome === 'failed' &&
+    chainSync.lastAttemptedAt >= (lastSuccessfulAt ?? 0);
+  const isStale =
+    !isFailing &&
+    ((lastSuccessfulAt === null && latestActivityAt(job) <= backlogCutoff) ||
+      (lastSuccessfulAt !== null && lastSuccessfulAt <= backlogCutoff));
+
+  return {
+    status: isFailing
+      ? 'failing'
+      : isStale
+        ? 'stale'
+        : lastSuccessfulAt === null
+          ? 'pending_initial_sync'
+          : 'healthy',
+    staleForMs:
+      (isFailing || isStale) && staleAnchor < now ? now - staleAnchor : null,
+    lastAttemptedAt: chainSync.lastAttemptedAt,
+    lastSuccessfulAt,
+    lastPersistedAt: chainSync.lastPersistedAt ?? null,
+    lastMode: chainSync.lastMode,
+    lastOutcome: chainSync.lastOutcome,
+    lastSyncedBlock: chainSync.lastSyncedBlock ?? null,
+    lastIssueCount: chainSync.lastIssueCount,
+    lastCriticalIssueCount: chainSync.lastCriticalIssueCount,
+    lastReconciliationIssueCount: chainSync.lastReconciliationIssueCount,
+    lastErrorMessage: chainSync.lastErrorMessage ?? null,
+  };
 }
 
 @Injectable()
@@ -360,6 +427,8 @@ export class EscrowHealthService {
 
     const jobs = await this.escrowRepository.listAll();
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const normalizedReason = options.reason ?? null;
     const normalizedLimit = Math.min(
       options.limit ?? this.operationsConfig.escrowHealthDefaultLimit,
@@ -367,7 +436,9 @@ export class EscrowHealthService {
     );
 
     const allAttentionJobs = jobs
-      .map((job) => this.buildJobSummary(job, staleCutoff, now))
+      .map((job) =>
+        this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
+      )
       .filter((job) => job.reasons.length > 0)
       .sort((left, right) => {
         const leftPriority = attentionPriority(left.reasons);
@@ -394,6 +465,8 @@ export class EscrowHealthService {
         limit: normalizedLimit,
       },
       thresholds: {
+        chainSyncBacklogHours: this.operationsConfig.escrowChainSyncBacklogHours,
+        chainSyncBacklogMs: this.operationsConfig.escrowChainSyncBacklogMs,
         staleJobHours: this.operationsConfig.escrowStaleJobHours,
         staleJobMs: this.operationsConfig.escrowStaleJobMs,
         defaultLimit: this.operationsConfig.escrowHealthDefaultLimit,
@@ -403,6 +476,9 @@ export class EscrowHealthService {
         totalJobs: jobs.length,
         jobsNeedingAttention: allAttentionJobs.length,
         matchedJobs: matchedJobs.length,
+        chainSyncBacklogJobs: matchedJobs.filter((job) =>
+          job.reasons.includes('chain_sync_backlog'),
+        ).length,
         openDisputeJobs: matchedJobs.filter((job) =>
           job.reasons.includes('open_dispute'),
         ).length,
@@ -431,6 +507,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
 
     if (!isJobCurrentlyStale(job, staleCutoff)) {
       throw new ConflictException('Job is not currently stale');
@@ -453,7 +531,7 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(job, staleCutoff, now),
+      job: this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
     };
   }
 
@@ -469,6 +547,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
     const guidance = inferFailureGuidance(
@@ -503,6 +583,7 @@ export class EscrowHealthService {
       job: this.buildJobSummary(
         job,
         staleCutoff,
+        chainSyncBacklogCutoff,
         now,
         failedExecutionDiagnostics,
       ),
@@ -521,6 +602,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
@@ -552,6 +635,7 @@ export class EscrowHealthService {
       job: this.buildJobSummary(
         job,
         staleCutoff,
+        chainSyncBacklogCutoff,
         now,
         failedExecutionDiagnostics,
       ),
@@ -566,6 +650,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
@@ -589,6 +675,7 @@ export class EscrowHealthService {
       job: this.buildJobSummary(
         job,
         staleCutoff,
+        chainSyncBacklogCutoff,
         now,
         failedExecutionDiagnostics,
       ),
@@ -607,6 +694,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const failedExecutionDiagnostics =
       this.requireFailedExecutionDiagnostics(job);
     const existingWorkflow = job.operations.executionFailureWorkflow;
@@ -637,6 +726,7 @@ export class EscrowHealthService {
       job: this.buildJobSummary(
         job,
         staleCutoff,
+        chainSyncBacklogCutoff,
         now,
         failedExecutionDiagnostics,
       ),
@@ -651,6 +741,8 @@ export class EscrowHealthService {
     const user = await this.requireOperatorAccess(userId);
     const job = await this.requireJob(jobId);
     const staleCutoff = now - this.operationsConfig.escrowStaleJobMs;
+    const chainSyncBacklogCutoff =
+      now - this.operationsConfig.escrowChainSyncBacklogMs;
     const existingWorkflow = job.operations.staleWorkflow;
 
     if (!existingWorkflow) {
@@ -667,13 +759,14 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(job, staleCutoff, now),
+      job: this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
     };
   }
 
   private buildJobSummary(
     job: EscrowJobRecord,
     staleCutoff: number,
+    chainSyncBacklogCutoff: number,
     now: number,
     failedExecutionDiagnostics = buildFailedExecutionDiagnostics(
       job.executions,
@@ -690,6 +783,7 @@ export class EscrowHealthService {
     const failureGuidance = failedExecutionDiagnostics
       ? inferFailureGuidance(failedExecutions, failedExecutionDiagnostics)
       : null;
+    const chainSync = buildChainSyncStatus(job, now, chainSyncBacklogCutoff);
     const reasons = new Set<EscrowAttentionReason>();
 
     if (openDisputes > 0) {
@@ -702,6 +796,10 @@ export class EscrowHealthService {
 
     if (reconciliation) {
       reasons.add('reconciliation_drift');
+    }
+
+    if (chainSync && chainSync.status !== 'healthy' && chainSync.status !== 'pending_initial_sync') {
+      reasons.add('chain_sync_backlog');
     }
 
     if (
@@ -724,9 +822,12 @@ export class EscrowHealthService {
           : null,
       reasons: sortReasons(reasons),
       counts: {
+        chainSyncBacklog:
+          chainSync?.status === 'stale' || chainSync?.status === 'failing',
         openDisputes,
         failedExecutions,
       },
+      chainSync,
       executionFailureWorkflow:
         job.operations.executionFailureWorkflow && failedExecutionDiagnostics
           ? {

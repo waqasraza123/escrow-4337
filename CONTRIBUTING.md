@@ -18,9 +18,12 @@ If you are resuming active work in a local checkout, also read `docs/_local/curr
 
 ```bash
 pnpm install
+pnpm setup:githooks
 pnpm typecheck
 pnpm lint
 ```
+
+`pnpm install` also runs the repo `prepare` hook, which applies the versioned Git hook path at `.githooks`.
 
 For contract work:
 
@@ -53,6 +56,29 @@ cd packages/contracts && forge test
 ```
 
 Do not claim repo health beyond the commands you actually ran.
+
+## Safe Push Workflow
+
+This repo uses a versioned Git pre-push hook at `.githooks/pre-push`.
+
+- Normal `git push` runs `scripts/verify-push.sh` through the Git pre-push hook.
+- Pushes are blocked if `pnpm build` fails.
+- The shared verifier can be run manually with `pnpm verify:push`.
+- The explicit AI-friendly wrapper command is `pnpm safe-push`.
+
+Typical usage:
+
+```bash
+pnpm verify:push
+pnpm safe-push
+pnpm safe-push -- origin your-branch
+```
+
+If hooks are not active in a local clone, re-apply them with:
+
+```bash
+pnpm setup:githooks
+```
 
 ## Documentation Expectations
 

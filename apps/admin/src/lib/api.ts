@@ -81,6 +81,30 @@ export type RuntimeProfile = {
     resolutionAuthority: 'linked_arbitrator_wallet';
     exportSupport: boolean;
   };
+  operations: {
+    chainSyncDaemon: {
+      status: 'ok' | 'warning' | 'failed';
+      summary: string;
+      required: boolean;
+      rpcConfigured: boolean;
+      persistDefault: boolean;
+      intervalSeconds: number;
+      runOnStart: boolean;
+      lockProvider: 'local' | 'postgres_advisory';
+      alertingConfigured: boolean;
+      alertMinSeverity: 'warning' | 'critical';
+      alertSendRecovery: boolean;
+      alertResendIntervalSeconds: number;
+      thresholds: {
+        maxHeartbeatAgeSeconds: number;
+        maxCurrentRunAgeSeconds: number;
+        maxConsecutiveFailures: number;
+        maxConsecutiveSkips: number;
+      };
+      issues: string[];
+      warnings: string[];
+    };
+  };
   warnings: string[];
 };
 
@@ -92,6 +116,7 @@ export type EscrowHealthReport = {
   generatedAt: string;
   filters: {
     reason:
+      | 'chain_sync_backlog'
       | 'failed_execution'
       | 'open_dispute'
       | 'reconciliation_drift'
@@ -100,6 +125,8 @@ export type EscrowHealthReport = {
     limit: number;
   };
   thresholds: {
+    chainSyncBacklogHours: number;
+    chainSyncBacklogMs: number;
     staleJobHours: number;
     staleJobMs: number;
     defaultLimit: number;
@@ -109,6 +136,7 @@ export type EscrowHealthReport = {
     totalJobs: number;
     jobsNeedingAttention: number;
     matchedJobs: number;
+    chainSyncBacklogJobs: number;
     openDisputeJobs: number;
     reconciliationDriftJobs: number;
     failedExecutionJobs: number;
@@ -122,11 +150,26 @@ export type EscrowHealthReport = {
     latestActivityAt: number;
     staleForMs: number | null;
     reasons: Array<
-      'failed_execution' | 'open_dispute' | 'reconciliation_drift' | 'stale_job'
+      'chain_sync_backlog' | 'failed_execution' | 'open_dispute' | 'reconciliation_drift' | 'stale_job'
     >;
     counts: {
+      chainSyncBacklog: boolean;
       openDisputes: number;
       failedExecutions: number;
+    };
+    chainSync: null | {
+      status: 'pending_initial_sync' | 'healthy' | 'stale' | 'failing';
+      staleForMs: number | null;
+      lastAttemptedAt: number | null;
+      lastSuccessfulAt: number | null;
+      lastPersistedAt: number | null;
+      lastMode: 'preview' | 'persisted' | null;
+      lastOutcome: 'succeeded' | 'failed' | 'blocked' | null;
+      lastSyncedBlock: number | null;
+      lastIssueCount: number;
+      lastCriticalIssueCount: number;
+      lastReconciliationIssueCount: number;
+      lastErrorMessage: string | null;
     };
     executionFailureWorkflow: null | {
       claimedByUserId: string;
@@ -183,10 +226,7 @@ export type EscrowHealthReport = {
         | 'rpc_or_provider'
         | 'operator_input'
         | 'unknown';
-      retryPosture:
-        | 'safe_after_review'
-        | 'wait_for_external_fix'
-        | 'hold_for_configuration_change';
+      retryPosture: 'safe_after_review' | 'wait_for_external_fix' | 'hold_for_configuration_change';
       summary: string;
       recommendedActions: string[];
     };
@@ -274,6 +314,177 @@ export type EscrowJobHistoryImportReport = {
       importedStatus: string | null;
     }>;
   };
+};
+
+export type EscrowChainSyncDaemonStatus = {
+  updatedAt: string;
+  worker: {
+    workerId: string;
+    hostname: string;
+    pid: number;
+    state: 'idle' | 'running' | 'stopped';
+    intervalMs: number;
+    runOnStart: boolean;
+    overrideLimit: number | null;
+    overridePersist: boolean | null;
+    startedAt: string;
+    stoppedAt: string | null;
+  };
+  heartbeat: {
+    lastHeartbeatAt: string;
+    lastRunStartedAt: string | null;
+    lastRunCompletedAt: string | null;
+    lastRunOutcome: 'completed' | 'failed' | 'skipped' | null;
+    consecutiveFailures: number;
+    consecutiveSkips: number;
+    lastErrorMessage: string | null;
+  };
+  currentRun: {
+    startedAt: string;
+    lockProvider: 'local' | 'postgres_advisory' | null;
+  } | null;
+  lastRun: null | {
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+    outcome: 'completed' | 'failed' | 'skipped';
+    workerId: string;
+    lockProvider: 'local' | 'postgres_advisory' | null;
+    mode: 'preview' | 'persisted' | null;
+    filters: EscrowChainSyncBatchReport['filters'] | null;
+    selection: EscrowChainSyncBatchReport['selection'] | null;
+    summary: EscrowChainSyncBatchReport['summary'] | null;
+    errorMessage: string | null;
+    skipReason: 'lock_unavailable' | null;
+  };
+  recentRuns: Array<NonNullable<EscrowChainSyncDaemonStatus['lastRun']>>;
+};
+
+export type EscrowChainSyncDaemonHealthReport = {
+  generatedAt: string;
+  ok: boolean;
+  status: 'ok' | 'warning' | 'failed';
+  required: boolean;
+  summary: string;
+  thresholds: {
+    maxHeartbeatAgeMs: number;
+    maxCurrentRunAgeMs: number;
+    maxConsecutiveFailures: number;
+    maxConsecutiveSkips: number;
+  };
+  issues: Array<{
+    code:
+      | 'daemon_missing'
+      | 'worker_stopped'
+      | 'heartbeat_stale'
+      | 'run_stalled'
+      | 'consecutive_failures'
+      | 'consecutive_skips'
+      | 'last_run_failed';
+    severity: 'warning' | 'critical';
+    summary: string;
+    detail: string | null;
+  }>;
+  daemon: EscrowChainSyncDaemonStatus | null;
+};
+
+export type EscrowChainSyncReport = {
+  syncedAt: string;
+  mode: 'preview' | 'persisted';
+  job: {
+    jobId: string;
+    title: string;
+    chainId: number;
+    contractAddress: string;
+    escrowId: string;
+  };
+  range: {
+    fromBlock: number;
+    toBlock: number;
+    latestBlock: number;
+    lookbackBlocks: number;
+  };
+  normalization: {
+    fetchedLogs: number;
+    duplicateLogs: number;
+    uniqueLogs: number;
+    auditEvents: number;
+    auditChanged: boolean;
+  };
+  issues: Array<{
+    code:
+      | 'funding_currency_mismatch'
+      | 'job_created_client_mismatch'
+      | 'job_created_hash_mismatch'
+      | 'job_created_log_missing'
+      | 'no_chain_events_found'
+      | 'unsupported_partial_resolution';
+    severity: 'warning' | 'critical';
+    summary: string;
+    detail: string | null;
+    blockNumber: number | null;
+    txHash: string | null;
+  }>;
+  chainReconciliation: EscrowHealthReport['jobs'][number]['reconciliation'];
+  localComparison: {
+    aggregateMatches: boolean;
+    auditDigestMatches: boolean;
+    localStatus: string;
+    chainDerivedStatus: string;
+    localFundedAmount: string | null;
+    chainDerivedFundedAmount: string | null;
+    localAuditEvents: number;
+    chainAuditEvents: number;
+    mismatchedMilestones: Array<{
+      index: number;
+      localStatus: string | null;
+      chainDerivedStatus: string | null;
+    }>;
+  };
+  persistence: {
+    requested: boolean;
+    applied: boolean;
+    blocked: boolean;
+    blockedReason: string | null;
+  };
+};
+
+export type EscrowChainSyncBatchReport = {
+  startedAt: string;
+  completedAt: string;
+  mode: 'preview' | 'persisted';
+  filters: {
+    scope: 'all' | 'attention';
+    reason: 'failed_execution' | 'open_dispute' | 'reconciliation_drift' | 'stale_job' | null;
+    limit: number;
+  };
+  selection: {
+    totalJobs: number;
+    matchedJobs: number;
+    selectedJobs: number;
+  };
+  summary: {
+    processedJobs: number;
+    cleanJobs: number;
+    changedJobs: number;
+    persistedJobs: number;
+    blockedJobs: number;
+    failedJobs: number;
+    criticalIssueJobs: number;
+  };
+  jobs: Array<{
+    jobId: string;
+    title: string;
+    outcome: 'clean' | 'changed' | 'persisted' | 'blocked' | 'failed';
+    changed: boolean;
+    persisted: boolean;
+    blocked: boolean;
+    issueCount: number;
+    criticalIssueCount: number;
+    reconciliationIssueCount: number;
+    errorMessage: string | null;
+    sync: EscrowChainSyncReport | null;
+  }>;
 };
 
 export type AuditBundle = {
@@ -372,6 +583,7 @@ export const adminApi = {
     accessToken: string,
     options?: {
       reason?:
+        | 'chain_sync_backlog'
         | 'failed_execution'
         | 'open_dispute'
         | 'reconciliation_drift'
@@ -402,6 +614,65 @@ export const adminApi = {
       {
         method: 'POST',
         body: JSON.stringify({ documentJson }),
+      },
+      accessToken,
+    );
+  },
+  syncEscrowChainAudit(
+    input: {
+      jobId: string;
+      fromBlock?: number;
+      toBlock?: number;
+      persist?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<EscrowChainSyncReport>(
+      apiBaseUrl,
+      '/operations/reconciliation/chain-audit-sync',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getEscrowChainSyncDaemonStatus(accessToken: string) {
+    return requestJson<EscrowChainSyncDaemonStatus | null>(
+      apiBaseUrl,
+      '/operations/reconciliation/chain-audit-sync/daemon-status',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getEscrowChainSyncDaemonHealth(accessToken: string) {
+    return requestJson<EscrowChainSyncDaemonHealthReport>(
+      apiBaseUrl,
+      '/operations/reconciliation/chain-audit-sync/daemon-health',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  syncEscrowChainAuditBatch(
+    input: {
+      scope?: 'all' | 'attention';
+      reason?:
+        | 'chain_sync_backlog'
+        | 'failed_execution'
+        | 'open_dispute'
+        | 'reconciliation_drift'
+        | 'stale_job';
+      limit?: number;
+      persist?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<EscrowChainSyncBatchReport>(
+      apiBaseUrl,
+      '/operations/reconciliation/chain-audit-sync/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
       },
       accessToken,
     );

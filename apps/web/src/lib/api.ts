@@ -176,6 +176,30 @@ export type RuntimeProfile = {
     resolutionAuthority: 'linked_arbitrator_wallet';
     exportSupport: boolean;
   };
+  operations: {
+    chainSyncDaemon: {
+      status: 'ok' | 'warning' | 'failed';
+      summary: string;
+      required: boolean;
+      rpcConfigured: boolean;
+      persistDefault: boolean;
+      intervalSeconds: number;
+      runOnStart: boolean;
+      lockProvider: 'local' | 'postgres_advisory';
+      alertingConfigured: boolean;
+      alertMinSeverity: 'warning' | 'critical';
+      alertSendRecovery: boolean;
+      alertResendIntervalSeconds: number;
+      thresholds: {
+        maxHeartbeatAgeSeconds: number;
+        maxCurrentRunAgeSeconds: number;
+        maxConsecutiveFailures: number;
+        maxConsecutiveSkips: number;
+      };
+      issues: string[];
+      warnings: string[];
+    };
+  };
   warnings: string[];
 };
 

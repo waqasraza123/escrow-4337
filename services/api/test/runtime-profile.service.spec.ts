@@ -1,8 +1,10 @@
 import { EmailConfigService } from '../src/modules/auth/email/email.config';
 import { EscrowContractConfigService } from '../src/modules/escrow/onchain/escrow-contract.config';
+import { EscrowChainSyncDaemonDeploymentService } from '../src/modules/operations/escrow-chain-sync-daemon-deployment.service';
 import { RuntimeProfileService } from '../src/modules/operations/runtime-profile.service';
 import { PersistenceConfigService } from '../src/persistence/persistence.config';
 import { SmartAccountConfigService } from '../src/modules/wallet/provisioning/smart-account.config';
+import { OperationsConfigService } from '../src/modules/operations/operations.config';
 
 describe('RuntimeProfileService', () => {
   const originalEnv = { ...process.env };
@@ -21,6 +23,10 @@ describe('RuntimeProfileService', () => {
       new EscrowContractConfigService(),
       new PersistenceConfigService(),
       new SmartAccountConfigService(),
+      new EscrowChainSyncDaemonDeploymentService(
+        new OperationsConfigService(),
+        new PersistenceConfigService(),
+      ),
     );
   }
 
@@ -65,6 +71,13 @@ describe('RuntimeProfileService', () => {
       '0x2222222222222222222222222222222222222222',
     );
     expect(profile.operator.exportSupport).toBe(true);
+    expect(profile.operations.chainSyncDaemon).toMatchObject({
+      status: 'ok',
+      required: false,
+      rpcConfigured: false,
+      alertingConfigured: false,
+      lockProvider: 'postgres_advisory',
+    });
     expect(profile.warnings).toEqual([]);
   });
 
@@ -87,12 +100,20 @@ describe('RuntimeProfileService', () => {
       '0x1111111111111111111111111111111111111111';
     process.env.ESCROW_ARBITRATOR_ADDRESS =
       '0x2222222222222222222222222222222222222222';
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED = 'true';
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_SCHEDULE_INTERVAL_SEC = '300';
+    process.env.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_MAX_HEARTBEAT_AGE_SEC =
+      '300';
 
     const profile = createService().getProfile();
 
     expect(profile.profile).toBe('local-mock');
+    expect(profile.operations.chainSyncDaemon.status).toBe('failed');
     expect(profile.warnings).toContain(
       'Auth email delivery is using mock mode, so OTP behavior is not exercising a deployed relay.',
+    );
+    expect(profile.warnings).toContain(
+      'Recurring chain sync is required, but OPERATIONS_ESCROW_RPC_URL or ESCROW_CHAIN_RPC_URL is not set.',
     );
     expect(profile.warnings).toContain(
       'No browser CORS origins are configured. Separate frontend origins may fail against this backend profile.',

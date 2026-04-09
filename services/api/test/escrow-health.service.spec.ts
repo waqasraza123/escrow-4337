@@ -205,6 +205,7 @@ describe('EscrowHealthService', () => {
       reason: null,
       limit: 25,
     });
+    expect(report.thresholds.chainSyncBacklogHours).toBe(6);
     expect(report.thresholds.staleJobHours).toBe(24);
     expect(report.thresholds.defaultLimit).toBe(25);
     expect(report.thresholds.maxLimit).toBe(100);
@@ -212,6 +213,7 @@ describe('EscrowHealthService', () => {
       totalJobs: 3,
       jobsNeedingAttention: 3,
       matchedJobs: 3,
+      chainSyncBacklogJobs: 1,
       openDisputeJobs: 1,
       reconciliationDriftJobs: 0,
       failedExecutionJobs: 1,
@@ -226,6 +228,7 @@ describe('EscrowHealthService', () => {
       title: 'Disputed delivery',
       reasons: ['open_dispute'],
       counts: {
+        chainSyncBacklog: false,
         openDisputes: 1,
         failedExecutions: 0,
       },
@@ -234,6 +237,7 @@ describe('EscrowHealthService', () => {
       title: 'Relay-failed funding',
       reasons: ['failed_execution'],
       counts: {
+        chainSyncBacklog: false,
         openDisputes: 0,
         failedExecutions: 3,
       },
@@ -302,8 +306,9 @@ describe('EscrowHealthService', () => {
     ]);
     expect(report.jobs[2]).toMatchObject({
       title: 'Stale draft job',
-      reasons: ['stale_job'],
+      reasons: ['chain_sync_backlog', 'stale_job'],
       counts: {
+        chainSyncBacklog: true,
         openDisputes: 0,
         failedExecutions: 0,
       },
@@ -380,6 +385,7 @@ describe('EscrowHealthService', () => {
       totalJobs: 4,
       jobsNeedingAttention: 4,
       matchedJobs: 3,
+      chainSyncBacklogJobs: 0,
       openDisputeJobs: 3,
       reconciliationDriftJobs: 3,
       failedExecutionJobs: 0,
@@ -428,6 +434,7 @@ describe('EscrowHealthService', () => {
       totalJobs: 1,
       jobsNeedingAttention: 1,
       matchedJobs: 1,
+      chainSyncBacklogJobs: 0,
       openDisputeJobs: 0,
       reconciliationDriftJobs: 1,
       failedExecutionJobs: 0,
@@ -455,6 +462,79 @@ describe('EscrowHealthService', () => {
     expect(report.jobs[0]?.reconciliation?.issues[0]).toMatchObject({
       code: 'funding_state_mismatch',
       severity: 'critical',
+    });
+  });
+
+  it('surfaces chain-sync backlog when the latest sync attempt is failing', async () => {
+    const createdJob = await escrowService.createJob(clientUserId, {
+      workerAddress,
+      currencyAddress,
+      title: 'Backlogged chain sync',
+      description: 'Recurring chain sync has not produced a healthy recent snapshot.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const record = await escrowRepository.getById(createdJob.jobId);
+    if (!record) {
+      throw new Error('Expected backlogged job record to exist');
+    }
+
+    record.createdAt = 1_000;
+    record.updatedAt = 1_000;
+    record.audit = record.audit.map((event) => ({
+      ...event,
+      at: 1_000,
+    }));
+    record.executions = record.executions.map((execution) => ({
+      ...execution,
+      submittedAt: 1_000,
+      confirmedAt: 1_001,
+    }));
+    record.operations.chainSync = {
+      lastAttemptedAt: 2_000,
+      lastOutcome: 'failed',
+      lastMode: 'preview',
+      lastIssueCount: 0,
+      lastCriticalIssueCount: 0,
+      lastReconciliationIssueCount: 0,
+      lastErrorMessage: 'RPC request timed out',
+    };
+    await escrowRepository.save(record);
+
+    const report = await escrowHealthService.getReport(
+      arbitratorUserId,
+      {
+        reason: 'chain_sync_backlog',
+      },
+      100_000_000,
+    );
+
+    expect(report.summary).toEqual({
+      totalJobs: 1,
+      jobsNeedingAttention: 1,
+      matchedJobs: 1,
+      chainSyncBacklogJobs: 1,
+      openDisputeJobs: 0,
+      reconciliationDriftJobs: 0,
+      failedExecutionJobs: 0,
+      staleJobs: 1,
+    });
+    expect(report.jobs[0]).toMatchObject({
+      title: 'Backlogged chain sync',
+      reasons: ['chain_sync_backlog', 'stale_job'],
+      counts: {
+        chainSyncBacklog: true,
+        openDisputes: 0,
+        failedExecutions: 0,
+      },
+      chainSync: {
+        status: 'failing',
+        lastAttemptedAt: 2_000,
+        lastSuccessfulAt: null,
+        lastErrorMessage: 'RPC request timed out',
+      },
     });
   });
 
@@ -508,6 +588,7 @@ describe('EscrowHealthService', () => {
     );
 
     expect(report.summary).toMatchObject({
+      chainSyncBacklogJobs: 0,
       reconciliationDriftJobs: 1,
       matchedJobs: 1,
     });

@@ -8,6 +8,14 @@ import type {
   UserWallet,
 } from '../lib/api';
 
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends Array<infer Item>
+    ? Array<DeepPartial<Item>>
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : T[K];
+};
+
 export const lookupHistoryStorageKey = 'escrow4337.admin.recent-lookups';
 export const sessionStorageKey = 'escrow4337.admin.session';
 
@@ -59,9 +67,9 @@ export function createWalletLinkChallenge(): WalletLinkChallenge {
 }
 
 export function createRuntimeProfile(
-  overrides: Partial<RuntimeProfile> = {},
+  overrides: DeepPartial<RuntimeProfile> = {},
 ): RuntimeProfile {
-  return {
+  const base: RuntimeProfile = {
     generatedAt: '2026-04-06T00:00:00.000Z',
     profile: 'local-mock',
     summary:
@@ -82,23 +90,77 @@ export function createRuntimeProfile(
       resolutionAuthority: 'linked_arbitrator_wallet',
       exportSupport: true,
     },
+    operations: {
+      chainSyncDaemon: {
+        status: 'ok',
+        summary:
+          'Recurring chain-sync daemon is optional in this environment.',
+        required: false,
+        rpcConfigured: false,
+        persistDefault: false,
+        intervalSeconds: 300,
+        runOnStart: true,
+        lockProvider: 'postgres_advisory',
+        alertingConfigured: false,
+        alertMinSeverity: 'critical',
+        alertSendRecovery: true,
+        alertResendIntervalSeconds: 3600,
+        thresholds: {
+          maxHeartbeatAgeSeconds: 900,
+          maxCurrentRunAgeSeconds: 1800,
+          maxConsecutiveFailures: 3,
+          maxConsecutiveSkips: 6,
+        },
+        issues: [],
+        warnings: [],
+      },
+    },
     warnings: [
       'Escrow execution is using mock mode, so lifecycle mutations are not exercising deployed contract relay infrastructure.',
     ],
+  };
+
+  return {
+    ...base,
     ...overrides,
+    environment: {
+      ...base.environment,
+      ...overrides.environment,
+    },
+    providers: {
+      ...base.providers,
+      ...overrides.providers,
+    },
+    operator: {
+      ...base.operator,
+      ...overrides.operator,
+    },
+    operations: {
+      chainSyncDaemon: {
+        ...base.operations.chainSyncDaemon,
+        ...overrides.operations?.chainSyncDaemon,
+        thresholds: {
+          ...base.operations.chainSyncDaemon.thresholds,
+          ...overrides.operations?.chainSyncDaemon?.thresholds,
+        },
+      },
+    },
+    warnings: overrides.warnings ?? base.warnings,
   };
 }
 
 export function createEscrowHealthReport(
-  overrides: Partial<EscrowHealthReport> = {},
+  overrides: DeepPartial<EscrowHealthReport> = {},
 ): EscrowHealthReport {
-  return {
+  const base: EscrowHealthReport = {
     generatedAt: '2026-04-07T00:00:00.000Z',
     filters: {
       reason: null,
       limit: 25,
     },
     thresholds: {
+      chainSyncBacklogHours: 6,
+      chainSyncBacklogMs: 21_600_000,
       staleJobHours: 72,
       staleJobMs: 259_200_000,
       defaultLimit: 25,
@@ -108,6 +170,7 @@ export function createEscrowHealthReport(
       totalJobs: 4,
       jobsNeedingAttention: 1,
       matchedJobs: 1,
+      chainSyncBacklogJobs: 0,
       openDisputeJobs: 1,
       reconciliationDriftJobs: 0,
       failedExecutionJobs: 0,
@@ -123,9 +186,11 @@ export function createEscrowHealthReport(
         staleForMs: null,
         reasons: ['open_dispute'],
         counts: {
+          chainSyncBacklog: false,
           openDisputes: 1,
           failedExecutions: 0,
         },
+        chainSync: null,
         executionFailureWorkflow: null,
         staleWorkflow: null,
         latestFailedExecution: null,
@@ -139,7 +204,24 @@ export function createEscrowHealthReport(
         },
       },
     ],
+  };
+
+  return {
+    ...base,
     ...overrides,
+    filters: {
+      ...base.filters,
+      ...overrides.filters,
+    },
+    thresholds: {
+      ...base.thresholds,
+      ...overrides.thresholds,
+    },
+    summary: {
+      ...base.summary,
+      ...overrides.summary,
+    },
+    jobs: (overrides.jobs as EscrowHealthReport['jobs'] | undefined) ?? base.jobs,
   };
 }
 

@@ -4,6 +4,7 @@ import type {
   SessionRecord,
 } from '../../modules/auth/auth.types';
 import type {
+  EscrowChainSyncRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
@@ -49,6 +50,7 @@ function normalizeEscrowJobRecord(
     | EscrowJobRecord
     | (Omit<EscrowJobRecord, 'operations'> & {
         operations?: {
+          chainSync?: EscrowChainSyncRecord | null;
           executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
           staleWorkflow?: EscrowStaleWorkflowRecord | null;
         };
@@ -57,6 +59,11 @@ function normalizeEscrowJobRecord(
   return {
     ...job,
     operations: {
+      chainSync: job.operations?.chainSync
+        ? {
+            ...job.operations.chainSync,
+          }
+        : null,
       executionFailureWorkflow: job.operations?.executionFailureWorkflow
         ? {
             ...job.operations.executionFailureWorkflow,

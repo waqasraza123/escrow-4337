@@ -163,6 +163,7 @@ const jobHistoryImportSchema = z
       milestones: z.array(milestoneSchema),
       operations: z
         .object({
+          chainSync: z.unknown().nullable().optional(),
           executionFailureWorkflow: z.unknown().nullable(),
           staleWorkflow: z.unknown().nullable(),
         })
@@ -294,6 +295,7 @@ function toSyntheticJobRecord(
   return {
     ...structuredClone(document.job),
     operations: {
+      chainSync: null,
       executionFailureWorkflow: null,
       staleWorkflow: null,
     },

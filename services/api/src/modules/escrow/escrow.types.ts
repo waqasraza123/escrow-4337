@@ -144,6 +144,21 @@ export type EscrowExecutionFailureWorkflowRecord = {
   updatedAt: number;
 };
 
+export type EscrowChainSyncOutcome = 'succeeded' | 'failed' | 'blocked';
+
+export type EscrowChainSyncRecord = {
+  lastAttemptedAt: number;
+  lastOutcome: EscrowChainSyncOutcome;
+  lastMode: 'preview' | 'persisted';
+  lastSuccessfulAt?: number;
+  lastPersistedAt?: number;
+  lastSyncedBlock?: number;
+  lastIssueCount: number;
+  lastCriticalIssueCount: number;
+  lastReconciliationIssueCount: number;
+  lastErrorMessage?: string;
+};
+
 export type EscrowJobRecord = {
   id: string;
   title: string;
@@ -158,6 +173,7 @@ export type EscrowJobRecord = {
   milestones: EscrowMilestoneRecord[];
   audit: EscrowAuditEvent[];
   operations: {
+    chainSync: EscrowChainSyncRecord | null;
     executionFailureWorkflow: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow: EscrowStaleWorkflowRecord | null;
   };

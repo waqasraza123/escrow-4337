@@ -4,6 +4,7 @@ import { EmailConfigService } from '../auth/email/email.config';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
 import { PersistenceConfigService } from '../../persistence/persistence.config';
 import { SmartAccountConfigService } from '../wallet/provisioning/smart-account.config';
+import { EscrowChainSyncDaemonDeploymentService } from './escrow-chain-sync-daemon-deployment.service';
 import type { BackendRuntimeProfile } from './runtime-profile.types';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class RuntimeProfileService {
     private readonly escrowConfig: EscrowContractConfigService,
     private readonly persistenceConfig: PersistenceConfigService,
     private readonly smartAccountConfig: SmartAccountConfigService,
+    private readonly daemonDeployment: EscrowChainSyncDaemonDeploymentService,
   ) {}
 
   getProfile(): BackendRuntimeProfile {
@@ -27,6 +29,7 @@ export class RuntimeProfileService {
       smartAccountMode: this.smartAccountConfig.mode,
       escrowMode: this.escrowConfig.mode,
     };
+    const daemonPosture = this.daemonDeployment.getPosture();
     const warnings: string[] = [];
 
     if (environment.persistenceDriver !== 'postgres') {
@@ -59,6 +62,8 @@ export class RuntimeProfileService {
       );
     }
 
+    warnings.push(...daemonPosture.issues, ...daemonPosture.warnings);
+
     const allRelaysEnabled =
       environment.persistenceDriver === 'postgres' &&
       providers.emailMode === 'relay' &&
@@ -85,6 +90,9 @@ export class RuntimeProfileService {
         arbitratorAddress: this.readArbitratorAddress(),
         resolutionAuthority: 'linked_arbitrator_wallet',
         exportSupport: true,
+      },
+      operations: {
+        chainSyncDaemon: daemonPosture,
       },
       warnings,
     };

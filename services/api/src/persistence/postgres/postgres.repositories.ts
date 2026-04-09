@@ -6,6 +6,7 @@ import type {
 } from '../../modules/auth/auth.types';
 import type {
   EscrowAuditEvent,
+  EscrowChainSyncRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowExecutionRecord,
@@ -118,6 +119,7 @@ type JobRow = QueryResultRow & {
   worker_address: string;
   currency_address: string;
   operations_json: {
+    chainSync?: EscrowChainSyncRecord | null;
     executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow?: EscrowStaleWorkflowRecord | null;
   } | null;
@@ -299,6 +301,11 @@ function normalizeFailureWorkflowStatus(
 
 function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
   return {
+    chainSync: row.operations_json?.chainSync
+      ? ({
+          ...row.operations_json.chainSync,
+        } as EscrowChainSyncRecord)
+      : null,
     executionFailureWorkflow: row.operations_json?.executionFailureWorkflow
       ? {
           ...row.operations_json.executionFailureWorkflow,

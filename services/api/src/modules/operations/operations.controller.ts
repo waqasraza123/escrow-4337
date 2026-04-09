@@ -10,6 +10,7 @@ import {
 import { User, type ReqUser } from '../../common/decorators/user.decorator';
 import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { EscrowChainSyncService } from './escrow-chain-sync.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { EscrowHistoryImportService } from './escrow-history-import.service';
 import * as operationsDto from './operations.dto';
@@ -21,6 +22,7 @@ export class OperationsController {
     private readonly runtimeProfile: RuntimeProfileService,
     private readonly escrowHealth: EscrowHealthService,
     private readonly escrowHistoryImport: EscrowHistoryImportService,
+    private readonly escrowChainSync: EscrowChainSyncService,
   ) {}
 
   @Get('runtime-profile')
@@ -46,6 +48,38 @@ export class OperationsController {
     body: operationsDto.ImportJobHistoryDto,
   ) {
     return this.escrowHistoryImport.importJobHistory(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('reconciliation/chain-audit-sync/daemon-status')
+  getChainAuditDaemonStatus(@User() user: ReqUser) {
+    return this.escrowChainSync.getDaemonStatus(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('reconciliation/chain-audit-sync/daemon-health')
+  getChainAuditDaemonHealth(@User() user: ReqUser) {
+    return this.escrowChainSync.getDaemonHealthReport(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('reconciliation/chain-audit-sync')
+  syncChainAudit(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(operationsDto.syncEscrowChainAuditSchema))
+    body: operationsDto.SyncEscrowChainAuditDto,
+  ) {
+    return this.escrowChainSync.syncJobAudit(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('reconciliation/chain-audit-sync/batch')
+  syncChainAuditBatch(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(operationsDto.syncEscrowChainAuditBatchSchema))
+    body: operationsDto.SyncEscrowChainAuditBatchDto,
+  ) {
+    return this.escrowChainSync.syncBatch(user.id, body);
   }
 
   @UseGuards(AuthGuard)
