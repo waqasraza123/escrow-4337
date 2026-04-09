@@ -22,6 +22,12 @@ pnpm setup:githooks
 pnpm verify:ci
 ```
 
+For a deployed release-candidate gate:
+
+```bash
+pnpm launch:candidate
+```
+
 `pnpm install` also runs the repo `prepare` hook, which applies the versioned Git hook path at `.githooks`.
 
 For contract work:
@@ -48,6 +54,7 @@ Typical checks:
 
 ```bash
 pnpm verify:ci
+pnpm launch:candidate
 pnpm typecheck
 pnpm lint
 pnpm build
@@ -66,6 +73,7 @@ This repo uses a versioned Git pre-push hook at `.githooks/pre-push`.
 - Normal `git push` runs `scripts/verify-push.sh` through the Git pre-push hook.
 - Pushes are blocked if `pnpm build` fails.
 - `pnpm verify:ci` is the full non-mutating local and CI verification entrypoint.
+- `pnpm launch:candidate` is the stricter deployed release gate.
 - The shared verifier can be run manually with `pnpm verify:push`.
 - The explicit AI-friendly wrapper command is `pnpm safe-push`.
 

@@ -28,6 +28,7 @@
 ## Current Roadmap
 
 - Execute the new API deployment validation flow against real staging or production-like infrastructure, including deployed Postgres migration checks, live relay or provider reachability, bundler or paymaster chain validation, and deployed ingress or proxy validation.
+- Run the new launch-candidate gate against a real staged environment, capture launch-readiness evidence from the deployed backend, and treat any failed launch-readiness check or unowned incident as a blocker before promotion.
 - Harden and validate the new web and admin product-console surfaces against a real deployed backend environment, then expand operator failure coverage, richer export workflows, and live relay-backed workflows.
 - Drive the first real staging pass through the new GitHub Actions deployed-smoke lane, including API deployment validation, runtime-profile alignment, and worker posture evidence.
 - Make root build and test flows meaningful end to end, not just partially wired, then expand coverage beyond auth.
@@ -93,6 +94,7 @@
 - Root Playwright now also supports a separate deployed-profile validation lane with explicit `PLAYWRIGHT_DEPLOYED_*` target configuration, read-only remote smoke coverage for web, admin, and the public runtime-profile endpoint, and an optional public-audit lookup check when a known remote job id is configured.
 - Deployed-profile runtime validation no longer assumes healthy browser access to the backend profile: shared frontend diagnostics now surface `Runtime profile unavailable` plus unknown backend posture when the browser cannot load the runtime-profile endpoint, route tests cover that fallback in both apps, and the deployed Playwright lane derives expected runtime-alignment assertions from what the browser can actually read in the target environment.
 - Phase 7 repo hardening now exists in-repo: `pnpm verify:ci` is the canonical non-mutating local and CI gate, `pnpm contracts:check` normalizes Foundry checks, GitHub Actions now own `CI` plus `Deployed Smoke` workflows, `services/api/Dockerfile` defines a reusable GHCR-targeted API or worker image contract, Next production builds now skip lint while retaining type validation, and the repo now includes explicit environment, deployment, and focused security-review documents for local, staging, and production posture.
+- Phase 8 launch preparation now exists in-repo: API exposes `GET /operations/launch-readiness` as a machine-readable launch posture, root `pnpm launch:candidate` defines the deployed release-candidate suite, GitHub Actions now include a manual `Launch Candidate` workflow for `staging` or `production`, deployed smoke can enforce launch readiness with `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`, and `docs/LAUNCH_READINESS.md` records launch scope, exclusions, ownership, monitoring posture, rollback posture, and legal or chain assumptions.
 - Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 - Root `pnpm test` now executes a real API test path instead of failing on an empty Jest contract.
 - Root repo now uses a versioned Git pre-push workflow under `.githooks`, with `scripts/verify-push.sh` as the shared verifier, `scripts/safe-push.sh` as the explicit push wrapper, and `pnpm safe-push` as the AI-friendly command.
@@ -139,6 +141,7 @@
 - Phase 7 deployment packaging should stay hybrid: only the API or worker role is containerized in-repo, while `apps/web` and `apps/admin` remain provider-managed Next.js builds with explicit `NEXT_PUBLIC_API_BASE_URL` configuration.
 - Production builds for the Next apps should stay CI-stable: lint belongs to the dedicated lint stage, while `next build` should continue to enforce type validity without duplicating lint execution.
 - Deployed frontend validation should run through the explicit `PLAYWRIGHT_PROFILE=deployed` lane with declared web, admin, and API targets; remote smoke checks should stay read-only unless a known-safe public audit job id is supplied.
+- Launch-candidate posture should be evaluated through `pnpm launch:candidate` plus `GET /operations/launch-readiness`; normal deployed smoke remains a lighter read-only posture check unless `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true` is set deliberately.
 - Long-running route-level frontend tests and the API wallet integration test now use explicit timeout budgets instead of framework defaults so root `pnpm test` remains stable under concurrent Turbo execution.
 
 ## Deferred / Not Yet Implemented
@@ -148,6 +151,7 @@
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
 - Live end-to-end validation of the configured escrow execution relay against real environments.
 - Live execution of the new GitHub Actions `Deployed Smoke` workflow against a real staging environment with populated GitHub Environment secrets.
+- Live execution of the new GitHub Actions `Launch Candidate` workflow or `pnpm launch:candidate` against a real staged environment with launch-readiness evidence capture.
 - Full operator RBAC, richer export workflows beyond the public audit-derived artifacts, and non-arbitrator privileged workflows are not yet implemented; the current admin privileged path is limited to authenticated sessions that link the configured arbitrator wallet and call dispute resolution through the existing protected API.
 - Stale-job escalation beyond manual operator claims and provider-native retry execution or automated remediation beyond guidance plus status workflow are still pending.
 - Operations health now includes a replay-backed persisted-timeline reconciliation pass, a protected `job-history` import preview, manual job-scoped chain-audit sync, protected batch chain-audit backfill, a compiled bounded batch runner, a deployment-owned recurring daemon command, webhook-capable daemon health alerting over the shared status snapshot, and explicit `chain_sync_backlog` coverage reporting from persisted per-job sync metadata, but broader indexed onchain reconciliation is still pending.
@@ -164,6 +168,7 @@
 - Daemon health alerting now gives deployments a production-grade consumption path for shared worker status, but it still depends on explicit webhook configuration and has not yet been validated end to end against a real alerting destination.
 - Daemon deployment posture is now validated and exposed through runtime-profile, but the repo still lacks real staging evidence that a scheduler, worker process, and alert destination are all wired correctly in one deployed environment.
 - Phase 7 now documents the staging and production secret contract plus rollout order, but that documentation still needs live staging evidence before it should be treated as deployment proof.
+- Launch readiness is now machine-readable, but it is still derived from runtime configuration plus persisted daemon status; it is not a substitute for live staging evidence, relay exercise, or incident-drill proof.
 - Imported `job-history` previews improve ingestion readiness and operator comparison workflows, but they still depend on externally supplied export artifacts rather than a live event indexer.
 - Browser-wallet-native wallet linking now exists in the web app, but it still depends on injected-wallet support for `eth_requestAccounts`, `eth_chainId`, and `personal_sign`; unsupported wallets still need the manual fallback.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.
@@ -185,6 +190,7 @@
 
 - `git status --short`
 - `pnpm verify:ci`
+- `pnpm launch:candidate`
 - `pnpm db:up`
 - `pnpm --filter escrow4334-api db:migrate:status`
 - `pnpm --filter escrow4334-api deployment:validate`

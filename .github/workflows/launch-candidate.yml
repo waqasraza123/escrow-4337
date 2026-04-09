@@ -1,0 +1,96 @@
+name: Launch Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment to validate
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  launch-candidate:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+      JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+      JWT_ACCESS_TTL_SEC: ${{ secrets.JWT_ACCESS_TTL_SEC }}
+      JWT_REFRESH_TTL_SEC: ${{ secrets.JWT_REFRESH_TTL_SEC }}
+      AUTH_SESSION_TTL_SEC: ${{ secrets.AUTH_SESSION_TTL_SEC }}
+      AUTH_OTP_TTL_SEC: ${{ secrets.AUTH_OTP_TTL_SEC }}
+      AUTH_OTP_VERIFY_MAX_ATTEMPTS: ${{ secrets.AUTH_OTP_VERIFY_MAX_ATTEMPTS }}
+      AUTH_OTP_LOCK_SEC: ${{ secrets.AUTH_OTP_LOCK_SEC }}
+      AUTH_OTP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_SEND_WINDOW_SEC }}
+      AUTH_OTP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_SEND_MAX_PER_WINDOW }}
+      AUTH_OTP_IP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_IP_SEND_WINDOW_SEC }}
+      AUTH_OTP_IP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_IP_SEND_MAX_PER_WINDOW }}
+      AUTH_EMAIL_MODE: ${{ secrets.AUTH_EMAIL_MODE }}
+      AUTH_EMAIL_FROM_EMAIL: ${{ secrets.AUTH_EMAIL_FROM_EMAIL }}
+      AUTH_EMAIL_FROM_NAME: ${{ secrets.AUTH_EMAIL_FROM_NAME }}
+      AUTH_EMAIL_REPLY_TO: ${{ secrets.AUTH_EMAIL_REPLY_TO }}
+      AUTH_EMAIL_RELAY_BASE_URL: ${{ secrets.AUTH_EMAIL_RELAY_BASE_URL }}
+      AUTH_EMAIL_RELAY_API_KEY: ${{ secrets.AUTH_EMAIL_RELAY_API_KEY }}
+      AUTH_EMAIL_OTP_SUBJECT: ${{ secrets.AUTH_EMAIL_OTP_SUBJECT }}
+      WALLET_SMART_ACCOUNT_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_MODE }}
+      WALLET_SMART_ACCOUNT_CHAIN_ID: ${{ secrets.WALLET_SMART_ACCOUNT_CHAIN_ID }}
+      WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS }}
+      WALLET_SMART_ACCOUNT_FACTORY_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_FACTORY_ADDRESS }}
+      WALLET_SMART_ACCOUNT_BUNDLER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_BUNDLER_URL }}
+      WALLET_SMART_ACCOUNT_RELAY_BASE_URL: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_BASE_URL }}
+      WALLET_SMART_ACCOUNT_RELAY_API_KEY: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_API_KEY }}
+      WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE }}
+      WALLET_SMART_ACCOUNT_PAYMASTER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_PAYMASTER_URL }}
+      ESCROW_CONTRACT_MODE: ${{ secrets.ESCROW_CONTRACT_MODE }}
+      ESCROW_CHAIN_ID: ${{ secrets.ESCROW_CHAIN_ID }}
+      ESCROW_CONTRACT_ADDRESS: ${{ secrets.ESCROW_CONTRACT_ADDRESS }}
+      ESCROW_ARBITRATOR_ADDRESS: ${{ secrets.ESCROW_ARBITRATOR_ADDRESS }}
+      ESCROW_RELAY_BASE_URL: ${{ secrets.ESCROW_RELAY_BASE_URL }}
+      ESCROW_RELAY_API_KEY: ${{ secrets.ESCROW_RELAY_API_KEY }}
+      NEST_API_TRUST_PROXY: ${{ secrets.NEST_API_TRUST_PROXY }}
+      OPERATIONS_ESCROW_RPC_URL: ${{ secrets.OPERATIONS_ESCROW_RPC_URL }}
+      OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED }}
+      OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL }}
+      PLAYWRIGHT_DEPLOYED_WEB_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_WEB_BASE_URL }}
+      PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL }}
+      PLAYWRIGHT_DEPLOYED_API_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_API_BASE_URL }}
+      PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE: ${{ secrets.PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE }}
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: 'true'
+      PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID: ${{ secrets.PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID }}
+      PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP }}
+      PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run launch candidate suite
+        run: pnpm launch:candidate

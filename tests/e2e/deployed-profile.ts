@@ -12,6 +12,7 @@ export type DeployedProfileConfig = {
   apiBaseUrl: string;
   auditJobId: string | null;
   expectedProfile: RuntimeProfileKind;
+  expectLaunchReady: boolean;
   allowInsecureHttp: boolean;
   allowLocalhost: boolean;
 };
@@ -96,8 +97,7 @@ export function readDeployedProfileConfig(
 ): DeployedProfileConfig {
   const allowInsecureHttp = readBooleanFlag(env.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP);
   const allowLocalhost = readBooleanFlag(env.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST);
-  const expectedProfileRaw =
-    env.PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE?.trim() || 'deployment-like';
+  const expectedProfileRaw = env.PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE?.trim() || 'deployment-like';
 
   if (expectedProfileRaw !== 'deployment-like' && expectedProfileRaw !== 'mixed') {
     throw new Error(
@@ -132,6 +132,7 @@ export function readDeployedProfileConfig(
     ),
     auditJobId: env.PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID?.trim() || null,
     expectedProfile: expectedProfileRaw,
+    expectLaunchReady: readBooleanFlag(env.PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY),
     allowInsecureHttp,
     allowLocalhost,
   };

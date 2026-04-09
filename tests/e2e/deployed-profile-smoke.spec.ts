@@ -7,6 +7,27 @@ import {
   type RuntimeProfileResponse,
 } from './deployed-profile';
 
+type LaunchReadinessResponse = {
+  generatedAt: string;
+  ready: boolean;
+  summary: string;
+  profile: RuntimeProfileResponse['profile'];
+  scope: {
+    supportedSurfaces: string[];
+    exclusions: string[];
+  };
+  checks: Array<{
+    id: string;
+    owner: 'deployment' | 'frontend' | 'operator' | 'worker';
+    status: 'ok' | 'warning' | 'failed';
+    summary: string;
+    details?: string;
+    blocker: boolean;
+  }>;
+  blockers: string[];
+  warnings: string[];
+};
+
 type BrowserRuntimeProfileProbe =
   | {
       ok: true;
@@ -117,25 +138,15 @@ async function expectRuntimeValidationPanel(page: Page, apiBaseUrl: string) {
   );
 
   await expect(summaryValue(panel, 'Frontend origin')).toHaveText(currentOrigin);
-  await expect(summaryValue(panel, 'CORS readiness')).toHaveText(
-    runtimeAlignment.corsLabel,
-  );
-  await expect(summaryValue(panel, 'API transport')).toHaveText(
-    runtimeAlignment.transportLabel,
-  );
-  await expect(summaryValue(panel, 'Persistence')).toHaveText(
-    runtimeAlignment.persistenceLabel,
-  );
-  await expect(summaryValue(panel, 'Trust proxy')).toHaveText(
-    runtimeAlignment.trustProxyLabel,
-  );
+  await expect(summaryValue(panel, 'CORS readiness')).toHaveText(runtimeAlignment.corsLabel);
+  await expect(summaryValue(panel, 'API transport')).toHaveText(runtimeAlignment.transportLabel);
+  await expect(summaryValue(panel, 'Persistence')).toHaveText(runtimeAlignment.persistenceLabel);
+  await expect(summaryValue(panel, 'Trust proxy')).toHaveText(runtimeAlignment.trustProxyLabel);
   await expect(summaryValue(panel, 'Allowed origins')).toHaveText(
     runtimeAlignment.corsOriginsLabel,
   );
   await expect(panel.getByText(runtimeAlignment.corsMessage, { exact: true })).toBeVisible();
-  await expect(
-    panel.getByText(runtimeAlignment.transportMessage, { exact: true }),
-  ).toBeVisible();
+  await expect(panel.getByText(runtimeAlignment.transportMessage, { exact: true })).toBeVisible();
 
   if (!browserRuntimeProfile.ok) {
     await expect(summaryValue(panel, 'Profile')).toHaveText('Unavailable');
@@ -198,9 +209,7 @@ async function expectExportDownload(page: Page, probe: ExportProbe) {
 test('deployed runtime-profile endpoint reports the expected backend posture', async ({
   request,
 }) => {
-  const runtimeResponse = await request.get(
-    `${deployed.apiBaseUrl}/operations/runtime-profile`,
-  );
+  const runtimeResponse = await request.get(`${deployed.apiBaseUrl}/operations/runtime-profile`);
 
   expect(runtimeResponse.ok()).toBeTruthy();
 
@@ -220,6 +229,29 @@ test('deployed runtime-profile endpoint reports the expected backend posture', a
 
   const authResponse = await request.get(`${deployed.apiBaseUrl}/auth/me`);
   expect([401, 403]).toContain(authResponse.status());
+});
+
+test('deployed launch-readiness endpoint reports the current launch posture', async ({
+  request,
+}) => {
+  const readinessResponse = await request.get(`${deployed.apiBaseUrl}/operations/launch-readiness`);
+
+  expect(readinessResponse.ok()).toBeTruthy();
+
+  const readiness = (await readinessResponse.json()) as LaunchReadinessResponse;
+
+  expect(readiness.profile).toBe(deployed.expectedProfile);
+  expect(Array.isArray(readiness.checks)).toBe(true);
+  expect(Array.isArray(readiness.blockers)).toBe(true);
+  expect(Array.isArray(readiness.warnings)).toBe(true);
+  expect(readiness.scope.supportedSurfaces.length).toBeGreaterThan(0);
+  expect(readiness.scope.exclusions.length).toBeGreaterThan(0);
+
+  if (deployed.expectLaunchReady) {
+    expect(readiness.ready).toBe(true);
+    expect(readiness.blockers).toEqual([]);
+    expect(readiness.checks.filter((check) => check.status === 'failed')).toEqual([]);
+  }
 });
 
 test('web console surfaces the expected deployed API target and runtime posture', async ({
@@ -279,9 +311,7 @@ test('admin can load the configured deployed audit bundle and download exports',
       format: 'json',
       buttonName: 'Export job history JSON',
       successMessage: 'Downloaded job-history JSON export.',
-      fileNamePattern: new RegExp(
-        `^escrow-${deployed.auditJobId!}-job-history-.*\\.json$`,
-      ),
+      fileNamePattern: new RegExp(`^escrow-${deployed.auditJobId!}-job-history-.*\\.json$`),
       requiredText: deployed.auditJobId!,
     },
     {
@@ -289,9 +319,7 @@ test('admin can load the configured deployed audit bundle and download exports',
       format: 'csv',
       buttonName: 'Export job history CSV',
       successMessage: 'Downloaded job-history CSV export.',
-      fileNamePattern: new RegExp(
-        `^escrow-${deployed.auditJobId!}-job-history-.*\\.csv$`,
-      ),
+      fileNamePattern: new RegExp(`^escrow-${deployed.auditJobId!}-job-history-.*\\.csv$`),
       requiredText: deployed.auditJobId!,
     },
     {
@@ -299,9 +327,7 @@ test('admin can load the configured deployed audit bundle and download exports',
       format: 'json',
       buttonName: 'Export dispute case JSON',
       successMessage: 'Downloaded dispute-case JSON export.',
-      fileNamePattern: new RegExp(
-        `^escrow-${deployed.auditJobId!}-dispute-case-.*\\.json$`,
-      ),
+      fileNamePattern: new RegExp(`^escrow-${deployed.auditJobId!}-dispute-case-.*\\.json$`),
       requiredText: deployed.auditJobId!,
     },
     {
@@ -309,9 +335,7 @@ test('admin can load the configured deployed audit bundle and download exports',
       format: 'csv',
       buttonName: 'Export dispute case CSV',
       successMessage: 'Downloaded dispute-case CSV export.',
-      fileNamePattern: new RegExp(
-        `^escrow-${deployed.auditJobId!}-dispute-case-.*\\.csv$`,
-      ),
+      fileNamePattern: new RegExp(`^escrow-${deployed.auditJobId!}-dispute-case-.*\\.csv$`),
       requiredText: deployed.auditJobId!,
     },
   ];

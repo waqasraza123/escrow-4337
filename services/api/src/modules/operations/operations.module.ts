@@ -20,6 +20,7 @@ import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daem
 import { EscrowChainSyncRunLockService } from './escrow-chain-sync-run-lock.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { EscrowHistoryImportService } from './escrow-history-import.service';
+import { LaunchReadinessService } from './launch-readiness.service';
 import { OperationsConfigService } from './operations.config';
 import { OperationsController } from './operations.controller';
 import { EscrowReconciliationService } from './escrow-reconciliation.service';
@@ -51,6 +52,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
     EscrowChainSyncRunLockService,
     EscrowReconciliationService,
     EscrowHistoryImportService,
+    LaunchReadinessService,
     OperationsConfigService,
     EscrowHealthService,
     RuntimeProfileService,
@@ -63,6 +65,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
     EscrowChainSyncDaemonMonitoringService,
     EscrowHealthService,
     EscrowHistoryImportService,
+    LaunchReadinessService,
     EscrowReconciliationService,
     RuntimeProfileService,
   ],

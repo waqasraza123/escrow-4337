@@ -13,6 +13,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { EscrowChainSyncService } from './escrow-chain-sync.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { EscrowHistoryImportService } from './escrow-history-import.service';
+import { LaunchReadinessService } from './launch-readiness.service';
 import * as operationsDto from './operations.dto';
 import { RuntimeProfileService } from './runtime-profile.service';
 
@@ -20,6 +21,7 @@ import { RuntimeProfileService } from './runtime-profile.service';
 export class OperationsController {
   constructor(
     private readonly runtimeProfile: RuntimeProfileService,
+    private readonly launchReadiness: LaunchReadinessService,
     private readonly escrowHealth: EscrowHealthService,
     private readonly escrowHistoryImport: EscrowHistoryImportService,
     private readonly escrowChainSync: EscrowChainSyncService,
@@ -28,6 +30,11 @@ export class OperationsController {
   @Get('runtime-profile')
   getRuntimeProfile() {
     return this.runtimeProfile.getProfile();
+  }
+
+  @Get('launch-readiness')
+  getLaunchReadiness() {
+    return this.launchReadiness.getReport();
   }
 
   @UseGuards(AuthGuard)
