@@ -90,6 +90,7 @@ export type EscrowMilestoneRecord = {
   deliveryNote?: string;
   deliveryEvidenceUrls?: string[];
   disputeReason?: string;
+  disputeEvidenceUrls?: string[];
   resolutionAction?: 'release' | 'refund';
   resolutionNote?: string;
 };
@@ -253,6 +254,7 @@ export type EscrowDisputeCaseExport = {
     disputedAt: number | null;
     resolvedAt: number | null;
     disputeReason: string | null;
+    disputeEvidenceUrls: string[];
     resolutionAction: 'release' | 'refund' | null;
     resolutionNote: string | null;
     relatedAudit: EscrowAuditEvent[];

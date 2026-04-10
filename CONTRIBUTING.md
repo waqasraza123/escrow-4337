@@ -28,6 +28,8 @@ For a deployed release-candidate gate:
 pnpm launch:candidate
 ```
 
+That command writes an evidence bundle under `artifacts/launch-candidate/` unless `LAUNCH_CANDIDATE_ARTIFACT_DIR` overrides the location.
+
 `pnpm install` also runs the repo `prepare` hook, which applies the versioned Git hook path at `.githooks`.
 
 For contract work:

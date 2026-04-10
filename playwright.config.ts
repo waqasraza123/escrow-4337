@@ -23,6 +23,7 @@ function shellEnv(input: Record<string, string>) {
 const localApiEnvString = shellEnv(localApiEnv);
 const playwrightProfile =
   process.env.PLAYWRIGHT_PROFILE?.trim() === 'deployed' ? 'deployed' : 'local';
+const playwrightReporter = process.env.PLAYWRIGHT_REPORTER?.trim() || 'list';
 
 function loadOptionalProfileEnv(profile: 'local' | 'deployed') {
   const envPath = resolve(
@@ -62,14 +63,12 @@ const deployedProject = {
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
-  reporter: 'list',
+  reporter: playwrightReporter,
   timeout: 120_000,
   use: {
     trace: 'on-first-retry',
   },
-  projects: [
-    playwrightProfile === 'deployed' ? deployedProject : localProject,
-  ],
+  projects: [playwrightProfile === 'deployed' ? deployedProject : localProject],
   webServer:
     playwrightProfile === 'deployed'
       ? undefined

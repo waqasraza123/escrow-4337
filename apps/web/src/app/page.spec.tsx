@@ -61,7 +61,7 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../lib/injected-wallet', () => mockedInjectedWallet);
 
-import Home from './page';
+import Home from './app/page';
 
 function mockAuthenticatedConsoleLoad(options?: {
   jobs?: ReturnType<typeof createJobsListResponse>;

@@ -201,6 +201,7 @@ describe('EscrowService', () => {
     });
     await escrowService.disputeMilestone(clientUserId, createdJob.jobId, 0, {
       reason: 'Funding terms were not met',
+      evidenceUrls: ['https://example.com/dispute-proof'],
     });
 
     const resolutionResult = await escrowService.resolveMilestone(
@@ -223,6 +224,9 @@ describe('EscrowService', () => {
     expect(auditBundle.bundle.job.milestones[0]?.resolutionAction).toBe(
       'refund',
     );
+    expect(auditBundle.bundle.job.milestones[0]?.disputeEvidenceUrls).toEqual([
+      'https://example.com/dispute-proof',
+    ]);
   });
 
   it('records failed onchain execution attempts without mutating local job state', async () => {

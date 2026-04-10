@@ -47,6 +47,13 @@ import {
 const historyKey = 'escrow4337.admin.recent-lookups';
 const sessionStorageKey = 'escrow4337.admin.session';
 
+export type OperatorConsoleView = 'dashboard' | 'case';
+
+type OperatorConsoleProps = {
+  view?: OperatorConsoleView;
+  initialJobId?: string | null;
+};
+
 function readSession(): SessionTokens | null {
   if (typeof window === 'undefined') {
     return null;
@@ -351,7 +358,29 @@ function getFailureAcknowledgementMessage(
   )}.`;
 }
 
-export function OperatorConsole() {
+function getOperatorFrame(view: OperatorConsoleView) {
+  if (view === 'case') {
+    return {
+      eyebrow: 'Operator Case',
+      title: 'Resolve one milestone dispute from the visible case history.',
+      copy:
+        'This route stays focused on one contract: milestone posture, delivery evidence, dispute evidence, receipts, timeline, and final operator resolution.',
+    };
+  }
+
+  return {
+    eyebrow: 'Operator Console',
+    title: 'Review disputes and execution issues from the public audit trail.',
+    copy:
+      'This surface stays within the existing public audit endpoint. It is organized around operator tasks: dispute triage, receipt inspection, milestone posture review, and explicit visibility into what still requires backend authorization work.',
+  };
+}
+
+export function OperatorConsole({
+  view = 'dashboard',
+  initialJobId = null,
+}: OperatorConsoleProps) {
+  const frame = getOperatorFrame(view);
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -359,7 +388,7 @@ export function OperatorConsole() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authCode, setAuthCode] = useState('');
-  const [jobId, setJobId] = useState('');
+  const [jobId, setJobId] = useState(initialJobId ?? '');
   const [audit, setAudit] = useState<AuditBundle | null>(null);
   const [lookupHistory, setLookupHistory] = useState<string[]>([]);
   const [challenge, setChallenge] = useState<WalletLinkChallenge | null>(null);
@@ -414,6 +443,10 @@ export function OperatorConsole() {
   }, []);
 
   useEffect(() => {
+    setJobId(initialJobId ?? '');
+  }, [initialJobId]);
+
+  useEffect(() => {
     const session = readSession();
     if (!session) {
       return;
@@ -426,6 +459,14 @@ export function OperatorConsole() {
   useEffect(() => {
     void loadRuntimeProfile();
   }, []);
+
+  useEffect(() => {
+    if (!initialJobId) {
+      return;
+    }
+
+    void handleLookup(initialJobId);
+  }, [initialJobId]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -1204,13 +1245,9 @@ export function OperatorConsole() {
     <div className={styles.console}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>Operator Console</p>
-          <h1>Review disputes and execution issues from the public audit trail.</h1>
-          <p className={styles.heroCopy}>
-            This surface stays within the existing public audit endpoint. It is organized around
-            operator tasks: dispute triage, receipt inspection, milestone posture review, and
-            explicit visibility into what still requires backend authorization work.
-          </p>
+          <p className={styles.eyebrow}>{frame.eyebrow}</p>
+          <h1>{frame.title}</h1>
+          <p className={styles.heroCopy}>{frame.copy}</p>
         </div>
         <div className={styles.heroCard}>
           <div>
@@ -1460,6 +1497,7 @@ export function OperatorConsole() {
           </div>
         </section>
 
+        {view === 'dashboard' ? (
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -2360,7 +2398,62 @@ export function OperatorConsole() {
             ) : null}
           </div>
         </section>
+        ) : null}
       </div>
+
+      {view === 'dashboard' ? (
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>Dispute Queue</p>
+              <h2>Open disputes ready for operator review</h2>
+            </div>
+          </header>
+          <div className={styles.stack}>
+            {controlsArbitratorWallet && escrowHealth ? (
+              escrowHealth.jobs.filter((job) => job.reasons.includes('open_dispute')).length > 0 ? (
+                escrowHealth.jobs
+                  .filter((job) => job.reasons.includes('open_dispute'))
+                  .map((job) => (
+                    <article key={`dispute-${job.jobId}`} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>Dispute case ready</strong>
+                        <span>{job.status}</span>
+                      </div>
+                      <p>{`Job title: ${job.title}`}</p>
+                      <p>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</p>
+                      <small>{job.jobId}</small>
+                      <div className={styles.inlineActions}>
+                        <a href={`/cases/${job.jobId}`}>Open case route</a>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => void handleLookup(job.jobId)}
+                        >
+                          Load in place
+                        </button>
+                      </div>
+                    </article>
+                  ))
+              ) : (
+                <EmptyStateCard
+                  title="No active disputes"
+                  message="The operator health report does not currently show any open disputes."
+                  className={styles.emptyCard}
+                  messageClassName={styles.stateText}
+                />
+              )
+            ) : (
+              <EmptyStateCard
+                title="Authenticate and link the arbitrator wallet"
+                message="The dispute queue is only available after the operator session controls the configured arbitrator wallet."
+                className={styles.emptyCard}
+                messageClassName={styles.stateText}
+              />
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
@@ -2693,10 +2786,10 @@ export function OperatorConsole() {
                         protected resolve endpoint can be used from this console.
                       </p>
                     </article>
-                  </>
-                )}
-              </div>
-            </section>
+              </>
+            )}
+          </div>
+        </section>
           </div>
 
           <div className={styles.grid}>

@@ -14,8 +14,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Escrow4337 Client Console",
-  description: "Manual escrow console for OTP auth, wallet provisioning, and milestone operations.",
+  title: "Milestone Escrow",
+  description:
+    "Milestone escrow for crypto-native agency and client service work on Base.",
 };
 
 export default function RootLayout({

@@ -455,7 +455,7 @@ export class EscrowService {
     dto: DisputeMilestoneDto,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
-    const actorAddress = await this.escrowActorService.resolvePartyForJob(
+    const actorAddress = await this.escrowActorService.resolveClientForJob(
       userId,
       job,
     );
@@ -482,6 +482,7 @@ export class EscrowService {
         milestone.status = 'disputed';
         milestone.disputedAt = now;
         milestone.disputeReason = dto.reason;
+        milestone.disputeEvidenceUrls = cloneValue(dto.evidenceUrls);
         job.updatedAt = now;
         this.syncJobStatus(job);
         this.appendAudit(job, {

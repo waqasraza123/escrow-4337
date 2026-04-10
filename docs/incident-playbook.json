@@ -1,0 +1,54 @@
+{
+  "severities": [
+    {
+      "id": "critical",
+      "summary": "Launch-blocking outage or integrity risk that requires immediate rollback, containment, or explicit production hold."
+    },
+    {
+      "id": "warning",
+      "summary": "Degraded posture that may continue only with explicit owner acknowledgement and no unresolved launch blockers."
+    }
+  ],
+  "incidents": [
+    {
+      "id": "api_unavailable",
+      "severity": "critical",
+      "owner": "deployment",
+      "summary": "The deployed API is unavailable or failing launch smoke for public entrypoints.",
+      "rollback": "Roll back the API image to the last known-good SHA, then re-run deployed smoke and deployment validation.",
+      "evidence": ["deployment-validation.json", "launch-readiness.json", "smoke-deployed.json"]
+    },
+    {
+      "id": "daemon_unhealthy",
+      "severity": "critical",
+      "owner": "worker",
+      "summary": "The recurring chain-sync daemon is stopped, stale, or failing beyond configured thresholds.",
+      "rollback": "Stop the worker independently, restore the last known-good worker deployment, and confirm recovered daemon health before promotion.",
+      "evidence": ["chain-sync-daemon-health.json", "launch-readiness.json"]
+    },
+    {
+      "id": "operator_authority_gap",
+      "severity": "critical",
+      "owner": "operator",
+      "summary": "The configured arbitrator wallet or launch-scoped operator capability is unavailable.",
+      "rollback": "Block promotion until the configured arbitrator wallet, export support, and operator workflow posture are restored or the launch scope is redefined.",
+      "evidence": ["launch-readiness.json", "runtime-profile.json"]
+    },
+    {
+      "id": "frontend_runtime_mismatch",
+      "severity": "warning",
+      "owner": "frontend",
+      "summary": "Web or admin runtime alignment, origin configuration, or deployed availability is degraded.",
+      "rollback": "Hold promotion or revert the affected frontend deploy until deployed smoke confirms runtime-profile alignment again.",
+      "evidence": ["runtime-profile.json", "smoke-deployed.json"]
+    },
+    {
+      "id": "relay_or_chain_assumption_gap",
+      "severity": "critical",
+      "owner": "deployment",
+      "summary": "Deployment validation, launch readiness, or documented chain assumptions no longer match the candidate environment.",
+      "rollback": "Block promotion until deployment config, chain assumptions, and relay posture are corrected and re-validated.",
+      "evidence": ["deployment-validation.json", "runtime-profile.json", "launch-readiness.json"]
+    }
+  ]
+}

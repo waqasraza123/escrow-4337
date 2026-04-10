@@ -131,6 +131,7 @@ const milestoneSchema = z.object({
   deliveryNote: z.string().optional(),
   deliveryEvidenceUrls: z.array(z.string()).optional(),
   disputeReason: z.string().optional(),
+  disputeEvidenceUrls: z.array(z.string()).optional(),
   resolutionAction: z.enum(['release', 'refund']).optional(),
   resolutionNote: z.string().optional(),
 });

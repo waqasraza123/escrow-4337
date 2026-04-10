@@ -48,6 +48,7 @@ Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/
 
 Phase 7 now also standardizes a reusable API or worker image contract through [services/api/Dockerfile](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/Dockerfile). The same image supports `node dist/main`, `pnpm --filter escrow4334-api db:migrate`, `pnpm --filter escrow4334-api deployment:validate`, and `pnpm --filter escrow4334-api chain-sync:daemon`. See [docs/ENVIRONMENT_MATRIX.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ENVIRONMENT_MATRIX.md) and [docs/DEPLOYMENT_RUNBOOK.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/DEPLOYMENT_RUNBOOK.md) for staging or production expectations.
 Phase 8 launch preparation now also exposes `GET /operations/launch-readiness` as the machine-readable launch posture for a deployed backend. See [docs/LAUNCH_READINESS.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/LAUNCH_READINESS.md) for the release-candidate evidence contract.
+Launch-candidate evidence now also captures `deployment:validate`, daemon-health, runtime-profile, and launch-readiness artifacts together. See [docs/INCIDENT_PLAYBOOK.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/INCIDENT_PLAYBOOK.md) for launch-scoped incident ownership and rollback expectations.
 
 Targeted quality checks:
 

@@ -97,4 +97,4 @@ Remaining risks:
 
 - no external contract audit has been completed
 - deployed smoke remains read-only and cannot prove full privileged user workflows
-- the repo still lacks Phase 8 launch ownership, incident drills, and rollback evidence beyond the runbook contract
+- launch ownership and rollback evidence contracts now exist in-repo, but live staged drill evidence and alert-destination proof are still missing

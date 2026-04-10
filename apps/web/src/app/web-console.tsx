@@ -82,6 +82,20 @@ type CreatedJobResult = {
   txHash: string;
 };
 
+export type EscrowConsoleView =
+  | 'overview'
+  | 'sign-in'
+  | 'setup'
+  | 'new-contract'
+  | 'contract'
+  | 'deliver'
+  | 'dispute';
+
+type EscrowConsoleProps = {
+  view?: EscrowConsoleView;
+  initialJobId?: string | null;
+};
+
 const categoryOptions = [
   'software-development',
   'design',
@@ -276,7 +290,76 @@ function getRuntimeProfileLabel(profile: RuntimeProfile['profile']) {
   }
 }
 
-export function EscrowConsole() {
+function getConsoleFrame(view: EscrowConsoleView) {
+  switch (view) {
+    case 'sign-in':
+      return {
+        eyebrow: 'Sign In',
+        title: 'Start a milestone escrow session.',
+        copy:
+          'Use OTP sign-in first. The app will then restore your escrow access, linked wallets, and contract actions.',
+      };
+    case 'setup':
+      return {
+        eyebrow: 'Setup',
+        title: 'Link the right wallet before money moves.',
+        copy:
+          'Clients need a provisioned smart account to create contracts. Contractors need the exact delivery wallet linked before they can join and deliver.',
+      };
+    case 'new-contract':
+      return {
+        eyebrow: 'New Contract',
+        title: 'Create one milestone-based service contract.',
+        copy:
+          'Bind the contractor wallet up front, define the milestones in plain language, and review the release and dispute model before funding.',
+      };
+    case 'contract':
+      return {
+        eyebrow: 'Contract',
+        title: 'Review one contract with the exact actor rules.',
+        copy:
+          'This shared link can be opened by the client or contractor. Actions unlock only when the signed-in account controls the required wallet.',
+      };
+    case 'deliver':
+      return {
+        eyebrow: 'Deliver',
+        title: 'Submit milestone delivery with explicit evidence.',
+        copy:
+          'The contractor joins through the shared contract link, signs in, links the bound wallet, and delivers against the funded milestone.',
+      };
+    case 'dispute':
+      return {
+        eyebrow: 'Dispute',
+        title: 'Escalate one milestone with a clear evidence trail.',
+        copy:
+          'Disputes stay milestone-scoped. The client records the issue and supporting links, and the operator resolves from the visible audit trail.',
+      };
+    case 'overview':
+    default:
+      return {
+        eyebrow: 'Client Console',
+        title: 'Operate the escrow lifecycle from OTP login to dispute resolution.',
+        copy:
+          'This surface is wired to the real API modules already in the repo: auth, SIWE wallet linking, smart-account provisioning, job creation, milestone actions, and public audit review.',
+      };
+  }
+}
+
+function getStringTerm(job: JobView | null, key: string) {
+  const value = job?.termsJSON?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function getNumericTerm(job: JobView | null, key: string) {
+  const value = job?.termsJSON?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+export function EscrowConsole({
+  view = 'overview',
+  initialJobId = null,
+}: EscrowConsoleProps) {
+  const frame = getConsoleFrame(view);
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -284,7 +367,7 @@ export function EscrowConsole() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [walletState, setWalletState] = useState<WalletState | null>(null);
   const [jobsResponse, setJobsResponse] = useState<JobsListResponse>({ jobs: [] });
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(initialJobId);
   const [auditBundle, setAuditBundle] = useState<AuditBundle | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authCode, setAuthCode] = useState('');
@@ -330,6 +413,7 @@ export function EscrowConsole() {
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryEvidence, setDeliveryEvidence] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
+  const [disputeEvidence, setDisputeEvidence] = useState('');
   const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>(
     'release',
   );
@@ -337,6 +421,7 @@ export function EscrowConsole() {
   const [createdJobResult, setCreatedJobResult] = useState<CreatedJobResult | null>(
     null,
   );
+  const [joinLinkState, setJoinLinkState] = useState<AsyncState>(createIdleState());
   const [pendingLifecycleAction, setPendingLifecycleAction] =
     useState<PendingLifecycleAction | null>(null);
 
@@ -352,6 +437,33 @@ export function EscrowConsole() {
   const selectedJobRoles = selectedJob?.participantRoles ?? [];
   const isClientForSelectedJob = selectedJobRoles.includes('client');
   const isWorkerForSelectedJob = selectedJobRoles.includes('worker');
+  const linkedWalletAddresses = useMemo(
+    () => new Set(walletState?.wallets.map((wallet) => wallet.address) ?? []),
+    [walletState],
+  );
+  const controlsSelectedWorkerWallet = Boolean(
+    selectedJobView && linkedWalletAddresses.has(selectedJobView.onchain.workerAddress),
+  );
+  const controlsSelectedClientWallet = Boolean(
+    selectedJobView && linkedWalletAddresses.has(selectedJobView.onchain.clientAddress),
+  );
+  const reviewWindowDays = getNumericTerm(selectedJobView, 'reviewWindowDays');
+  const disputeModel = getStringTerm(selectedJobView, 'disputeModel');
+  const evidenceExpectation = getStringTerm(selectedJobView, 'evidenceExpectation');
+  const showRuntime = ['overview', 'sign-in', 'setup', 'new-contract'].includes(view);
+  const showAccess = ['overview', 'sign-in', 'setup', 'new-contract'].includes(view);
+  const showSetup = ['overview', 'setup', 'new-contract', 'contract', 'deliver', 'dispute'].includes(
+    view,
+  );
+  const showComposer = ['overview', 'new-contract'].includes(view);
+  const showJobIndex = ['overview', 'contract', 'deliver', 'dispute'].includes(view);
+  const showSelectedJob = ['overview', 'contract', 'deliver', 'dispute'].includes(view);
+  const showClientWorkspace =
+    isClientForSelectedJob && ['overview', 'contract', 'dispute'].includes(view);
+  const showWorkerWorkspace =
+    isWorkerForSelectedJob && ['overview', 'contract', 'deliver'].includes(view);
+  const showSharedDispute = ['overview', 'contract', 'dispute'].includes(view);
+  const showOperatorPosture = ['overview', 'contract', 'dispute'].includes(view);
 
   const [createJobState, setCreateJobState] = useState<JobComposerState>(
     createInitialJobComposerState,
@@ -452,6 +564,10 @@ export function EscrowConsole() {
     () => getJobExecutions(jobExecutions),
     [jobExecutions],
   );
+
+  useEffect(() => {
+    setSelectedJobId(initialJobId);
+  }, [initialJobId]);
 
   useEffect(() => {
     const session = readSession();
@@ -571,8 +687,10 @@ export function EscrowConsole() {
     setDeliveryNote('');
     setDeliveryEvidence('');
     setDisputeReason('');
+    setDisputeEvidence('');
     setResolutionAction('release');
     setResolutionNote('');
+    setJoinLinkState(createIdleState());
   }, [selectedJobId]);
 
   useEffect(() => {
@@ -757,6 +875,31 @@ export function EscrowConsole() {
     setSelectedJobId(null);
     setAuditBundle(null);
     writeSession(null);
+  }
+
+  async function handleCopyJoinLink() {
+    if (!selectedJobView || typeof window === 'undefined') {
+      return;
+    }
+
+    const joinLink = `${window.location.origin}/app/contracts/${selectedJobView.id}`;
+    setJoinLinkState(createWorkingState('Copying contractor join link...'));
+
+    try {
+      await window.navigator.clipboard.writeText(joinLink);
+      setJoinLinkState(
+        createSuccessState(
+          'Join link copied. Share it with the contractor so they can sign in and link the bound worker wallet.',
+        ),
+      );
+    } catch (error) {
+      setJoinLinkState(
+        createErrorState(
+          error,
+          `Copy failed. Share this link manually: ${joinLink}`,
+        ),
+      );
+    }
   }
 
   async function handleShariahToggle(nextValue: boolean) {
@@ -1171,7 +1314,10 @@ export function EscrowConsole() {
         webApi.disputeMilestone(
           selectedJobView.id,
           selectedMilestoneIndex,
-          disputeReason,
+          {
+            reason: disputeReason,
+            evidenceUrls: splitEvidenceUrls(disputeEvidence),
+          },
           accessToken,
         ),
     });
@@ -1228,13 +1374,9 @@ export function EscrowConsole() {
     <div className={styles.console}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>Client Console</p>
-          <h1>Operate the escrow lifecycle from OTP login to dispute resolution.</h1>
-          <p className={styles.heroCopy}>
-            This surface is wired to the real API modules already in the repo:
-            auth, SIWE wallet linking, smart-account provisioning, job creation,
-            milestone actions, and public audit review.
-          </p>
+          <p className={styles.eyebrow}>{frame.eyebrow}</p>
+          <h1>{frame.title}</h1>
+          <p className={styles.heroCopy}>{frame.copy}</p>
         </div>
         <div className={styles.heroCard}>
           <div>
@@ -1260,6 +1402,7 @@ export function EscrowConsole() {
         </div>
       </section>
 
+      {showRuntime ? (
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <div>
@@ -1330,7 +1473,9 @@ export function EscrowConsole() {
           </article>
         </div>
       </section>
+      ) : null}
 
+      {showAccess ? (
       <div className={styles.grid}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -1438,7 +1583,9 @@ export function EscrowConsole() {
           )}
         </section>
       </div>
+      ) : null}
 
+      {showSetup ? (
       <div className={styles.grid}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -1552,8 +1699,11 @@ export function EscrowConsole() {
           </div>
         </section>
       </div>
+      ) : null}
 
+      {showComposer || showJobIndex ? (
       <div className={styles.grid}>
+        {showComposer ? (
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -1868,7 +2018,9 @@ export function EscrowConsole() {
             />
           </div>
         </section>
+        ) : null}
 
+        {showJobIndex ? (
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -1907,8 +2059,11 @@ export function EscrowConsole() {
             )}
           </div>
         </section>
+        ) : null}
       </div>
+      ) : null}
 
+      {showSelectedJob ? (
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <div>
@@ -1937,6 +2092,40 @@ export function EscrowConsole() {
                   <strong>{formatTimestamp(selectedJobView.updatedAt)}</strong>
                 </article>
               </div>
+              <div className={styles.summaryGrid}>
+                <article>
+                  <span className={styles.metaLabel}>Client wallet</span>
+                  <strong>{previewHash(selectedJobView.onchain.clientAddress)}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Contractor wallet</span>
+                  <strong>{previewHash(selectedJobView.onchain.workerAddress)}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Review window</span>
+                  <strong>
+                    {reviewWindowDays !== null ? `${reviewWindowDays} days` : 'Not set'}
+                  </strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Dispute model</span>
+                  <strong>{disputeModel || 'operator-mediation'}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Evidence expectation</span>
+                  <strong>
+                    {evidenceExpectation || 'Delivery note plus linked evidence URLs'}
+                  </strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Operator resolution</span>
+                  <strong>
+                    {runtimeProfile?.operator.arbitratorAddress
+                      ? previewHash(runtimeProfile.operator.arbitratorAddress)
+                      : 'Configured arbitrator wallet'}
+                  </strong>
+                </article>
+              </div>
               <div className={styles.roleBar}>
                 {selectedJobRoles.length > 0 ? (
                   selectedJobRoles.map((role) => (
@@ -1948,6 +2137,38 @@ export function EscrowConsole() {
                   <span className={styles.roleBadgeMuted}>observer</span>
                 )}
               </div>
+              <article className={styles.timelineCard}>
+                <div className={styles.walletTitleRow}>
+                  <strong>Contractor join access</strong>
+                  <span>
+                    {controlsSelectedWorkerWallet
+                      ? 'Wallet verified'
+                      : accessToken
+                        ? 'Wallet missing'
+                        : 'Share link ready'}
+                  </span>
+                </div>
+                <p className={styles.muted}>
+                  {controlsSelectedWorkerWallet
+                    ? 'This session controls the exact worker wallet bound at contract creation.'
+                    : accessToken
+                      ? `Link ${selectedJobView.onchain.workerAddress} to unlock contractor delivery for this shared contract link.`
+                      : 'Share this contract link with the contractor. They must sign in and link the bound worker wallet before delivery is enabled.'}
+                </p>
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={handleCopyJoinLink}
+                  >
+                    Copy contractor link
+                  </button>
+                </div>
+                <StatusNotice
+                  message={joinLinkState.message}
+                  messageClassName={styles.stateText}
+                />
+              </article>
               {jobActionState.message ||
               (auditState.kind === 'error' && auditState.message) ? (
                 <StatusNotice
@@ -2000,7 +2221,7 @@ export function EscrowConsole() {
                 )}
               </div>
               <div className={styles.workspaceStack}>
-                {isClientForSelectedJob ? (
+                {showClientWorkspace ? (
                   <div className={styles.actionPanel}>
                     <div className={styles.workspaceHead}>
                       <div>
@@ -2188,7 +2409,20 @@ export function EscrowConsole() {
                   </div>
                 ) : null}
 
-                {isWorkerForSelectedJob ? (
+                {view === 'deliver' && !isWorkerForSelectedJob ? (
+                  <EmptyStateCard
+                    title="Contractor wallet required"
+                    message={
+                      accessToken
+                        ? `Link ${selectedJobView.onchain.workerAddress} before delivering this milestone.`
+                        : 'Sign in and link the exact contractor wallet from the shared contract link before delivery is enabled.'
+                    }
+                    className={styles.timelineCard}
+                    messageClassName={styles.muted}
+                  />
+                ) : null}
+
+                {showWorkerWorkspace ? (
                   <div className={styles.actionPanel}>
                     <div className={styles.workspaceHead}>
                       <div>
@@ -2247,6 +2481,22 @@ export function EscrowConsole() {
                   </div>
                 ) : null}
 
+                {view === 'dispute' && !isClientForSelectedJob ? (
+                  <EmptyStateCard
+                    title="Client wallet required"
+                    message={
+                      controlsSelectedClientWallet
+                        ? 'This session controls the client wallet, but the contract list has not refreshed into a writable client role yet.'
+                        : accessToken
+                        ? `Link ${selectedJobView.onchain.clientAddress} before opening a milestone dispute.`
+                        : 'Sign in and link the exact client wallet from the shared contract link before dispute actions are enabled.'
+                    }
+                    className={styles.timelineCard}
+                    messageClassName={styles.muted}
+                  />
+                ) : null}
+
+                {showSharedDispute ? (
                 <div className={styles.actionPanel}>
                   <div className={styles.workspaceHead}>
                     <div>
@@ -2287,6 +2537,11 @@ export function EscrowConsole() {
                         </span>
                       </div>
                       <p className={styles.muted}>{disputeCard.detail}</p>
+                      {!isClientForSelectedJob ? (
+                        <p className={styles.muted}>
+                          Only the client wallet can open a dispute in this launch flow.
+                        </p>
+                      ) : null}
                       <label className={styles.field}>
                         <span>Dispute reason</span>
                         <textarea
@@ -2295,10 +2550,22 @@ export function EscrowConsole() {
                           rows={3}
                         />
                       </label>
+                      <label className={styles.field}>
+                        <span>Dispute evidence URLs</span>
+                        <textarea
+                          value={disputeEvidence}
+                          onChange={(event) => setDisputeEvidence(event.target.value)}
+                          rows={2}
+                          placeholder="https://... https://..."
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={handleDisputeMilestone}
-                        disabled={!isLifecycleActionEnabled(disputeCard)}
+                        disabled={
+                          !isClientForSelectedJob ||
+                          !isLifecycleActionEnabled(disputeCard)
+                        }
                       >
                         Open dispute
                       </button>
@@ -2309,7 +2576,9 @@ export function EscrowConsole() {
                     </article>
                   ) : null}
                 </div>
+                ) : null}
 
+                {showOperatorPosture ? (
                 <div className={styles.actionPanel}>
                   <div className={styles.workspaceHead}>
                     <div>
@@ -2369,6 +2638,7 @@ export function EscrowConsole() {
                     </article>
                   ) : null}
                 </div>
+                ) : null}
               </div>
             </div>
 
@@ -2426,6 +2696,18 @@ export function EscrowConsole() {
                       <article className={styles.timelineCard}>
                         <strong>Dispute reason</strong>
                         <p>{selectedMilestone.disputeReason}</p>
+                      </article>
+                    ) : null}
+                    {selectedMilestone.disputeEvidenceUrls?.length ? (
+                      <article className={styles.timelineCard}>
+                        <strong>Dispute evidence links</strong>
+                        <div className={styles.linkList}>
+                          {selectedMilestone.disputeEvidenceUrls.map((url) => (
+                            <a key={url} href={url} target="_blank" rel="noreferrer">
+                              {url}
+                            </a>
+                          ))}
+                        </div>
                       </article>
                     ) : null}
                     {selectedMilestone.resolutionAction ? (
@@ -2549,6 +2831,7 @@ export function EscrowConsole() {
           />
         )}
       </section>
+      ) : null}
     </div>
   );
 }

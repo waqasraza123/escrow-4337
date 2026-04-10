@@ -28,6 +28,8 @@ Use `pnpm launch:candidate` as the canonical launch-candidate suite. It runs:
 
 The GitHub-native equivalent is the manual `Launch Candidate` workflow against `staging` or `production`.
 
+The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
+
 ## Launch Readiness Endpoint
 
 `GET /operations/launch-readiness` is the machine-readable launch posture for the currently deployed backend. It summarizes:
@@ -50,6 +52,8 @@ Treat any failed check or non-empty `blockers` array as a launch blocker.
 
 Unowned incidents are launch blockers.
 
+See `docs/INCIDENT_PLAYBOOK.md` and `docs/incident-playbook.json` for the launch-scoped incident classes, owners, rollback guidance, and required evidence artifacts.
+
 ## Monitoring, Alerting, And Rollback Posture
 
 - `deployment:validate` must stay green for the candidate environment.
@@ -58,6 +62,7 @@ Unowned incidents are launch blockers.
 - Roll back the API image first when the deploy is unhealthy.
 - Stop the worker independently if the incident is isolated to recurring chain sync.
 - Re-run deployed smoke after rollback before declaring recovery.
+- Preserve the launch-candidate artifact bundle for the candidate environment so rollback and recovery evidence stay tied to the same release decision.
 
 ## Legal, Compliance, And Chain Assumptions
 

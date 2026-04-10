@@ -511,6 +511,7 @@ export type AuditBundle = {
         deliveryNote?: string;
         deliveryEvidenceUrls?: string[];
         disputeReason?: string;
+        disputeEvidenceUrls?: string[];
         resolutionAction?: 'release' | 'refund';
         resolutionNote?: string;
       }>;

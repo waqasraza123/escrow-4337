@@ -55,6 +55,7 @@ export const releaseMilestoneSchema = z.object({}).strict();
 export const disputeMilestoneSchema = z
   .object({
     reason: z.string().trim().min(1).max(5000),
+    evidenceUrls: z.array(z.string().url().max(2048)).max(10).default([]),
   })
   .strict();
 

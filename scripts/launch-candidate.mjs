@@ -1,0 +1,431 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { config as loadDotenv } from 'dotenv';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '..');
+const args = process.argv.slice(2);
+
+if (args.includes('--help')) {
+  console.log(`Usage: pnpm launch:candidate [--artifacts-dir <path>]
+
+Runs the deployed launch-candidate gate, captures evidence artifacts under
+artifacts/launch-candidate by default, and exits non-zero on launch blockers.`);
+  process.exit(0);
+}
+
+const artifactsDir = readArtifactsDir(args);
+
+loadOptionalEnv('.env.e2e.deployed');
+
+const apiBaseUrl = readRequiredEnv('PLAYWRIGHT_DEPLOYED_API_BASE_URL');
+const expectLaunchReady =
+  process.env.PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY?.trim().toLowerCase() !== 'false';
+
+mkdirSync(artifactsDir, {
+  recursive: true,
+});
+
+async function main() {
+  const incidentPlaybook = readIncidentPlaybook();
+  const incidentOwnershipIssues = validateIncidentPlaybook(incidentPlaybook);
+  if (incidentOwnershipIssues.length > 0) {
+    const error = [
+      'Launch candidate is blocked because the incident playbook is incomplete.',
+      ...incidentOwnershipIssues.map((issue) => `- ${issue}`),
+    ].join('\n');
+    writeFileSync(resolve(artifactsDir, 'incident-playbook-validation.txt'), `${error}\n`, 'utf8');
+    throw new Error(error);
+  }
+
+  await runLoggedCommand(
+    'verify-ci',
+    ['pnpm', 'verify:ci'],
+    resolve(artifactsDir, 'verify-ci.log'),
+  );
+  await runLoggedCommand(
+    'api-build',
+    ['pnpm', '--filter', 'escrow4334-api', 'build'],
+    resolve(artifactsDir, 'api-build.log'),
+  );
+  await runLoggedCommand(
+    'db-migrate-status',
+    ['pnpm', '--filter', 'escrow4334-api', 'db:migrate:status'],
+    resolve(artifactsDir, 'db-migrate-status.log'),
+  );
+
+  const deploymentValidation = await runJsonCommand(
+    'deployment-validate',
+    [
+      'pnpm',
+      '--filter',
+      'escrow4334-api',
+      'exec',
+      'node',
+      './scripts/run-built-cli.mjs',
+      'dist/modules/operations/deployment-validation-runner.js',
+    ],
+    resolve(artifactsDir, 'deployment-validation.raw.log'),
+    resolve(artifactsDir, 'deployment-validation.json'),
+  );
+
+  const daemonHealth = await runJsonCommand(
+    'chain-sync-daemon-health',
+    [
+      'pnpm',
+      '--filter',
+      'escrow4334-api',
+      'exec',
+      'node',
+      './scripts/run-built-cli.mjs',
+      'dist/modules/operations/escrow-chain-sync-daemon-health-runner.js',
+      '--fail-on',
+      'never',
+    ],
+    resolve(artifactsDir, 'chain-sync-daemon-health.raw.log'),
+    resolve(artifactsDir, 'chain-sync-daemon-health.json'),
+  );
+
+  const runtimeProfile = await fetchJsonArtifact(
+    new URL('/operations/runtime-profile', apiBaseUrl).toString(),
+    resolve(artifactsDir, 'runtime-profile.json'),
+  );
+  const launchReadiness = await fetchJsonArtifact(
+    new URL('/operations/launch-readiness', apiBaseUrl).toString(),
+    resolve(artifactsDir, 'launch-readiness.json'),
+  );
+
+  const smokeReport = await runJsonCommand(
+    'smoke-deployed',
+    ['pnpm', 'exec', 'playwright', 'test'],
+    resolve(artifactsDir, 'smoke-deployed.raw.log'),
+    resolve(artifactsDir, 'smoke-deployed.json'),
+    {
+      PLAYWRIGHT_PROFILE: 'deployed',
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
+
+  const blockers = collectBlockers({
+    deploymentValidation,
+    daemonHealth,
+    launchReadiness,
+    expectLaunchReady,
+    smokeReport,
+  });
+  const summary = {
+    generatedAt: new Date().toISOString(),
+    artifactsDir,
+    expectLaunchReady,
+    incidentPlaybook: {
+      file: 'docs/incident-playbook.json',
+      incidentCount: incidentPlaybook.incidents.length,
+      ownerCount: uniqueCount(incidentPlaybook.incidents.map((incident) => incident.owner)),
+    },
+    deploymentValidation: {
+      ok: deploymentValidation.ok,
+      failedChecks: deploymentValidation.checks
+        .filter((check) => check.status === 'failed')
+        .map((check) => check.id),
+      warningChecks: deploymentValidation.checks
+        .filter((check) => check.status === 'warning')
+        .map((check) => check.id),
+    },
+    daemonHealth: {
+      status: daemonHealth.status,
+      summary: daemonHealth.summary,
+      issueCodes: daemonHealth.issues.map((issue) => issue.code),
+    },
+    runtimeProfile: {
+      profile: runtimeProfile.profile,
+      providers: runtimeProfile.providers,
+      warnings: runtimeProfile.warnings,
+    },
+    launchReadiness: {
+      ready: launchReadiness.ready,
+      blockers: launchReadiness.blockers,
+      warnings: launchReadiness.warnings,
+    },
+    smoke: summarizePlaywrightReport(smokeReport),
+    blockers,
+  };
+
+  writeFileSync(
+    resolve(artifactsDir, 'summary.json'),
+    `${JSON.stringify(summary, null, 2)}\n`,
+    'utf8',
+  );
+  writeFileSync(resolve(artifactsDir, 'summary.md'), buildSummaryMarkdown(summary), 'utf8');
+
+  if (blockers.length > 0) {
+    throw new Error(
+      `Launch candidate is blocked:\n${blockers.map((blocker) => `- ${blocker}`).join('\n')}`,
+    );
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
+
+function readArtifactsDir(argv) {
+  const flagIndex = argv.indexOf('--artifacts-dir');
+  if (flagIndex >= 0) {
+    const provided = argv[flagIndex + 1];
+    if (!provided) {
+      throw new Error('--artifacts-dir requires a value.');
+    }
+
+    return resolve(repoRoot, provided);
+  }
+
+  if (process.env.LAUNCH_CANDIDATE_ARTIFACT_DIR) {
+    return resolve(repoRoot, process.env.LAUNCH_CANDIDATE_ARTIFACT_DIR);
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return resolve(repoRoot, 'artifacts', 'launch-candidate', timestamp);
+}
+
+function loadOptionalEnv(fileName) {
+  const envPath = resolve(repoRoot, fileName);
+  if (!existsSync(envPath)) {
+    return;
+  }
+
+  loadDotenv({
+    path: envPath,
+    override: false,
+  });
+}
+
+function readRequiredEnv(key) {
+  const value = process.env[key]?.trim();
+  if (!value) {
+    throw new Error(
+      `Launch candidate requires ${key}. Copy .env.e2e.deployed.example to .env.e2e.deployed or export the variable explicitly.`,
+    );
+  }
+  return value;
+}
+
+function readIncidentPlaybook() {
+  const filePath = resolve(repoRoot, 'docs', 'incident-playbook.json');
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+function validateIncidentPlaybook(playbook) {
+  const issues = [];
+
+  if (!Array.isArray(playbook.incidents) || playbook.incidents.length === 0) {
+    issues.push('docs/incident-playbook.json must define at least one incident.');
+    return issues;
+  }
+
+  for (const incident of playbook.incidents) {
+    if (!incident.id) {
+      issues.push('Every incident must have an id.');
+    }
+    if (!incident.summary) {
+      issues.push(`Incident ${incident.id || '<missing id>'} is missing a summary.`);
+    }
+    if (!incident.owner) {
+      issues.push(`Incident ${incident.id || '<missing id>'} is missing an owner.`);
+    }
+    if (!incident.rollback) {
+      issues.push(`Incident ${incident.id || '<missing id>'} is missing rollback guidance.`);
+    }
+    if (!Array.isArray(incident.evidence) || incident.evidence.length === 0) {
+      issues.push(
+        `Incident ${incident.id || '<missing id>'} must list at least one evidence artifact.`,
+      );
+    }
+  }
+
+  return issues;
+}
+
+async function runLoggedCommand(stepName, command, logPath, extraEnv = {}) {
+  console.log(`launch-candidate: ${command.join(' ')}`);
+  const result = await spawnCommand(command, extraEnv);
+  writeFileSync(
+    logPath,
+    [renderCommand(stepName, command), result.stdout, result.stderr].filter(Boolean).join('\n'),
+    'utf8',
+  );
+
+  if (result.code !== 0) {
+    throw new Error(`${stepName} failed with exit code ${result.code}.`);
+  }
+
+  return result;
+}
+
+async function runJsonCommand(stepName, command, rawLogPath, jsonPath, extraEnv = {}) {
+  const result = await runLoggedCommand(stepName, command, rawLogPath, extraEnv);
+  const parsed = parseTrailingJson(result.stdout);
+  writeFileSync(jsonPath, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  return parsed;
+}
+
+async function spawnCommand(command, extraEnv) {
+  const executable = process.platform === 'win32' ? `${command[0]}.cmd` : command[0];
+  const child = spawn(executable, command.slice(1), {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      ...extraEnv,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stdout = '';
+  let stderr = '';
+
+  child.stdout.on('data', (chunk) => {
+    const text = chunk.toString();
+    stdout += text;
+    process.stdout.write(text);
+  });
+  child.stderr.on('data', (chunk) => {
+    const text = chunk.toString();
+    stderr += text;
+    process.stderr.write(text);
+  });
+
+  const code = await new Promise((resolveCode, reject) => {
+    child.on('error', reject);
+    child.on('close', resolveCode);
+  });
+
+  return {
+    code,
+    stdout,
+    stderr,
+  };
+}
+
+function parseTrailingJson(input) {
+  const trimmed = input.trim();
+  const starts = [trimmed.lastIndexOf('\n{'), trimmed.lastIndexOf('\n[')]
+    .filter((index) => index >= 0)
+    .sort((left, right) => right - left);
+
+  const candidates = [trimmed];
+  for (const index of starts) {
+    candidates.push(trimmed.slice(index + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {}
+  }
+
+  throw new Error('Expected command output to end with valid JSON.');
+}
+
+async function fetchJsonArtifact(url, outputPath) {
+  console.log(`launch-candidate: fetch ${url}`);
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json',
+    },
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    writeFileSync(outputPath, text ? `${text}\n` : `HTTP ${response.status}\n`, 'utf8');
+    throw new Error(`Fetch failed for ${url} with status ${response.status}.`);
+  }
+
+  const parsed = JSON.parse(text);
+  writeFileSync(outputPath, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  return parsed;
+}
+
+function collectBlockers({
+  deploymentValidation,
+  daemonHealth,
+  launchReadiness,
+  expectLaunchReady,
+  smokeReport,
+}) {
+  const blockers = [];
+
+  if (deploymentValidation.ok !== true) {
+    blockers.push('Deployment validation reported failed checks.');
+  }
+
+  if (daemonHealth.status === 'failed') {
+    blockers.push('Daemon health reported failed posture.');
+  }
+
+  if (expectLaunchReady && launchReadiness.ready !== true) {
+    blockers.push(
+      ...launchReadiness.blockers.map((blocker) => `Launch readiness blocker: ${blocker}`),
+    );
+  }
+
+  if (summarizePlaywrightReport(smokeReport).failed > 0) {
+    blockers.push('Deployed smoke tests reported failures.');
+  }
+
+  return blockers;
+}
+
+function summarizePlaywrightReport(report) {
+  const stats = report.stats || {};
+  const expected = stats.expected ?? 0;
+  const unexpected = stats.unexpected ?? 0;
+  const flaky = stats.flaky ?? 0;
+  const skipped = stats.skipped ?? 0;
+
+  return {
+    expected,
+    unexpected,
+    flaky,
+    skipped,
+    total: expected + unexpected + flaky + skipped,
+    failed: unexpected + flaky,
+  };
+}
+
+function buildSummaryMarkdown(summary) {
+  return `# Launch Candidate Summary
+
+- Generated at: ${summary.generatedAt}
+- Artifact directory: ${summary.artifactsDir}
+- Expect launch ready: ${summary.expectLaunchReady ? 'true' : 'false'}
+- Deployment validation: ${summary.deploymentValidation.ok ? 'ok' : 'failed'}
+- Daemon health: ${summary.daemonHealth.status}
+- Runtime profile: ${summary.runtimeProfile.profile}
+- Launch readiness: ${summary.launchReadiness.ready ? 'ready' : 'blocked'}
+- Playwright failures: ${summary.smoke.failed}
+
+## Blockers
+
+${summary.blockers.length === 0 ? '- none' : summary.blockers.map((blocker) => `- ${blocker}`).join('\n')}
+
+## Launch Readiness Warnings
+
+${summary.launchReadiness.warnings.length === 0 ? '- none' : summary.launchReadiness.warnings.map((warning) => `- ${warning}`).join('\n')}
+
+## Incident Ownership
+
+- Incident definitions: ${summary.incidentPlaybook.incidentCount}
+- Distinct owners: ${summary.incidentPlaybook.ownerCount}
+`;
+}
+
+function renderCommand(stepName, command) {
+  return [`# ${stepName}`, `$ ${command.join(' ')}`].join('\n');
+}
+
+function uniqueCount(values) {
+  return new Set(values.filter(Boolean)).size;
+}

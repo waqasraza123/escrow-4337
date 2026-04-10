@@ -94,6 +94,7 @@ describe('Escrow export support', () => {
     });
     await controller.dispute(clientUser, createResponse.jobId, 0, {
       reason: 'Scope mismatch',
+      evidenceUrls: ['https://example.com/dispute-proof'],
     });
     await controller.resolve(arbitratorUser, createResponse.jobId, 0, {
       action: 'refund',
@@ -157,10 +158,11 @@ describe('Escrow export support', () => {
     );
     expect(typeof disputeCase.body).toBe('string');
     expect(disputeCase.body).toContain(
-      'job_id,job_title,artifact,milestone_index,milestone_title,status,amount,disputed_at,resolved_at,dispute_reason,resolution_action,resolution_note,related_audit_count,related_execution_count,failed_execution_count',
+      'job_id,job_title,artifact,milestone_index,milestone_title,status,amount,disputed_at,resolved_at,dispute_reason,dispute_evidence_urls,resolution_action,resolution_note,related_audit_count,related_execution_count,failed_execution_count',
     );
     expect(disputeCase.body).toContain('Escrow export coverage');
     expect(disputeCase.body).toContain('Scope mismatch');
+    expect(disputeCase.body).toContain('https://example.com/dispute-proof');
     expect(disputeCase.body).toContain('refund');
     expect(disputeCase.body).toContain('Refund after review');
   });

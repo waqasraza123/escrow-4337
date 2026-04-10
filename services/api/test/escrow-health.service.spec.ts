@@ -136,6 +136,7 @@ describe('EscrowHealthService', () => {
     });
     await escrowService.disputeMilestone(clientUserId, disputedJob.jobId, 0, {
       reason: 'Review failed',
+      evidenceUrls: ['https://example.com/review-failed'],
     });
 
     const failedJob = await escrowService.createJob(clientUserId, {

@@ -137,6 +137,7 @@ describe('EscrowController integration', () => {
 
     const disputeResponse = await controller.dispute(clientUser, jobId, 0, {
       reason: 'The delivery is incomplete',
+      evidenceUrls: ['https://example.com/dispute-note'],
     });
     expect(disputeResponse.jobId).toBe(jobId);
     expect(disputeResponse.milestoneIndex).toBe(0);

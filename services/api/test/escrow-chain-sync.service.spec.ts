@@ -614,6 +614,7 @@ describe('EscrowChainSyncService', () => {
     const createdJob = await createDeliveredJob();
     await escrowService.disputeMilestone(clientUserId, createdJob.jobId, 0, {
       reason: 'Needs review',
+      evidenceUrls: ['https://example.com/review'],
     });
 
     return createdJob;

@@ -110,6 +110,7 @@ export function createJobView(): JobView {
         deliveredAt: 200,
         deliveryNote: 'Discovery package shared for review.',
         deliveryEvidenceUrls: ['https://example.com/discovery'],
+        disputeEvidenceUrls: [],
       },
       {
         title: 'Delivery',
@@ -117,6 +118,7 @@ export function createJobView(): JobView {
         amount: '50',
         dueAt: 250,
         status: 'pending',
+        disputeEvidenceUrls: [],
       },
     ],
     onchain: {

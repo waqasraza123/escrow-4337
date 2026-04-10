@@ -244,6 +244,7 @@ export function createAuditBundle(): AuditBundle {
             amount: '50',
             status: 'released',
             releasedAt: 200,
+            disputeEvidenceUrls: [],
           },
           {
             title: 'Delivery',
@@ -253,6 +254,7 @@ export function createAuditBundle(): AuditBundle {
             deliveredAt: 300,
             disputedAt: 400,
             disputeReason: 'Acceptance criteria not met',
+            disputeEvidenceUrls: ['https://example.com/dispute-context'],
           },
         ],
         onchain: {

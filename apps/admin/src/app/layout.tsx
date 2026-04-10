@@ -15,8 +15,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Escrow4337 Operator Console",
-  description: "Audit and execution inspector for escrow disputes and timeline review.",
+  title: "Milestone Escrow Operator",
+  description:
+    "Dispute review and operator case resolution for milestone escrow contracts.",
 };
 
 export default function RootLayout({

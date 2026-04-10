@@ -100,6 +100,7 @@ export type JobView = {
     deliveryNote?: string;
     deliveryEvidenceUrls?: string[];
     disputeReason?: string;
+    disputeEvidenceUrls?: string[];
     resolutionAction?: 'release' | 'refund';
     resolutionNote?: string;
   }>;
@@ -413,7 +414,10 @@ export const webApi = {
   disputeMilestone(
     jobId: string,
     milestoneIndex: number,
-    reason: string,
+    input: {
+      reason: string;
+      evidenceUrls: string[];
+    },
     accessToken: string,
   ) {
     return requestJson<{ txHash: string }>(
@@ -421,7 +425,7 @@ export const webApi = {
       `/jobs/${jobId}/milestones/${milestoneIndex}/dispute`,
       {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify(input),
       },
       accessToken,
     );

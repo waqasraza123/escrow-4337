@@ -28,6 +28,7 @@ Run the same image with different commands:
 5. Deploy the recurring worker separately if `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED=true`.
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
 7. Before final sign-off, run the manual `Launch Candidate` workflow or `pnpm launch:candidate` against the same environment.
+8. Preserve the generated launch-candidate artifact bundle for rollout evidence and any rollback review.
 
 ## Frontend Contract
 
@@ -70,5 +71,6 @@ Staging smoke must stay read-only. Do not use privileged mutations or non-public
 
 - [Environment Matrix](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ENVIRONMENT_MATRIX.md)
 - [Launch Readiness](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/LAUNCH_READINESS.md)
+- [Incident Playbook](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/INCIDENT_PLAYBOOK.md)
 - [Security Review](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/SECURITY_REVIEW.md)
 - [API README](/Users/mc/development/blockchain/ethereum/base/Escrow4337/services/api/README.md)

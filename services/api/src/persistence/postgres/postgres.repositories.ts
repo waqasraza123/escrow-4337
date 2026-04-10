@@ -139,6 +139,7 @@ type MilestoneRow = QueryResultRow & {
   delivery_note: string | null;
   delivery_evidence_urls: string[] | null;
   dispute_reason: string | null;
+  dispute_evidence_urls: string[] | null;
   resolution_action: 'release' | 'refund' | null;
   resolution_note: string | null;
 };
@@ -332,6 +333,7 @@ function mapMilestone(row: MilestoneRow): EscrowMilestoneRecord {
     deliveryNote: row.delivery_note ?? undefined,
     deliveryEvidenceUrls: row.delivery_evidence_urls ?? undefined,
     disputeReason: row.dispute_reason ?? undefined,
+    disputeEvidenceUrls: row.dispute_evidence_urls ?? undefined,
     resolutionAction: row.resolution_action ?? undefined,
     resolutionNote: row.resolution_note ?? undefined,
   };
@@ -468,6 +470,7 @@ async function replaceEscrowAggregate(
           delivery_note,
           delivery_evidence_urls,
           dispute_reason,
+          dispute_evidence_urls,
           resolution_action,
           resolution_note
         )
@@ -486,8 +489,9 @@ async function replaceEscrowAggregate(
           $12,
           $13::jsonb,
           $14,
-          $15,
-          $16
+          $15::jsonb,
+          $16,
+          $17
         )
       `,
       [
@@ -513,6 +517,7 @@ async function replaceEscrowAggregate(
         milestone.deliveryNote ?? null,
         JSON.stringify(milestone.deliveryEvidenceUrls ?? []),
         milestone.disputeReason ?? null,
+        JSON.stringify(milestone.disputeEvidenceUrls ?? []),
         milestone.resolutionAction ?? null,
         milestone.resolutionNote ?? null,
       ],
@@ -1202,6 +1207,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             delivery_note,
             delivery_evidence_urls,
             dispute_reason,
+            dispute_evidence_urls,
             resolution_action,
             resolution_note
           FROM escrow_milestones
@@ -1311,6 +1317,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
                   delivery_note,
                   delivery_evidence_urls,
                   dispute_reason,
+                  dispute_evidence_urls,
                   resolution_action,
                   resolution_note
                 FROM escrow_milestones
@@ -1429,6 +1436,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
                   delivery_note,
                   delivery_evidence_urls,
                   dispute_reason,
+                  dispute_evidence_urls,
                   resolution_action,
                   resolution_note
                 FROM escrow_milestones
