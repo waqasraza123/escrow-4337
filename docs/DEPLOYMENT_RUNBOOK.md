@@ -75,6 +75,7 @@ Staging smoke must stay read-only. Do not use privileged mutations or non-public
 
 ## Related Docs
 
+- [Staging Execution Sequence](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/STAGING_EXECUTION_SEQUENCE.md)
 - [Environment Matrix](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ENVIRONMENT_MATRIX.md)
 - [Launch Readiness](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/LAUNCH_READINESS.md)
 - [Incident Playbook](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/INCIDENT_PLAYBOOK.md)

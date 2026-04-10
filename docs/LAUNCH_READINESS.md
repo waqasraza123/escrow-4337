@@ -37,6 +37,8 @@ The Playwright harness now also includes a focused launch-candidate exact flow:
 
 Keep that exact flow optional for deployed environments until the staging secret contract is in place. It is meant to make launch-proof runs easier, not to weaken the existing read-only default smoke lane.
 
+For the exact staging rollout order that combines deployment, smoke, launch readiness, evidence capture, and rollback checkpoints, use [docs/STAGING_EXECUTION_SEQUENCE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/STAGING_EXECUTION_SEQUENCE.md).
+
 ## Launch Readiness Endpoint
 
 `GET /operations/launch-readiness` is the machine-readable launch posture for the currently deployed backend. It summarizes:
