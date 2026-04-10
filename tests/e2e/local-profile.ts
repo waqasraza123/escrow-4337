@@ -16,6 +16,7 @@ export const localArbitratorPrivateKey =
   '0x59c6995e998f97a5a0044966f094538c5f2f6f7d5f6a17d4f2ff1f908db8b27b';
 export const localArbitratorWallet = new Wallet(localArbitratorPrivateKey);
 export const localArbitratorAddress = localArbitratorWallet.address;
+export const webSessionStorageKey = 'escrow4337.web.session';
 
 export const localApiEnv: Record<string, string> = {
   NODE_ENV: 'development',
@@ -57,6 +58,27 @@ export const localApiEnv: Record<string, string> = {
 
 let pool: Pool | null = null;
 
+export type LocalSessionTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+type VerifyAuthResponse = LocalSessionTokens & {
+  user: {
+    id: string;
+    email: string;
+  };
+};
+
+type WalletLinkChallengeResponse = {
+  challengeId: string;
+  message: string;
+};
+
+type CreateJobResponse = {
+  jobId: string;
+};
+
 function getPool() {
   pool ??= new Pool({
     connectionString: localDatabaseUrl,
@@ -73,6 +95,55 @@ function hashOtp(code: string, salt: string) {
   return createHash('sha256')
     .update(salt + code)
     .digest('hex');
+}
+
+async function readErrorMessage(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return `Request failed with ${response.status}`;
+  }
+
+  try {
+    const body = JSON.parse(text) as {
+      message?: string | string[];
+      error?: string;
+    };
+
+    if (Array.isArray(body.message)) {
+      return body.message.join(', ');
+    }
+
+    return body.message || body.error || text;
+  } catch {
+    return text;
+  }
+}
+
+async function apiJson<T>(
+  path: string,
+  init: RequestInit = {},
+  accessToken?: string,
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('content-type', 'application/json');
+  if (accessToken) {
+    headers.set('authorization', `Bearer ${accessToken}`);
+  }
+
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
 }
 
 export async function resetOtpState(email: string) {
@@ -104,6 +175,145 @@ export async function forceOtpCode(email: string, code = localOtpCode) {
       WHERE email = $1
     `,
     [key, hash, salt, expiresAt],
+  );
+}
+
+export async function createLocalSession(email: string): Promise<LocalSessionTokens> {
+  await resetOtpState(email);
+  await apiJson<{ ok: true }>('/auth/start', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  await forceOtpCode(email, localOtpCode);
+
+  const response = await apiJson<VerifyAuthResponse>('/auth/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email, code: localOtpCode }),
+  });
+
+  return {
+    accessToken: response.accessToken,
+    refreshToken: response.refreshToken,
+  };
+}
+
+export async function linkWalletForSession(
+  session: LocalSessionTokens,
+  wallet: Wallet,
+) {
+  const challenge = await apiJson<WalletLinkChallengeResponse>(
+    '/wallet/link/challenge',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        address: wallet.address,
+        walletKind: 'eoa',
+        chainId: 84532,
+      }),
+    },
+    session.accessToken,
+  );
+  const signature = await wallet.signMessage(challenge.message);
+
+  return apiJson(
+    '/wallet/link/verify',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        challengeId: challenge.challengeId,
+        message: challenge.message,
+        signature,
+      }),
+    },
+    session.accessToken,
+  );
+}
+
+export async function provisionSmartAccountForSession(
+  session: LocalSessionTokens,
+  ownerAddress: string,
+) {
+  return apiJson(
+    '/wallet/smart-account/provision',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        ownerAddress,
+        setAsDefault: true,
+      }),
+    },
+    session.accessToken,
+  );
+}
+
+export async function createJobForSession(
+  session: LocalSessionTokens,
+  input: {
+    contractorEmail: string;
+    workerAddress: string;
+    currencyAddress: string;
+    title: string;
+    description: string;
+    category?: string;
+    termsJSON?: Record<string, string | number | boolean>;
+  },
+) {
+  const response = await apiJson<CreateJobResponse>(
+    '/jobs',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        contractorEmail: input.contractorEmail,
+        workerAddress: input.workerAddress,
+        currencyAddress: input.currencyAddress,
+        title: input.title,
+        description: input.description,
+        category: input.category ?? 'software-development',
+        termsJSON: input.termsJSON ?? {
+          disputeModel: 'operator-mediation',
+          reviewWindowDays: 3,
+          evidenceExpectation: 'Delivery note plus linked evidence URLs',
+        },
+      }),
+    },
+    session.accessToken,
+  );
+
+  return response.jobId;
+}
+
+export async function fundJobForSession(
+  session: LocalSessionTokens,
+  jobId: string,
+  amount: string,
+) {
+  return apiJson(
+    `/jobs/${jobId}/fund`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    },
+    session.accessToken,
+  );
+}
+
+export async function setMilestonesForSession(
+  session: LocalSessionTokens,
+  jobId: string,
+  milestones: Array<{
+    title: string;
+    deliverable: string;
+    amount: string;
+    dueAt?: number;
+  }>,
+) {
+  return apiJson(
+    `/jobs/${jobId}/milestones`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ milestones }),
+    },
+    session.accessToken,
   );
 }
 
