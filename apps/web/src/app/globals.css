@@ -23,6 +23,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html[data-locale='ar'] body {
+  font-family: var(--font-display-ar), var(--font-display), "Segoe UI", sans-serif;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -51,6 +55,16 @@ textarea,
 input,
 select {
   font-family: var(--font-mono), "SFMono-Regular", monospace;
+}
+
+[data-ltr='true'] {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+
+html[dir='rtl'] [data-ltr='true'] {
+  text-align: left;
 }
 
 button:hover {

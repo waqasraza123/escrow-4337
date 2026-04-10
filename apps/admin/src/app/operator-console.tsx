@@ -43,6 +43,8 @@ import {
   getExecutionFailures,
   getRecentLookupSuggestions,
 } from './operator-case';
+import { LanguageSwitcher } from './language-switcher';
+import { useAdminI18n } from '../lib/i18n';
 
 const historyKey = 'escrow4337.admin.recent-lookups';
 const sessionStorageKey = 'escrow4337.admin.session';
@@ -82,17 +84,6 @@ function writeSession(tokens: SessionTokens | null) {
   }
 
   window.localStorage.setItem(sessionStorageKey, JSON.stringify(tokens));
-}
-
-function getRuntimeProfileLabel(profile: RuntimeProfile['profile']) {
-  switch (profile) {
-    case 'deployment-like':
-      return 'Deployment-like';
-    case 'local-mock':
-      return 'Local mock';
-    case 'mixed':
-      return 'Mixed';
-  }
 }
 
 function getPressureClassName(pressure: 'stable' | 'attention' | 'critical') {
@@ -358,29 +349,23 @@ function getFailureAcknowledgementMessage(
   )}.`;
 }
 
-function getOperatorFrame(view: OperatorConsoleView) {
+function getOperatorFrame(
+  view: OperatorConsoleView,
+  messages: ReturnType<typeof useAdminI18n>['messages'],
+) {
   if (view === 'case') {
-    return {
-      eyebrow: 'Operator Case',
-      title: 'Resolve one milestone dispute from the visible case history.',
-      copy:
-        'This route stays focused on one contract: milestone posture, delivery evidence, dispute evidence, receipts, timeline, and final operator resolution.',
-    };
+    return messages.frame.case;
   }
 
-  return {
-    eyebrow: 'Operator Console',
-    title: 'Review disputes and execution issues from the public audit trail.',
-    copy:
-      'This surface stays within the existing public audit endpoint. It is organized around operator tasks: dispute triage, receipt inspection, milestone posture review, and explicit visibility into what still requires backend authorization work.',
-  };
+  return messages.frame.dashboard;
 }
 
 export function OperatorConsole({
   view = 'dashboard',
   initialJobId = null,
 }: OperatorConsoleProps) {
-  const frame = getOperatorFrame(view);
+  const { definition, messages } = useAdminI18n();
+  const frame = getOperatorFrame(view, messages);
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -437,6 +422,11 @@ export function OperatorConsole({
   const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>('release');
   const [resolutionNote, setResolutionNote] = useState('');
   const [state, setState] = useState<AsyncState>(createIdleState());
+  const formatDate = (value?: number | null, fallback?: string) =>
+    formatTimestamp(value, {
+      fallback,
+      locale: definition.langTag,
+    });
 
   useEffect(() => {
     setLookupHistory(readStoredStringList(historyKey));
@@ -678,26 +668,29 @@ export function OperatorConsole({
     }
   }
 
-  const caseBrief = useMemo(() => (audit ? buildCaseBrief(audit.bundle) : null), [audit]);
+  const caseBrief = useMemo(
+    () => (audit ? buildCaseBrief(audit.bundle, messages.helperCopy) : null),
+    [audit, messages.helperCopy],
+  );
   const milestoneReviewCards = useMemo(
-    () => (audit ? buildMilestoneReviewCards(audit.bundle.job) : []),
-    [audit],
+    () => (audit ? buildMilestoneReviewCards(audit.bundle.job, messages.helperCopy) : []),
+    [audit, messages.helperCopy],
   );
   const disputedMilestoneCards = useMemo(
     () => getDisputedMilestoneCards(milestoneReviewCards),
     [milestoneReviewCards],
   );
   const executionIssueCards = useMemo(
-    () => (audit ? buildExecutionIssueCards(audit.bundle.executions) : []),
-    [audit],
+    () => (audit ? buildExecutionIssueCards(audit.bundle.executions, messages.helperCopy) : []),
+    [audit, messages.helperCopy],
   );
   const failedExecutionCards = useMemo(
     () => getExecutionFailures(executionIssueCards),
     [executionIssueCards],
   );
   const operatorTimeline = useMemo(
-    () => (audit ? buildOperatorTimeline(audit.bundle) : []),
-    [audit],
+    () => (audit ? buildOperatorTimeline(audit.bundle, messages.helperCopy) : []),
+    [audit, messages.helperCopy],
   );
   const lookupSuggestions = useMemo(
     () => getRecentLookupSuggestions(lookupHistory, jobId),
@@ -1243,6 +1236,18 @@ export function OperatorConsole({
 
   return (
     <div className={styles.console}>
+      <div className={styles.topBar}>
+        <div className={styles.topBarContent}>
+          <span className={styles.topBarLabel}>{messages.topBar.label}</span>
+          <p className={styles.topBarMeta}>{messages.topBar.meta}</p>
+        </div>
+        <LanguageSwitcher
+          className={styles.languageSwitcher}
+          labelClassName={styles.languageSwitcherLabel}
+          optionClassName={styles.languageSwitcherOption}
+          optionActiveClassName={styles.languageSwitcherOptionActive}
+        />
+      </div>
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{frame.eyebrow}</p>
@@ -1252,21 +1257,29 @@ export function OperatorConsole({
         <div className={styles.heroCard}>
           <div>
             <span className={styles.metaLabel}>API base URL</span>
-            <strong>{adminApi.baseUrl}</strong>
+            <strong className={styles.ltrValue} data-ltr="true">{adminApi.baseUrl}</strong>
           </div>
           <div>
             <span className={styles.metaLabel}>Backend profile</span>
             <strong>
-              {runtimeProfile ? getRuntimeProfileLabel(runtimeProfile.profile) : 'Loading'}
+              {runtimeProfile
+                ? messages.labels.runtimeProfile[runtimeProfile.profile]
+                : messages.common.loading}
             </strong>
           </div>
           <div>
             <span className={styles.metaLabel}>Loaded case</span>
-            <strong>{audit?.bundle.job.id || 'None selected'}</strong>
+            <strong className={styles.ltrValue} data-ltr="true">
+              {audit?.bundle.job.id || messages.common.unavailable}
+            </strong>
           </div>
           <div>
             <span className={styles.metaLabel}>Pressure</span>
-            <strong>{caseBrief?.pressure || 'Waiting for lookup'}</strong>
+            <strong>
+              {caseBrief
+                ? messages.labels.pressure[caseBrief.pressure]
+                : messages.common.loading}
+            </strong>
           </div>
         </div>
       </section>
@@ -1283,7 +1296,9 @@ export function OperatorConsole({
             <article>
               <span className={styles.metaLabel}>Profile</span>
               <strong>
-                {runtimeProfile ? getRuntimeProfileLabel(runtimeProfile.profile) : 'Unavailable'}
+                {runtimeProfile
+                  ? messages.labels.runtimeProfile[runtimeProfile.profile]
+                  : messages.common.unavailable}
               </strong>
             </article>
             <article>
@@ -2509,7 +2524,7 @@ export function OperatorConsole({
               <span
                 className={`${styles.pressureBadge} ${getPressureClassName(caseBrief.pressure)}`}
               >
-                {caseBrief.pressure}
+                {messages.labels.pressure[caseBrief.pressure]}
               </span>
             </header>
             <div className={styles.summaryGrid}>
@@ -2535,7 +2550,7 @@ export function OperatorConsole({
               </article>
               <article>
                 <span className={styles.metaLabel}>Latest activity</span>
-                <strong>{formatTimestamp(caseBrief.latestActivityAt)}</strong>
+                <strong>{formatDate(caseBrief.latestActivityAt)}</strong>
               </article>
             </div>
             <StatusNotice message={caseBrief.pressureSummary} messageClassName={styles.stateText} />
@@ -2589,7 +2604,7 @@ export function OperatorConsole({
               <header className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelEyebrow}>Dispute Review</p>
-                  <h2>Milestones needing operator attention</h2>
+                  <h2>{messages.case.milestoneAttention}</h2>
                 </div>
               </header>
               <div className={styles.stack}>
@@ -2612,8 +2627,8 @@ export function OperatorConsole({
                   ))
                 ) : (
                   <EmptyStateCard
-                    title="No active disputes"
-                    message="This public bundle does not currently show any disputed milestones."
+                    title={messages.case.disputeReview}
+                    message={messages.case.noDisputedMilestones}
                     className={styles.emptyCard}
                     messageClassName={styles.stateText}
                   />
@@ -2625,7 +2640,7 @@ export function OperatorConsole({
               <header className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelEyebrow}>Execution Triage</p>
-                  <h2>Failures and receipt posture</h2>
+                  <h2>{messages.case.failuresAndReceipts}</h2>
                 </div>
               </header>
               <div className={styles.stack}>
@@ -2648,12 +2663,12 @@ export function OperatorConsole({
                       </small>
                       <small>{card.actorAddress}</small>
                       <small>{previewHash(card.txHash)}</small>
-                      <small>{formatTimestamp(card.at)}</small>
+                      <small>{formatDate(card.at)}</small>
                     </article>
                   ))
                 ) : (
                   <EmptyStateCard
-                    title="No failed executions"
+                    title={messages.helperCopy.executionFailed}
                     message="The current receipt stream does not show failed public executions."
                     className={styles.emptyCard}
                     messageClassName={styles.stateText}
@@ -2668,7 +2683,7 @@ export function OperatorConsole({
               <header className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelEyebrow}>Milestone Posture</p>
-                  <h2>Operator-readable milestone board</h2>
+                  <h2>{messages.case.milestoneBoard}</h2>
                 </div>
               </header>
               <div className={styles.stack}>
@@ -2695,14 +2710,14 @@ export function OperatorConsole({
               <header className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelEyebrow}>Privileged Resolution</p>
-                  <h2>Operator dispute action center</h2>
+                  <h2>{messages.case.resolveMilestone}</h2>
                 </div>
               </header>
               <div className={styles.stack}>
                 {disputedMilestoneCards.length === 0 ? (
                   <EmptyStateCard
-                    title="No active disputes"
-                    message="Privileged resolution is only actionable when the current bundle still shows a disputed milestone."
+                    title={messages.case.disputeReview}
+                    message={messages.case.resolutionBlocked}
                     className={styles.emptyCard}
                     messageClassName={styles.stateText}
                   />
@@ -2772,7 +2787,7 @@ export function OperatorConsole({
                     </div>
                     <div className={styles.inlineActions}>
                       <button type="button" onClick={handleResolveMilestone}>
-                        Resolve disputed milestone
+                        {messages.case.resolveMilestone}
                       </button>
                     </div>
                     <StatusNotice
@@ -2862,22 +2877,22 @@ export function OperatorConsole({
           <section className={styles.panel}>
             <header className={styles.panelHeader}>
               <div>
-                <p className={styles.panelEyebrow}>Timeline</p>
-                <h2>Operator-readable combined event stream</h2>
+                  <p className={styles.panelEyebrow}>Timeline</p>
+                <h2>{messages.case.timeline}</h2>
               </div>
             </header>
             <div className={styles.stack}>
               {operatorTimeline.map((entry, index) => (
                 <article
                   key={`${entry.kind}-${entry.label}-${entry.at}-${index}`}
-                  className={`${styles.timelineCard} ${getTimelineToneClassName(entry.tone)}`}
+                    className={`${styles.timelineCard} ${getTimelineToneClassName(entry.tone)}`}
                 >
                   <div className={styles.timelineHead}>
                     <strong>{entry.label}</strong>
-                    <span>{formatTimestamp(entry.at)}</span>
+                    <span>{formatDate(entry.at)}</span>
                   </div>
                   <p>{entry.summary}</p>
-                  <pre>{entry.detail}</pre>
+                  <pre className={styles.ltrValue} data-ltr="true">{entry.detail}</pre>
                 </article>
               ))}
             </div>
@@ -2888,18 +2903,18 @@ export function OperatorConsole({
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>Operator Scope</p>
-              <h2>What this surface can review today</h2>
+              <h2>{messages.case.whatThisSurfaceCanReview}</h2>
             </div>
           </header>
           <div className={styles.grid}>
             <EmptyStateCard
-              title="Dispute review"
-              message="Load a public job bundle to review milestone disputes, reasons, and current settlement posture."
+              title={messages.case.disputeReview}
+              message={messages.case.emptyLoad}
               className={styles.emptyCard}
               messageClassName={styles.stateText}
             />
             <EmptyStateCard
-              title="Receipt triage"
+              title={messages.case.receiptTriage}
               message="Inspect confirmed and failed execution receipts without endpoint spelunking."
               className={styles.emptyCard}
               messageClassName={styles.stateText}
@@ -2911,7 +2926,7 @@ export function OperatorConsole({
               messageClassName={styles.stateText}
             />
             <EmptyStateCard
-              title="Public-only posture"
+              title={messages.case.publicOnlyPosture}
               message="The console only reflects public audit data. It does not invent privileged actions that the backend cannot enforce."
               className={styles.emptyCard}
               messageClassName={styles.stateText}

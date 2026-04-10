@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AuditBundle, JobView } from '../lib/api';
+import { getWebMessages } from '../lib/i18n';
 import {
   buildJobLifecycleCards,
   buildMilestoneLifecycleCards,
@@ -45,6 +46,8 @@ function createJob(
   };
 }
 
+const lifecycleCopy = getWebMessages('en').console.lifecycle;
+
 function createExecution(
   override: Partial<AuditBundle['bundle']['executions'][number]>,
 ): AuditBundle['bundle']['executions'][number] {
@@ -80,6 +83,7 @@ describe('milestone lifecycle helpers', () => {
   it('marks funding ready and milestone commit blocked until funding exists', () => {
     const job = createJob();
     const cards = buildJobLifecycleCards({
+      copy: lifecycleCopy,
       job,
       executions: [],
       pendingAction: null,
@@ -98,6 +102,7 @@ describe('milestone lifecycle helpers', () => {
   it('surfaces failed funding attempts as retryable failure state', () => {
     const job = createJob();
     const cards = buildJobLifecycleCards({
+      copy: lifecycleCopy,
       job,
       executions: [
         createExecution({
@@ -126,6 +131,7 @@ describe('milestone lifecycle helpers', () => {
     };
 
     const cards = buildMilestoneLifecycleCards({
+      copy: lifecycleCopy,
       job: createJob([{ status: 'pending' }]),
       milestoneIndex: 0,
       executions: [],
@@ -148,6 +154,7 @@ describe('milestone lifecycle helpers', () => {
       },
     ]);
     const cards = buildMilestoneLifecycleCards({
+      copy: lifecycleCopy,
       job,
       milestoneIndex: 0,
       executions: [
@@ -190,7 +197,7 @@ describe('milestone lifecycle helpers', () => {
       disputeReason: 'Acceptance criteria not met',
       resolutionAction: 'refund',
       resolutionNote: 'Refund approved',
-    });
+    }, lifecycleCopy);
 
     expect(entries.map((entry) => entry.label)).toEqual([
       'Due',

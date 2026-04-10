@@ -39,6 +39,64 @@ type ExecutionRecord = AuditBundle['bundle']['executions'][number];
 type AuditEvent = AuditBundle['bundle']['audit'][number];
 type MilestoneView = JobView['milestones'][number];
 
+export type WebLifecycleMessages = {
+  submitting: string;
+  waitingForApiConfirmation: string;
+  blocked: string;
+  retryNeeded: string;
+  fundingConfirmedSummary: string;
+  fundingConfirmedDetail: (fundedAmount: string | null) => string;
+  readyToFundSummary: string;
+  readyToFundDetail: string;
+  commitMilestonesTitle: string;
+  fundEscrowTitle: string;
+  milestonesCommittedSummary: string;
+  milestonesCommittedDetail: (count: number) => string;
+  fundingRequiredBeforeMilestones: string;
+  readyToCommitSummary: string;
+  readyToCommitDetail: string;
+  commitMilestonesFirst: string;
+  selectValidMilestone: string;
+  workerDeliveryTitle: string;
+  deliveryRecordedSummary: string;
+  deliveryRecordedDetail: string;
+  pendingMilestonesOnly: string;
+  readyForDeliverySummary: string;
+  readyForDeliveryDetail: string;
+  clientReleaseTitle: string;
+  releasedSummary: string;
+  releasedDetail: string;
+  resolveInsteadOfRelease: string;
+  alreadyRefunded: string;
+  deliveredOnlyForRelease: string;
+  readyForReleaseSummary: string;
+  readyForReleaseDetail: string;
+  openDisputeTitle: string;
+  disputeOpenedSummary: string;
+  disputeOpenedDetail: string;
+  alreadyReleased: string;
+  deliveredOnlyForDispute: string;
+  readyToDisputeSummary: string;
+  readyToDisputeDetail: string;
+  resolveDisputeTitle: string;
+  resolutionRecordedSummary: string;
+  resolutionRecordedDetail: (action: string) => string;
+  resolutionRecordedFallback: string;
+  disputedOnlyForResolution: string;
+  readyToResolveSummary: string;
+  readyToResolveDetail: string;
+  timelineDue: string;
+  timelineDueDetail: string;
+  timelineDelivered: string;
+  timelineDeliveredDetail: string;
+  timelineDisputed: string;
+  timelineDisputedDetail: string;
+  timelineResolved: string;
+  timelineResolvedDetail: (action: string) => string;
+  timelineReleased: string;
+  timelineReleasedDetail: string;
+};
+
 function sortByMostRecent<T extends { confirmedAt?: number; submittedAt?: number; at?: number }>(
   entries: T[],
 ) {
@@ -78,6 +136,7 @@ function getLatestExecution(
 function buildLifecycleCard(input: {
   action: LifecycleAction;
   title: string;
+  copy: WebLifecycleMessages;
   pendingAction: PendingLifecycleAction | null;
   milestoneIndex?: number;
   latestExecution?: ExecutionRecord;
@@ -91,6 +150,7 @@ function buildLifecycleCard(input: {
   const {
     action,
     blockedDetail,
+    copy,
     confirmedDetail,
     confirmedSummary,
     isConfirmed,
@@ -107,8 +167,8 @@ function buildLifecycleCard(input: {
       action,
       title,
       phase: 'pending',
-      summary: 'Submitting',
-      detail: pendingAction?.summary || 'Waiting for the API to confirm the latest request.',
+      summary: copy.submitting,
+      detail: pendingAction?.summary || copy.waitingForApiConfirmation,
       canTrigger: false,
       timestamp: pendingAction?.startedAt,
     };
@@ -134,7 +194,7 @@ function buildLifecycleCard(input: {
       action,
       title,
       phase: 'blocked',
-      summary: 'Blocked',
+      summary: copy.blocked,
       detail: blockedDetail,
       canTrigger: false,
     };
@@ -145,7 +205,7 @@ function buildLifecycleCard(input: {
       action,
       title,
       phase: 'failed',
-      summary: 'Retry needed',
+      summary: copy.retryNeeded,
       detail: latestExecution.failureMessage || readyDetail,
       failureMessage: latestExecution.failureMessage,
       canTrigger: true,
@@ -191,8 +251,9 @@ export function buildJobLifecycleCards(input: {
   job: JobView;
   executions: ExecutionRecord[];
   pendingAction: PendingLifecycleAction | null;
+  copy: WebLifecycleMessages;
 }) {
-  const { job, executions, pendingAction } = input;
+  const { copy, job, executions, pendingAction } = input;
   const latestFundingExecution = getLatestExecution(executions, 'fund_job');
   const latestMilestoneSetupExecution = getLatestExecution(
     executions,
@@ -202,31 +263,31 @@ export function buildJobLifecycleCards(input: {
   return [
     buildLifecycleCard({
       action: 'fund_job',
-      title: 'Fund escrow',
+      title: copy.fundEscrowTitle,
+      copy,
       pendingAction,
       latestExecution: latestFundingExecution,
       isConfirmed: job.fundedAmount !== null,
-      confirmedSummary: 'Funding confirmed',
-      confirmedDetail: `The escrow is funded with ${job.fundedAmount ?? 'the required amount'} and is ready for milestone setup.`,
-      readySummary: 'Ready to fund',
-      readyDetail:
-        'Submit escrow funding before milestones can be committed onchain.',
+      confirmedSummary: copy.fundingConfirmedSummary,
+      confirmedDetail: copy.fundingConfirmedDetail(job.fundedAmount),
+      readySummary: copy.readyToFundSummary,
+      readyDetail: copy.readyToFundDetail,
     }),
     buildLifecycleCard({
       action: 'set_milestones',
-      title: 'Commit milestones',
+      title: copy.commitMilestonesTitle,
+      copy,
       pendingAction,
       latestExecution: latestMilestoneSetupExecution,
       isConfirmed: job.milestones.length > 0,
-      confirmedSummary: 'Milestones committed',
-      confirmedDetail: `${job.milestones.length} milestone${job.milestones.length === 1 ? '' : 's'} recorded for this job.`,
+      confirmedSummary: copy.milestonesCommittedSummary,
+      confirmedDetail: copy.milestonesCommittedDetail(job.milestones.length),
       blockedDetail:
         job.fundedAmount === null
-          ? 'Funding must be confirmed before milestones can be committed.'
+          ? copy.fundingRequiredBeforeMilestones
           : undefined,
-      readySummary: 'Ready to commit',
-      readyDetail:
-        'Commit the drafted milestones so the worker can start delivering against named checkpoints.',
+      readySummary: copy.readyToCommitSummary,
+      readyDetail: copy.readyToCommitDetail,
     }),
   ];
 }
@@ -236,8 +297,9 @@ export function buildMilestoneLifecycleCards(input: {
   milestoneIndex: number;
   executions: ExecutionRecord[];
   pendingAction: PendingLifecycleAction | null;
+  copy: WebLifecycleMessages;
 }) {
-  const { job, milestoneIndex, executions, pendingAction } = input;
+  const { copy, job, milestoneIndex, executions, pendingAction } = input;
   const milestone = job.milestones[milestoneIndex];
   const latestDeliveryExecution = getLatestExecution(
     executions,
@@ -263,104 +325,106 @@ export function buildMilestoneLifecycleCards(input: {
   const missingMilestoneReason = getMilestoneBlockedReason(
     milestone,
     job.milestones.length === 0
-      ? 'Commit milestones first. There is no active milestone to manage yet.'
-      : 'Select a valid milestone to continue.',
+      ? copy.commitMilestonesFirst
+      : copy.selectValidMilestone,
   );
 
   return [
     buildLifecycleCard({
       action: 'deliver_milestone',
-      title: 'Worker delivery',
+      title: copy.workerDeliveryTitle,
+      copy,
       pendingAction,
       milestoneIndex,
       latestExecution: latestDeliveryExecution,
       isConfirmed: Boolean(milestone && milestone.deliveredAt),
-      confirmedSummary: 'Delivery recorded',
+      confirmedSummary: copy.deliveryRecordedSummary,
       confirmedDetail:
         milestone?.deliveryNote?.trim()
           ? milestone.deliveryNote
-          : 'The worker has submitted the deliverable and evidence for review.',
+          : copy.deliveryRecordedDetail,
       blockedDetail:
         missingMilestoneReason ||
         (milestone?.status !== 'pending'
-          ? 'Only pending milestones can be delivered.'
+          ? copy.pendingMilestonesOnly
           : undefined),
-      readySummary: 'Ready for delivery',
-      readyDetail:
-        'Submit the delivery note and evidence URLs for the selected milestone.',
+      readySummary: copy.readyForDeliverySummary,
+      readyDetail: copy.readyForDeliveryDetail,
     }),
     buildLifecycleCard({
       action: 'release_milestone',
-      title: 'Client release',
+      title: copy.clientReleaseTitle,
+      copy,
       pendingAction,
       milestoneIndex,
       latestExecution: latestReleaseExecution,
       isConfirmed: milestone?.status === 'released' && !milestone?.resolutionAction,
-      confirmedSummary: 'Released',
-      confirmedDetail:
-        'The client accepted the milestone and released the payout.',
+      confirmedSummary: copy.releasedSummary,
+      confirmedDetail: copy.releasedDetail,
       blockedDetail:
         missingMilestoneReason ||
         (milestone?.status === 'disputed'
-          ? 'This milestone is disputed. Resolve the dispute instead of releasing directly.'
+          ? copy.resolveInsteadOfRelease
           : milestone?.status === 'refunded'
-            ? 'This milestone has already been refunded.'
+            ? copy.alreadyRefunded
             : milestone?.status !== 'delivered'
-              ? 'Only delivered milestones can be released.'
+              ? copy.deliveredOnlyForRelease
               : undefined),
-      readySummary: 'Ready for release',
-      readyDetail:
-        'Release payment once the delivery note and evidence are accepted.',
+      readySummary: copy.readyForReleaseSummary,
+      readyDetail: copy.readyForReleaseDetail,
     }),
     buildLifecycleCard({
       action: 'open_dispute',
-      title: 'Open dispute',
+      title: copy.openDisputeTitle,
+      copy,
       pendingAction,
       milestoneIndex,
       latestExecution: latestDisputeExecution,
       isConfirmed: Boolean(milestone?.disputedAt),
-      confirmedSummary: 'Dispute opened',
+      confirmedSummary: copy.disputeOpenedSummary,
       confirmedDetail:
         milestone?.disputeReason?.trim()
           ? milestone.disputeReason
-          : 'The milestone has been escalated for resolution.',
+          : copy.disputeOpenedDetail,
       blockedDetail:
         missingMilestoneReason ||
         (milestone?.status === 'released'
-          ? 'This milestone has already been released.'
+          ? copy.alreadyReleased
           : milestone?.status === 'refunded'
-            ? 'This milestone has already been refunded.'
+            ? copy.alreadyRefunded
             : milestone?.status !== 'delivered'
-              ? 'Only delivered milestones can be disputed.'
+              ? copy.deliveredOnlyForDispute
               : undefined),
-      readySummary: 'Ready to dispute',
-      readyDetail:
-        'Escalate the selected delivered milestone if the submission is contested.',
+      readySummary: copy.readyToDisputeSummary,
+      readyDetail: copy.readyToDisputeDetail,
     }),
     buildLifecycleCard({
       action: 'resolve_dispute',
-      title: 'Resolve dispute',
+      title: copy.resolveDisputeTitle,
+      copy,
       pendingAction,
       milestoneIndex,
       latestExecution: latestResolutionExecution,
       isConfirmed: Boolean(milestone?.resolutionAction),
-      confirmedSummary: 'Resolution recorded',
+      confirmedSummary: copy.resolutionRecordedSummary,
       confirmedDetail: milestone?.resolutionAction
-        ? `Resolved with ${milestone.resolutionAction}.`
-        : 'The dispute has been resolved.',
+        ? copy.resolutionRecordedDetail(milestone.resolutionAction)
+        : copy.resolutionRecordedFallback,
       blockedDetail:
         missingMilestoneReason ||
         (milestone?.status !== 'disputed'
-          ? 'Only disputed milestones can be resolved.'
+          ? copy.disputedOnlyForResolution
           : undefined),
-      readySummary: 'Ready to resolve',
-      readyDetail:
-        'Operator resolution should only be used when the acting wallet controls the configured arbitrator account.',
+      readySummary: copy.readyToResolveSummary,
+      readyDetail: copy.readyToResolveDetail,
     }),
   ];
 }
 
-export function buildMilestoneTimelineEntries(milestone: MilestoneView | undefined) {
+export function buildMilestoneTimelineEntries(
+  milestone: MilestoneView | undefined,
+  copy: WebLifecycleMessages,
+) {
   if (!milestone) {
     return [];
   }
@@ -369,8 +433,8 @@ export function buildMilestoneTimelineEntries(milestone: MilestoneView | undefin
 
   if (milestone.dueAt) {
     entries.push({
-      label: 'Due',
-      detail: 'Target delivery checkpoint',
+      label: copy.timelineDue,
+      detail: copy.timelineDueDetail,
       at: milestone.dueAt,
       tone: 'neutral',
     });
@@ -378,10 +442,10 @@ export function buildMilestoneTimelineEntries(milestone: MilestoneView | undefin
 
   if (milestone.deliveredAt) {
     entries.push({
-      label: 'Delivered',
+      label: copy.timelineDelivered,
       detail:
         milestone.deliveryNote?.trim() ||
-        'Delivery note and evidence were submitted for review.',
+        copy.timelineDeliveredDetail,
       at: milestone.deliveredAt,
       tone: 'success',
     });
@@ -389,9 +453,9 @@ export function buildMilestoneTimelineEntries(milestone: MilestoneView | undefin
 
   if (milestone.disputedAt) {
     entries.push({
-      label: 'Disputed',
+      label: copy.timelineDisputed,
       detail:
-        milestone.disputeReason?.trim() || 'Delivery was escalated for operator review.',
+        milestone.disputeReason?.trim() || copy.timelineDisputedDetail,
       at: milestone.disputedAt,
       tone: 'warning',
     });
@@ -399,17 +463,17 @@ export function buildMilestoneTimelineEntries(milestone: MilestoneView | undefin
 
   if (milestone.resolvedAt && milestone.resolutionAction) {
     entries.push({
-      label: 'Resolved',
+      label: copy.timelineResolved,
       detail: milestone.resolutionNote?.trim()
         ? `${milestone.resolutionAction}: ${milestone.resolutionNote}`
-        : `Resolved with ${milestone.resolutionAction}.`,
+        : copy.timelineResolvedDetail(milestone.resolutionAction),
       at: milestone.resolvedAt,
       tone: milestone.resolutionAction === 'refund' ? 'warning' : 'success',
     });
   } else if (milestone.releasedAt) {
     entries.push({
-      label: 'Released',
-      detail: 'Payout released to the worker.',
+      label: copy.timelineReleased,
+      detail: copy.timelineReleasedDetail,
       at: milestone.releasedAt,
       tone: 'success',
     });

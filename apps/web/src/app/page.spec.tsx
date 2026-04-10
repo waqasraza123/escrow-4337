@@ -21,6 +21,7 @@ import {
   createWalletState,
   sessionStorageKey,
 } from '../test/fixtures';
+import { WebI18nProvider } from '../lib/i18n';
 
 const { mockedWebApi, mockedInjectedWallet } = vi.hoisted(() => ({
   mockedWebApi: {
@@ -74,6 +75,14 @@ function mockAuthenticatedConsoleLoad(options?: {
   mockedWebApi.getAudit.mockResolvedValue(options?.audit ?? createAuditBundle());
 }
 
+function renderHome() {
+  return renderApp(
+    <WebI18nProvider initialLocale="en">
+      <Home />
+    </WebI18nProvider>,
+  );
+}
+
 describe('web page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,7 +95,7 @@ describe('web page', () => {
   });
 
   it('renders the signed-out onboarding console shell', async () => {
-    renderApp(<Home />);
+    renderHome();
 
     expect(
       screen.getByRole('heading', {
@@ -109,8 +118,8 @@ describe('web page', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Select a job to manage lifecycle actions'),
-    ).toBeInTheDocument();
+      screen.getAllByText('Select a job to manage lifecycle actions').length,
+    ).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
@@ -122,7 +131,7 @@ describe('web page', () => {
   it('shows truthful runtime diagnostics when the backend profile cannot load', async () => {
     mockedWebApi.getRuntimeProfile.mockRejectedValue(new Error('Failed to fetch'));
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(
@@ -138,7 +147,7 @@ describe('web page', () => {
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockAuthenticatedConsoleLoad();
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();
@@ -166,7 +175,7 @@ describe('web page', () => {
     mockedWebApi.verifyAuth.mockResolvedValue(createVerifyResponse());
     mockAuthenticatedConsoleLoad();
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(
       screen.getByPlaceholderText('client@example.com'),
@@ -197,7 +206,7 @@ describe('web page', () => {
       .mockRejectedValueOnce(new Error('Rate limit hit'))
       .mockResolvedValueOnce({ ok: true });
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(
       screen.getByPlaceholderText('client@example.com'),
@@ -228,7 +237,7 @@ describe('web page', () => {
     mockAuthenticatedConsoleLoad();
     mockedWebApi.refresh.mockRejectedValue(new Error('Refresh token expired'));
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();
@@ -251,7 +260,7 @@ describe('web page', () => {
     mockAuthenticatedConsoleLoad();
     mockedWebApi.logout.mockResolvedValue({ ok: true });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();
@@ -280,7 +289,7 @@ describe('web page', () => {
       createWalletLinkChallenge(),
     );
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();
@@ -329,7 +338,7 @@ describe('web page', () => {
     );
     mockedWebApi.verifyWalletChallenge.mockResolvedValue(createWalletState());
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();
@@ -414,7 +423,7 @@ describe('web page', () => {
       .mockResolvedValue(refreshedAudit)
       .mockResolvedValueOnce(createAuditBundle());
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('client@example.com')).toBeInTheDocument();

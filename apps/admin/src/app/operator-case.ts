@@ -47,6 +47,29 @@ export type OperatorTimelineEntry = {
   tone: 'neutral' | 'warning' | 'critical' | 'success';
 };
 
+export type OperatorCaseMessages = {
+  disputesAndFailures: string;
+  disputesOnly: string;
+  failuresOnly: string;
+  activeNoEscalation: string;
+  noPressure: string;
+  disputeReviewRequired: string;
+  deliveredAwaitingClient: string;
+  noEscalationVisible: string;
+  settledRelease: string;
+  settledRefund: string;
+  resolvedWith: (action: string) => string;
+  settledFallback: string;
+  deliveryAwaitingFallback: string;
+  disputeReasonFallback: string;
+  pendingFallback: string;
+  executionFailed: string;
+  executionConfirmed: string;
+  executionFailureFallback: string;
+  auditFallback: string;
+  executionFallback: string;
+};
+
 function sortDescending<T extends { at: number }>(entries: T[]) {
   return [...entries].sort((left, right) => right.at - left.at);
 }
@@ -74,49 +97,48 @@ function summarizePressure(input: {
   disputedMilestones: number;
   failedExecutions: number;
   openMilestones: number;
+  messages: OperatorCaseMessages;
 }): Pick<CaseBrief, 'pressure' | 'pressureSummary'> {
-  const { disputedMilestones, failedExecutions, openMilestones } = input;
+  const { disputedMilestones, failedExecutions, messages, openMilestones } = input;
 
   if (disputedMilestones > 0 && failedExecutions > 0) {
     return {
       pressure: 'critical',
-      pressureSummary:
-        'Disputes and failed executions are both present. This case needs operator attention first.',
+      pressureSummary: messages.disputesAndFailures,
     };
   }
 
   if (disputedMilestones > 0) {
     return {
       pressure: 'attention',
-      pressureSummary:
-        'At least one milestone is disputed. Review evidence, timeline, and the acting wallet posture.',
+      pressureSummary: messages.disputesOnly,
     };
   }
 
   if (failedExecutions > 0) {
     return {
       pressure: 'attention',
-      pressureSummary:
-        'Execution failures are present. Inspect receipts before assuming the case is blocked by participants.',
+      pressureSummary: messages.failuresOnly,
     };
   }
 
   if (openMilestones > 0) {
     return {
       pressure: 'stable',
-      pressureSummary:
-        'The case is active but not escalated. Watch delivery and release posture for the next change.',
+      pressureSummary: messages.activeNoEscalation,
     };
   }
 
   return {
     pressure: 'stable',
-    pressureSummary:
-      'No disputes or failed executions are visible in the public audit trail.',
+    pressureSummary: messages.noPressure,
   };
 }
 
-export function buildCaseBrief(bundle: AuditBundle['bundle']): CaseBrief {
+export function buildCaseBrief(
+  bundle: AuditBundle['bundle'],
+  messages: OperatorCaseMessages,
+): CaseBrief {
   const disputedMilestones = bundle.job.milestones.filter(
     (milestone) => milestone.status === 'disputed',
   ).length;
@@ -139,12 +161,16 @@ export function buildCaseBrief(bundle: AuditBundle['bundle']): CaseBrief {
     ...summarizePressure({
       disputedMilestones,
       failedExecutions,
+      messages,
       openMilestones,
     }),
   };
 }
 
-export function buildMilestoneReviewCards(job: AuditBundle['bundle']['job']) {
+export function buildMilestoneReviewCards(
+  job: AuditBundle['bundle']['job'],
+  messages: OperatorCaseMessages,
+) {
   return job.milestones.map((milestone, milestoneIndex): MilestoneReviewCard => {
     if (milestone.status === 'disputed') {
       return {
@@ -153,10 +179,10 @@ export function buildMilestoneReviewCards(job: AuditBundle['bundle']['job']) {
         status: milestone.status,
         amount: milestone.amount,
         posture: 'review',
-        operatorSummary: 'Dispute review required',
+        operatorSummary: messages.disputeReviewRequired,
         supportingDetail:
           milestone.disputeReason?.trim() ||
-          'A dispute exists, but the public audit payload did not include a typed reason.',
+          messages.disputeReasonFallback,
       };
     }
 
@@ -169,13 +195,13 @@ export function buildMilestoneReviewCards(job: AuditBundle['bundle']['job']) {
         posture: 'resolved',
         operatorSummary:
           milestone.status === 'released'
-            ? 'Settled in favor of release'
-            : 'Settled in favor of refund',
+            ? messages.settledRelease
+            : messages.settledRefund,
         supportingDetail: milestone.resolutionNote?.trim()
           ? milestone.resolutionNote
           : milestone.resolutionAction
-            ? `Resolution action recorded as ${milestone.resolutionAction}.`
-            : 'This milestone is fully settled.',
+            ? messages.resolvedWith(milestone.resolutionAction)
+            : messages.settledFallback,
       };
     }
 
@@ -186,10 +212,10 @@ export function buildMilestoneReviewCards(job: AuditBundle['bundle']['job']) {
         status: milestone.status,
         amount: milestone.amount,
         posture: 'review',
-        operatorSummary: 'Delivered and awaiting client action',
+        operatorSummary: messages.deliveredAwaitingClient,
         supportingDetail:
           milestone.deliveryNote?.trim() ||
-          'Delivery evidence is present, but release or dispute has not yet closed the milestone.',
+          messages.deliveryAwaitingFallback,
       };
     }
 
@@ -199,15 +225,18 @@ export function buildMilestoneReviewCards(job: AuditBundle['bundle']['job']) {
       status: milestone.status,
       amount: milestone.amount,
       posture: 'stable',
-      operatorSummary: 'No escalation visible',
+      operatorSummary: messages.noEscalationVisible,
       supportingDetail:
         milestone.deliverable ||
-        'The milestone is still pending and has not entered the dispute path.',
+        messages.pendingFallback,
     };
   });
 }
 
-export function buildExecutionIssueCards(executions: Execution[]) {
+export function buildExecutionIssueCards(
+  executions: Execution[],
+  messages: OperatorCaseMessages,
+) {
   return sortDescending(
     executions.map((execution): ExecutionIssueCard => {
       const at = execution.confirmedAt ?? execution.submittedAt;
@@ -220,11 +249,11 @@ export function buildExecutionIssueCards(executions: Execution[]) {
           milestoneIndex: execution.milestoneIndex,
           actorAddress: execution.actorAddress,
           at,
-          summary: 'Execution failed',
+          summary: messages.executionFailed,
           detail:
             execution.failureMessage ||
             execution.failureCode ||
-            'The public receipt marks this execution as failed without a richer message.',
+            messages.executionFailureFallback,
           txHash: execution.txHash,
         };
       }
@@ -236,23 +265,26 @@ export function buildExecutionIssueCards(executions: Execution[]) {
         milestoneIndex: execution.milestoneIndex,
         actorAddress: execution.actorAddress,
         at,
-        summary: 'Confirmed execution',
+        summary: messages.executionConfirmed,
         detail:
           execution.txHash
-            ? 'Receipt confirmed onchain or through the configured mock execution path.'
-            : 'Confirmed execution without a surfaced transaction hash.',
+            ? messages.executionFallback
+            : messages.executionFallback,
         txHash: execution.txHash,
       };
     }),
   );
 }
 
-function buildAuditTimelineEntry(event: AuditEvent): OperatorTimelineEntry {
+function buildAuditTimelineEntry(
+  event: AuditEvent,
+  messages: OperatorCaseMessages,
+): OperatorTimelineEntry {
   const label = event.type;
   const summary =
     event.payload.milestoneIndex === undefined
-      ? 'Job-level audit event'
-      : `Milestone ${Number(event.payload.milestoneIndex) + 1} audit event`;
+      ? messages.auditFallback
+      : `${messages.auditFallback} ${Number(event.payload.milestoneIndex) + 1}`;
   const detail = JSON.stringify(event.payload, null, 2);
 
   return {
@@ -269,7 +301,10 @@ function buildAuditTimelineEntry(event: AuditEvent): OperatorTimelineEntry {
   };
 }
 
-function buildExecutionTimelineEntry(execution: Execution): OperatorTimelineEntry {
+function buildExecutionTimelineEntry(
+  execution: Execution,
+  messages: OperatorCaseMessages,
+): OperatorTimelineEntry {
   const at = execution.confirmedAt ?? execution.submittedAt;
   const milestoneLabel =
     execution.milestoneIndex === undefined
@@ -280,7 +315,7 @@ function buildExecutionTimelineEntry(execution: Execution): OperatorTimelineEntr
     kind: 'execution',
     label: execution.action,
     at,
-    summary: `${execution.status} receipt for ${milestoneLabel}`,
+    summary: `${execution.status} ${messages.executionConfirmed} ${milestoneLabel}`,
     detail:
       execution.failureMessage ||
       execution.txHash ||
@@ -294,11 +329,16 @@ function buildExecutionTimelineEntry(execution: Execution): OperatorTimelineEntr
   };
 }
 
-export function buildOperatorTimeline(bundle: AuditBundle['bundle']) {
+export function buildOperatorTimeline(
+  bundle: AuditBundle['bundle'],
+  messages: OperatorCaseMessages,
+) {
   return sortDescending(
     [
-      ...bundle.audit.map(buildAuditTimelineEntry),
-      ...bundle.executions.map(buildExecutionTimelineEntry),
+      ...bundle.audit.map((event) => buildAuditTimelineEntry(event, messages)),
+      ...bundle.executions.map((execution) =>
+        buildExecutionTimelineEntry(execution, messages),
+      ),
     ].map((entry) => ({
       ...entry,
       at: entry.at,

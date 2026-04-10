@@ -3,13 +3,17 @@ import {
   createErrorState,
   createSuccessState,
   createWorkingState,
+  getLocaleDefinition,
   formatTimestamp,
+  localeCookieName,
   previewHash,
   pushStoredStringList,
   readErrorMessage,
+  readLocaleCookie,
   readContentDispositionFilename,
   requestDocument,
   requestJson,
+  syncDocumentLocale,
   saveDownloadedDocument,
   describeRuntimeAlignment,
   resolveApiBaseUrl,
@@ -40,8 +44,35 @@ describe('frontend core helpers', () => {
 
   it('normalizes timestamps and hash previews', () => {
     expect(formatTimestamp(null)).toBe('Not available');
+    expect(
+      formatTimestamp(1_700_000_000_000, { locale: 'ar' }),
+    ).toBeTruthy();
     expect(previewHash(undefined)).toBe('Pending');
     expect(previewHash('0x1234567890abcdef')).toBe('0x12345678...abcdef');
+  });
+
+  it('resolves locale defaults and syncs document direction', () => {
+    expect(readLocaleCookie(null)).toBe('en');
+    expect(readLocaleCookie('ar')).toBe('ar');
+    expect(getLocaleDefinition('ar')).toMatchObject({
+      langTag: 'ar',
+      dir: 'rtl',
+    });
+
+    vi.stubGlobal('document', {
+      cookie: `${localeCookieName}=ar`,
+      documentElement: {
+        lang: 'en',
+        dir: 'ltr',
+        dataset: {},
+      },
+    });
+
+    syncDocumentLocale('ar');
+
+    expect(document.documentElement.lang).toBe('ar');
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.dataset.locale).toBe('ar');
   });
 
   it('pushes deduplicated string lists with a limit', () => {

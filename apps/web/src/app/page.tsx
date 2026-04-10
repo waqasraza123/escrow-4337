@@ -1,88 +1,75 @@
+'use client';
+
 import Link from 'next/link';
 import styles from './marketing.module.css';
+import { LanguageSwitcher } from './language-switcher';
+import { useWebI18n } from '../lib/i18n';
 
 export default function Home() {
+  const { messages } = useWebI18n();
+
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <nav className={styles.nav}>
-          <strong className={styles.brand}>Milestone Escrow</strong>
+          <strong className={styles.brand}>{messages.common.brand}</strong>
           <div className={styles.navLinks}>
-            <Link href="/trust">Trust</Link>
-            <Link href="/app/sign-in">Sign in</Link>
-            <Link href="/app/new-contract">Start a milestone escrow</Link>
+            <Link href="/trust">{messages.common.trust}</Link>
+            <Link href="/app/sign-in">{messages.common.signIn}</Link>
+            <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
           </div>
+          <LanguageSwitcher
+            className={styles.languageSwitcher}
+            labelClassName={styles.languageSwitcherLabel}
+            optionClassName={styles.languageSwitcherOption}
+            optionActiveClassName={styles.languageSwitcherOptionActive}
+          />
         </nav>
 
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>Agency and client service work on Base</p>
-            <h1>Milestone escrow for crypto service work</h1>
-            <p className={styles.lead}>
-              Lock client funds upfront, release by milestone, and resolve disputes
-              with a clear audit trail on Base. This launch candidate is built for
-              one flow: client funds, contractor delivers, client releases or
-              disputes, operator resolves.
-            </p>
+            <p className={styles.eyebrow}>{messages.marketing.heroEyebrow}</p>
+            <h1>{messages.marketing.heroTitle}</h1>
+            <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Link href="/app/new-contract">Start a milestone escrow</Link>
+              <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
               <Link className={styles.secondaryLink} href="/trust">
-                See the trust model
+                {messages.marketing.trustCta}
               </Link>
             </div>
           </div>
           <div className={styles.cardStack}>
-            <article className={styles.statCard}>
-              <strong>Email-first onboarding</strong>
-              <p>OTP sign-in plus wallet linking keeps setup lighter than raw wallet-only flows.</p>
-            </article>
-            <article className={styles.statCard}>
-              <strong>Milestone release and dispute flow</strong>
-              <p>Funding, delivery, release, dispute, and operator resolution are already implemented in the repo.</p>
-            </article>
-            <article className={styles.statCard}>
-              <strong>Operator-visible case history</strong>
-              <p>Each contract exposes an audit bundle, execution receipts, and exportable case artifacts.</p>
-            </article>
+            {messages.marketing.stats.map((card) => (
+              <article key={card.title} className={styles.statCard}>
+                <strong>{card.title}</strong>
+                <p>{card.body}</p>
+              </article>
+            ))}
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>How it works</h2>
+          <h2>{messages.marketing.howItWorksTitle}</h2>
           <div className={styles.steps}>
-            <article className={styles.stepCard}>
-              <span>01</span>
-              <strong>Create and fund</strong>
-              <p>The client creates a milestone contract, binds the contractor wallet, and funds the escrow.</p>
-            </article>
-            <article className={styles.stepCard}>
-              <span>02</span>
-              <strong>Deliver and review</strong>
-              <p>The contractor joins through the shared link, signs in, links the exact wallet, and submits delivery evidence.</p>
-            </article>
-            <article className={styles.stepCard}>
-              <span>03</span>
-              <strong>Release or dispute</strong>
-              <p>The client releases the milestone or opens a dispute. The operator resolves from the visible case history.</p>
-            </article>
+            {messages.marketing.steps.map((step, index) => (
+              <article key={step.title} className={styles.stepCard}>
+                <span>{`0${index + 1}`}</span>
+                <strong>{step.title}</strong>
+                <p>{step.body}</p>
+              </article>
+            ))}
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>What this launch candidate is and is not</h2>
+          <h2>{messages.marketing.productBoundsTitle}</h2>
           <div className={styles.objectionGrid}>
-            <article className={styles.objectionCard}>
-              <strong>It is a focused agency or client escrow flow.</strong>
-              <p>One client, one contractor, one operator, one chain, one milestone-based service contract model.</p>
-            </article>
-            <article className={styles.objectionCard}>
-              <strong>It is not a marketplace or embedded platform.</strong>
-              <p>No talent discovery, no white-label API layer, no multi-chain sprawl, and no generalized escrow platform pitch.</p>
-            </article>
-            <article className={styles.objectionCard}>
-              <strong>Trust claims stay narrow.</strong>
-              <p>The product shows what is implemented now and what still needs live staged proof before it should be called production-proven.</p>
-            </article>
+            {messages.marketing.bounds.map((entry) => (
+              <article key={entry.title} className={styles.objectionCard}>
+                <strong>{entry.title}</strong>
+                <p>{entry.body}</p>
+              </article>
+            ))}
           </div>
         </section>
       </div>

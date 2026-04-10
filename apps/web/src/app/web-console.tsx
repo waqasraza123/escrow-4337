@@ -33,6 +33,7 @@ import {
   signMessageWithInjectedWallet,
   subscribeInjectedWallet,
 } from '../lib/injected-wallet';
+import { useWebI18n } from '../lib/i18n';
 import {
   buildJobLifecycleCards,
   buildMilestoneLifecycleCards,
@@ -45,6 +46,7 @@ import {
   type LifecycleCard,
   type PendingLifecycleAction,
 } from './milestone-lifecycle';
+import { LanguageSwitcher } from './language-switcher';
 
 type WalletConnectionState = {
   status: 'checking' | 'unavailable' | 'disconnected' | 'connected';
@@ -105,29 +107,9 @@ const categoryOptions = [
   'research',
   'product',
   'operations',
-];
+ ] as const;
 
-const composerSteps: Array<{
-  id: ComposerStep;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: 'scope',
-    label: 'Scope',
-    description: 'Define the work, category, and expected outcome.',
-  },
-  {
-    id: 'counterparty',
-    label: 'Counterparty',
-    description: 'Set the worker wallet and settlement posture.',
-  },
-  {
-    id: 'plan',
-    label: 'Plan',
-    description: 'Review milestones, commercial terms, and launch readiness.',
-  },
-];
+const composerStepIds: ComposerStep[] = ['scope', 'counterparty', 'plan'];
 
 function createInitialJobComposerState(): JobComposerState {
   return {
@@ -231,21 +213,6 @@ function splitEvidenceUrls(input: string) {
     .filter(Boolean);
 }
 
-function getLifecyclePhaseLabel(phase: LifecycleCard['phase']) {
-  switch (phase) {
-    case 'ready':
-      return 'Ready';
-    case 'pending':
-      return 'Pending';
-    case 'confirmed':
-      return 'Confirmed';
-    case 'failed':
-      return 'Failed';
-    case 'blocked':
-      return 'Blocked';
-  }
-}
-
 function getLifecyclePhaseClassName(phase: LifecycleCard['phase']) {
   switch (phase) {
     case 'ready':
@@ -282,69 +249,26 @@ function isLifecycleActionEnabled(card: LifecycleCard) {
   return card.canTrigger && (card.phase === 'ready' || card.phase === 'failed');
 }
 
-function getRuntimeProfileLabel(profile: RuntimeProfile['profile']) {
-  switch (profile) {
-    case 'deployment-like':
-      return 'Deployment-like';
-    case 'local-mock':
-      return 'Local mock';
-    case 'mixed':
-      return 'Mixed';
-  }
-}
-
-function getConsoleFrame(view: EscrowConsoleView) {
+function getConsoleFrame(
+  view: EscrowConsoleView,
+  messages: ReturnType<typeof useWebI18n>['messages'],
+) {
   switch (view) {
     case 'sign-in':
-      return {
-        eyebrow: 'Sign In',
-        title: 'Start a milestone escrow session.',
-        copy:
-          'Use OTP sign-in first. The app will then restore your escrow access, linked wallets, and contract actions.',
-      };
+      return messages.console.frames.signIn;
     case 'setup':
-      return {
-        eyebrow: 'Setup',
-        title: 'Link the right wallet before money moves.',
-        copy:
-          'Clients need a provisioned smart account to create contracts. Contractors need the exact delivery wallet linked before they can join and deliver.',
-      };
+      return messages.console.frames.setup;
     case 'new-contract':
-      return {
-        eyebrow: 'New Contract',
-        title: 'Create one milestone-based service contract.',
-        copy:
-          'Bind the contractor wallet up front, define the milestones in plain language, and review the release and dispute model before funding.',
-      };
+      return messages.console.frames.newContract;
     case 'contract':
-      return {
-        eyebrow: 'Contract',
-        title: 'Review one contract with the exact actor rules.',
-        copy:
-          'This shared link can be opened by the client or contractor. Actions unlock only when the signed-in account controls the required wallet.',
-      };
+      return messages.console.frames.contract;
     case 'deliver':
-      return {
-        eyebrow: 'Deliver',
-        title: 'Submit milestone delivery with explicit evidence.',
-        copy:
-          'The contractor joins through the shared contract link, signs in, links the bound wallet, and delivers against the funded milestone.',
-      };
+      return messages.console.frames.deliver;
     case 'dispute':
-      return {
-        eyebrow: 'Dispute',
-        title: 'Escalate one milestone with a clear evidence trail.',
-        copy:
-          'Disputes stay milestone-scoped. The client records the issue and supporting links, and the operator resolves from the visible audit trail.',
-      };
+      return messages.console.frames.dispute;
     case 'overview':
     default:
-      return {
-        eyebrow: 'Client Console',
-        title: 'Operate the escrow lifecycle from OTP login to dispute resolution.',
-        copy:
-          'This surface is wired to the real API modules already in the repo: auth, SIWE wallet linking, smart-account provisioning, job creation, milestone actions, and public audit review.',
-      };
+      return messages.console.frames.overview;
   }
 }
 
@@ -364,11 +288,40 @@ function getNumericTerm(
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function getLifecyclePhaseLabel(
+  phase: LifecycleCard['phase'],
+  messages: ReturnType<typeof useWebI18n>['messages'],
+) {
+  return messages.console.labels.lifecyclePhase[phase];
+}
+
+function getJobStatusLabel(
+  status: JobView['status'],
+  messages: ReturnType<typeof useWebI18n>['messages'],
+) {
+  return messages.console.labels.jobStatus[status];
+}
+
+function getMilestoneStatusLabel(
+  status: JobView['milestones'][number]['status'],
+  messages: ReturnType<typeof useWebI18n>['messages'],
+) {
+  return messages.console.labels.milestoneStatus[status];
+}
+
+function getRuntimeProfileText(
+  profile: RuntimeProfile['profile'],
+  messages: ReturnType<typeof useWebI18n>['messages'],
+) {
+  return messages.console.labels.runtimeProfile[profile];
+}
+
 export function EscrowConsole({
   view = 'overview',
   initialJobId = null,
 }: EscrowConsoleProps) {
-  const frame = getConsoleFrame(view);
+  const { definition, messages } = useWebI18n();
+  const frame = getConsoleFrame(view, messages);
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile | null>(null);
   const [runtimeState, setRuntimeState] = useState<AsyncState>(createIdleState());
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -505,6 +458,21 @@ export function EscrowConsole({
   const [createJobState, setCreateJobState] = useState<JobComposerState>(
     createInitialJobComposerState,
   );
+  const formatDate = (value?: number | null, fallback?: string) =>
+    formatTimestamp(value, {
+      fallback,
+      locale: definition.langTag,
+    });
+  const composerSteps = useMemo(
+    () =>
+      composerStepIds.map((id) => ({
+        id,
+        label: messages.console.composer.steps[id].label,
+        description: messages.console.composer.steps[id].description,
+      })),
+    [messages],
+  );
+  const lifecycleMessages = messages.console.lifecycle;
 
   const milestoneDraftCount = useMemo(
     () => milestones.filter(isMilestoneDraftReady).length,
@@ -526,7 +494,7 @@ export function EscrowConsole({
   const composerChecklist = useMemo(
     () => [
       {
-        label: 'Scope is defined',
+        label: messages.console.composer.checklist.scopeDefined,
         ok: Boolean(
           createJobState.title.trim() &&
             createJobState.description.trim() &&
@@ -534,44 +502,46 @@ export function EscrowConsole({
         ),
       },
       {
-        label: 'Contractor email is set',
+        label: messages.console.composer.checklist.contractorEmailSet,
         ok: Boolean(createJobState.contractorEmail.trim()),
       },
       {
-        label: 'Worker wallet is set',
+        label: messages.console.composer.checklist.workerWalletSet,
         ok: Boolean(createJobState.workerAddress.trim()),
       },
       {
-        label: 'Settlement token address is set',
+        label: messages.console.composer.checklist.settlementTokenSet,
         ok: Boolean(createJobState.currencyAddress.trim()),
       },
       {
-        label: 'Default execution wallet is a provisioned smart account',
+        label: messages.console.composer.checklist.defaultWalletReady,
         ok: hasProvisionedDefaultWallet,
       },
       {
-        label: 'At least one milestone draft is ready',
+        label: messages.console.composer.checklist.milestoneReady,
         ok: milestoneDraftCount > 0,
       },
     ],
-    [createJobState, hasProvisionedDefaultWallet, milestoneDraftCount],
+    [createJobState, hasProvisionedDefaultWallet, messages, milestoneDraftCount],
   );
   const canCreateJob = composerChecklist.every((item) => item.ok);
   const jobLifecycleCards = useMemo(
     () =>
       selectedJobView
         ? buildJobLifecycleCards({
+            copy: lifecycleMessages,
             job: selectedJobView,
             executions: jobExecutions,
             pendingAction: pendingLifecycleAction,
           })
         : [],
-    [jobExecutions, pendingLifecycleAction, selectedJobView],
+    [jobExecutions, lifecycleMessages, pendingLifecycleAction, selectedJobView],
   );
   const milestoneLifecycleCards = useMemo(
     () =>
       selectedJobView
         ? buildMilestoneLifecycleCards({
+            copy: lifecycleMessages,
             job: selectedJobView,
             milestoneIndex: selectedMilestoneIndex,
             executions: jobExecutions,
@@ -580,14 +550,15 @@ export function EscrowConsole({
         : [],
     [
       jobExecutions,
+      lifecycleMessages,
       pendingLifecycleAction,
       selectedJobView,
       selectedMilestoneIndex,
     ],
   );
   const selectedMilestoneTimeline = useMemo(
-    () => buildMilestoneTimelineEntries(selectedMilestone),
-    [selectedMilestone],
+    () => buildMilestoneTimelineEntries(selectedMilestone, lifecycleMessages),
+    [lifecycleMessages, selectedMilestone],
   );
   const selectedMilestoneAuditEvents = useMemo(
     () => getMilestoneAuditEvents(jobAuditEvents, selectedMilestoneIndex),
@@ -1435,6 +1406,18 @@ export function EscrowConsole({
 
   return (
     <div className={styles.console}>
+      <div className={styles.topBar}>
+        <div className={styles.topBarContent}>
+          <span className={styles.topBarLabel}>{messages.console.topBarLabel}</span>
+          <p className={styles.topBarMeta}>{messages.console.topBarMeta}</p>
+        </div>
+        <LanguageSwitcher
+          className={styles.languageSwitcher}
+          labelClassName={styles.languageSwitcherLabel}
+          optionClassName={styles.languageSwitcherOption}
+          optionActiveClassName={styles.languageSwitcherOptionActive}
+        />
+      </div>
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{frame.eyebrow}</p>
@@ -1443,23 +1426,29 @@ export function EscrowConsole({
         </div>
         <div className={styles.heroCard}>
           <div>
-            <span className={styles.metaLabel}>API base URL</span>
-            <strong>{webApi.baseUrl}</strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>Backend profile</span>
-            <strong>
-              {runtimeProfile
-                ? getRuntimeProfileLabel(runtimeProfile.profile)
-                : 'Loading'}
+            <span className={styles.metaLabel}>{messages.console.runtime.apiBaseUrl}</span>
+            <strong className={styles.ltrValue} data-ltr="true">
+              {webApi.baseUrl}
             </strong>
           </div>
           <div>
-            <span className={styles.metaLabel}>Session</span>
-            <strong>{accessToken ? 'Authenticated' : 'Signed out'}</strong>
+            <span className={styles.metaLabel}>{messages.console.runtime.backendProfile}</span>
+            <strong>
+              {runtimeProfile
+                ? getRuntimeProfileText(runtimeProfile.profile, messages)
+                : messages.common.loading}
+            </strong>
           </div>
           <div>
-            <span className={styles.metaLabel}>Jobs in view</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.session}</span>
+            <strong>
+              {accessToken
+                ? messages.common.authenticated
+                : messages.common.signedOut}
+            </strong>
+          </div>
+          <div>
+            <span className={styles.metaLabel}>{messages.console.runtime.jobsInView}</span>
             <strong>{jobsResponse.jobs.length}</strong>
           </div>
         </div>
@@ -1470,55 +1459,59 @@ export function EscrowConsole({
         <header className={styles.panelHeader}>
           <div>
             <p className={styles.panelEyebrow}>Runtime</p>
-            <h2>Backend profile validation</h2>
+            <h2>{messages.console.runtime.title}</h2>
           </div>
         </header>
         <div className={styles.summaryGrid}>
           <article>
-            <span className={styles.metaLabel}>Profile</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.profile}</span>
             <strong>
               {runtimeProfile
-                ? getRuntimeProfileLabel(runtimeProfile.profile)
-                : 'Unavailable'}
+                ? getRuntimeProfileText(runtimeProfile.profile, messages)
+                : messages.common.unavailable}
             </strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Providers</span>
-            <strong>
+            <span className={styles.metaLabel}>{messages.console.runtime.providers}</span>
+            <strong className={styles.ltrValue} data-ltr="true">
               {runtimeProfile
                 ? `${runtimeProfile.providers.emailMode}/${runtimeProfile.providers.smartAccountMode}/${runtimeProfile.providers.escrowMode}`
-                : 'Unknown'}
+                : messages.common.unknown}
             </strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Arbitrator wallet</span>
-            <strong>
+            <span className={styles.metaLabel}>{messages.console.runtime.arbitratorWallet}</span>
+            <strong className={styles.ltrValue} data-ltr="true">
               {previewHash(runtimeProfile?.operator.arbitratorAddress ?? undefined)}
             </strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Frontend origin</span>
-            <strong>{runtimeAlignment.currentOrigin}</strong>
+            <span className={styles.metaLabel}>{messages.console.runtime.frontendOrigin}</span>
+            <strong className={styles.ltrValue} data-ltr="true">
+              {runtimeAlignment.currentOrigin}
+            </strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>CORS readiness</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.corsReadiness}</span>
             <strong>{runtimeAlignment.corsLabel}</strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>API transport</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.apiTransport}</span>
             <strong>{runtimeAlignment.transportLabel}</strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Persistence</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.persistence}</span>
             <strong>{runtimeAlignment.persistenceLabel}</strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Trust proxy</span>
+            <span className={styles.metaLabel}>{messages.console.runtime.trustProxy}</span>
             <strong>{runtimeAlignment.trustProxyLabel}</strong>
           </article>
           <article>
-            <span className={styles.metaLabel}>Allowed origins</span>
-            <strong>{runtimeAlignment.corsOriginsLabel}</strong>
+            <span className={styles.metaLabel}>{messages.console.runtime.allowedOrigins}</span>
+            <strong className={styles.ltrValue} data-ltr="true">
+              {runtimeAlignment.corsOriginsLabel}
+            </strong>
           </article>
         </div>
         <div className={styles.stack}>
@@ -1543,24 +1536,26 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Access</p>
-              <h2>Email OTP session</h2>
+              <p className={styles.panelEyebrow}>{messages.common.profile}</p>
+              <h2>{messages.console.access.title}</h2>
             </div>
             {refreshToken ? (
               <div className={styles.inlineActions}>
                 <button type="button" onClick={handleRefreshSession}>
-                  Refresh
+                  {messages.console.access.refresh}
                 </button>
                 <button type="button" className={styles.secondaryButton} onClick={handleLogout}>
-                  Logout
+                  {messages.console.access.logout}
                 </button>
               </div>
             ) : null}
           </header>
           <div className={styles.stack}>
             <label className={styles.field}>
-              <span>Email</span>
+              <span>{messages.console.access.email}</span>
               <input
+                className={styles.ltrValue}
+                data-ltr="true"
                 value={authEmail}
                 onChange={(event) => setAuthEmail(event.target.value)}
                 placeholder="client@example.com"
@@ -1568,13 +1563,15 @@ export function EscrowConsole({
             </label>
             <div className={styles.inlineActions}>
               <button type="button" onClick={handleStartAuth}>
-                Send OTP
+                {messages.console.access.sendOtp}
               </button>
               <p className={styles.stateText}>{startState.message}</p>
             </div>
             <label className={styles.field}>
-              <span>Verification code</span>
+              <span>{messages.console.access.code}</span>
               <input
+                className={styles.ltrValue}
+                data-ltr="true"
                 value={authCode}
                 onChange={(event) => setAuthCode(event.target.value)}
                 placeholder="123456"
@@ -1582,7 +1579,7 @@ export function EscrowConsole({
             </label>
             <div className={styles.inlineActions}>
               <button type="button" onClick={handleVerifyAuth}>
-                Verify session
+                {messages.console.access.verifySession}
               </button>
               <p className={styles.stateText}>{verifyState.message}</p>
             </div>
@@ -1593,32 +1590,38 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Profile</p>
-              <h2>Account policy and wallet state</h2>
+              <p className={styles.panelEyebrow}>{messages.common.profile}</p>
+              <h2>{messages.console.profile.title}</h2>
             </div>
           </header>
           {profile ? (
             <div className={styles.stack}>
               <div className={styles.summaryGrid}>
                 <article>
-                  <span className={styles.metaLabel}>User</span>
+                  <span className={styles.metaLabel}>{messages.console.profile.user}</span>
                   <strong>{profile.email}</strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Shariah mode</span>
-                  <strong>{profile.shariahMode ? 'Enabled' : 'Disabled'}</strong>
+                  <span className={styles.metaLabel}>{messages.console.profile.shariahMode}</span>
+                  <strong>
+                    {profile.shariahMode
+                      ? messages.common.enabled
+                      : messages.common.disabled}
+                  </strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Default execution wallet</span>
-                  <strong>{profile.defaultExecutionWalletAddress || 'Not set'}</strong>
+                  <span className={styles.metaLabel}>{messages.console.profile.defaultExecutionWallet}</span>
+                  <strong className={styles.ltrValue} data-ltr="true">
+                    {profile.defaultExecutionWalletAddress || messages.common.notSet}
+                  </strong>
                 </article>
               </div>
               <div className={styles.inlineActions}>
                 <button type="button" onClick={() => handleShariahToggle(!profile.shariahMode)}>
-                  Toggle Shariah mode
+                  {messages.console.profile.toggleShariah}
                 </button>
                 <button type="button" className={styles.secondaryButton} onClick={() => void refreshConsole()}>
-                  Reload account
+                  {messages.console.profile.reloadAccount}
                 </button>
               </div>
               <div className={styles.walletList}>
@@ -1626,12 +1629,18 @@ export function EscrowConsole({
                   <article key={wallet.address} className={styles.walletCard}>
                     <div className={styles.walletTitleRow}>
                       <strong>{wallet.label || wallet.walletKind}</strong>
-                      <span>{wallet.walletKind === 'smart_account' ? 'Smart account' : 'EOA'}</span>
+                      <span>
+                        {wallet.walletKind === 'smart_account'
+                          ? messages.console.profile.smartAccount
+                          : messages.console.profile.eoa}
+                      </span>
                     </div>
-                    <code>{wallet.address}</code>
+                    <code className={styles.ltrValue} data-ltr="true">
+                      {wallet.address}
+                    </code>
                     <div className={styles.inlineActions}>
                       <button type="button" className={styles.secondaryButton} onClick={() => handleSetDefaultWallet(wallet.address)}>
-                        Set default
+                        {messages.console.profile.setDefault}
                       </button>
                     </div>
                   </article>
@@ -1641,7 +1650,7 @@ export function EscrowConsole({
             </div>
           ) : (
             <p className={styles.muted}>
-              Authenticate first. The console will then load your profile, wallets, and jobs.
+              {messages.console.access.authHint}
             </p>
           )}
         </section>
@@ -1653,8 +1662,8 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Wallet Link</p>
-              <h2>Browser wallet onboarding</h2>
+              <p className={styles.panelEyebrow}>{messages.console.wallet.walletLink}</p>
+              <h2>{messages.console.wallet.browserWalletHeading}</h2>
             </div>
           </header>
           <div className={styles.stack}>
@@ -1662,59 +1671,63 @@ export function EscrowConsole({
               <div className={styles.walletTitleRow}>
                 <strong>
                   {walletConnection.status === 'connected'
-                    ? 'Injected wallet connected'
+                    ? messages.console.wallet.connected
                     : walletConnection.status === 'unavailable'
-                      ? 'No injected wallet detected'
-                      : 'Injected wallet ready to connect'}
+                      ? messages.console.wallet.unavailable
+                      : messages.console.wallet.ready}
                 </strong>
                 <span>
                   {walletConnection.chainId
                     ? `Chain ${walletConnection.chainId}`
-                    : 'Chain unknown'}
+                    : messages.console.wallet.chainUnknown}
                 </span>
               </div>
-              <code>{walletConnection.address || 'No active account'}</code>
+              <code className={styles.ltrValue} data-ltr="true">
+                {walletConnection.address || messages.console.wallet.noActiveAccount}
+              </code>
               <p className={styles.stateText}>{walletConnection.message}</p>
               <div className={styles.inlineActions}>
                 <button type="button" onClick={handleConnectInjectedWallet}>
-                  Connect injected wallet
+                  {messages.console.wallet.connectWallet}
                 </button>
                 <button
                   type="button"
                   className={styles.secondaryButton}
                   onClick={handleLinkInjectedWallet}
                 >
-                  Link connected wallet
+                  {messages.console.wallet.linkWallet}
                 </button>
               </div>
             </div>
             <label className={styles.field}>
-              <span>EOA address</span>
-              <input value={linkAddress} onChange={(event) => setLinkAddress(event.target.value)} placeholder="0x..." />
+              <span>{messages.console.wallet.eoaAddress}</span>
+              <input className={styles.ltrValue} data-ltr="true" value={linkAddress} onChange={(event) => setLinkAddress(event.target.value)} placeholder="0x..." />
             </label>
             <label className={styles.field}>
-              <span>Label</span>
+              <span>{messages.console.wallet.label}</span>
               <input value={linkLabel} onChange={(event) => setLinkLabel(event.target.value)} placeholder="Primary signer" />
             </label>
             <label className={styles.field}>
-              <span>Chain id</span>
-              <input value={linkChainId} onChange={(event) => setLinkChainId(event.target.value)} />
+              <span>{messages.console.wallet.chainId}</span>
+              <input className={styles.ltrValue} data-ltr="true" value={linkChainId} onChange={(event) => setLinkChainId(event.target.value)} />
             </label>
             <p className={styles.muted}>
-              Use the injected-wallet buttons for the native browser flow. The manual challenge path remains available as a fallback for wallets that do not expose `personal_sign`.
+              {messages.console.wallet.fallbackHint}
             </p>
             <button type="button" onClick={handleCreateChallenge}>
-              Create SIWE challenge
+              {messages.console.wallet.createChallenge}
             </button>
             {challenge ? (
               <>
                 <label className={styles.field}>
-                  <span>Issued message</span>
-                  <textarea value={challenge.message} readOnly rows={8} />
+                  <span>{messages.console.wallet.issuedMessage}</span>
+                  <textarea className={styles.ltrValue} data-ltr="true" value={challenge.message} readOnly rows={8} />
                 </label>
                 <label className={styles.field}>
-                  <span>Wallet signature</span>
+                  <span>{messages.console.wallet.walletSignature}</span>
                   <textarea
+                    className={styles.ltrValue}
+                    data-ltr="true"
                     value={walletSignature}
                     onChange={(event) => setWalletSignature(event.target.value)}
                     placeholder="Paste the 0x-prefixed SIWE signature"
@@ -1722,7 +1735,7 @@ export function EscrowConsole({
                   />
                 </label>
                 <button type="button" onClick={handleVerifyWallet}>
-                  Verify linked wallet
+                  {messages.console.wallet.verifyLinkedWallet}
                 </button>
               </>
             ) : null}
@@ -1732,21 +1745,23 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Provisioning</p>
-              <h2>Smart-account execution wallet</h2>
+              <p className={styles.panelEyebrow}>{messages.console.wallet.provisioning}</p>
+              <h2>{messages.console.wallet.smartAccountTitle}</h2>
             </div>
           </header>
           <div className={styles.stack}>
             <label className={styles.field}>
-              <span>Verified owner EOA</span>
+              <span>{messages.console.wallet.verifiedOwnerEoa}</span>
               <input
+                className={styles.ltrValue}
+                data-ltr="true"
                 value={provisionOwnerAddress}
                 onChange={(event) => setProvisionOwnerAddress(event.target.value)}
                 placeholder="0x..."
               />
             </label>
             <label className={styles.field}>
-              <span>Execution label</span>
+              <span>{messages.console.wallet.executionLabel}</span>
               <input
                 value={provisionLabel}
                 onChange={(event) => setProvisionLabel(event.target.value)}
@@ -1754,10 +1769,10 @@ export function EscrowConsole({
               />
             </label>
             <button type="button" onClick={handleProvisionSmartAccount}>
-              Provision smart account
+              {messages.console.wallet.provisionSmartAccount}
             </button>
             <p className={styles.muted}>
-              The API requires a SIWE-verified owner wallet before job creation can use a sponsored smart account.
+              {messages.console.wallet.smartAccountHint}
             </p>
           </div>
         </section>
@@ -1770,8 +1785,8 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Compose</p>
-              <h2>Guided client job authoring</h2>
+              <p className={styles.panelEyebrow}>{messages.console.composer.title}</p>
+              <h2>{messages.console.composer.title}</h2>
             </div>
           </header>
           <div className={styles.stack}>
@@ -1796,22 +1811,22 @@ export function EscrowConsole({
               <div className={styles.composerSection}>
                 <div className={styles.summaryGrid}>
                   <article>
-                    <span className={styles.metaLabel}>Target experience</span>
-                    <strong>Productized escrow launch</strong>
+                    <span className={styles.metaLabel}>{messages.console.composer.targetExperience}</span>
+                    <strong>{messages.console.composer.targetExperienceValue}</strong>
                     <p className={styles.muted}>
-                      Write the scope in business language first. The API terms will be generated from the structured plan below.
+                      {messages.console.composer.scopeHint}
                     </p>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Drafted milestones</span>
+                    <span className={styles.metaLabel}>{messages.console.composer.draftedMilestones}</span>
                     <strong>{milestoneDraftCount}</strong>
                     <p className={styles.muted}>
-                      Total drafted amount: {milestoneDraftTotal || 0}
+                      {`${messages.console.composer.totalDraftedAmount}: ${milestoneDraftTotal || 0}`}
                     </p>
                   </article>
                 </div>
                 <label className={styles.field}>
-                  <span>Job title</span>
+                  <span>{messages.console.composer.jobTitle}</span>
                   <input
                     value={createJobState.title}
                     onChange={(event) =>
@@ -1824,7 +1839,7 @@ export function EscrowConsole({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Project summary</span>
+                  <span>{messages.console.composer.projectSummary}</span>
                   <textarea
                     value={createJobState.description}
                     onChange={(event) =>
@@ -1838,7 +1853,7 @@ export function EscrowConsole({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Category</span>
+                  <span>{messages.console.composer.category}</span>
                   <select
                     value={createJobState.category}
                     onChange={(event) =>
@@ -1850,7 +1865,7 @@ export function EscrowConsole({
                   >
                     {categoryOptions.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {messages.console.composer.categories[option]}
                       </option>
                     ))}
                   </select>
@@ -1861,8 +1876,10 @@ export function EscrowConsole({
             {composerStep === 'counterparty' ? (
               <div className={styles.composerSection}>
                 <label className={styles.field}>
-                  <span>Contractor email</span>
+                  <span>{messages.console.composer.contractorEmail}</span>
                   <input
+                    className={styles.ltrValue}
+                    data-ltr="true"
                     value={createJobState.contractorEmail}
                     onChange={(event) =>
                       setCreateJobState((current) => ({
@@ -1874,8 +1891,10 @@ export function EscrowConsole({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Worker wallet</span>
+                  <span>{messages.console.composer.workerWallet}</span>
                   <input
+                    className={styles.ltrValue}
+                    data-ltr="true"
                     value={createJobState.workerAddress}
                     onChange={(event) =>
                       setCreateJobState((current) => ({
@@ -1887,8 +1906,10 @@ export function EscrowConsole({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Settlement token address</span>
+                  <span>{messages.console.composer.settlementTokenAddress}</span>
                   <input
+                    className={styles.ltrValue}
+                    data-ltr="true"
                     value={createJobState.currencyAddress}
                     onChange={(event) =>
                       setCreateJobState((current) => ({
@@ -1901,8 +1922,10 @@ export function EscrowConsole({
                 </label>
                 <div className={styles.composerSplit}>
                   <label className={styles.field}>
-                    <span>Settlement asset label</span>
+                    <span>{messages.console.composer.settlementAssetLabel}</span>
                     <input
+                      className={styles.ltrValue}
+                      data-ltr="true"
                       value={createJobState.settlementAsset}
                       onChange={(event) =>
                         setCreateJobState((current) => ({
@@ -1913,8 +1936,10 @@ export function EscrowConsole({
                     />
                   </label>
                   <label className={styles.field}>
-                    <span>Settlement chain</span>
+                    <span>{messages.console.composer.settlementChain}</span>
                     <input
+                      className={styles.ltrValue}
+                      data-ltr="true"
                       value={createJobState.settlementChain}
                       onChange={(event) =>
                         setCreateJobState((current) => ({
@@ -1927,26 +1952,26 @@ export function EscrowConsole({
                 </div>
                 <div className={styles.summaryGrid}>
                   <article>
-                    <span className={styles.metaLabel}>Execution wallet posture</span>
+                    <span className={styles.metaLabel}>{messages.console.composer.executionWalletPosture}</span>
                     <strong>
                       {hasProvisionedDefaultWallet
-                        ? 'Ready to create jobs'
-                        : 'Smart account required'}
+                        ? messages.console.composer.readyToCreateJobs
+                        : messages.console.composer.smartAccountRequired}
                     </strong>
                     <p className={styles.muted}>
-                      Client job creation requires a default smart account execution wallet.
+                      {messages.console.wallet.smartAccountHint}
                     </p>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Counterparty check</span>
+                    <span className={styles.metaLabel}>{messages.console.composer.counterpartyCheck}</span>
                     <strong>
                       {createJobState.contractorEmail.trim() &&
                       createJobState.workerAddress.trim()
-                        ? 'Contractor identity captured'
-                        : 'Contractor identity incomplete'}
+                        ? messages.console.composer.contractorIdentityCaptured
+                        : messages.console.composer.contractorIdentityIncomplete}
                     </strong>
                     <p className={styles.muted}>
-                      The contractor must join with this email and this worker wallet.
+                      {messages.console.composer.counterpartyHint}
                     </p>
                   </article>
                 </div>
@@ -1957,8 +1982,10 @@ export function EscrowConsole({
               <div className={styles.composerSection}>
                 <div className={styles.composerSplit}>
                   <label className={styles.field}>
-                    <span>Review window in days</span>
+                    <span>{messages.console.composer.reviewWindowDays}</span>
                     <input
+                      className={styles.ltrValue}
+                      data-ltr="true"
                       value={createJobState.reviewWindowDays}
                       onChange={(event) =>
                         setCreateJobState((current) => ({
@@ -1969,7 +1996,7 @@ export function EscrowConsole({
                     />
                   </label>
                   <label className={styles.field}>
-                    <span>Dispute model</span>
+                    <span>{messages.console.composer.disputeModel}</span>
                     <select
                       value={createJobState.disputeModel}
                       onChange={(event) =>
@@ -1985,7 +2012,7 @@ export function EscrowConsole({
                   </label>
                 </div>
                 <label className={styles.field}>
-                  <span>Evidence expectation</span>
+                  <span>{messages.console.composer.evidenceExpectation}</span>
                   <input
                     value={createJobState.evidenceExpectation}
                     onChange={(event) =>
@@ -1997,7 +2024,7 @@ export function EscrowConsole({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Kickoff note</span>
+                  <span>{messages.console.composer.kickoffNote}</span>
                   <textarea
                     value={createJobState.kickoffNote}
                     onChange={(event) =>
@@ -2011,16 +2038,21 @@ export function EscrowConsole({
                 </label>
                 <div className={styles.composerSummaryCard}>
                   <div className={styles.walletTitleRow}>
-                    <strong>Commercial plan</strong>
-                    <span>{milestoneDraftCount} ready milestones</span>
+                    <strong>{messages.console.composer.commercialPlan}</strong>
+                    <span>{messages.console.composer.readyMilestones(milestoneDraftCount)}</span>
                   </div>
                   <p className={styles.muted}>
-                    Contractor join requires {createJobState.contractorEmail || 'the pending contractor email'} and {createJobState.workerAddress || 'the bound worker wallet'} from the shared contract link.
+                    {messages.console.composer.contractorJoinHint(
+                      createJobState.contractorEmail,
+                      createJobState.workerAddress,
+                    )}
                   </p>
                   <p className={styles.muted}>
-                    Total drafted milestone amount: {milestoneDraftTotal || 0}
+                    {messages.console.composer.totalDraftedMilestoneAmount(
+                      milestoneDraftTotal,
+                    )}
                   </p>
-                  <textarea value={composerTermsPreview} readOnly rows={10} />
+                  <textarea className={styles.ltrValue} data-ltr="true" value={composerTermsPreview} readOnly rows={10} />
                 </div>
               </div>
             ) : null}
@@ -2028,7 +2060,11 @@ export function EscrowConsole({
             <div className={styles.checklist}>
               {composerChecklist.map((item) => (
                 <div key={item.label} className={styles.checklistItem}>
-                  <strong>{item.ok ? 'Ready' : 'Pending'}</strong>
+                  <strong>
+                    {item.ok
+                      ? messages.console.composer.checklistReady
+                      : messages.console.composer.checklistPending}
+                  </strong>
                   <span>{item.label}</span>
                 </div>
               ))}
@@ -2043,7 +2079,7 @@ export function EscrowConsole({
                   setComposerStep(composerSteps[Math.max(0, index - 1)]?.id ?? 'scope');
                 }}
               >
-                Back
+                {messages.console.composer.back}
               </button>
               <button
                 type="button"
@@ -2056,17 +2092,19 @@ export function EscrowConsole({
                   );
                 }}
               >
-                Next
+                {messages.console.composer.next}
               </button>
               <button type="button" onClick={handleCreateJob} disabled={!canCreateJob}>
-                Create guided job
+                {messages.console.composer.createGuidedJob}
               </button>
             </div>
             {createdJobResult ? (
               <div className={styles.composerSummaryCard}>
                 <div className={styles.walletTitleRow}>
-                  <strong>Job created</strong>
-                  <span>{previewHash(createdJobResult.txHash)}</span>
+                  <strong>{messages.console.composer.jobCreated}</strong>
+                  <span className={styles.ltrValue} data-ltr="true">
+                    {previewHash(createdJobResult.txHash)}
+                  </span>
                 </div>
                 <p className={styles.muted}>
                   Escrow id {createdJobResult.escrowId}. Use the drafted milestones and funding amount below to move directly into launch steps.
@@ -2077,17 +2115,17 @@ export function EscrowConsole({
                     className={styles.secondaryButton}
                     onClick={() => setSelectedJobId(createdJobResult.jobId)}
                   >
-                    Review selected job
+                    {messages.console.composer.reviewSelectedJob}
                   </button>
                   <button type="button" onClick={() => void handleCommitMilestones(createdJobResult.jobId)}>
-                    Commit drafted milestones
+                    {messages.console.composer.commitDraftedMilestones}
                   </button>
                   <button
                     type="button"
                     className={styles.secondaryButton}
                     onClick={handleUseMilestoneBudget}
                   >
-                    Stage funding from milestone total
+                    {messages.console.composer.stageFundingFromMilestoneTotal}
                   </button>
                 </div>
               </div>
@@ -2104,15 +2142,15 @@ export function EscrowConsole({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
-              <p className={styles.panelEyebrow}>Portfolio</p>
-              <h2>Your job index</h2>
+              <p className={styles.panelEyebrow}>{messages.console.portfolio.title}</p>
+              <h2>{messages.console.portfolio.title}</h2>
             </div>
           </header>
           <div className={styles.jobList}>
             {jobsResponse.jobs.length === 0 ? (
               <EmptyStateCard
-                title="No jobs available"
-                message="No jobs are available yet for the current identity."
+                title={messages.console.portfolio.emptyTitle}
+                message={messages.console.portfolio.emptyMessage}
                 className={styles.timelineCard}
                 messageClassName={styles.muted}
               />
@@ -2125,14 +2163,18 @@ export function EscrowConsole({
                     selectedJobId === entry.job.id ? styles.jobRowActive : ''
                   }`}
                   onClick={() => setSelectedJobId(entry.job.id)}
-                >
+                  >
                   <div>
                     <strong>{entry.job.title}</strong>
-                    <p>{entry.job.category}</p>
+                    <p>{messages.console.composer.categories[entry.job.category as keyof typeof messages.console.composer.categories] ?? entry.job.category}</p>
                   </div>
                   <div>
-                    <span>{entry.job.status}</span>
-                    <small>{entry.participantRoles.join(', ')}</small>
+                    <span>{getJobStatusLabel(entry.job.status, messages)}</span>
+                    <small>
+                      {entry.participantRoles
+                        .map((role) => messages.console.labels.role[role])
+                        .join(', ')}
+                    </small>
                   </div>
                 </button>
               ))
@@ -2147,8 +2189,8 @@ export function EscrowConsole({
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <div>
-            <p className={styles.panelEyebrow}>Selected Job</p>
-            <h2>{selectedJobView?.title || 'Select a job to manage lifecycle actions'}</h2>
+            <p className={styles.panelEyebrow}>{messages.console.selectedJob.title}</p>
+            <h2>{selectedJobView?.title || messages.console.selectedJob.placeholder}</h2>
           </div>
         </header>
         {selectedJobView ? (
@@ -2156,53 +2198,67 @@ export function EscrowConsole({
             <div className={styles.stack}>
               <div className={styles.summaryGrid}>
                 <article>
-                  <span className={styles.metaLabel}>Status</span>
-                  <strong>{selectedJobView.status}</strong>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.status}</span>
+                  <strong>{getJobStatusLabel(selectedJobView.status, messages)}</strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Funded amount</span>
-                  <strong>{selectedJobView.fundedAmount || 'Not funded'}</strong>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.fundedAmount}</span>
+                  <strong>{selectedJobView.fundedAmount || messages.common.notFunded}</strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Escrow id</span>
-                  <strong>{selectedJobView.onchain.escrowId || 'Pending'}</strong>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.escrowId}</span>
+                  <strong className={styles.ltrValue} data-ltr="true">
+                    {selectedJobView.onchain.escrowId || messages.common.pending}
+                  </strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Updated</span>
-                  <strong>{formatTimestamp(selectedJobView.updatedAt)}</strong>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.updated}</span>
+                  <strong>{formatDate(selectedJobView.updatedAt)}</strong>
                 </article>
               </div>
               <div className={styles.summaryGrid}>
                 <article>
-                  <span className={styles.metaLabel}>Client wallet</span>
-                  <strong>{previewHash(selectedJobView.onchain.clientAddress)}</strong>
-                </article>
-                <article>
-                  <span className={styles.metaLabel}>Contractor wallet</span>
-                  <strong>{previewHash(selectedJobView.onchain.workerAddress)}</strong>
-                </article>
-                <article>
-                  <span className={styles.metaLabel}>Contractor join</span>
-                  <strong>{selectedContractorParticipation?.status || 'legacy'}</strong>
-                </article>
-                <article>
-                  <span className={styles.metaLabel}>Review window</span>
-                  <strong>
-                    {reviewWindowDays !== null ? `${reviewWindowDays} days` : 'Not set'}
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.clientWallet}</span>
+                  <strong className={styles.ltrValue} data-ltr="true">
+                    {previewHash(selectedJobView.onchain.clientAddress)}
                   </strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Dispute model</span>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.contractorWallet}</span>
+                  <strong className={styles.ltrValue} data-ltr="true">
+                    {previewHash(selectedJobView.onchain.workerAddress)}
+                  </strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.contractorJoin}</span>
+                  <strong>
+                    {selectedContractorParticipation
+                      ? messages.console.labels.contractorParticipation[
+                          selectedContractorParticipation.status
+                        ]
+                      : messages.common.legacy}
+                  </strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.reviewWindow}</span>
+                  <strong>
+                    {reviewWindowDays !== null
+                      ? messages.common.days(reviewWindowDays)
+                      : messages.common.notSet}
+                  </strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.disputeModel}</span>
                   <strong>{disputeModel || 'operator-mediation'}</strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Evidence expectation</span>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.evidenceExpectation}</span>
                   <strong>
                     {evidenceExpectation || 'Delivery note plus linked evidence URLs'}
                   </strong>
                 </article>
                 <article>
-                  <span className={styles.metaLabel}>Operator resolution</span>
+                  <span className={styles.metaLabel}>{messages.console.selectedJob.operatorResolution}</span>
                   <strong>
                     {runtimeProfile?.operator.arbitratorAddress
                       ? previewHash(runtimeProfile.operator.arbitratorAddress)
@@ -2214,44 +2270,46 @@ export function EscrowConsole({
                 {selectedJobRoles.length > 0 ? (
                   selectedJobRoles.map((role) => (
                     <span key={role} className={styles.roleBadge}>
-                      {role}
+                      {messages.console.labels.role[role]}
                     </span>
                   ))
                 ) : (
-                  <span className={styles.roleBadgeMuted}>observer</span>
+                  <span className={styles.roleBadgeMuted}>{messages.common.observer}</span>
                 )}
               </div>
               <article className={styles.timelineCard}>
                 <div className={styles.walletTitleRow}>
-                  <strong>Contractor join access</strong>
+                  <strong>{messages.console.selectedJob.contractorJoinAccess}</strong>
                   <span>
                     {selectedContractorParticipation?.status === 'joined'
-                      ? 'Joined'
+                      ? messages.common.joined
                       : canJoinSelectedContract
-                        ? 'Ready to join'
+                        ? messages.common.readyToJoin
                         : controlsSelectedWorkerWallet
-                          ? 'Wallet verified'
+                          ? messages.common.walletVerified
                           : accessToken
-                            ? 'Setup required'
-                            : 'Share link ready'}
+                            ? messages.common.setupRequired
+                            : messages.common.shareLinkReady}
                   </span>
                 </div>
                 <p className={styles.muted}>
                   {!accessToken
-                    ? 'Share this contract link with the contractor. They must sign in, use the matching email, and link the bound worker wallet before delivery is enabled.'
+                    ? messages.console.messages.joinAccessSignedOut
                     : selectedContractorParticipation?.status === 'joined'
-                      ? 'This contract has already been joined by the bound contractor identity.'
+                      ? messages.console.messages.joinAccessJoined
                       : pendingContractorEmail && !currentUserMatchesPendingContractorEmail
-                        ? 'Use the matching contractor email from contract setup before joining this contract.'
+                        ? messages.console.messages.joinAccessWrongEmail
                         : !pendingContractorEmail
-                          ? 'Use the contractor email entered during contract setup before joining this contract.'
+                          ? messages.console.messages.joinAccessNoEmail
                         : !controlsSelectedWorkerWallet
-                          ? `Link ${selectedJobView.onchain.workerAddress} before joining this contract.`
-                          : 'This session controls the bound worker wallet and is ready for contractor join.'}
+                          ? messages.console.messages.joinAccessWallet(
+                              selectedJobView.onchain.workerAddress,
+                            )
+                          : messages.console.messages.joinAccessReady}
                 </p>
                 {selectedJob?.job.contractorParticipation?.contractorEmail ? (
                   <p className={styles.muted}>
-                    Pending contractor email:{' '}
+                    {`${messages.console.selectedJob.pendingContractorEmail}: `}
                     {selectedJob.job.contractorParticipation.contractorEmail}
                   </p>
                 ) : null}
@@ -2261,7 +2319,7 @@ export function EscrowConsole({
                     className={styles.secondaryButton}
                     onClick={handleCopyJoinLink}
                   >
-                    Copy contractor link
+                    {messages.console.selectedJob.copyContractorLink}
                   </button>
                   {selectedContractorParticipation?.status === 'pending' ? (
                     <button
@@ -2269,7 +2327,7 @@ export function EscrowConsole({
                       onClick={handleJoinContract}
                       disabled={!canJoinSelectedContract}
                     >
-                      Join contract
+                      {messages.console.selectedJob.joinContract}
                     </button>
                   ) : null}
                 </div>
@@ -2293,9 +2351,9 @@ export function EscrowConsole({
               <div className={styles.milestoneRail}>
                 {selectedJobView.milestones.length === 0 ? (
                   <article className={styles.milestonePickerEmpty}>
-                    <strong>No milestones committed yet</strong>
+                    <strong>{messages.console.selectedJob.noMilestonesTitle}</strong>
                     <p className={styles.muted}>
-                      Fund the job and commit milestone checkpoints before delivery actions can begin.
+                      {messages.console.selectedJob.noMilestonesMessage}
                     </p>
                   </article>
                 ) : (
@@ -2309,20 +2367,22 @@ export function EscrowConsole({
                       onClick={() => setSelectedMilestoneIndex(index)}
                     >
                       <div className={styles.timelineHead}>
-                        <strong>{`${index + 1}. ${milestone.title}`}</strong>
+                        <strong>{messages.common.milestoneNumber(index + 1, milestone.title)}</strong>
                         <span
                           className={`${styles.milestoneBadge} ${getMilestoneStatusClassName(
                             milestone.status,
                           )}`}
                         >
-                          {milestone.status}
+                          {getMilestoneStatusLabel(milestone.status, messages)}
                         </span>
                       </div>
                       <p>{milestone.deliverable}</p>
                       <div className={styles.milestoneMetaRow}>
                         <small>{milestone.amount} USDC</small>
                         <small>
-                          {milestone.dueAt ? `Due ${formatTimestamp(milestone.dueAt)}` : 'No due date'}
+                          {milestone.dueAt
+                            ? messages.common.dueAt(formatDate(milestone.dueAt))
+                            : messages.common.noDueDate}
                         </small>
                       </div>
                     </button>
@@ -2334,9 +2394,9 @@ export function EscrowConsole({
                   <div className={styles.actionPanel}>
                     <div className={styles.workspaceHead}>
                       <div>
-                        <h3>Client workspace</h3>
+                        <h3>{messages.console.selectedJob.clientWorkspace}</h3>
                         <p className={styles.muted}>
-                          Fund the escrow, commit milestone checkpoints, and release accepted work with explicit receipt posture.
+                          {messages.console.selectedJob.clientWorkspaceCopy}
                         </p>
                       </div>
                     </div>
@@ -2352,13 +2412,15 @@ export function EscrowConsole({
                             <p>{fundJobCard.summary}</p>
                           </div>
                           <span className={styles.lifecycleState}>
-                            {getLifecyclePhaseLabel(fundJobCard.phase)}
+                            {getLifecyclePhaseLabel(fundJobCard.phase, messages)}
                           </span>
                         </div>
                         <p className={styles.muted}>{fundJobCard.detail}</p>
                         <label className={styles.field}>
-                          <span>Fund amount</span>
+                          <span>{messages.console.actions.fundAmount}</span>
                           <input
+                            className={styles.ltrValue}
+                            data-ltr="true"
                             value={fundAmount}
                             onChange={(event) => setFundAmount(event.target.value)}
                           />
@@ -2369,19 +2431,25 @@ export function EscrowConsole({
                             onClick={handleFundJob}
                             disabled={!isLifecycleActionEnabled(fundJobCard)}
                           >
-                            Fund selected job
+                            {messages.console.actions.fundSelectedJob}
                           </button>
                           <button
                             type="button"
                             className={styles.secondaryButton}
                             onClick={handleUseMilestoneBudget}
                           >
-                            Use drafted milestone total
+                            {messages.console.composer.useDraftedMilestoneTotal}
                           </button>
                         </div>
                         <div className={styles.lifecycleMeta}>
-                          <small>{fundJobCard.timestamp ? formatTimestamp(fundJobCard.timestamp) : 'No receipt yet'}</small>
-                          <small>{previewHash(fundJobCard.txHash)}</small>
+                          <small>
+                            {fundJobCard.timestamp
+                              ? formatDate(fundJobCard.timestamp)
+                              : messages.common.noReceiptYet}
+                          </small>
+                          <small className={styles.ltrValue} data-ltr="true">
+                            {previewHash(fundJobCard.txHash)}
+                          </small>
                         </div>
                       </article>
                     ) : null}
@@ -2398,12 +2466,12 @@ export function EscrowConsole({
                             <p>{commitMilestonesCard.summary}</p>
                           </div>
                           <span className={styles.lifecycleState}>
-                            {getLifecyclePhaseLabel(commitMilestonesCard.phase)}
+                            {getLifecyclePhaseLabel(commitMilestonesCard.phase, messages)}
                           </span>
                         </div>
                         <p className={styles.muted}>{commitMilestonesCard.detail}</p>
                         <div className={styles.stack}>
-                          <h4>Milestone drafting</h4>
+                          <h4>{messages.console.composer.milestoneDrafting}</h4>
                           {milestones.map((milestone, index) => (
                             <div key={`draft-${index}`} className={styles.milestoneEditor}>
                               <input
@@ -2420,6 +2488,8 @@ export function EscrowConsole({
                                 placeholder="Title"
                               />
                               <input
+                                className={styles.ltrValue}
+                                data-ltr="true"
                                 value={milestone.amount}
                                 onChange={(event) =>
                                   setMilestones((current) =>
@@ -2463,25 +2533,27 @@ export function EscrowConsole({
                                   },
                                 ])
                               }
-                            >
-                              Add milestone
+                              >
+                              {messages.console.composer.addMilestone}
                             </button>
                             <button
                               type="button"
                               onClick={handleSetMilestones}
                               disabled={!isLifecycleActionEnabled(commitMilestonesCard)}
                             >
-                              Commit milestones
+                              {messages.console.composer.commitMilestones}
                             </button>
                           </div>
                         </div>
                         <div className={styles.lifecycleMeta}>
                           <small>
                             {commitMilestonesCard.timestamp
-                              ? formatTimestamp(commitMilestonesCard.timestamp)
-                              : 'No receipt yet'}
+                              ? formatDate(commitMilestonesCard.timestamp)
+                              : messages.common.noReceiptYet}
                           </small>
-                          <small>{previewHash(commitMilestonesCard.txHash)}</small>
+                          <small className={styles.ltrValue} data-ltr="true">
+                            {previewHash(commitMilestonesCard.txHash)}
+                          </small>
                         </div>
                       </article>
                     ) : null}
@@ -2498,7 +2570,7 @@ export function EscrowConsole({
                             <p>{releaseCard.summary}</p>
                           </div>
                           <span className={styles.lifecycleState}>
-                            {getLifecyclePhaseLabel(releaseCard.phase)}
+                            {getLifecyclePhaseLabel(releaseCard.phase, messages)}
                           </span>
                         </div>
                         <p className={styles.muted}>{releaseCard.detail}</p>
@@ -2507,11 +2579,17 @@ export function EscrowConsole({
                           onClick={handleReleaseMilestone}
                           disabled={!isLifecycleActionEnabled(releaseCard)}
                         >
-                          Release selected milestone
+                          {messages.console.actions.releaseSelectedMilestone}
                         </button>
                         <div className={styles.lifecycleMeta}>
-                          <small>{releaseCard.timestamp ? formatTimestamp(releaseCard.timestamp) : 'No receipt yet'}</small>
-                          <small>{previewHash(releaseCard.txHash)}</small>
+                          <small>
+                            {releaseCard.timestamp
+                              ? formatDate(releaseCard.timestamp)
+                              : messages.common.noReceiptYet}
+                          </small>
+                          <small className={styles.ltrValue} data-ltr="true">
+                            {previewHash(releaseCard.txHash)}
+                          </small>
                         </div>
                       </article>
                     ) : null}
@@ -2520,11 +2598,13 @@ export function EscrowConsole({
 
                 {view === 'deliver' && !isWorkerForSelectedJob ? (
                   <EmptyStateCard
-                    title="Contractor wallet required"
+                    title={messages.console.emptyStates.contractorWalletRequired}
                     message={
                       accessToken
-                        ? `Link ${selectedJobView.onchain.workerAddress} before delivering this milestone.`
-                        : 'Sign in and link the exact contractor wallet from the shared contract link before delivery is enabled.'
+                        ? messages.console.messages.deliveryRequiresWallet(
+                            selectedJobView.onchain.workerAddress,
+                          )
+                        : messages.console.messages.signInForDelivery
                     }
                     className={styles.timelineCard}
                     messageClassName={styles.muted}
@@ -2535,9 +2615,9 @@ export function EscrowConsole({
                   <div className={styles.actionPanel}>
                     <div className={styles.workspaceHead}>
                       <div>
-                        <h3>Worker workspace</h3>
+                        <h3>{messages.console.selectedJob.workerWorkspace}</h3>
                         <p className={styles.muted}>
-                          Deliver milestone evidence with explicit pending and confirmation posture.
+                          {messages.console.selectedJob.workerWorkspaceCopy}
                         </p>
                       </div>
                     </div>
@@ -2553,12 +2633,12 @@ export function EscrowConsole({
                             <p>{deliveryCard.summary}</p>
                           </div>
                           <span className={styles.lifecycleState}>
-                            {getLifecyclePhaseLabel(deliveryCard.phase)}
+                            {getLifecyclePhaseLabel(deliveryCard.phase, messages)}
                           </span>
                         </div>
                         <p className={styles.muted}>{deliveryCard.detail}</p>
                         <label className={styles.field}>
-                          <span>Delivery note</span>
+                          <span>{messages.console.selectedJob.deliveryNote}</span>
                           <textarea
                             value={deliveryNote}
                             onChange={(event) => setDeliveryNote(event.target.value)}
@@ -2566,8 +2646,10 @@ export function EscrowConsole({
                           />
                         </label>
                         <label className={styles.field}>
-                          <span>Evidence URLs</span>
+                          <span>{messages.console.actions.evidenceUrls}</span>
                           <textarea
+                            className={styles.ltrValue}
+                            data-ltr="true"
                             value={deliveryEvidence}
                             onChange={(event) => setDeliveryEvidence(event.target.value)}
                             rows={2}
@@ -2579,11 +2661,17 @@ export function EscrowConsole({
                           onClick={handleDeliverMilestone}
                           disabled={!isLifecycleActionEnabled(deliveryCard)}
                         >
-                          Deliver selected milestone
+                          {messages.console.actions.deliverSelectedMilestone}
                         </button>
                         <div className={styles.lifecycleMeta}>
-                          <small>{deliveryCard.timestamp ? formatTimestamp(deliveryCard.timestamp) : 'No receipt yet'}</small>
-                          <small>{previewHash(deliveryCard.txHash)}</small>
+                          <small>
+                            {deliveryCard.timestamp
+                              ? formatDate(deliveryCard.timestamp)
+                              : messages.common.noReceiptYet}
+                          </small>
+                          <small className={styles.ltrValue} data-ltr="true">
+                            {previewHash(deliveryCard.txHash)}
+                          </small>
                         </div>
                       </article>
                     ) : null}
@@ -2592,13 +2680,15 @@ export function EscrowConsole({
 
                 {view === 'dispute' && !isClientForSelectedJob ? (
                   <EmptyStateCard
-                    title="Client wallet required"
+                    title={messages.console.emptyStates.clientWalletRequired}
                     message={
                       controlsSelectedClientWallet
-                        ? 'This session controls the client wallet, but the contract list has not refreshed into a writable client role yet.'
+                        ? messages.console.messages.clientRoleRefresh
                         : accessToken
-                        ? `Link ${selectedJobView.onchain.clientAddress} before opening a milestone dispute.`
-                        : 'Sign in and link the exact client wallet from the shared contract link before dispute actions are enabled.'
+                          ? messages.console.messages.disputeRequiresWallet(
+                              selectedJobView.onchain.clientAddress,
+                            )
+                          : messages.console.messages.signInForDispute
                     }
                     className={styles.timelineCard}
                     messageClassName={styles.muted}
@@ -2609,16 +2699,23 @@ export function EscrowConsole({
                 <div className={styles.actionPanel}>
                   <div className={styles.workspaceHead}>
                     <div>
-                      <h3>Shared dispute posture</h3>
+                      <h3>{messages.console.selectedJob.sharedDisputePosture}</h3>
                       <p className={styles.muted}>
-                        Both participants should see the same selected milestone, current state, and escalation evidence.
+                        {messages.console.selectedJob.sharedDisputeCopy}
                       </p>
                     </div>
                   </div>
                   <div className={styles.selectedMilestoneHeader}>
                     <div>
-                      <span className={styles.metaLabel}>Selected milestone</span>
-                      <strong>{selectedMilestone ? `${selectedMilestoneIndex + 1}. ${selectedMilestone.title}` : 'No milestone selected'}</strong>
+                      <span className={styles.metaLabel}>{messages.console.selectedJob.selectedMilestone}</span>
+                      <strong>
+                        {selectedMilestone
+                          ? messages.common.milestoneNumber(
+                              selectedMilestoneIndex + 1,
+                              selectedMilestone.title,
+                            )
+                          : messages.console.selectedJob.noMilestoneSelected}
+                      </strong>
                     </div>
                     {selectedMilestone ? (
                       <span
@@ -2626,7 +2723,7 @@ export function EscrowConsole({
                           selectedMilestone.status,
                         )}`}
                       >
-                        {selectedMilestone.status}
+                        {getMilestoneStatusLabel(selectedMilestone.status, messages)}
                       </span>
                     ) : null}
                   </div>
@@ -2642,17 +2739,17 @@ export function EscrowConsole({
                           <p>{disputeCard.summary}</p>
                         </div>
                         <span className={styles.lifecycleState}>
-                          {getLifecyclePhaseLabel(disputeCard.phase)}
+                          {getLifecyclePhaseLabel(disputeCard.phase, messages)}
                         </span>
                       </div>
                       <p className={styles.muted}>{disputeCard.detail}</p>
                       {!isClientForSelectedJob ? (
                         <p className={styles.muted}>
-                          Only the client wallet can open a dispute in this launch flow.
+                          {messages.console.messages.onlyClientCanDispute}
                         </p>
                       ) : null}
                       <label className={styles.field}>
-                        <span>Dispute reason</span>
+                        <span>{messages.console.selectedJob.disputeReason}</span>
                         <textarea
                           value={disputeReason}
                           onChange={(event) => setDisputeReason(event.target.value)}
@@ -2660,8 +2757,10 @@ export function EscrowConsole({
                         />
                       </label>
                       <label className={styles.field}>
-                        <span>Dispute evidence URLs</span>
+                        <span>{messages.console.actions.disputeEvidenceUrls}</span>
                         <textarea
+                          className={styles.ltrValue}
+                          data-ltr="true"
                           value={disputeEvidence}
                           onChange={(event) => setDisputeEvidence(event.target.value)}
                           rows={2}
@@ -2676,11 +2775,17 @@ export function EscrowConsole({
                           !isLifecycleActionEnabled(disputeCard)
                         }
                       >
-                        Open dispute
+                        {messages.console.actions.openDispute}
                       </button>
                       <div className={styles.lifecycleMeta}>
-                        <small>{disputeCard.timestamp ? formatTimestamp(disputeCard.timestamp) : 'No receipt yet'}</small>
-                        <small>{previewHash(disputeCard.txHash)}</small>
+                        <small>
+                          {disputeCard.timestamp
+                            ? formatDate(disputeCard.timestamp)
+                            : messages.common.noReceiptYet}
+                        </small>
+                        <small className={styles.ltrValue} data-ltr="true">
+                          {previewHash(disputeCard.txHash)}
+                        </small>
                       </div>
                     </article>
                   ) : null}
@@ -2691,9 +2796,9 @@ export function EscrowConsole({
                 <div className={styles.actionPanel}>
                   <div className={styles.workspaceHead}>
                     <div>
-                      <h3>Operator posture</h3>
+                      <h3>{messages.console.selectedJob.operatorPosture}</h3>
                       <p className={styles.muted}>
-                        Privileged operator workflows are still incomplete. Resolution remains available here only for sessions that already control the configured arbitrator wallet.
+                        {messages.console.selectedJob.operatorPostureCopy}
                       </p>
                     </div>
                   </div>
@@ -2709,24 +2814,28 @@ export function EscrowConsole({
                           <p>{resolveCard.summary}</p>
                         </div>
                         <span className={styles.lifecycleState}>
-                          {getLifecyclePhaseLabel(resolveCard.phase)}
+                          {getLifecyclePhaseLabel(resolveCard.phase, messages)}
                         </span>
                       </div>
                       <p className={styles.muted}>{resolveCard.detail}</p>
                       <label className={styles.field}>
-                        <span>Resolution action</span>
+                        <span>{messages.console.actions.resolutionAction}</span>
                         <select
                           value={resolutionAction}
                           onChange={(event) =>
                             setResolutionAction(event.target.value as 'release' | 'refund')
                           }
                         >
-                          <option value="release">Release</option>
-                          <option value="refund">Refund</option>
+                          <option value="release">
+                            {messages.console.labels.resolutionAction.release}
+                          </option>
+                          <option value="refund">
+                            {messages.console.labels.resolutionAction.refund}
+                          </option>
                         </select>
                       </label>
                       <label className={styles.field}>
-                        <span>Resolution note</span>
+                        <span>{messages.console.actions.resolutionNote}</span>
                         <textarea
                           value={resolutionNote}
                           onChange={(event) => setResolutionNote(event.target.value)}
@@ -2738,11 +2847,17 @@ export function EscrowConsole({
                         onClick={handleResolveMilestone}
                         disabled={!isLifecycleActionEnabled(resolveCard)}
                       >
-                        Resolve dispute
+                        {messages.console.actions.resolveDispute}
                       </button>
                       <div className={styles.lifecycleMeta}>
-                        <small>{resolveCard.timestamp ? formatTimestamp(resolveCard.timestamp) : 'No receipt yet'}</small>
-                        <small>{previewHash(resolveCard.txHash)}</small>
+                        <small>
+                          {resolveCard.timestamp
+                            ? formatDate(resolveCard.timestamp)
+                            : messages.common.noReceiptYet}
+                        </small>
+                        <small className={styles.ltrValue} data-ltr="true">
+                          {previewHash(resolveCard.txHash)}
+                        </small>
                       </div>
                     </article>
                   ) : null}
@@ -2755,9 +2870,9 @@ export function EscrowConsole({
               <div className={styles.auditPanel}>
                 <div className={styles.lifecycleHead}>
                   <div>
-                    <h3>Selected milestone</h3>
+                    <h3>{messages.console.selectedJob.selectedMilestone}</h3>
                     <p className={styles.muted}>
-                      Inline context for the checkpoint currently in focus.
+                      {messages.console.selectedJob.selectedMilestoneContext}
                     </p>
                   </div>
                   {selectedMilestone ? (
@@ -2766,7 +2881,7 @@ export function EscrowConsole({
                         selectedMilestone.status,
                       )}`}
                     >
-                      {selectedMilestone.status}
+                      {getMilestoneStatusLabel(selectedMilestone.status, messages)}
                     </span>
                   ) : null}
                 </div>
@@ -2774,27 +2889,31 @@ export function EscrowConsole({
                   <div className={styles.stack}>
                     <div className={styles.summaryGrid}>
                       <article>
-                        <span className={styles.metaLabel}>Amount</span>
+                        <span className={styles.metaLabel}>{messages.console.selectedJob.amount}</span>
                         <strong>{selectedMilestone.amount} USDC</strong>
                       </article>
                       <article>
-                        <span className={styles.metaLabel}>Due</span>
-                        <strong>{selectedMilestone.dueAt ? formatTimestamp(selectedMilestone.dueAt) : 'Not set'}</strong>
+                        <span className={styles.metaLabel}>{messages.console.selectedJob.due}</span>
+                        <strong>
+                          {selectedMilestone.dueAt
+                            ? formatDate(selectedMilestone.dueAt)
+                            : messages.common.notSet}
+                        </strong>
                       </article>
                     </div>
                     <p>{selectedMilestone.deliverable}</p>
                     {selectedMilestone.deliveryNote ? (
                       <article className={styles.timelineCard}>
-                        <strong>Delivery note</strong>
+                        <strong>{messages.console.selectedJob.deliveryNote}</strong>
                         <p>{selectedMilestone.deliveryNote}</p>
                       </article>
                     ) : null}
                     {selectedMilestone.deliveryEvidenceUrls?.length ? (
                       <article className={styles.timelineCard}>
-                        <strong>Evidence links</strong>
+                        <strong>{messages.console.selectedJob.evidenceLinks}</strong>
                         <div className={styles.linkList}>
                           {selectedMilestone.deliveryEvidenceUrls.map((url) => (
-                            <a key={url} href={url} target="_blank" rel="noreferrer">
+                            <a key={url} href={url} target="_blank" rel="noreferrer" data-ltr="true">
                               {url}
                             </a>
                           ))}
@@ -2803,16 +2922,16 @@ export function EscrowConsole({
                     ) : null}
                     {selectedMilestone.disputeReason ? (
                       <article className={styles.timelineCard}>
-                        <strong>Dispute reason</strong>
+                        <strong>{messages.console.selectedJob.disputeReason}</strong>
                         <p>{selectedMilestone.disputeReason}</p>
                       </article>
                     ) : null}
                     {selectedMilestone.disputeEvidenceUrls?.length ? (
                       <article className={styles.timelineCard}>
-                        <strong>Dispute evidence links</strong>
+                        <strong>{messages.console.selectedJob.disputeEvidenceLinks}</strong>
                         <div className={styles.linkList}>
                           {selectedMilestone.disputeEvidenceUrls.map((url) => (
-                            <a key={url} href={url} target="_blank" rel="noreferrer">
+                            <a key={url} href={url} target="_blank" rel="noreferrer" data-ltr="true">
                               {url}
                             </a>
                           ))}
@@ -2821,9 +2940,13 @@ export function EscrowConsole({
                     ) : null}
                     {selectedMilestone.resolutionAction ? (
                       <article className={styles.timelineCard}>
-                        <strong>Resolution</strong>
+                        <strong>{messages.console.selectedJob.resolution}</strong>
                         <p>
-                          {selectedMilestone.resolutionAction}
+                          {
+                            messages.console.labels.resolutionAction[
+                              selectedMilestone.resolutionAction
+                            ]
+                          }
                           {selectedMilestone.resolutionNote
                             ? `: ${selectedMilestone.resolutionNote}`
                             : ''}
@@ -2833,48 +2956,50 @@ export function EscrowConsole({
                   </div>
                 ) : (
                   <p className={styles.muted}>
-                    Select a committed milestone to inspect delivery evidence and action posture.
+                    {messages.console.selectedJob.noMilestoneContext}
                   </p>
                 )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Milestone timeline</h3>
+                <h3>{messages.console.selectedJob.milestoneTimeline}</h3>
                 {selectedMilestoneTimeline.length > 0 ? (
                   selectedMilestoneTimeline.map((entry) => (
                     <article key={`${entry.label}-${entry.at}`} className={styles.timelineCard}>
                       <div className={styles.timelineHead}>
                         <strong>{entry.label}</strong>
-                        <span>{formatTimestamp(entry.at)}</span>
+                        <span>{formatDate(entry.at)}</span>
                       </div>
                       <p>{entry.detail}</p>
                     </article>
                   ))
                 ) : (
                   <p className={styles.muted}>
-                    No milestone timeline events recorded yet for the current selection.
+                    {messages.console.selectedJob.noMilestoneTimeline}
                   </p>
                 )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Milestone audit trail</h3>
+                <h3>{messages.console.selectedJob.milestoneAuditTrail}</h3>
                 {selectedMilestoneAuditEvents.length > 0 ? (
                   selectedMilestoneAuditEvents.map((event, index) => (
                     <article key={`${event.type}-${event.at}-${index}`} className={styles.timelineCard}>
                       <div className={styles.timelineHead}>
                         <strong>{event.type}</strong>
-                        <span>{formatTimestamp(event.at)}</span>
+                        <span>{formatDate(event.at)}</span>
                       </div>
-                      <pre>{formatJson(event.payload)}</pre>
+                      <pre className={styles.ltrValue} data-ltr="true">
+                        {formatJson(event.payload)}
+                      </pre>
                     </article>
                   ))
                 ) : (
                   <p className={styles.muted}>
-                    No milestone-specific audit events recorded yet.
+                    {messages.console.selectedJob.noMilestoneAudit}
                   </p>
                 )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Milestone receipts</h3>
+                <h3>{messages.console.selectedJob.milestoneReceipts}</h3>
                 {selectedMilestoneExecutions.length > 0 ? (
                   selectedMilestoneExecutions.map((execution) => (
                     <article key={execution.id} className={styles.timelineCard}>
@@ -2882,32 +3007,38 @@ export function EscrowConsole({
                         <strong>{execution.action}</strong>
                         <span>{execution.status}</span>
                       </div>
-                      <p>{execution.actorAddress}</p>
-                      <small>{formatTimestamp(execution.confirmedAt ?? execution.submittedAt)}</small>
-                      <small>{previewHash(execution.txHash)}</small>
+                      <p className={styles.ltrValue} data-ltr="true">
+                        {execution.actorAddress}
+                      </p>
+                      <small>{formatDate(execution.confirmedAt ?? execution.submittedAt)}</small>
+                      <small className={styles.ltrValue} data-ltr="true">
+                        {previewHash(execution.txHash)}
+                      </small>
                       {execution.failureMessage ? <small>{execution.failureMessage}</small> : null}
                     </article>
                   ))
                 ) : (
                   <p className={styles.muted}>
-                    No milestone-specific execution receipts recorded yet.
+                    {messages.console.selectedJob.noMilestoneReceipts}
                   </p>
                 )}
               </div>
               <div className={styles.auditPanel}>
-                <h3>Job launch history</h3>
+                <h3>{messages.console.selectedJob.jobLaunchHistory}</h3>
                 {jobLevelAuditEvents.length > 0 ? (
                   jobLevelAuditEvents.map((event, index) => (
                     <article key={`${event.type}-${event.at}-${index}`} className={styles.timelineCard}>
                       <div className={styles.timelineHead}>
                         <strong>{event.type}</strong>
-                        <span>{formatTimestamp(event.at)}</span>
+                        <span>{formatDate(event.at)}</span>
                       </div>
-                      <pre>{formatJson(event.payload)}</pre>
+                      <pre className={styles.ltrValue} data-ltr="true">
+                        {formatJson(event.payload)}
+                      </pre>
                     </article>
                   ))
                 ) : (
-                  <p className={styles.muted}>No job-level audit events recorded yet.</p>
+                  <p className={styles.muted}>{messages.console.selectedJob.noJobAudit}</p>
                 )}
               </div>
               <div className={styles.auditPanel}>
@@ -2919,22 +3050,26 @@ export function EscrowConsole({
                         <strong>{execution.action}</strong>
                         <span>{execution.status}</span>
                       </div>
-                      <p>{execution.actorAddress}</p>
-                      <small>{formatTimestamp(execution.confirmedAt ?? execution.submittedAt)}</small>
-                      <small>{previewHash(execution.txHash)}</small>
+                      <p className={styles.ltrValue} data-ltr="true">
+                        {execution.actorAddress}
+                      </p>
+                      <small>{formatDate(execution.confirmedAt ?? execution.submittedAt)}</small>
+                      <small className={styles.ltrValue} data-ltr="true">
+                        {previewHash(execution.txHash)}
+                      </small>
                       {execution.failureMessage ? <small>{execution.failureMessage}</small> : null}
                     </article>
                   ))
                 ) : (
-                  <p className={styles.muted}>No job-level execution receipts recorded yet.</p>
+                  <p className={styles.muted}>{messages.console.selectedJob.noJobReceipts}</p>
                 )}
               </div>
             </div>
           </div>
         ) : (
           <EmptyStateCard
-            title="Select a job"
-            message="Select a job from the index to view its milestones, audit events, and receipts."
+            title={messages.console.selectedJob.placeholder}
+            message={messages.console.selectedJob.selectJobMessage}
             className={styles.timelineCard}
             messageClassName={styles.muted}
           />

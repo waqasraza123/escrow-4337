@@ -1,66 +1,65 @@
+'use client';
+
 import Link from 'next/link';
 import styles from '../marketing.module.css';
+import { LanguageSwitcher } from '../language-switcher';
+import { useWebI18n } from '../../lib/i18n';
 
 export default function TrustPage() {
+  const { messages } = useWebI18n();
+  const trustMessages = messages.marketing.trustPage;
+
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <nav className={styles.nav}>
-          <strong className={styles.brand}>Milestone Escrow</strong>
+          <strong className={styles.brand}>{messages.common.brand}</strong>
           <div className={styles.navLinks}>
-            <Link href="/">Home</Link>
-            <Link href="/app/sign-in">Sign in</Link>
-            <Link href="/app/new-contract">Start a contract</Link>
+            <Link href="/">{messages.common.home}</Link>
+            <Link href="/app/sign-in">{messages.common.signIn}</Link>
+            <Link href="/app/new-contract">{messages.common.startContract}</Link>
           </div>
+          <LanguageSwitcher
+            className={styles.languageSwitcher}
+            labelClassName={styles.languageSwitcherLabel}
+            optionClassName={styles.languageSwitcherOption}
+            optionActiveClassName={styles.languageSwitcherOptionActive}
+          />
         </nav>
 
         <section className={styles.section}>
-          <h2>How escrow works here</h2>
+          <h2>{trustMessages.escrowTitle}</h2>
           <div className={styles.sectionBody}>
-            <p>
-              Funds are locked to one milestone-based service contract instead of sent as
-              an informal upfront payment. The contractor wallet is bound at contract
-              creation, and only that wallet can act as the contractor in the workflow.
-            </p>
+            <p>{trustMessages.escrowIntro}</p>
             <ul className={styles.list}>
-              <li>The client funds the job before milestone delivery starts.</li>
-              <li>The contractor delivers against the funded milestone with a delivery note and evidence URLs.</li>
-              <li>The client releases the milestone or opens a dispute with a reason and evidence URLs.</li>
+              {trustMessages.escrowList.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>How disputes work</h2>
+          <h2>{trustMessages.disputesTitle}</h2>
           <div className={styles.sectionBody}>
-            <p>
-              Disputes stay milestone-scoped. The operator does not act as a hidden admin;
-              the current product model uses the configured arbitrator wallet as the
-              designated dispute resolver.
-            </p>
+            <p>{trustMessages.disputesIntro}</p>
             <ul className={styles.list}>
-              <li>The operator sees the milestone posture, delivery note, delivery evidence, dispute reason, dispute evidence, audit events, and receipts.</li>
-              <li>The operator records a release or refund decision plus a resolution note.</li>
-              <li>The case remains exportable as job-history and dispute-case artifacts.</li>
+              {trustMessages.disputesList.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>What is implemented today</h2>
+          <h2>{trustMessages.implementedTitle}</h2>
           <div className={styles.proofGrid}>
-            <article className={styles.proofCard}>
-              <strong>Implemented in-repo</strong>
-              <p>OTP auth, wallet linking, smart-account provisioning, client funding, contractor delivery, client dispute, operator resolution, audit bundle lookup, and export artifacts.</p>
-            </article>
-            <article className={styles.proofCard}>
-              <strong>Visible in the product</strong>
-              <p>The shared contract link, role-specific action states, milestone evidence, dispute evidence, operator case review, and runtime readiness posture.</p>
-            </article>
-            <article className={styles.proofCard}>
-              <strong>Still being validated live</strong>
-              <p>Real staged launch-candidate evidence, live relay exercise, live alert delivery, and other deployed-environment proof still need to be run outside the repo.</p>
-            </article>
+            {trustMessages.proofCards.map((card) => (
+              <article key={card.title} className={styles.proofCard}>
+                <strong>{card.title}</strong>
+                <p>{card.body}</p>
+              </article>
+            ))}
           </div>
         </section>
       </div>

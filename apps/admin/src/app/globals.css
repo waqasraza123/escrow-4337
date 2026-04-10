@@ -23,6 +23,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html[data-locale='ar'] body {
+  font-family: var(--font-display-ar), var(--font-display), serif;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -53,4 +57,10 @@ pre,
 code,
 input {
   font-family: var(--font-mono), monospace;
+}
+
+[data-ltr='true'] {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
 }

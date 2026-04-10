@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AuditBundle } from '../lib/api';
+import { getAdminMessages } from '../lib/i18n';
 import {
   buildCaseBrief,
   buildExecutionIssueCards,
@@ -91,9 +92,11 @@ function createBundle(
   };
 }
 
+const helperCopy = getAdminMessages('en').helperCopy;
+
 describe('operator case helpers', () => {
   it('marks cases with disputes and failed executions as critical', () => {
-    const brief = buildCaseBrief(createBundle());
+    const brief = buildCaseBrief(createBundle(), helperCopy);
 
     expect(brief).toMatchObject({
       disputedMilestones: 1,
@@ -104,7 +107,7 @@ describe('operator case helpers', () => {
   });
 
   it('derives review posture for disputed milestones and resolved posture for settled milestones', () => {
-    const cards = buildMilestoneReviewCards(createBundle().job);
+    const cards = buildMilestoneReviewCards(createBundle().job, helperCopy);
 
     expect(cards[0]).toMatchObject({
       posture: 'resolved',
@@ -118,7 +121,7 @@ describe('operator case helpers', () => {
   });
 
   it('sorts execution issues newest first and exposes failures for triage', () => {
-    const cards = buildExecutionIssueCards(createBundle().executions);
+    const cards = buildExecutionIssueCards(createBundle().executions, helperCopy);
 
     expect(cards[0]).toMatchObject({
       id: 'exec-2',
@@ -130,7 +133,7 @@ describe('operator case helpers', () => {
 
   it('extracts disputed milestone cards for the dedicated review panel', () => {
     const disputed = getDisputedMilestoneCards(
-      buildMilestoneReviewCards(createBundle().job),
+      buildMilestoneReviewCards(createBundle().job, helperCopy),
     );
 
     expect(disputed).toHaveLength(1);
@@ -141,7 +144,7 @@ describe('operator case helpers', () => {
   });
 
   it('combines audit and execution streams into one operator timeline ordered by recency', () => {
-    const timeline = buildOperatorTimeline(createBundle());
+    const timeline = buildOperatorTimeline(createBundle(), helperCopy);
 
     expect(timeline[0]).toMatchObject({
       kind: 'execution',

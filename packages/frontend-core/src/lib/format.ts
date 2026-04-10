@@ -1,12 +1,20 @@
 export function formatTimestamp(
   value?: number | null,
-  fallback = 'Not available',
+  options: {
+    fallback?: string;
+    locale?: string;
+  } = {},
 ) {
+  const { fallback = 'Not available', locale } = options;
+
   if (!value) {
     return fallback;
   }
 
-  return new Date(value).toLocaleString();
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
 }
 
 export function previewHash(

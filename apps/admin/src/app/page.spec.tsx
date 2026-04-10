@@ -16,6 +16,7 @@ import {
   lookupHistoryStorageKey,
   sessionStorageKey,
 } from '../test/fixtures';
+import { AdminI18nProvider } from '../lib/i18n';
 
 const { mockedAdminApi } = vi.hoisted(() => ({
   mockedAdminApi: {
@@ -51,6 +52,14 @@ vi.mock('../lib/api', () => ({
 
 import Home from './page';
 
+function renderHome() {
+  return renderApp(
+    <AdminI18nProvider initialLocale="en">
+      <Home />
+    </AdminI18nProvider>,
+  );
+}
+
 describe('admin page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,7 +69,7 @@ describe('admin page', () => {
   });
 
   it('renders the public-only operator scope shell before any lookup', async () => {
-    renderApp(<Home />);
+    renderHome();
 
     expect(
       screen.getByRole('heading', {
@@ -84,7 +93,7 @@ describe('admin page', () => {
   it('shows truthful runtime diagnostics when the backend profile cannot load', async () => {
     mockedAdminApi.getRuntimeProfile.mockRejectedValue(new Error('Failed to fetch'));
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getAllByText('Runtime profile unavailable').length).toBeGreaterThan(0);
@@ -99,7 +108,7 @@ describe('admin page', () => {
     seedJsonStorage(lookupHistoryStorageKey, ['job-legacy']);
     mockedAdminApi.getAudit.mockResolvedValue(createAuditBundle());
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-123');
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
@@ -109,7 +118,7 @@ describe('admin page', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Reload case' })).toBeInTheDocument();
-    expect(screen.getAllByText('critical').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Critical').length).toBeGreaterThan(0);
     expect(mockedAdminApi.getAudit).toHaveBeenCalledWith('job-123');
     expect(window.localStorage.getItem(lookupHistoryStorageKey)).toBe(
       JSON.stringify(['job-123', 'job-legacy']),
@@ -120,7 +129,7 @@ describe('admin page', () => {
   it('surfaces a validation error when lookup is submitted without a job id', async () => {
     const user = userEvent.setup();
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
 
@@ -134,7 +143,7 @@ describe('admin page', () => {
     const user = userEvent.setup();
     mockedAdminApi.getAudit.mockRejectedValue(new Error('Bundle not found'));
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'missing-job');
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
@@ -154,7 +163,7 @@ describe('admin page', () => {
     seedJsonStorage(lookupHistoryStorageKey, ['job-suggested', 'job-older']);
     mockedAdminApi.getAudit.mockResolvedValue(createAuditBundle());
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.click(screen.getByRole('button', { name: 'job-suggested' }));
 
@@ -176,7 +185,7 @@ describe('admin page', () => {
     const user = userEvent.setup();
     mockedAdminApi.getAudit.mockResolvedValue(createQuietAuditBundle());
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-quiet');
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
@@ -185,8 +194,10 @@ describe('admin page', () => {
       expect(screen.getByRole('heading', { name: 'Healthy implementation' })).toBeInTheDocument();
     });
 
-    expect(screen.getAllByText('No active disputes').length).toBeGreaterThan(0);
-    expect(screen.getByText('No failed executions')).toBeInTheDocument();
+    expect(screen.getByText('This public bundle does not currently show any disputed milestones.')).toBeInTheDocument();
+    expect(
+      screen.getByText('The current receipt stream does not show failed public executions.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('No receipts available')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -207,7 +218,7 @@ describe('admin page', () => {
       wallets: [createEoaWallet(createHexAddress('2'))],
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('operator@example.com')).toBeInTheDocument();
@@ -264,7 +275,7 @@ describe('admin page', () => {
     );
     mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Loaded 1 jobs for all attention.')).toBeInTheDocument();
@@ -283,7 +294,7 @@ describe('admin page', () => {
       createUserProfile([createEoaWallet(createHexAddress('3'))]),
     );
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(
@@ -375,7 +386,7 @@ describe('admin page', () => {
       },
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Operator backlog')).toBeInTheDocument();
@@ -479,7 +490,7 @@ describe('admin page', () => {
       },
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Operator backlog')).toBeInTheDocument();
@@ -582,7 +593,7 @@ describe('admin page', () => {
       ],
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Operator backlog')).toBeInTheDocument();
@@ -747,7 +758,7 @@ describe('admin page', () => {
       },
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Recurring chain-sync daemon')).toBeInTheDocument();
@@ -906,7 +917,7 @@ describe('admin page', () => {
         }),
       );
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('State drift case')).toBeInTheDocument();
@@ -1148,7 +1159,7 @@ describe('admin page', () => {
       );
     mockedAdminApi.getAudit.mockResolvedValue(createAuditBundle());
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Operator backlog')).toBeInTheDocument();
@@ -1304,7 +1315,7 @@ describe('admin page', () => {
       },
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Stale operator review')).toBeInTheDocument();
@@ -1805,7 +1816,7 @@ describe('admin page', () => {
       },
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('Failure remediation target')).toBeInTheDocument();
@@ -1915,7 +1926,7 @@ describe('admin page', () => {
       txHash: '0xresolved',
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await waitFor(() => {
       expect(screen.getByText('operator@example.com')).toBeInTheDocument();
@@ -1939,7 +1950,11 @@ describe('admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Resolve disputed milestone' }));
 
     await waitFor(() => {
-      expect(screen.getAllByText('No active disputes').length).toBeGreaterThan(0);
+      expect(
+        screen.getByText(
+          'This public bundle does not currently show any disputed milestones.',
+        ),
+      ).toBeInTheDocument();
     });
 
     expect(mockedAdminApi.resolveMilestone).toHaveBeenCalledWith(
@@ -1973,7 +1988,7 @@ describe('admin page', () => {
       contentType: 'text/csv; charset=utf-8',
     });
 
-    renderApp(<Home />);
+    renderHome();
 
     await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-123');
     await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
