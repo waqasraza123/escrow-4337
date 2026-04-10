@@ -62,9 +62,13 @@ function normalizeEscrowJobRecord(
     ...job,
     contractorParticipation: job.contractorParticipation
       ? {
-          contractorEmail: normalizeEmail(job.contractorParticipation.contractorEmail),
+          contractorEmail: normalizeEmail(
+            job.contractorParticipation.contractorEmail,
+          ),
           status:
-            job.contractorParticipation.status === 'joined' ? 'joined' : 'pending',
+            job.contractorParticipation.status === 'joined'
+              ? 'joined'
+              : 'pending',
           joinedUserId: job.contractorParticipation.joinedUserId ?? null,
           joinedAt: job.contractorParticipation.joinedAt ?? null,
         }

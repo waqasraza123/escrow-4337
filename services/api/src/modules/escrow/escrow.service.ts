@@ -146,7 +146,9 @@ export class EscrowService {
             participantRoles,
           };
         })
-        .filter((job): job is EscrowJobsListResponse['jobs'][number] => Boolean(job))
+        .filter((job): job is EscrowJobsListResponse['jobs'][number] =>
+          Boolean(job),
+        )
         .sort((left, right) => right.job.updatedAt - left.job.updatedAt),
     };
   }
@@ -303,13 +305,14 @@ export class EscrowService {
       if (participation.joinedUserId === user.id) {
         return {
           jobId: job.id,
-          contractorParticipation: this.toPublicContractorParticipationView(
-            participation,
-          )!,
+          contractorParticipation:
+            this.toPublicContractorParticipationView(participation)!,
         };
       }
 
-      throw new ConflictException('Contractor participation has already been claimed');
+      throw new ConflictException(
+        'Contractor participation has already been claimed',
+      );
     }
 
     if (user.email !== participation.contractorEmail) {
@@ -318,7 +321,9 @@ export class EscrowService {
       );
     }
 
-    if (!this.usersService.userHasWalletAddress(user, job.onchain.workerAddress)) {
+    if (
+      !this.usersService.userHasWalletAddress(user, job.onchain.workerAddress)
+    ) {
       throw new ForbiddenException(
         `Link ${job.onchain.workerAddress} before joining this contract`,
       );
@@ -341,9 +346,8 @@ export class EscrowService {
 
     return {
       jobId: job.id,
-      contractorParticipation: this.toPublicContractorParticipationView(
-        participation,
-      )!,
+      contractorParticipation:
+        this.toPublicContractorParticipationView(participation)!,
     };
   }
 
@@ -681,8 +685,9 @@ export class EscrowService {
     void executions;
     return {
       ...jobView,
-      contractorParticipation:
-        this.toContractorParticipationView(contractorParticipation),
+      contractorParticipation: this.toContractorParticipationView(
+        contractorParticipation,
+      ),
     };
   }
 
@@ -693,8 +698,9 @@ export class EscrowService {
 
     return {
       ...jobView,
-      contractorParticipation:
-        this.toPublicContractorParticipationView(contractorParticipation),
+      contractorParticipation: this.toPublicContractorParticipationView(
+        contractorParticipation,
+      ),
     };
   }
 
@@ -741,8 +747,8 @@ export class EscrowService {
     }
 
     if (
-      normalizedAddresses.has(normalizeEvmAddress(job.onchain.workerAddress))
-      && this.userCanActAsWorker(job, user)
+      normalizedAddresses.has(normalizeEvmAddress(job.onchain.workerAddress)) &&
+      this.userCanActAsWorker(job, user)
     ) {
       roles.push('worker');
     }

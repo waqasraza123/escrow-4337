@@ -60,12 +60,7 @@ function runtimePanel(page: Page) {
 }
 
 function summaryValue(panel: Locator, label: string) {
-  return panel
-    .locator('article')
-    .filter({
-      has: panel.locator('span', { hasText: label }),
-    })
-    .locator('strong');
+  return panel.locator('article', { hasText: label }).locator('strong').first();
 }
 
 async function probeBrowserRuntimeProfile(

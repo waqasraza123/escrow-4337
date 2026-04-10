@@ -10,7 +10,12 @@ const addressSchema = z
   .trim()
   .regex(evmAddressPattern)
   .transform(normalizeEvmAddress);
-const emailSchema = z.string().trim().email().max(320).transform((value) => value.toLowerCase());
+const emailSchema = z
+  .string()
+  .trim()
+  .email()
+  .max(320)
+  .transform((value) => value.toLowerCase());
 
 export const createJobSchema = z
   .object({
