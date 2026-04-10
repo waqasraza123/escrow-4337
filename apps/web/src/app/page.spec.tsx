@@ -39,6 +39,7 @@ const { mockedWebApi, mockedInjectedWallet } = vi.hoisted(() => ({
     setDefaultWallet: vi.fn(),
     listJobs: vi.fn(),
     createJob: vi.fn(),
+    joinContractor: vi.fn(),
     fundJob: vi.fn(),
     setMilestones: vi.fn(),
     deliverMilestone: vi.fn(),
@@ -435,6 +436,12 @@ describe('web page', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
+    fireEvent.change(
+      screen.getByPlaceholderText('contractor@example.com'),
+      {
+        target: { value: 'worker@example.com' },
+      },
+    );
     fireEvent.change(screen.getByRole('textbox', { name: 'Worker wallet' }), {
       target: { value: createHexAddress('4') },
     });
@@ -462,6 +469,7 @@ describe('web page', () => {
 
     expect(mockedWebApi.createJob).toHaveBeenCalledWith(
       expect.objectContaining({
+        contractorEmail: 'worker@example.com',
         workerAddress: createHexAddress('4'),
         currencyAddress: createHexAddress('5'),
         title: 'Launch-ready implementation',

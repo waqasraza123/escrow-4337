@@ -45,6 +45,22 @@ const auditEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('job.contractor_participation_requested'),
+    at: z.number().int().nonnegative(),
+    payload: z.object({
+      jobId: z.string().min(1),
+      workerAddress: z.string().min(1),
+    }),
+  }),
+  z.object({
+    type: z.literal('job.contractor_joined'),
+    at: z.number().int().nonnegative(),
+    payload: z.object({
+      jobId: z.string().min(1),
+      workerAddress: z.string().min(1),
+    }),
+  }),
+  z.object({
     type: z.literal('job.funded'),
     at: z.number().int().nonnegative(),
     payload: z.object({
@@ -161,6 +177,13 @@ const jobHistoryImportSchema = z
       status: jobStatusSchema,
       createdAt: z.number().int().nonnegative(),
       updatedAt: z.number().int().nonnegative(),
+      contractorParticipation: z
+        .object({
+          status: z.enum(['pending', 'joined']),
+          joinedAt: z.number().int().nonnegative().nullable(),
+        })
+        .nullable()
+        .optional(),
       milestones: z.array(milestoneSchema),
       operations: z
         .object({
@@ -295,6 +318,7 @@ function toSyntheticJobRecord(
 ): EscrowJobRecord {
   return {
     ...structuredClone(document.job),
+    contractorParticipation: null,
     operations: {
       chainSync: null,
       executionFailureWorkflow: null,

@@ -13,6 +13,7 @@ const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
+const contractorEmail = 'worker@example.com';
 
 describe('EscrowController integration', () => {
   let controller: EscrowController;
@@ -71,6 +72,7 @@ describe('EscrowController integration', () => {
 
   it('supports the escrow lifecycle through dispute resolution and audit retrieval', async () => {
     const createResponse = await controller.create(clientUser, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Escrow orchestration',
@@ -119,6 +121,9 @@ describe('EscrowController integration', () => {
     expect(milestonesResponse.milestoneCount).toBe(2);
     expect(milestonesResponse.status).toBe('funded');
     expect(milestonesResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
+
+    const joinResponse = await controller.joinContractor(workerUser, jobId, {});
+    expect(joinResponse.contractorParticipation.status).toBe('joined');
 
     const firstDeliveryResponse = await controller.deliver(
       workerUser,
@@ -189,8 +194,10 @@ describe('EscrowController integration', () => {
     expect(auditResponse.bundle.job.milestones).toHaveLength(2);
     expect(auditResponse.bundle.audit.map((event) => event.type)).toEqual([
       'job.created',
+      'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_joined',
       'milestone.delivered',
       'milestone.disputed',
       'milestone.resolved',
@@ -214,6 +221,7 @@ describe('EscrowController integration', () => {
 
   it('retains persisted jobs after the escrow module is recreated', async () => {
     const created = await controller.create(clientUser, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Persist escrow state',
@@ -247,6 +255,7 @@ describe('EscrowController integration', () => {
     expect(auditResponse.bundle.job.onchain.escrowId).toBe('1');
     expect(auditResponse.bundle.audit.map((event) => event.type)).toEqual([
       'job.created',
+      'job.contractor_participation_requested',
       'job.funded',
     ]);
     expect(
@@ -256,6 +265,7 @@ describe('EscrowController integration', () => {
 
   it('lists authenticated jobs for the current participant only', async () => {
     const clientCreated = await controller.create(clientUser, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Client-viewable job',
@@ -273,7 +283,8 @@ describe('EscrowController integration', () => {
       '0x7777777777777777777777777777777777777777',
     );
 
-    await controller.create(otherClient, {
+    const workerCreated = await controller.create(otherClient, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Worker-viewable job',
@@ -283,6 +294,8 @@ describe('EscrowController integration', () => {
         currency: 'USDC',
       },
     });
+    await controller.joinContractor(workerUser, clientCreated.jobId, {});
+    await controller.joinContractor(workerUser, workerCreated.jobId, {});
 
     const clientList = await controller.list(clientUser);
     expect(clientList.jobs).toHaveLength(1);

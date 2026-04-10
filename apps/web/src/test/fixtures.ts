@@ -100,6 +100,11 @@ export function createJobView(): JobView {
     status: 'funded',
     createdAt: 100,
     updatedAt: 400,
+    contractorParticipation: {
+      contractorEmail: 'worker@example.com',
+      status: 'joined',
+      joinedAt: 170,
+    },
     milestones: [
       {
         title: 'Discovery',
@@ -171,7 +176,13 @@ export function createCustomJobsListResponse(
 export function createAuditBundle(): AuditBundle {
   return {
     bundle: {
-      job: createJobView(),
+      job: {
+        ...createJobView(),
+        contractorParticipation: {
+          status: 'joined',
+          joinedAt: 170,
+        },
+      },
       audit: [
         {
           type: 'job.funded',
@@ -205,7 +216,7 @@ export function createAuditBundle(): AuditBundle {
 }
 
 export function createCustomAuditBundle(
-  override: Partial<AuditBundle['bundle']> & {
+  override: Omit<Partial<AuditBundle['bundle']>, 'job'> & {
     job?: Omit<Partial<JobView>, 'onchain' | 'milestones'> & {
       onchain?: Partial<JobView['onchain']>;
       milestones?: JobView['milestones'];
@@ -218,7 +229,17 @@ export function createCustomAuditBundle(
     bundle: {
       ...base.bundle,
       ...override,
-      job: createCustomJobView(override.job),
+      job: override.job
+        ? {
+            ...createCustomJobView(override.job),
+            contractorParticipation: override.job.contractorParticipation
+              ? {
+                  status: override.job.contractorParticipation.status,
+                  joinedAt: override.job.contractorParticipation.joinedAt ?? null,
+                }
+              : createAuditBundle().bundle.job.contractorParticipation,
+          }
+        : base.bundle.job,
       audit: override.audit ?? base.bundle.audit,
       executions: override.executions ?? base.bundle.executions,
     },

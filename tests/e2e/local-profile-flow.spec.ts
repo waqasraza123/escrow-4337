@@ -25,9 +25,9 @@ test('local profile supports the full launch-candidate create, join, deliver, di
   test.setTimeout(240_000);
 
   const runId = makeRunId();
-  const clientEmail = `playwright.client.${runId}@escrow.local`;
-  const contractorEmail = `playwright.contractor.${runId}@escrow.local`;
-  const operatorEmail = `playwright.operator.${runId}@escrow.local`;
+  const clientEmail = `playwright.client.${runId}@example.com`;
+  const contractorEmail = `playwright.contractor.${runId}@example.com`;
+  const operatorEmail = `playwright.operator.${runId}@example.com`;
   const clientWallet = Wallet.createRandom();
   const contractorWallet = Wallet.createRandom();
 

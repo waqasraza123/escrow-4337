@@ -10,9 +10,11 @@ const addressSchema = z
   .trim()
   .regex(evmAddressPattern)
   .transform(normalizeEvmAddress);
+const emailSchema = z.string().trim().email().max(320).transform((value) => value.toLowerCase());
 
 export const createJobSchema = z
   .object({
+    contractorEmail: emailSchema,
     workerAddress: addressSchema,
     currencyAddress: addressSchema,
     title: z.string().trim().min(1).max(120),
@@ -66,6 +68,8 @@ export const resolveMilestoneSchema = z
   })
   .strict();
 
+export const joinContractorSchema = z.object({}).strict();
+
 export const exportArtifactQuerySchema = z
   .object({
     artifact: z.enum(['job-history', 'dispute-case']).default('job-history'),
@@ -81,4 +85,5 @@ export type DeliverMilestoneDto = z.infer<typeof deliverMilestoneSchema>;
 export type ReleaseMilestoneDto = z.infer<typeof releaseMilestoneSchema>;
 export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
 export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;
+export type JoinContractorDto = z.infer<typeof joinContractorSchema>;
 export type ExportArtifactQueryDto = z.infer<typeof exportArtifactQuerySchema>;

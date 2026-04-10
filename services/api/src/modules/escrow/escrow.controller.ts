@@ -20,6 +20,7 @@ import type {
   EscrowAuditBundle,
   EscrowJobsListResponse,
   FundJobResponse,
+  JoinContractorResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
 } from './escrow.types';
@@ -53,6 +54,18 @@ export class EscrowController {
     dto: escrowDto.FundJobDto,
   ): Promise<FundJobResponse> {
     return this.escrowService.fundJob(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/contractor/join')
+  joinContractor(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(escrowDto.joinContractorSchema))
+    dto: escrowDto.JoinContractorDto,
+  ): Promise<JoinContractorResponse> {
+    void dto;
+    return this.escrowService.joinContractor(user.id, id);
   }
 
   @UseGuards(AuthGuard)

@@ -5,6 +5,7 @@ import type {
 } from '../../modules/auth/auth.types';
 import type {
   EscrowChainSyncRecord,
+  EscrowContractorParticipationRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
@@ -48,7 +49,8 @@ function normalizeFailureWorkflowStatus(
 function normalizeEscrowJobRecord(
   job:
     | EscrowJobRecord
-    | (Omit<EscrowJobRecord, 'operations'> & {
+    | (Omit<EscrowJobRecord, 'operations' | 'contractorParticipation'> & {
+        contractorParticipation?: EscrowContractorParticipationRecord | null;
         operations?: {
           chainSync?: EscrowChainSyncRecord | null;
           executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
@@ -58,6 +60,15 @@ function normalizeEscrowJobRecord(
 ): EscrowJobRecord {
   return {
     ...job,
+    contractorParticipation: job.contractorParticipation
+      ? {
+          contractorEmail: normalizeEmail(job.contractorParticipation.contractorEmail),
+          status:
+            job.contractorParticipation.status === 'joined' ? 'joined' : 'pending',
+          joinedUserId: job.contractorParticipation.joinedUserId ?? null,
+          joinedAt: job.contractorParticipation.joinedAt ?? null,
+        }
+      : null,
     operations: {
       chainSync: job.operations?.chainSync
         ? {

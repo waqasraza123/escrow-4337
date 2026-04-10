@@ -7,6 +7,7 @@ import type {
 import type {
   EscrowAuditEvent,
   EscrowChainSyncRecord,
+  EscrowContractorParticipationRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowExecutionRecord,
@@ -118,6 +119,7 @@ type JobRow = QueryResultRow & {
   client_address: string;
   worker_address: string;
   currency_address: string;
+  contractor_participation_json: EscrowContractorParticipationRecord | null;
   operations_json: {
     chainSync?: EscrowChainSyncRecord | null;
     executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
@@ -319,6 +321,26 @@ function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
   };
 }
 
+function mapContractorParticipation(
+  row: JobRow,
+): EscrowContractorParticipationRecord | null {
+  if (!row.contractor_participation_json) {
+    return null;
+  }
+
+  return {
+    contractorEmail: row.contractor_participation_json.contractorEmail
+      .trim()
+      .toLowerCase(),
+    status:
+      row.contractor_participation_json.status === 'joined'
+        ? 'joined'
+        : 'pending',
+    joinedUserId: row.contractor_participation_json.joinedUserId ?? null,
+    joinedAt: row.contractor_participation_json.joinedAt ?? null,
+  };
+}
+
 function mapMilestone(row: MilestoneRow): EscrowMilestoneRecord {
   return {
     title: row.title,
@@ -389,6 +411,7 @@ async function replaceEscrowAggregate(
         client_address,
         worker_address,
         currency_address,
+        contractor_participation_json,
         operations_json
       )
       VALUES (
@@ -408,7 +431,8 @@ async function replaceEscrowAggregate(
         $14,
         $15,
         $16,
-        $17::jsonb
+        $17::jsonb,
+        $18::jsonb
       )
       ON CONFLICT (id) DO UPDATE
       SET
@@ -426,6 +450,7 @@ async function replaceEscrowAggregate(
         client_address = EXCLUDED.client_address,
         worker_address = EXCLUDED.worker_address,
         currency_address = EXCLUDED.currency_address,
+        contractor_participation_json = EXCLUDED.contractor_participation_json,
         operations_json = EXCLUDED.operations_json
     `,
     [
@@ -445,6 +470,7 @@ async function replaceEscrowAggregate(
       job.onchain.clientAddress,
       job.onchain.workerAddress,
       job.onchain.currencyAddress,
+      JSON.stringify(job.contractorParticipation),
       JSON.stringify(job.operations),
     ],
   );
@@ -1179,6 +1205,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             client_address,
             worker_address,
             currency_address,
+            contractor_participation_json,
             operations_json
           FROM escrow_jobs
           WHERE id = $1
@@ -1265,6 +1292,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
         milestones: milestoneResult.rows.map(mapMilestone),
         audit: auditResult.rows.map(mapAudit),
         onchain: mapOnchain(jobRow),
+        contractorParticipation: mapContractorParticipation(jobRow),
         operations: mapOperations(jobRow),
         executions: executionResult.rows.map(mapExecution),
       } satisfies EscrowJobRecord;
@@ -1292,6 +1320,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             client_address,
             worker_address,
             currency_address,
+            contractor_participation_json,
             operations_json
           FROM escrow_jobs
           ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
@@ -1373,6 +1402,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             updatedAt: Number(jobRow.updated_at_ms),
             milestones: milestones.rows.map(mapMilestone),
             audit: audit.rows.map(mapAudit),
+            contractorParticipation: mapContractorParticipation(jobRow),
             operations: mapOperations(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),
@@ -1409,6 +1439,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             client_address,
             worker_address,
             currency_address,
+            contractor_participation_json,
             operations_json
           FROM escrow_jobs
           WHERE client_address = ANY($1::text[]) OR worker_address = ANY($1::text[])
@@ -1492,6 +1523,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             updatedAt: Number(jobRow.updated_at_ms),
             milestones: milestones.rows.map(mapMilestone),
             audit: audit.rows.map(mapAudit),
+            contractorParticipation: mapContractorParticipation(jobRow),
             operations: mapOperations(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),

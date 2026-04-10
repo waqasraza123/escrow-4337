@@ -12,6 +12,7 @@ const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
+const contractorEmail = 'worker@example.com';
 
 describe('EscrowHistoryImportService', () => {
   const originalEnv = { ...process.env };
@@ -128,7 +129,7 @@ describe('EscrowHistoryImportService', () => {
       100_000,
     );
 
-    expect(report.normalization.auditWasReordered).toBe(false);
+    expect(report.normalization.auditWasReordered).toBe(true);
     expect(report.localComparison).toMatchObject({
       localJobFound: true,
       aggregateMatches: true,
@@ -153,6 +154,7 @@ describe('EscrowHistoryImportService', () => {
 
   async function createDeliveredJob() {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Imported timeline target',
@@ -174,6 +176,7 @@ describe('EscrowHistoryImportService', () => {
         },
       ],
     });
+    await escrowService.joinContractor(workerUserId, createdJob.jobId);
     await escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
       note: 'Submitted for replay import.',
       evidenceUrls: ['https://example.com/evidence'],

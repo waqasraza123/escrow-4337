@@ -36,6 +36,19 @@ export class EscrowActorService {
   }
 
   async resolveWorkerForJob(userId: string, job: EscrowJobRecord) {
+    const participation = job.contractorParticipation;
+
+    if (participation) {
+      if (
+        participation.status !== 'joined' ||
+        participation.joinedUserId !== userId
+      ) {
+        throw new ForbiddenException(
+          'Contractor must join this contract before worker actions are enabled',
+        );
+      }
+    }
+
     return this.requireLinkedWallet(userId, job.onchain.workerAddress);
   }
 

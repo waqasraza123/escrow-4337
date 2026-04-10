@@ -14,6 +14,7 @@ const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
+const contractorEmail = 'worker@example.com';
 
 describe('EscrowHealthService', () => {
   const originalEnv = { ...process.env };
@@ -82,6 +83,7 @@ describe('EscrowHealthService', () => {
     const reportNow = 100_000_000;
 
     const staleJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Stale draft job',
@@ -109,6 +111,7 @@ describe('EscrowHealthService', () => {
     await escrowRepository.save(staleRecord);
 
     const disputedJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Disputed delivery',
@@ -130,6 +133,7 @@ describe('EscrowHealthService', () => {
         },
       ],
     });
+    await escrowService.joinContractor(workerUserId, disputedJob.jobId);
     await escrowService.deliverMilestone(workerUserId, disputedJob.jobId, 0, {
       note: 'Submitted for review',
       evidenceUrls: ['https://example.com/evidence'],
@@ -140,6 +144,7 @@ describe('EscrowHealthService', () => {
     });
 
     const failedJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Relay-failed funding',
@@ -325,6 +330,7 @@ describe('EscrowHealthService', () => {
 
     for (const title of ['Dispute A', 'Dispute B', 'Dispute C', 'Failure A']) {
       const createdJob = await escrowService.createJob(clientUserId, {
+        contractorEmail,
         workerAddress,
         currencyAddress,
         title,
@@ -400,6 +406,7 @@ describe('EscrowHealthService', () => {
 
   it('surfaces reconciliation drift when aggregate state diverges from the persisted timeline', async () => {
     const driftedJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Timeline drift job',
@@ -448,7 +455,7 @@ describe('EscrowHealthService', () => {
         issueCount: 3,
         highestSeverity: 'critical',
         sourceCounts: {
-          auditEvents: 1,
+          auditEvents: 2,
           confirmedExecutions: 1,
           failedExecutions: 0,
         },
@@ -468,6 +475,7 @@ describe('EscrowHealthService', () => {
 
   it('surfaces chain-sync backlog when the latest sync attempt is failing', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Backlogged chain sync',
@@ -542,6 +550,7 @@ describe('EscrowHealthService', () => {
 
   it('surfaces timeline transition drift when replay encounters an impossible audit sequence', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Impossible audit ordering',
@@ -621,6 +630,7 @@ describe('EscrowHealthService', () => {
     const reportNow = 100_000_000;
 
     const staleJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Stale claim target',
@@ -686,6 +696,7 @@ describe('EscrowHealthService', () => {
     const reportNow = 100_000_000;
 
     const failedJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Retry-needed job',

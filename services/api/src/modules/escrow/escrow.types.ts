@@ -28,6 +28,22 @@ export type EscrowAuditEvent =
       };
     }
   | {
+      type: 'job.contractor_participation_requested';
+      at: number;
+      payload: {
+        jobId: string;
+        workerAddress: string;
+      };
+    }
+  | {
+      type: 'job.contractor_joined';
+      at: number;
+      payload: {
+        jobId: string;
+        workerAddress: string;
+      };
+    }
+  | {
       type: 'job.funded';
       at: number;
       payload: {
@@ -93,6 +109,26 @@ export type EscrowMilestoneRecord = {
   disputeEvidenceUrls?: string[];
   resolutionAction?: 'release' | 'refund';
   resolutionNote?: string;
+};
+
+export type EscrowContractorParticipationStatus = 'pending' | 'joined';
+
+export type EscrowContractorParticipationRecord = {
+  contractorEmail: string;
+  status: EscrowContractorParticipationStatus;
+  joinedUserId: string | null;
+  joinedAt: number | null;
+};
+
+export type EscrowContractorParticipationView = {
+  contractorEmail: string;
+  status: EscrowContractorParticipationStatus;
+  joinedAt: number | null;
+};
+
+export type EscrowContractorParticipationPublicView = {
+  status: EscrowContractorParticipationStatus;
+  joinedAt: number | null;
 };
 
 export type EscrowOnchainState = {
@@ -171,6 +207,7 @@ export type EscrowJobRecord = {
   status: JobStatus;
   createdAt: number;
   updatedAt: number;
+  contractorParticipation: EscrowContractorParticipationRecord | null;
   milestones: EscrowMilestoneRecord[];
   audit: EscrowAuditEvent[];
   operations: {
@@ -182,7 +219,19 @@ export type EscrowJobRecord = {
   executions: EscrowExecutionRecord[];
 };
 
-export type EscrowJobView = Omit<EscrowJobRecord, 'audit' | 'executions'>;
+export type EscrowJobView = Omit<
+  EscrowJobRecord,
+  'audit' | 'executions' | 'contractorParticipation'
+> & {
+  contractorParticipation: EscrowContractorParticipationView | null;
+};
+
+export type EscrowPublicJobView = Omit<
+  EscrowJobView,
+  'contractorParticipation'
+> & {
+  contractorParticipation: EscrowContractorParticipationPublicView | null;
+};
 
 export type EscrowParticipantRole = 'client' | 'worker';
 
@@ -197,7 +246,7 @@ export type EscrowJobsListResponse = {
 
 export type EscrowAuditBundle = {
   bundle: {
-    job: EscrowJobView;
+    job: EscrowPublicJobView;
     audit: EscrowAuditEvent[];
     executions: EscrowExecutionRecord[];
   };
@@ -222,7 +271,7 @@ export type EscrowJobHistoryExport = {
   schemaVersion: 1;
   artifact: 'job-history';
   exportedAt: string;
-  job: EscrowJobView;
+  job: EscrowPublicJobView;
   summary: {
     milestoneCount: number;
     disputedMilestones: number;
@@ -238,7 +287,7 @@ export type EscrowDisputeCaseExport = {
   schemaVersion: 1;
   artifact: 'dispute-case';
   exportedAt: string;
-  job: EscrowJobView;
+  job: EscrowPublicJobView;
   summary: {
     disputeCount: number;
     openDisputes: number;
@@ -277,6 +326,11 @@ export type CreateJobResponse = {
   status: JobStatus;
   escrowId: string;
   txHash: string;
+};
+
+export type JoinContractorResponse = {
+  jobId: string;
+  contractorParticipation: EscrowContractorParticipationPublicView;
 };
 
 export type FundJobResponse = {

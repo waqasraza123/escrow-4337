@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -29,10 +30,14 @@ import type {
   CreateJobResponse,
   EscrowAuditBundle,
   EscrowAuditEvent,
+  EscrowContractorParticipationPublicView,
   EscrowExecutionRecord,
   FundJobResponse,
   EscrowJobRecord,
   EscrowJobsListResponse,
+  EscrowJobView,
+  EscrowPublicJobView,
+  JoinContractorResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
 } from './escrow.types';
@@ -129,10 +134,19 @@ export class EscrowService {
 
     return {
       jobs: jobs
-        .map((job) => ({
-          job: this.toJobView(job),
-          participantRoles: this.resolveParticipantRoles(job, addresses),
-        }))
+        .map((job) => {
+          const participantRoles = this.resolveParticipantRoles(job, user);
+
+          if (participantRoles.length === 0) {
+            return null;
+          }
+
+          return {
+            job: this.toJobView(job),
+            participantRoles,
+          };
+        })
+        .filter((job): job is EscrowJobsListResponse['jobs'][number] => Boolean(job))
         .sort((left, right) => right.job.updatedAt - left.job.updatedAt),
     };
   }
@@ -166,6 +180,12 @@ export class EscrowService {
       status: 'draft',
       createdAt: now,
       updatedAt: createdJob.confirmedAt,
+      contractorParticipation: {
+        contractorEmail: dto.contractorEmail,
+        status: 'pending',
+        joinedUserId: null,
+        joinedAt: null,
+      },
       milestones: [],
       audit: [],
       operations: {
@@ -191,6 +211,14 @@ export class EscrowService {
         jobId,
         category: job.category,
         escrowId: createdJob.escrowId,
+      },
+    });
+    this.appendAudit(job, {
+      type: 'job.contractor_participation_requested',
+      at: createdJob.confirmedAt,
+      payload: {
+        jobId,
+        workerAddress,
       },
     });
     this.appendExecution(
@@ -260,6 +288,62 @@ export class EscrowService {
       fundedAmount: job.fundedAmount,
       status: job.status,
       txHash: receipt.txHash,
+    };
+  }
+
+  async joinContractor(
+    userId: string,
+    jobId: string,
+  ): Promise<JoinContractorResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const participation = this.requireContractorParticipation(job);
+    const user = await this.usersService.getRequiredById(userId);
+
+    if (participation.status === 'joined') {
+      if (participation.joinedUserId === user.id) {
+        return {
+          jobId: job.id,
+          contractorParticipation: this.toPublicContractorParticipationView(
+            participation,
+          )!,
+        };
+      }
+
+      throw new ConflictException('Contractor participation has already been claimed');
+    }
+
+    if (user.email !== participation.contractorEmail) {
+      throw new ForbiddenException(
+        'Authenticated email must match the pending contractor email',
+      );
+    }
+
+    if (!this.usersService.userHasWalletAddress(user, job.onchain.workerAddress)) {
+      throw new ForbiddenException(
+        `Link ${job.onchain.workerAddress} before joining this contract`,
+      );
+    }
+
+    const now = Date.now();
+    participation.status = 'joined';
+    participation.joinedUserId = user.id;
+    participation.joinedAt = now;
+    job.updatedAt = now;
+    this.appendAudit(job, {
+      type: 'job.contractor_joined',
+      at: now,
+      payload: {
+        jobId: job.id,
+        workerAddress: job.onchain.workerAddress,
+      },
+    });
+    await this.escrowRepository.save(job);
+
+    return {
+      jobId: job.id,
+      contractorParticipation: this.toPublicContractorParticipationView(
+        participation,
+      )!,
     };
   }
 
@@ -571,7 +655,10 @@ export class EscrowService {
 
     return {
       bundle: {
-        job: jobView,
+        job: this.toPublicJobViewFromRecord({
+          ...jobView,
+          contractorParticipation: job.contractorParticipation,
+        }),
         audit,
         executions,
       },
@@ -587,16 +674,63 @@ export class EscrowService {
     return buildEscrowExportDocument(bundle, artifact, format);
   }
 
-  private toJobView(job: EscrowJobRecord) {
-    const { audit, executions, ...jobView } = cloneValue(job);
+  private toJobView(job: EscrowJobRecord): EscrowJobView {
+    const { audit, executions, contractorParticipation, ...jobView } =
+      cloneValue(job);
     void audit;
     void executions;
-    return jobView;
+    return {
+      ...jobView,
+      contractorParticipation:
+        this.toContractorParticipationView(contractorParticipation),
+    };
   }
 
-  private resolveParticipantRoles(job: EscrowJobRecord, addresses: string[]) {
+  private toPublicJobViewFromRecord(
+    job: Omit<EscrowJobRecord, 'audit' | 'executions'>,
+  ): EscrowPublicJobView {
+    const { contractorParticipation, ...jobView } = cloneValue(job);
+
+    return {
+      ...jobView,
+      contractorParticipation:
+        this.toPublicContractorParticipationView(contractorParticipation),
+    };
+  }
+
+  private toContractorParticipationView(
+    participation: EscrowJobRecord['contractorParticipation'],
+  ) {
+    if (!participation) {
+      return null;
+    }
+
+    return {
+      contractorEmail: participation.contractorEmail,
+      status: participation.status,
+      joinedAt: participation.joinedAt,
+    };
+  }
+
+  private toPublicContractorParticipationView(
+    participation: EscrowJobRecord['contractorParticipation'],
+  ): EscrowContractorParticipationPublicView | null {
+    if (!participation) {
+      return null;
+    }
+
+    return {
+      status: participation.status,
+      joinedAt: participation.joinedAt,
+    };
+  }
+
+  private resolveParticipantRoles(
+    job: EscrowJobRecord,
+    user: Awaited<ReturnType<UsersService['getRequiredById']>>,
+  ) {
     const normalizedAddresses = new Set(
-      addresses.map((address) => normalizeEvmAddress(address)),
+      user.wallets.map((wallet) => normalizeEvmAddress(wallet.address)),
     );
     const roles: Array<'client' | 'worker'> = [];
 
@@ -608,11 +742,26 @@ export class EscrowService {
 
     if (
       normalizedAddresses.has(normalizeEvmAddress(job.onchain.workerAddress))
+      && this.userCanActAsWorker(job, user)
     ) {
       roles.push('worker');
     }
 
     return roles;
+  }
+
+  private userCanActAsWorker(
+    job: EscrowJobRecord,
+    user: Awaited<ReturnType<UsersService['getRequiredById']>>,
+  ) {
+    if (!job.contractorParticipation) {
+      return true;
+    }
+
+    return (
+      job.contractorParticipation.status === 'joined' &&
+      job.contractorParticipation.joinedUserId === user.id
+    );
   }
 
   private async executeMutation(input: {
@@ -695,6 +844,16 @@ export class EscrowService {
         }),
       )
       .digest('hex')}`;
+  }
+
+  private requireContractorParticipation(job: EscrowJobRecord) {
+    if (!job.contractorParticipation) {
+      throw new ConflictException(
+        'This contract does not support contractor join state',
+      );
+    }
+
+    return job.contractorParticipation;
   }
 
   private appendAudit(job: EscrowJobRecord, event: EscrowAuditEvent) {

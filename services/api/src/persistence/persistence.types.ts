@@ -58,7 +58,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 9;
+  version: 10;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;

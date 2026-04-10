@@ -18,6 +18,7 @@ const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
+const contractorEmail = 'worker@example.com';
 
 describe('EscrowService', () => {
   let escrowService: EscrowService;
@@ -62,6 +63,7 @@ describe('EscrowService', () => {
 
   it('supports the funded milestone lifecycle through release and completion', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Landing page build',
@@ -113,6 +115,13 @@ describe('EscrowService', () => {
     expect(milestoneResult.status).toBe('funded');
     expect(milestoneResult.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
+    const joinResult = await escrowService.joinContractor(
+      workerUserId,
+      createdJob.jobId,
+    );
+    expect(joinResult.contractorParticipation.status).toBe('joined');
+    expect(joinResult.contractorParticipation.joinedAt).not.toBeNull();
+
     const firstDeliveryResult = await escrowService.deliverMilestone(
       workerUserId,
       createdJob.jobId,
@@ -162,8 +171,10 @@ describe('EscrowService', () => {
     expect(auditBundle.bundle.executions).toHaveLength(7);
     expect(auditBundle.bundle.audit.map((event) => event.type)).toEqual([
       'job.created',
+      'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_joined',
       'milestone.delivered',
       'milestone.released',
       'milestone.delivered',
@@ -173,6 +184,7 @@ describe('EscrowService', () => {
 
   it('resolves disputed milestones and marks refunded jobs as resolved', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Backend milestone contract',
@@ -195,6 +207,7 @@ describe('EscrowService', () => {
         },
       ],
     });
+    await escrowService.joinContractor(workerUserId, createdJob.jobId);
     await escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
       note: 'Implementation delivered for review',
       evidenceUrls: [],
@@ -283,6 +296,7 @@ describe('EscrowService', () => {
     );
 
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Funding failure',
@@ -313,6 +327,7 @@ describe('EscrowService', () => {
 
   it('lists jobs for the current participant with derived roles', async () => {
     const firstJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Client-visible job',
@@ -326,6 +341,7 @@ describe('EscrowService', () => {
     await escrowService.fundJob(clientUserId, firstJob.jobId, {
       amount: '35',
     });
+    await escrowService.joinContractor(workerUserId, firstJob.jobId);
 
     const otherClient = await usersService.getOrCreateByEmail(
       'other-client@example.com',
@@ -358,7 +374,8 @@ describe('EscrowService', () => {
       otherExecutionAddress,
     );
 
-    await escrowService.createJob(otherClient.id, {
+    const secondJob = await escrowService.createJob(otherClient.id, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Worker-visible job',
@@ -368,6 +385,7 @@ describe('EscrowService', () => {
         currency: 'USDC',
       },
     });
+    await escrowService.joinContractor(workerUserId, secondJob.jobId);
 
     const clientJobs = await escrowService.listJobsForUser(clientUserId);
     expect(clientJobs.jobs).toHaveLength(1);
@@ -382,8 +400,71 @@ describe('EscrowService', () => {
     ).toEqual(['worker', 'worker']);
   });
 
+  it('keeps pending contractor jobs hidden until the matching contractor joins', async () => {
+    const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
+      workerAddress,
+      currencyAddress,
+      title: 'Join-gated delivery',
+      description: 'Worker access must stay pending until join succeeds.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    await escrowService.fundJob(clientUserId, createdJob.jobId, {
+      amount: '50',
+    });
+    await escrowService.setMilestones(clientUserId, createdJob.jobId, {
+      milestones: [
+        {
+          title: 'Delivery',
+          deliverable: 'Joined contractor milestone',
+          amount: '50',
+        },
+      ],
+    });
+
+    const pendingWorkerJobs = await escrowService.listJobsForUser(workerUserId);
+    expect(
+      pendingWorkerJobs.jobs.find((entry) => entry.job.id === createdJob.jobId),
+    ).toBeUndefined();
+
+    await expect(
+      escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
+        note: 'Premature delivery',
+        evidenceUrls: [],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    const joinResult = await escrowService.joinContractor(
+      workerUserId,
+      createdJob.jobId,
+    );
+    expect(joinResult.contractorParticipation.status).toBe('joined');
+
+    const joinedWorkerJobs = await escrowService.listJobsForUser(workerUserId);
+    expect(
+      joinedWorkerJobs.jobs.find((entry) => entry.job.id === createdJob.jobId)
+        ?.participantRoles,
+    ).toEqual(['worker']);
+
+    const auditBundle = await escrowService.getAuditBundle(createdJob.jobId);
+    expect(auditBundle.bundle.job.contractorParticipation).toMatchObject({
+      status: 'joined',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        auditBundle.bundle.job.contractorParticipation ?? {},
+        'contractorEmail',
+      ),
+    ).toBe(false);
+  });
+
   it('rejects milestone totals that do not match the funded amount', async () => {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Mismatch example',
@@ -424,6 +505,7 @@ describe('EscrowService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Invalid transitions',
@@ -456,6 +538,7 @@ describe('EscrowService', () => {
 
     await expect(
       escrowService.createJob(userWithoutWallet.id, {
+        contractorEmail,
         workerAddress,
         currencyAddress,
         title: 'Unlinked user',
@@ -483,6 +566,7 @@ describe('EscrowService', () => {
 
     await expect(
       escrowService.createJob(eoaOnlyUser.id, {
+        contractorEmail,
         workerAddress,
         currencyAddress,
         title: 'EOA execution',

@@ -18,6 +18,7 @@ import type {
   AuditBundle,
   JobView,
   JobsListResponse,
+  PublicJobView,
   RuntimeProfile,
   SessionTokens,
   SmartAccountProvisionResponse,
@@ -65,6 +66,7 @@ type JobComposerState = {
   title: string;
   description: string;
   category: string;
+  contractorEmail: string;
   workerAddress: string;
   currencyAddress: string;
   settlementAsset: string;
@@ -132,6 +134,7 @@ function createInitialJobComposerState(): JobComposerState {
     title: '',
     description: '',
     category: 'software-development',
+    contractorEmail: '',
     workerAddress: '',
     currencyAddress: '',
     settlementAsset: 'USDC',
@@ -345,12 +348,18 @@ function getConsoleFrame(view: EscrowConsoleView) {
   }
 }
 
-function getStringTerm(job: JobView | null, key: string) {
+function getStringTerm(
+  job: { termsJSON: Record<string, unknown> } | null,
+  key: string,
+) {
   const value = job?.termsJSON?.[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function getNumericTerm(job: JobView | null, key: string) {
+function getNumericTerm(
+  job: { termsJSON: Record<string, unknown> } | null,
+  key: string,
+) {
   const value = job?.termsJSON?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -430,7 +439,19 @@ export function EscrowConsole({
     [jobsResponse.jobs, selectedJobId],
   );
 
-  const selectedJobView = auditBundle?.bundle.job ?? selectedJob?.job ?? null;
+  const selectedJobView = useMemo(() => {
+    const listJob = selectedJob?.job ?? null;
+    const auditJob = auditBundle?.bundle.job ?? null;
+
+    if (listJob && auditJob && listJob.id === auditJob.id) {
+      return {
+        ...auditJob,
+        contractorParticipation: listJob.contractorParticipation,
+      };
+    }
+
+    return listJob ?? auditJob;
+  }, [auditBundle, selectedJob]);
   const jobAuditEvents = auditBundle?.bundle.audit ?? [];
   const jobExecutions = auditBundle?.bundle.executions ?? [];
   const selectedMilestone = selectedJobView?.milestones[selectedMilestoneIndex];
@@ -447,6 +468,22 @@ export function EscrowConsole({
   const controlsSelectedClientWallet = Boolean(
     selectedJobView && linkedWalletAddresses.has(selectedJobView.onchain.clientAddress),
   );
+  const selectedContractorParticipation = selectedJobView?.contractorParticipation ?? null;
+  const pendingContractorEmail =
+    selectedJob?.job.contractorParticipation?.contractorEmail?.trim().toLowerCase() ??
+    null;
+  const currentUserEmail = profile?.email?.trim().toLowerCase() ?? null;
+  const currentUserMatchesPendingContractorEmail = Boolean(
+    currentUserEmail &&
+      pendingContractorEmail &&
+      currentUserEmail === pendingContractorEmail,
+  );
+  const canJoinSelectedContract =
+    Boolean(accessToken) &&
+    Boolean(selectedJobView) &&
+    !isClientForSelectedJob &&
+    selectedContractorParticipation?.status === 'pending' &&
+    controlsSelectedWorkerWallet;
   const reviewWindowDays = getNumericTerm(selectedJobView, 'reviewWindowDays');
   const disputeModel = getStringTerm(selectedJobView, 'disputeModel');
   const evidenceExpectation = getStringTerm(selectedJobView, 'evidenceExpectation');
@@ -495,6 +532,10 @@ export function EscrowConsole({
             createJobState.description.trim() &&
             createJobState.category.trim(),
         ),
+      },
+      {
+        label: 'Contractor email is set',
+        ok: Boolean(createJobState.contractorEmail.trim()),
       },
       {
         label: 'Worker wallet is set',
@@ -1141,6 +1182,7 @@ export function EscrowConsole({
       const termsJSON = buildJobTermsJson(createJobState, milestones);
       const response = await webApi.createJob(
         {
+          contractorEmail: createJobState.contractorEmail,
           workerAddress: createJobState.workerAddress,
           currencyAddress: createJobState.currencyAddress,
           title: createJobState.title,
@@ -1164,6 +1206,27 @@ export function EscrowConsole({
       await refreshSelectedJobContext(response.jobId);
     } catch (error) {
       setJobActionState(createErrorState(error, 'Failed to create job'));
+    }
+  }
+
+  async function handleJoinContract() {
+    if (!accessToken || !selectedJobView) {
+      return;
+    }
+
+    setJobActionState(createWorkingState('Joining contract...'));
+
+    try {
+      await webApi.joinContractor(selectedJobView.id, accessToken);
+      await refreshSelectedJobContext(selectedJobView.id);
+      setJobActionState(
+        createSuccessState(
+          'Contract joined. Worker delivery is now enabled for this session.',
+        ),
+      );
+    } catch (error) {
+      await refreshSelectedJobContext(selectedJobView.id);
+      setJobActionState(createErrorState(error, 'Failed to join contract'));
     }
   }
 
@@ -1798,6 +1861,19 @@ export function EscrowConsole({
             {composerStep === 'counterparty' ? (
               <div className={styles.composerSection}>
                 <label className={styles.field}>
+                  <span>Contractor email</span>
+                  <input
+                    value={createJobState.contractorEmail}
+                    onChange={(event) =>
+                      setCreateJobState((current) => ({
+                        ...current,
+                        contractorEmail: event.target.value,
+                      }))
+                    }
+                    placeholder="contractor@example.com"
+                  />
+                </label>
+                <label className={styles.field}>
                   <span>Worker wallet</span>
                   <input
                     value={createJobState.workerAddress}
@@ -1864,12 +1940,13 @@ export function EscrowConsole({
                   <article>
                     <span className={styles.metaLabel}>Counterparty check</span>
                     <strong>
-                      {createJobState.workerAddress.trim()
-                        ? 'Worker address captured'
-                        : 'Worker address missing'}
+                      {createJobState.contractorEmail.trim() &&
+                      createJobState.workerAddress.trim()
+                        ? 'Contractor identity captured'
+                        : 'Contractor identity incomplete'}
                     </strong>
                     <p className={styles.muted}>
-                      Keep this aligned with the worker wallet that will deliver milestones.
+                      The contractor must join with this email and this worker wallet.
                     </p>
                   </article>
                 </div>
@@ -1937,6 +2014,9 @@ export function EscrowConsole({
                     <strong>Commercial plan</strong>
                     <span>{milestoneDraftCount} ready milestones</span>
                   </div>
+                  <p className={styles.muted}>
+                    Contractor join requires {createJobState.contractorEmail || 'the pending contractor email'} and {createJobState.workerAddress || 'the bound worker wallet'} from the shared contract link.
+                  </p>
                   <p className={styles.muted}>
                     Total drafted milestone amount: {milestoneDraftTotal || 0}
                   </p>
@@ -2102,6 +2182,10 @@ export function EscrowConsole({
                   <strong>{previewHash(selectedJobView.onchain.workerAddress)}</strong>
                 </article>
                 <article>
+                  <span className={styles.metaLabel}>Contractor join</span>
+                  <strong>{selectedContractorParticipation?.status || 'legacy'}</strong>
+                </article>
+                <article>
                   <span className={styles.metaLabel}>Review window</span>
                   <strong>
                     {reviewWindowDays !== null ? `${reviewWindowDays} days` : 'Not set'}
@@ -2141,20 +2225,36 @@ export function EscrowConsole({
                 <div className={styles.walletTitleRow}>
                   <strong>Contractor join access</strong>
                   <span>
-                    {controlsSelectedWorkerWallet
-                      ? 'Wallet verified'
-                      : accessToken
-                        ? 'Wallet missing'
-                        : 'Share link ready'}
+                    {selectedContractorParticipation?.status === 'joined'
+                      ? 'Joined'
+                      : canJoinSelectedContract
+                        ? 'Ready to join'
+                        : controlsSelectedWorkerWallet
+                          ? 'Wallet verified'
+                          : accessToken
+                            ? 'Setup required'
+                            : 'Share link ready'}
                   </span>
                 </div>
                 <p className={styles.muted}>
-                  {controlsSelectedWorkerWallet
-                    ? 'This session controls the exact worker wallet bound at contract creation.'
-                    : accessToken
-                      ? `Link ${selectedJobView.onchain.workerAddress} to unlock contractor delivery for this shared contract link.`
-                      : 'Share this contract link with the contractor. They must sign in and link the bound worker wallet before delivery is enabled.'}
+                  {!accessToken
+                    ? 'Share this contract link with the contractor. They must sign in, use the matching email, and link the bound worker wallet before delivery is enabled.'
+                    : selectedContractorParticipation?.status === 'joined'
+                      ? 'This contract has already been joined by the bound contractor identity.'
+                      : pendingContractorEmail && !currentUserMatchesPendingContractorEmail
+                        ? 'Use the matching contractor email from contract setup before joining this contract.'
+                        : !pendingContractorEmail
+                          ? 'Use the contractor email entered during contract setup before joining this contract.'
+                        : !controlsSelectedWorkerWallet
+                          ? `Link ${selectedJobView.onchain.workerAddress} before joining this contract.`
+                          : 'This session controls the bound worker wallet and is ready for contractor join.'}
                 </p>
+                {selectedJob?.job.contractorParticipation?.contractorEmail ? (
+                  <p className={styles.muted}>
+                    Pending contractor email:{' '}
+                    {selectedJob.job.contractorParticipation.contractorEmail}
+                  </p>
+                ) : null}
                 <div className={styles.inlineActions}>
                   <button
                     type="button"
@@ -2163,6 +2263,15 @@ export function EscrowConsole({
                   >
                     Copy contractor link
                   </button>
+                  {selectedContractorParticipation?.status === 'pending' ? (
+                    <button
+                      type="button"
+                      onClick={handleJoinContract}
+                      disabled={!canJoinSelectedContract}
+                    >
+                      Join contract
+                    </button>
+                  ) : null}
                 </div>
                 <StatusNotice
                   message={joinLinkState.message}

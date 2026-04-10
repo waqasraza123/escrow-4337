@@ -11,6 +11,7 @@ const clientAddress = '0x1111111111111111111111111111111111111111';
 const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
+const contractorEmail = 'worker@example.com';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 
 describe('Escrow export support', () => {
@@ -60,6 +61,7 @@ describe('Escrow export support', () => {
 
   it('builds deterministic job-history JSON and dispute-case CSV exports', async () => {
     const createResponse = await controller.create(clientUser, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Escrow export coverage',
@@ -88,6 +90,7 @@ describe('Escrow export support', () => {
         },
       ],
     });
+    await controller.joinContractor(workerUser, createResponse.jobId, {});
     await controller.deliver(workerUser, createResponse.jobId, 0, {
       note: 'Delivery submitted',
       evidenceUrls: ['https://example.com/evidence'],
@@ -128,15 +131,17 @@ describe('Escrow export support', () => {
       throw new Error('Expected JSON export body for job-history artifact');
     }
     const jobHistoryBody = jobHistory.body as EscrowJobHistoryExport;
-    expect(jobHistoryBody.timeline).toHaveLength(12);
+    expect(jobHistoryBody.timeline).toHaveLength(14);
     expect(jobHistoryBody.timeline.map((entry) => entry.label)).toEqual(
       expect.arrayContaining([
         'job.created',
+        'job.contractor_participation_requested',
         'create_job',
         'job.funded',
         'fund_job',
         'job.milestones_set',
         'set_milestones',
+        'job.contractor_joined',
         'milestone.delivered',
         'deliver_milestone',
         'milestone.disputed',

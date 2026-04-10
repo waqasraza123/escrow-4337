@@ -19,6 +19,7 @@ const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const workerAddress = '0x3333333333333333333333333333333333333333';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
+const contractorEmail = 'worker@example.com';
 const contractInterface = new utils.Interface([
   'event JobCreated(uint256 indexed escrowId, address indexed client, bytes32 jobHash)',
   'event EscrowFunded(uint256 indexed escrowId, uint256 amount, address currency)',
@@ -173,13 +174,13 @@ describe('EscrowChainSyncService', () => {
       duplicateLogs: 1,
       uniqueLogs: 4,
       auditEvents: 4,
-      auditChanged: false,
+      auditChanged: true,
     });
     expect(report.issues).toEqual([]);
     expect(report.localComparison).toMatchObject({
       aggregateMatches: true,
-      auditDigestMatches: true,
-      localAuditEvents: 4,
+      auditDigestMatches: false,
+      localAuditEvents: 6,
       chainAuditEvents: 4,
       localStatus: 'in_progress',
       chainDerivedStatus: 'in_progress',
@@ -353,8 +354,10 @@ describe('EscrowChainSyncService', () => {
     );
     expect(persisted.audit.map((event) => event.type)).toEqual([
       'job.created',
+      'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_joined',
       'milestone.delivered',
       'milestone.disputed',
     ]);
@@ -414,7 +417,7 @@ describe('EscrowChainSyncService', () => {
     expect(report.jobs).toHaveLength(1);
     expect(report.jobs[0]).toMatchObject({
       jobId: disputedJob.jobId,
-      outcome: 'clean',
+      outcome: 'changed',
       errorMessage: null,
     });
     expect(quietJob.jobId).not.toBe(disputedJob.jobId);
@@ -492,8 +495,10 @@ describe('EscrowChainSyncService', () => {
     ]);
     expect(persistedSecond.audit.map((event) => event.type)).toEqual([
       'job.created',
+      'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_joined',
       'milestone.delivered',
     ]);
     expect(persistedFirst.operations.chainSync).toMatchObject({
@@ -558,9 +563,9 @@ describe('EscrowChainSyncService', () => {
     });
     expect(report.summary).toEqual({
       processedJobs: 2,
-      cleanJobs: 1,
-      changedJobs: 1,
-      persistedJobs: 1,
+      cleanJobs: 0,
+      changedJobs: 2,
+      persistedJobs: 2,
       blockedJobs: 0,
       failedJobs: 0,
       criticalIssueJobs: 0,
@@ -581,6 +586,7 @@ describe('EscrowChainSyncService', () => {
 
   async function createDeliveredJob() {
     const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
       workerAddress,
       currencyAddress,
       title: 'Chain sync delivered job',
@@ -602,6 +608,7 @@ describe('EscrowChainSyncService', () => {
         },
       ],
     });
+    await escrowService.joinContractor(workerUserId, createdJob.jobId);
     await escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
       note: 'Submitted for chain sync.',
       evidenceUrls: ['https://example.com/evidence'],

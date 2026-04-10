@@ -87,6 +87,11 @@ export type JobView = {
   status: JobStatus;
   createdAt: number;
   updatedAt: number;
+  contractorParticipation: {
+    contractorEmail?: string;
+    status: 'pending' | 'joined';
+    joinedAt: number | null;
+  } | null;
   milestones: Array<{
     title: string;
     deliverable: string;
@@ -114,6 +119,13 @@ export type JobView = {
   };
 };
 
+export type PublicJobView = Omit<JobView, 'contractorParticipation'> & {
+  contractorParticipation: {
+    status: 'pending' | 'joined';
+    joinedAt: number | null;
+  } | null;
+};
+
 export type JobsListResponse = {
   jobs: Array<{
     job: JobView;
@@ -123,7 +135,7 @@ export type JobsListResponse = {
 
 export type AuditBundle = {
   bundle: {
-    job: JobView;
+    job: PublicJobView;
     audit: Array<{
       type: string;
       at: number;
@@ -325,6 +337,7 @@ export const webApi = {
   },
   createJob(
     input: {
+      contractorEmail: string;
       workerAddress: string;
       currencyAddress: string;
       title: string;
@@ -346,6 +359,23 @@ export const webApi = {
       {
         method: 'POST',
         body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  joinContractor(jobId: string, accessToken: string) {
+    return requestJson<{
+      jobId: string;
+      contractorParticipation: {
+        status: 'pending' | 'joined';
+        joinedAt: number | null;
+      };
+    }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/contractor/join`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
       },
       accessToken,
     );

@@ -26,6 +26,7 @@ function createJob(
     status: 'draft',
     createdAt: 100,
     updatedAt: 100,
+    contractorParticipation: null,
     milestones: milestoneOverrides.map((override, index) => ({
       title: `Milestone ${index + 1}`,
       deliverable: `Deliverable ${index + 1}`,

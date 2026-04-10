@@ -38,19 +38,47 @@ export async function signInWithOtp(input: {
   afterOtpIssued?: () => Promise<void>;
 }) {
   const { afterOtpIssued, email, otpCode, page, url } = input;
+  const emailInput = page.getByRole('textbox', { name: 'Email' });
+  const codeInput = page.getByRole('textbox', { name: 'Verification code' });
+  const sendOtpButton = page.getByRole('button', { name: 'Send OTP' });
+  const verifySessionButton = page.getByRole('button', { name: 'Verify session' });
+  const otpIssuedMessage = page.getByText(
+    'OTP issued. Check your configured mail inbox or relay logs.',
+  );
+  const validationFailedMessage = page.getByText('Validation failed');
 
   await page.goto(url);
-  await page.getByPlaceholder(/@/).fill(email);
-  await page.getByRole('button', { name: 'Send OTP' }).click();
+  await page.waitForLoadState('networkidle');
+  await expect(emailInput).toBeVisible();
 
-  await expect(
-    page.getByText('OTP issued. Check your configured mail inbox or relay logs.'),
-  ).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await emailInput.fill(email);
+    await expect(emailInput).toHaveValue(email);
+    await sendOtpButton.click();
+
+    const success = await otpIssuedMessage
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (success) {
+      break;
+    }
+
+    const validationFailed = await validationFailedMessage
+      .waitFor({ state: 'visible', timeout: 500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (attempt === 1 || !validationFailed) {
+      throw new Error(`OTP start failed for ${email}`);
+    }
+  }
 
   await afterOtpIssued?.();
 
-  await page.getByPlaceholder('123456').fill(otpCode);
-  await page.getByRole('button', { name: 'Verify session' }).click();
+  await codeInput.fill(otpCode);
+  await verifySessionButton.click();
   await expect(page.getByText(email)).toBeVisible();
 }
 
@@ -61,17 +89,46 @@ export async function linkWallet(input: {
   challengeMessage: string;
 }) {
   const { challengeMessage, page, successMessage, wallet } = input;
+  const addressInput = page.getByRole('textbox', { name: 'EOA address' });
+  const issuedMessageInput = page.getByRole('textbox', { name: 'Issued message' });
+  const walletSignatureInput = page.getByRole('textbox', { name: 'Wallet signature' });
+  const createChallengeButton = page.getByRole('button', { name: 'Create SIWE challenge' });
+  const verifyLinkedWalletButton = page.getByRole('button', { name: 'Verify linked wallet' });
+  const challengeCreatedMessage = page.getByText(challengeMessage);
+  const validationFailedMessage = page.getByText('Validation failed');
 
-  await page.getByRole('textbox', { name: 'EOA address' }).fill(wallet.address);
-  await page.getByRole('button', { name: 'Create SIWE challenge' }).click();
+  await page.waitForLoadState('networkidle');
+  await expect(addressInput).toBeVisible();
 
-  await expect(page.getByText(challengeMessage)).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await addressInput.fill(wallet.address);
+    await expect(addressInput).toHaveValue(wallet.address);
+    await createChallengeButton.click();
 
-  const message = await page.getByRole('textbox', { name: 'Issued message' }).inputValue();
+    const success = await challengeCreatedMessage
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (success) {
+      break;
+    }
+
+    const validationFailed = await validationFailedMessage
+      .waitFor({ state: 'visible', timeout: 500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (attempt === 1 || !validationFailed) {
+      throw new Error(`Wallet-link challenge failed for ${wallet.address}`);
+    }
+  }
+
+  const message = await issuedMessageInput.inputValue();
   const signature = await wallet.signMessage(message);
 
-  await page.getByRole('textbox', { name: 'Wallet signature' }).fill(signature);
-  await page.getByRole('button', { name: 'Verify linked wallet' }).click();
+  await walletSignatureInput.fill(signature);
+  await verifyLinkedWalletButton.click();
 
   await expect(page.getByText(successMessage)).toBeVisible();
 }
@@ -90,10 +147,19 @@ export async function createGuidedJob(input: {
   webBaseUrl: string;
   jobTitle: string;
   description: string;
+  contractorEmail: string;
   workerAddress: string;
   currencyAddress: string;
 }) {
-  const { currencyAddress, description, jobTitle, page, webBaseUrl, workerAddress } =
+  const {
+    contractorEmail,
+    currencyAddress,
+    description,
+    jobTitle,
+    page,
+    webBaseUrl,
+    workerAddress,
+  } =
     input;
 
   const createResponsePromise = page.waitForResponse((response) => {
@@ -110,6 +176,7 @@ export async function createGuidedJob(input: {
     .fill(description);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
+  await page.getByPlaceholder('contractor@example.com').fill(contractorEmail);
   await page.getByRole('textbox', { name: 'Worker wallet' }).fill(workerAddress);
   await page.getByRole('textbox', { name: 'Settlement token address' }).fill(currencyAddress);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -210,6 +277,8 @@ export async function runLaunchCandidateFlow(input: {
     afterOtpIssued: onClientOtpIssued,
   });
   await clientPage.goto(`${webBaseUrl}/app/setup`);
+  await expect(clientPage.getByText(flow.client.email)).toBeVisible();
+  await expect(clientPage.getByText('Console state is current.')).toBeVisible();
   await linkWallet({
     page: clientPage,
     wallet: flow.client.wallet,
@@ -224,6 +293,7 @@ export async function runLaunchCandidateFlow(input: {
     webBaseUrl,
     jobTitle: flow.jobTitle,
     description: flow.description,
+    contractorEmail: flow.contractor.email,
     workerAddress: flow.contractor.wallet.address,
     currencyAddress: flow.currencyAddress,
   });
@@ -242,6 +312,8 @@ export async function runLaunchCandidateFlow(input: {
   });
   await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
   await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
+  await expect(contractorPage.getByText(flow.contractor.email)).toBeVisible();
+  await expect(contractorPage.getByText('Console state is current.')).toBeVisible();
   await linkWallet({
     page: contractorPage,
     wallet: flow.contractor.wallet,
@@ -249,7 +321,12 @@ export async function runLaunchCandidateFlow(input: {
       'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
     successMessage: 'Wallet linked and ready for smart-account provisioning.',
   });
-  await expect(contractorPage.getByText('Wallet verified')).toBeVisible();
+  await contractorPage.getByRole('button', { name: 'Join contract' }).click();
+  await expect(
+    contractorPage.getByText(
+      'Contract joined. Worker delivery is now enabled for this session.',
+    ),
+  ).toBeVisible();
 
   await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}/deliver`);
   await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
@@ -276,6 +353,7 @@ export async function runLaunchCandidateFlow(input: {
     otpCode: flow.operator.otpCode,
     afterOtpIssued: onOperatorOtpIssued,
   });
+  await expect(operatorPage.getByText('Console state is current.')).toBeVisible();
   await linkWallet({
     page: operatorPage,
     wallet: flow.operator.wallet,
