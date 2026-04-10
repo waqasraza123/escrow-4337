@@ -46,7 +46,7 @@ if (playwrightProfile === 'deployed') {
 
 const localProject = {
   name: 'chromium',
-  testIgnore: [/deployed-profile-smoke\.spec\.ts$/],
+  testIgnore: [/deployed-profile-smoke\.spec\.ts$/, /deployed-launch-candidate-flow\.spec\.ts$/],
   use: {
     ...devices['Desktop Chrome'],
   },
@@ -54,7 +54,7 @@ const localProject = {
 
 const deployedProject = {
   name: 'deployed-chromium',
-  testMatch: /deployed-profile-smoke\.spec\.ts$/,
+  testMatch: /(deployed-profile-smoke|deployed-launch-candidate-flow)\.spec\.ts$/,
   use: {
     ...devices['Desktop Chrome'],
   },

@@ -30,6 +30,13 @@ The GitHub-native equivalent is the manual `Launch Candidate` workflow against `
 
 The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
 
+The Playwright harness now also includes a focused launch-candidate exact flow:
+
+- local profile: client create and fund, contractor join and deliver, client dispute, operator resolve
+- deployed profile: the same exact flow, but only when explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials, OTP codes, and private keys are provided
+
+Keep that exact flow optional for deployed environments until the staging secret contract is in place. It is meant to make launch-proof runs easier, not to weaken the existing read-only default smoke lane.
+
 ## Launch Readiness Endpoint
 
 `GET /operations/launch-readiness` is the machine-readable launch posture for the currently deployed backend. It summarizes:

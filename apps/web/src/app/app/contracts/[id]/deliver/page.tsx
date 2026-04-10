@@ -1,10 +1,16 @@
 import styles from '../../../../page.module.css';
 import { EscrowConsole } from '../../../../web-console';
 
-export default function DeliverPage({ params }: { params: { id: string } }) {
+export default async function DeliverPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
     <main className={styles.page}>
-      <EscrowConsole view="deliver" initialJobId={params.id} />
+      <EscrowConsole view="deliver" initialJobId={id} />
     </main>
   );
 }

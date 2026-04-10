@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { Wallet } from 'ethers';
 import { Pool } from 'pg';
 
 export const apiPort = 4100;
@@ -11,6 +12,10 @@ export const adminBaseUrl = `http://localhost:${adminPort}`;
 export const localDatabaseUrl =
   'postgresql://escrow4337:escrow4337@127.0.0.1:5432/escrow4337';
 export const localOtpCode = '123456';
+export const localArbitratorPrivateKey =
+  '0x59c6995e998f97a5a0044966f094538c5f2f6f7d5f6a17d4f2ff1f908db8b27b';
+export const localArbitratorWallet = new Wallet(localArbitratorPrivateKey);
+export const localArbitratorAddress = localArbitratorWallet.address;
 
 export const localApiEnv: Record<string, string> = {
   NODE_ENV: 'development',
@@ -47,7 +52,7 @@ export const localApiEnv: Record<string, string> = {
   ESCROW_CONTRACT_MODE: 'mock',
   ESCROW_CHAIN_ID: '84532',
   ESCROW_CONTRACT_ADDRESS: '0x1111111111111111111111111111111111111111',
-  ESCROW_ARBITRATOR_ADDRESS: '0x2222222222222222222222222222222222222222',
+  ESCROW_ARBITRATOR_ADDRESS: localArbitratorAddress,
 };
 
 let pool: Pool | null = null;

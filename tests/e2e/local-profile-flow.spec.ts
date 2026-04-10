@@ -4,110 +4,94 @@ import {
   adminBaseUrl,
   closeLocalProfileDb,
   forceOtpCode,
+  localArbitratorWallet,
   localOtpCode,
   resetOtpState,
-  waitForJobIdByTitle,
   webBaseUrl,
 } from './local-profile';
-
-function makeHexAddress(fill: string) {
-  return `0x${fill.repeat(40)}`;
-}
+import {
+  makeRunId,
+  makeTestCurrencyAddress,
+  runLaunchCandidateFlow,
+} from './launch-candidate-flow';
 
 test.afterAll(async () => {
   await closeLocalProfileDb();
 });
 
-test('client can sign in, link a wallet, provision, create and fund a job, then load it in admin', async ({
+test('local profile supports the full launch-candidate create, join, deliver, dispute, and resolve flow', async ({
   browser,
-  page,
 }) => {
-  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const email = `playwright.${runId}@escrow.local`;
-  const jobTitle = `Playwright Local Flow ${runId}`;
-  const workerWallet = Wallet.createRandom();
-  const ownerWallet = Wallet.createRandom();
-  const currencyAddress = makeHexAddress('5');
+  test.setTimeout(240_000);
 
-  await resetOtpState(email);
+  const runId = makeRunId();
+  const clientEmail = `playwright.client.${runId}@escrow.local`;
+  const contractorEmail = `playwright.contractor.${runId}@escrow.local`;
+  const operatorEmail = `playwright.operator.${runId}@escrow.local`;
+  const clientWallet = Wallet.createRandom();
+  const contractorWallet = Wallet.createRandom();
 
-  await page.goto(webBaseUrl);
-  await page.getByPlaceholder('client@example.com').fill(email);
-  await page.getByRole('button', { name: 'Send OTP' }).click();
+  await Promise.all([
+    resetOtpState(clientEmail),
+    resetOtpState(contractorEmail),
+    resetOtpState(operatorEmail),
+  ]);
+
+  const clientContext = await browser.newContext();
+  const contractorContext = await browser.newContext();
+  const operatorContext = await browser.newContext();
+  const clientPage = await clientContext.newPage();
+  const contractorPage = await contractorContext.newPage();
+  const operatorPage = await operatorContext.newPage();
+
+  await runLaunchCandidateFlow({
+    clientPage,
+    contractorPage,
+    operatorPage,
+    webBaseUrl,
+    adminBaseUrl,
+    flow: {
+      client: {
+        email: clientEmail,
+        otpCode: localOtpCode,
+        wallet: clientWallet,
+      },
+      contractor: {
+        email: contractorEmail,
+        otpCode: localOtpCode,
+        wallet: contractorWallet,
+      },
+      operator: {
+        email: operatorEmail,
+        otpCode: localOtpCode,
+        wallet: localArbitratorWallet,
+      },
+      currencyAddress: makeTestCurrencyAddress(),
+      jobTitle: `Playwright Launch Flow ${runId}`,
+      description:
+        'Full local-profile proof for the narrowed agency and client milestone escrow launch candidate.',
+      deliveryNote: 'Contractor delivered the agreed implementation milestone.',
+      deliveryEvidenceUrl: `https://example.com/delivery/${runId}`,
+      disputeReason: 'Client found one blocked acceptance criterion that requires operator review.',
+      disputeEvidenceUrl: `https://example.com/dispute/${runId}`,
+      resolutionAction: 'release',
+      resolutionNote: 'Operator confirmed delivery quality and released the disputed milestone.',
+    },
+    onClientOtpIssued: () => forceOtpCode(clientEmail, localOtpCode),
+    onContractorOtpIssued: () => forceOtpCode(contractorEmail, localOtpCode),
+    onOperatorOtpIssued: () => forceOtpCode(operatorEmail, localOtpCode),
+  });
 
   await expect(
-    page.getByText('OTP issued. Check your configured mail inbox or relay logs.'),
-  ).toBeVisible();
-
-  await forceOtpCode(email, localOtpCode);
-
-  await page.getByPlaceholder('123456').fill(localOtpCode);
-  await page.getByRole('button', { name: 'Verify session' }).click();
-
-  await expect(page.getByText(email)).toBeVisible();
-  await expect(page.getByText('Authenticated')).toBeVisible();
-
-  await page.getByRole('textbox', { name: 'EOA address' }).fill(ownerWallet.address);
-  await page.getByRole('button', { name: 'Create SIWE challenge' }).click();
-
-  await expect(
-    page.getByText(
-      'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
+    clientPage.getByText(
+      'Operator confirmed delivery quality and released the disputed milestone.',
+      { exact: false },
     ),
   ).toBeVisible();
 
-  const challengeMessage = await page
-    .getByRole('textbox', { name: 'Issued message' })
-    .inputValue();
-  const signature = await ownerWallet.signMessage(challengeMessage);
-
-  await page.getByRole('textbox', { name: 'Wallet signature' }).fill(signature);
-  await page.getByRole('button', { name: 'Verify linked wallet' }).click();
-
-  await expect(
-    page.getByText('Wallet linked and ready for smart-account provisioning.'),
-  ).toBeVisible();
-
-  await page.getByRole('button', { name: 'Provision smart account' }).click();
-
-  await expect(
-    page.getByText('Smart account ready. Sponsorship policy: sponsored.'),
-  ).toBeVisible();
-
-  await page
-    .getByPlaceholder('Milestone-based product implementation')
-    .fill(jobTitle);
-  await page
-    .getByPlaceholder(
-      'Describe the scope, delivery expectations, and what the worker will be paid to complete.',
-    )
-    .fill('Playwright-backed local-profile coverage for the guided client path.');
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
-
-  await page.getByRole('textbox', { name: 'Worker wallet' }).fill(workerWallet.address);
-  await page
-    .getByRole('textbox', { name: 'Settlement token address' })
-    .fill(currencyAddress);
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await page.getByRole('button', { name: 'Create guided job' }).click();
-
-  await expect(page.getByText(/^Job created\. Escrow id /).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: jobTitle })).toBeVisible();
-
-  await page.getByRole('button', { name: 'Fund selected job' }).click();
-
-  await expect(page.getByText(/^Funding confirmed via /).first()).toBeVisible();
-
-  const jobId = await waitForJobIdByTitle(jobTitle);
-
-  const adminPage = await browser.newPage();
-  await adminPage.goto(adminBaseUrl);
-  await adminPage.getByPlaceholder('Paste a job UUID').fill(jobId);
-  await adminPage.getByRole('button', { name: 'Load public bundle' }).click();
-
-  await expect(adminPage.getByRole('heading', { name: jobTitle })).toBeVisible();
-  await expect(adminPage.getByText(jobId, { exact: true })).toBeVisible();
-  await expect(adminPage.getByText('Operator case loaded.')).toBeVisible();
-
-  await adminPage.close();
+  await Promise.all([
+    clientContext.close(),
+    contractorContext.close(),
+    operatorContext.close(),
+  ]);
 });

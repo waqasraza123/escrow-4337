@@ -1,10 +1,16 @@
 import styles from '../../page.module.css';
 import { OperatorConsole } from '../../operator-console';
 
-export default function OperatorCasePage({ params }: { params: { id: string } }) {
+export default async function OperatorCasePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
     <main className={styles.page}>
-      <OperatorConsole view="case" initialJobId={params.id} />
+      <OperatorConsole view="case" initialJobId={id} />
     </main>
   );
 }

@@ -44,6 +44,12 @@ Staging is the first required live-environment checkpoint:
 - `pnpm --filter escrow4334-api deployment:validate`
 - `pnpm smoke:deployed`
 
+Optional deeper proof for the narrowed launch candidate:
+
+- populate `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials and OTP codes
+- run `pnpm e2e:deployed`
+- use the exact-flow spec to exercise create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
+
 Staging smoke must stay read-only. Do not use privileged mutations or non-public case data in the workflow.
 
 ## Production Promotion

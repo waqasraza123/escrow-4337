@@ -1,16 +1,25 @@
 import { expect, test } from '@playwright/test';
 import { adminBaseUrl, webBaseUrl } from './local-profile';
 
-test('web console renders onboarding shell', async ({ page }) => {
+test('web marketing homepage explains the narrowed launch candidate', async ({ page }) => {
   await page.goto(webBaseUrl);
+
+  await expect(
+    page.getByRole('heading', {
+      name: 'Milestone escrow for crypto service work',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Lock client funds upfront')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Start a milestone escrow' }).first()).toBeVisible();
+});
+
+test('web app renders the routed onboarding shell', async ({ page }) => {
+  await page.goto(`${webBaseUrl}/app`);
 
   await expect(
     page.getByRole('heading', {
       name: 'Operate the escrow lifecycle from OTP login to dispute resolution.',
     }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Connect injected wallet' }),
   ).toBeVisible();
   await expect(
     page.getByText('Authenticate first. The console will then load your profile, wallets, and jobs.'),

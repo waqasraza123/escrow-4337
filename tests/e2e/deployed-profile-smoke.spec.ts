@@ -254,10 +254,19 @@ test('deployed launch-readiness endpoint reports the current launch posture', as
   }
 });
 
-test('web console surfaces the expected deployed API target and runtime posture', async ({
+test('web routes surface the expected deployed marketing and app posture', async ({
   page,
 }) => {
   await page.goto(deployed.webBaseUrl);
+
+  await expect(
+    page.getByRole('heading', {
+      name: 'Milestone escrow for crypto service work',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Lock client funds upfront')).toBeVisible();
+
+  await page.goto(`${deployed.webBaseUrl}/app`);
 
   await expect(
     page.getByRole('heading', {

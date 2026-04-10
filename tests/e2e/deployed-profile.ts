@@ -17,6 +17,19 @@ export type DeployedProfileConfig = {
   allowLocalhost: boolean;
 };
 
+export type DeployedLaunchCandidateActorConfig = {
+  email: string;
+  otpCode: string;
+  privateKey: string;
+};
+
+export type DeployedLaunchCandidateFlowConfig = {
+  currencyAddress: string;
+  client: DeployedLaunchCandidateActorConfig;
+  contractor: DeployedLaunchCandidateActorConfig;
+  operator: DeployedLaunchCandidateActorConfig;
+};
+
 export type RuntimeProfileResponse = {
   generatedAt: string;
   profile: 'local-mock' | 'mixed' | 'deployment-like';
@@ -56,6 +69,34 @@ function readRequiredEnv(env: NodeJS.ProcessEnv, key: string) {
   }
 
   return value;
+}
+
+function readOptionalEnv(env: NodeJS.ProcessEnv, key: string) {
+  return env[key]?.trim() || '';
+}
+
+function readRequiredGroup(
+  env: NodeJS.ProcessEnv,
+  keys: string[],
+): Record<string, string> | null {
+  const values = Object.fromEntries(keys.map((key) => [key, readOptionalEnv(env, key)]));
+  const populated = Object.values(values).filter(Boolean).length;
+
+  if (populated === 0) {
+    return null;
+  }
+
+  const missing = Object.entries(values)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Deployed launch-candidate flow config is incomplete. Missing: ${missing.join(', ')}.`,
+    );
+  }
+
+  return values;
 }
 
 function normalizeAbsoluteUrl(
@@ -135,6 +176,46 @@ export function readDeployedProfileConfig(
     expectLaunchReady: readBooleanFlag(env.PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY),
     allowInsecureHttp,
     allowLocalhost,
+  };
+}
+
+export function readDeployedLaunchCandidateFlowConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): DeployedLaunchCandidateFlowConfig | null {
+  const values = readRequiredGroup(env, [
+    'PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE',
+    'PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY',
+    'PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL',
+    'PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE',
+    'PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY',
+  ]);
+
+  if (!values) {
+    return null;
+  }
+
+  return {
+    currencyAddress: values.PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS,
+    client: {
+      email: values.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL,
+      otpCode: values.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE,
+      privateKey: values.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY,
+    },
+    contractor: {
+      email: values.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL,
+      otpCode: values.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE,
+      privateKey: values.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY,
+    },
+    operator: {
+      email: values.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL,
+      otpCode: values.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE,
+      privateKey: values.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY,
+    },
   };
 }
 
