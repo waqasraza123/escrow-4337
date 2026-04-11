@@ -17,6 +17,7 @@ export const localArbitratorPrivateKey =
 export const localArbitratorWallet = new Wallet(localArbitratorPrivateKey);
 export const localArbitratorAddress = localArbitratorWallet.address;
 export const webSessionStorageKey = 'escrow4337.web.session';
+export const adminSessionStorageKey = 'escrow4337.admin.session';
 
 export const localApiEnv: Record<string, string> = {
   NODE_ENV: 'development',
