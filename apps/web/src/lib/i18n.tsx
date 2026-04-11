@@ -232,6 +232,35 @@ const webMessages = {
         smartAccount: 'Smart account',
         eoa: 'EOA',
       },
+      setup: {
+        title: 'Activation checklist',
+        nextBlockerTitle: 'Next blocker',
+        clientTrackTitle: 'Ready to create contracts',
+        clientTrackReady:
+          'This session has the linked owner wallet and a default smart account for client-side contract creation.',
+        clientTrackNeedsSignIn:
+          'Sign in first so the app can restore your wallets and contract actions.',
+        clientTrackNeedsWalletLink:
+          'Link the owner EOA you plan to use before provisioning a smart account.',
+        clientTrackNeedsSmartAccount:
+          'Provision and set a smart account as the default execution wallet before creating contracts.',
+        contractorTrackTitle: 'Ready to open contractor invite links',
+        contractorTrackReady:
+          'This session can open invite links and validate the exact worker wallet required by a contract.',
+        contractorTrackNeedsSignIn:
+          'Sign in first so the app can evaluate contractor invite readiness.',
+        contractorTrackNeedsWalletLink:
+          'Link the exact worker wallet from the contractor invite before trying to join a contract.',
+        blockers: {
+          signIn: 'Start with OTP sign-in.',
+          connectWallet: 'Connect the browser wallet you want to link.',
+          linkWallet: 'Link an EOA so the app can trust a real signing wallet.',
+          provisionSmartAccount:
+            'Provision a smart account if you want this session to create client contracts.',
+          ready:
+            'Setup is complete for both contract creation and invite-based contractor access.',
+        },
+      },
       wallet: {
         walletLinkTitle: 'Browser wallet onboarding',
         walletLink: 'Wallet Link',
@@ -786,6 +815,34 @@ const webMessages = {
         setDefault: 'تعيين كافتراضي',
         smartAccount: 'حساب ذكي',
         eoa: 'محفظة EOA',
+      },
+      setup: {
+        title: 'قائمة تفعيل مختصرة',
+        nextBlockerTitle: 'العائق التالي',
+        clientTrackTitle: 'جاهز لإنشاء العقود',
+        clientTrackReady:
+          'تحتوي هذه الجلسة على محفظة مالك مرتبطة وحساب ذكي افتراضي لإنشاء العقود من جهة العميل.',
+        clientTrackNeedsSignIn:
+          'سجّل الدخول أولاً حتى يتمكن التطبيق من استعادة المحافظ وإجراءات العقد.',
+        clientTrackNeedsWalletLink:
+          'اربط محفظة المالك EOA التي تنوي استخدامها قبل تهيئة الحساب الذكي.',
+        clientTrackNeedsSmartAccount:
+          'هيّئ حساباً ذكياً واجعله محفظة التنفيذ الافتراضية قبل إنشاء العقود.',
+        contractorTrackTitle: 'جاهز لفتح روابط دعوة المقاول',
+        contractorTrackReady:
+          'يمكن لهذه الجلسة فتح روابط الدعوة والتحقق من محفظة العامل الدقيقة المطلوبة في العقد.',
+        contractorTrackNeedsSignIn:
+          'سجّل الدخول أولاً حتى يتمكن التطبيق من تقييم جاهزية دعوة المقاول.',
+        contractorTrackNeedsWalletLink:
+          'اربط محفظة العامل الدقيقة من دعوة المقاول قبل محاولة الانضمام إلى العقد.',
+        blockers: {
+          signIn: 'ابدأ بتسجيل الدخول عبر OTP.',
+          connectWallet: 'صل محفظة المتصفح التي تريد ربطها.',
+          linkWallet: 'اربط محفظة EOA حتى يثق التطبيق في محفظة توقيع حقيقية.',
+          provisionSmartAccount:
+            'هيّئ حساباً ذكياً إذا كنت تريد أن تنشئ هذه الجلسة عقود العميل.',
+          ready: 'اكتمل الإعداد لإنشاء العقود والوصول إلى دعوات المقاول.',
+        },
       },
       wallet: {
         walletLinkTitle: 'تهيئة محفظة المتصفح',

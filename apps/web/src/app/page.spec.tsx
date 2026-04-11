@@ -162,6 +162,8 @@ describe('web page', () => {
         'Authenticate first. The console will then load your profile, wallets, and jobs.',
       ),
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Activation checklist' })).toBeInTheDocument();
+    expect(screen.getByText('Start with OTP sign-in.')).toBeInTheDocument();
     expect(
       screen.getAllByText('Select a job to manage lifecycle actions').length,
     ).toBeGreaterThan(0);

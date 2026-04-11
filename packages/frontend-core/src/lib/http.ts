@@ -1,8 +1,6 @@
 export const defaultLocalApiPort = '4100';
 
-export function resolveLocalApiBaseUrl(
-  localApiPort = process.env.NEXT_PUBLIC_API_PORT,
-) {
+export function resolveLocalApiBaseUrl(localApiPort?: string) {
   const port = localApiPort?.trim() || defaultLocalApiPort;
   return `http://localhost:${port}`;
 }

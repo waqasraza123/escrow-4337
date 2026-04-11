@@ -1,6 +1,7 @@
 import {
   requestJson,
   resolveApiBaseUrl,
+  resolveLocalApiBaseUrl,
 } from '@escrow4334/frontend-core';
 
 export type UserWallet =
@@ -247,7 +248,10 @@ export type RuntimeProfile = {
   warnings: string[];
 };
 
-const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+const apiBaseUrl = resolveApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+  resolveLocalApiBaseUrl(process.env.NEXT_PUBLIC_API_PORT),
+);
 
 export const webApi = {
   baseUrl: apiBaseUrl,

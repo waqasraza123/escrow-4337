@@ -2,6 +2,7 @@ import {
   requestDocument,
   requestJson,
   resolveApiBaseUrl,
+  resolveLocalApiBaseUrl,
   type DownloadedDocument,
 } from '@escrow4334/frontend-core';
 
@@ -544,7 +545,10 @@ export type AuditBundle = {
   };
 };
 
-const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+const apiBaseUrl = resolveApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+  resolveLocalApiBaseUrl(process.env.NEXT_PUBLIC_API_PORT),
+);
 
 export const adminApi = {
   baseUrl: apiBaseUrl,

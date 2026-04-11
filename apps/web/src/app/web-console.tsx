@@ -547,6 +547,55 @@ export function EscrowConsole({
           wallet.walletKind === 'smart_account',
       ),
   );
+  const hasLinkedEoa = Boolean(
+    walletState?.wallets.some((wallet) => wallet.walletKind === 'eoa'),
+  );
+  const hasLinkedWallet = Boolean((walletState?.wallets.length ?? 0) > 0);
+  const clientSetupReady = Boolean(accessToken) && hasLinkedEoa && hasProvisionedDefaultWallet;
+  const contractorSetupReady = Boolean(accessToken) && hasLinkedWallet;
+  const setupNextBlocker = !accessToken
+    ? messages.console.setup.blockers.signIn
+    : !hasLinkedEoa && walletConnection.status !== 'connected'
+      ? messages.console.setup.blockers.connectWallet
+      : !hasLinkedEoa
+        ? messages.console.setup.blockers.linkWallet
+        : !hasProvisionedDefaultWallet
+          ? messages.console.setup.blockers.provisionSmartAccount
+          : messages.console.setup.blockers.ready;
+  const setupTracks = useMemo(
+    () => [
+      {
+        title: messages.console.setup.clientTrackTitle,
+        status: clientSetupReady ? messages.common.ready : messages.common.setupRequired,
+        body: clientSetupReady
+          ? messages.console.setup.clientTrackReady
+          : !accessToken
+            ? messages.console.setup.clientTrackNeedsSignIn
+            : !hasLinkedEoa
+              ? messages.console.setup.clientTrackNeedsWalletLink
+              : messages.console.setup.clientTrackNeedsSmartAccount,
+      },
+      {
+        title: messages.console.setup.contractorTrackTitle,
+        status: contractorSetupReady
+          ? messages.common.readyToJoin
+          : messages.common.setupRequired,
+        body: contractorSetupReady
+          ? messages.console.setup.contractorTrackReady
+          : !accessToken
+            ? messages.console.setup.contractorTrackNeedsSignIn
+            : messages.console.setup.contractorTrackNeedsWalletLink,
+      },
+    ],
+    [
+      accessToken,
+      clientSetupReady,
+      contractorSetupReady,
+      hasLinkedEoa,
+      messages,
+      hasProvisionedDefaultWallet,
+    ],
+  );
   const composerChecklist = useMemo(
     () => [
       {
@@ -1884,6 +1933,52 @@ export function EscrowConsole({
 
       {showSetup ? (
       <div className={styles.grid}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>{messages.console.frames.setup.eyebrow}</p>
+              <h2>{messages.console.setup.title}</h2>
+            </div>
+          </header>
+          <div className={styles.stack}>
+            <div className={styles.summaryGrid}>
+              {setupTracks.map((track) => (
+                <article key={track.title}>
+                  <span className={styles.metaLabel}>{track.title}</span>
+                  <strong>{track.status}</strong>
+                  <p className={styles.muted}>{track.body}</p>
+                </article>
+              ))}
+            </div>
+            <article className={styles.statusBanner}>
+              <strong>{messages.console.setup.nextBlockerTitle}</strong>
+              <p className={styles.stateText}>{setupNextBlocker}</p>
+            </article>
+            <div className={styles.inlineActions}>
+              {!accessToken ? null : !hasLinkedEoa && walletConnection.status !== 'connected' ? (
+                <button type="button" onClick={handleConnectInjectedWallet}>
+                  {messages.console.wallet.connectWallet}
+                </button>
+              ) : !hasLinkedEoa ? (
+                <button type="button" onClick={handleLinkInjectedWallet}>
+                  {messages.console.wallet.linkWallet}
+                </button>
+              ) : !hasProvisionedDefaultWallet ? (
+                <button type="button" onClick={handleProvisionSmartAccount}>
+                  {messages.console.wallet.provisionSmartAccount}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => void refreshConsole()}
+                >
+                  {messages.console.profile.reloadAccount}
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
