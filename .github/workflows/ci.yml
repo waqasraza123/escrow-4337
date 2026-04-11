@@ -32,6 +32,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start local Postgres
+        run: pnpm db:up
+
+      - name: Wait for local Postgres
+        run: timeout 60 sh -c 'until [ "$(docker inspect -f "{{.State.Health.Status}}" escrow4337-postgres 2>/dev/null)" = "healthy" ]; do sleep 1; done'
+
       - name: Verify repo
         run: pnpm verify:ci
 

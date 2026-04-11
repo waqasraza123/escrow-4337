@@ -1,4 +1,3 @@
-import { expect, test } from '@playwright/test';
 import { Wallet } from 'ethers';
 import {
   adminBaseUrl,
@@ -8,12 +7,13 @@ import {
   localOtpCode,
   resetOtpState,
   webBaseUrl,
-} from './local-profile';
+} from '../../../fixtures/local-profile';
+import { expect, test } from '../../../fixtures/test';
 import {
-  makeRunId,
   makeTestCurrencyAddress,
   runLaunchCandidateFlow,
-} from './launch-candidate-flow';
+} from '../../../flows/launch-candidate-flow';
+import { makeTestEmail } from '../../../data/builders';
 
 test.afterAll(async () => {
   await closeLocalProfileDb();
@@ -21,13 +21,13 @@ test.afterAll(async () => {
 
 test('local profile supports the full launch-candidate create, join, deliver, dispute, and resolve flow', async ({
   browser,
+  runId,
 }) => {
   test.setTimeout(240_000);
 
-  const runId = makeRunId();
-  const clientEmail = `playwright.client.${runId}@example.com`;
-  const contractorEmail = `playwright.contractor.${runId}@example.com`;
-  const operatorEmail = `playwright.operator.${runId}@example.com`;
+  const clientEmail = makeTestEmail('client', runId);
+  const contractorEmail = makeTestEmail('contractor', runId);
+  const operatorEmail = makeTestEmail('operator', runId);
   const clientWallet = Wallet.createRandom();
   const contractorWallet = Wallet.createRandom();
 

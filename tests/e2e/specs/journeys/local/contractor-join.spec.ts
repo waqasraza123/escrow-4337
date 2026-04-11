@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
 import { Wallet } from 'ethers';
+import { type Page } from '@playwright/test';
 import {
   closeLocalProfileDb,
   createJobForSession,
@@ -10,8 +10,9 @@ import {
   setMilestonesForSession,
   webBaseUrl,
   webSessionStorageKey,
-} from './local-profile';
-import { makeRunId, makeTestCurrencyAddress } from './launch-candidate-flow';
+} from '../../../fixtures/local-profile';
+import { expect, test } from '../../../fixtures/test';
+import { makeTestCurrencyAddress } from '../../../data/builders';
 
 test.afterAll(async () => {
   await closeLocalProfileDb();
@@ -69,8 +70,7 @@ async function createFundedJoinReadyJob(input: {
   return { clientSession, jobId };
 }
 
-test('deliver route stays blocked until the contractor joins', async ({ page }) => {
-  const runId = makeRunId();
+test('deliver route stays blocked until the contractor joins', async ({ page, runId }) => {
   const clientWallet = Wallet.createRandom();
   const workerWallet = Wallet.createRandom();
   const contractorEmail = `deliver.contractor.${runId}@example.com`;
@@ -99,8 +99,8 @@ test('deliver route stays blocked until the contractor joins', async ({ page }) 
 
 test('contractor join rejects a session whose email does not match the pending contractor email', async ({
   page,
+  runId,
 }) => {
-  const runId = makeRunId();
   const clientWallet = Wallet.createRandom();
   const wrongUserWallet = Wallet.createRandom();
   const wrongUserEmail = `wrong.contractor.${runId}@example.com`;
@@ -132,8 +132,8 @@ test('contractor join rejects a session whose email does not match the pending c
 
 test('eligible contractor can join from the contract route and then reach delivery', async ({
   page,
+  runId,
 }) => {
-  const runId = makeRunId();
   const clientWallet = Wallet.createRandom();
   const contractorWallet = Wallet.createRandom();
   const contractorEmail = `join.contractor.${runId}@example.com`;

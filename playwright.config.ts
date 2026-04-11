@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { defineConfig, devices } from '@playwright/test';
 import { config as loadDotenv } from 'dotenv';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
 import {
   adminBaseUrl,
   adminPort,
@@ -11,8 +11,8 @@ import {
   localApiEnv,
   webBaseUrl,
   webPort,
-} from './tests/e2e/local-profile';
-import { readDeployedProfileConfig } from './tests/e2e/deployed-profile';
+} from './tests/e2e/fixtures/local-profile';
+import { readDeployedProfileConfig } from './tests/e2e/fixtures/deployed-profile';
 
 function shellEnv(input: Record<string, string>) {
   return Object.entries(input)
@@ -20,16 +20,12 @@ function shellEnv(input: Record<string, string>) {
     .join(' ');
 }
 
-const localApiEnvString = shellEnv(localApiEnv);
-const playwrightProfile =
-  process.env.PLAYWRIGHT_PROFILE?.trim() === 'deployed' ? 'deployed' : 'local';
-const playwrightReporter = process.env.PLAYWRIGHT_REPORTER?.trim() || 'list';
-
 function loadOptionalProfileEnv(profile: 'local' | 'deployed') {
   const envPath = resolve(
     process.cwd(),
     profile === 'deployed' ? '.env.e2e.deployed' : '.env.e2e.local',
   );
+
   if (existsSync(envPath)) {
     loadDotenv({
       path: envPath,
@@ -38,58 +34,130 @@ function loadOptionalProfileEnv(profile: 'local' | 'deployed') {
   }
 }
 
+function readReporters(): ReporterDescription[] {
+  const explicitReporter = process.env.PLAYWRIGHT_REPORTER?.trim();
+  if (explicitReporter) {
+    return [[explicitReporter]];
+  }
+
+  if (!process.env.CI) {
+    return [['list']];
+  }
+
+  return [
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'artifacts/playwright/html-report' }],
+    ['junit', { outputFile: 'artifacts/playwright/results/junit.xml' }],
+    ['json', { outputFile: 'artifacts/playwright/results/results.json' }],
+  ];
+}
+
+function readLocalServerMode() {
+  return process.env.PLAYWRIGHT_LOCAL_SERVER_MODE?.trim() === 'built' || process.env.CI
+    ? 'built'
+    : 'dev';
+}
+
+const playwrightProfile =
+  process.env.PLAYWRIGHT_PROFILE?.trim() === 'deployed' ? 'deployed' : 'local';
+const localServerMode = readLocalServerMode();
+const localApiEnvString = shellEnv(localApiEnv);
+
 loadOptionalProfileEnv(playwrightProfile);
 
 if (playwrightProfile === 'deployed') {
   readDeployedProfileConfig();
 }
 
-const localProject = {
-  name: 'chromium',
-  testIgnore: [/deployed-profile-smoke\.spec\.ts$/, /deployed-launch-candidate-flow\.spec\.ts$/],
+const localProjectBase = {
+  use: {
+    ...devices['Desktop Chrome'],
+    baseURL: webBaseUrl,
+  },
+};
+
+const deployedProjectBase = {
   use: {
     ...devices['Desktop Chrome'],
   },
 };
 
-const deployedProject = {
-  name: 'deployed-chromium',
-  testMatch: /(deployed-profile-smoke|deployed-launch-candidate-flow)\.spec\.ts$/,
-  use: {
-    ...devices['Desktop Chrome'],
+const localProjects = [
+  {
+    name: 'local-smoke',
+    testMatch: /smoke\/local\/.*\.spec\.ts$/,
+    ...localProjectBase,
   },
-};
+  {
+    name: 'local-journeys',
+    testMatch: /journeys\/local\/.*\.spec\.ts$/,
+    ...localProjectBase,
+  },
+];
+
+const deployedProjects = [
+  {
+    name: 'deployed-smoke',
+    testMatch: /smoke\/deployed\/.*\.spec\.ts$/,
+    ...deployedProjectBase,
+  },
+  {
+    name: 'deployed-journeys',
+    testMatch: /journeys\/deployed\/.*\.spec\.ts$/,
+    ...deployedProjectBase,
+  },
+];
+
+const localWebCommand =
+  localServerMode === 'built'
+    ? `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter web build && NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter web exec next start --port ${webPort}`
+    : `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter web exec next dev --port ${webPort}`;
+
+const localAdminCommand =
+  localServerMode === 'built'
+    ? `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter admin build && NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter admin exec next start --port ${adminPort}`
+    : `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter admin exec next dev --port ${adminPort}`;
+
+const localApiCommand =
+  `${localApiEnvString} pnpm --filter escrow4334-api build && ` +
+  `${localApiEnvString} pnpm --filter escrow4334-api db:migrate && ` +
+  `${localApiEnvString} pnpm --filter escrow4334-api exec node dist/main`;
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests/e2e/specs',
   fullyParallel: true,
-  reporter: playwrightReporter,
   timeout: 120_000,
+  reporter: readReporters(),
+  retries: Number(process.env.PLAYWRIGHT_RETRIES ?? (process.env.CI ? '1' : '0')),
+  workers: process.env.CI ? 3 : undefined,
+  outputDir: 'artifacts/playwright/test-results',
   use: {
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: process.env.CI ? 'retain-on-failure' : 'off',
   },
-  projects: [playwrightProfile === 'deployed' ? deployedProject : localProject],
+  projects: playwrightProfile === 'deployed' ? deployedProjects : localProjects,
   webServer:
     playwrightProfile === 'deployed'
       ? undefined
       : [
           {
-            command: `${localApiEnvString} pnpm --filter escrow4334-api build && ${localApiEnvString} pnpm --filter escrow4334-api db:migrate && ${localApiEnvString} pnpm --filter escrow4334-api exec node dist/main`,
+            command: localApiCommand,
             url: apiReadyUrl,
-            reuseExistingServer: false,
+            reuseExistingServer: !process.env.CI,
             timeout: 180_000,
           },
           {
-            command: `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter web exec next dev --port ${webPort}`,
+            command: localWebCommand,
             url: webBaseUrl,
-            reuseExistingServer: false,
-            timeout: 120_000,
+            reuseExistingServer: !process.env.CI,
+            timeout: localServerMode === 'built' ? 180_000 : 120_000,
           },
           {
-            command: `NEXT_PUBLIC_API_BASE_URL=${JSON.stringify(apiBaseUrl)} pnpm --filter admin exec next dev --port ${adminPort}`,
+            command: localAdminCommand,
             url: adminBaseUrl,
-            reuseExistingServer: false,
-            timeout: 120_000,
+            reuseExistingServer: !process.env.CI,
+            timeout: localServerMode === 'built' ? 180_000 : 120_000,
           },
         ],
 });

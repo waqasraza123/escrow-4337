@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Download, type Locator, type Page } from '@playwright/test';
+import { type Download, type Locator, type Page } from '@playwright/test';
+import { expect, test } from '../../../fixtures/test';
 import {
   describeDeployedRuntimeAlignment,
   getRuntimeProfileLabel,
   readDeployedProfileConfig,
   type RuntimeProfileResponse,
-} from './deployed-profile';
+} from '../../../fixtures/deployed-profile';
 
 type LaunchReadinessResponse = {
   generatedAt: string;

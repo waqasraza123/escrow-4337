@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { Wallet } from 'ethers';
+import { makeRunId, makeTestCurrencyAddress } from '../data/builders';
 
 export type FlowActor = {
   email: string;
@@ -22,13 +23,7 @@ export type LaunchCandidateFlowInput = {
   resolutionNote: string;
 };
 
-export function makeRunId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function makeTestCurrencyAddress(fill = '5') {
-  return `0x${fill.repeat(40)}`;
-}
+export { makeRunId, makeTestCurrencyAddress };
 
 export async function signInWithOtp(input: {
   page: Page;
@@ -159,8 +154,7 @@ export async function createGuidedJob(input: {
     page,
     webBaseUrl,
     workerAddress,
-  } =
-    input;
+  } = input;
 
   const createResponsePromise = page.waitForResponse((response) => {
     const url = new URL(response.url());

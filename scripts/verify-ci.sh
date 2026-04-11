@@ -14,5 +14,5 @@ run pnpm typecheck
 run pnpm lint
 run pnpm test
 run pnpm build
-run pnpm exec playwright test --list
+run env PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:smoke:local
 run pnpm contracts:check

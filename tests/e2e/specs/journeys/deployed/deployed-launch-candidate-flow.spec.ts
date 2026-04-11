@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test';
 import { Wallet } from 'ethers';
 import {
   readDeployedLaunchCandidateFlowConfig,
   readDeployedProfileConfig,
-} from './deployed-profile';
-import { makeRunId, runLaunchCandidateFlow } from './launch-candidate-flow';
+} from '../../../fixtures/deployed-profile';
+import { expect, test } from '../../../fixtures/test';
+import { runLaunchCandidateFlow } from '../../../flows/launch-candidate-flow';
 
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
@@ -12,6 +12,7 @@ const deployedFlow = readDeployedLaunchCandidateFlowConfig();
 test('deployed environment can exercise the exact launch-candidate escrow flow when explicit credentials are provided', async ({
   browser,
   request,
+  runId,
 }) => {
   test.skip(
     !deployedFlow,
@@ -32,7 +33,6 @@ test('deployed environment can exercise the exact launch-candidate escrow flow w
     operatorWallet.address.toLowerCase(),
   );
 
-  const runId = makeRunId();
   const clientContext = await browser.newContext();
   const contractorContext = await browser.newContext();
   const operatorContext = await browser.newContext();
