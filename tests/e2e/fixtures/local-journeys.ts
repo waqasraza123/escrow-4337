@@ -6,6 +6,7 @@ import {
   adminSessionStorageKey,
   createLocalSession,
   linkWalletForSession,
+  provisionSmartAccountForSession,
   type LocalSessionTokens,
   webBaseUrl,
   webSessionStorageKey,
@@ -25,6 +26,7 @@ type LocalSessionFactoryInput = {
   role: string;
   app?: LocalActorApp;
   linkedWallet?: Wallet;
+  provisionSmartAccountOwner?: string;
 };
 
 type LocalSessionFactory = (
@@ -71,6 +73,10 @@ export const test = base.extend<{
 
         if (input.linkedWallet) {
           await linkWalletForSession(session, input.linkedWallet);
+        }
+
+        if (input.provisionSmartAccountOwner) {
+          await provisionSmartAccountForSession(session, input.provisionSmartAccountOwner);
         }
 
         const storageState =
