@@ -30,12 +30,12 @@ The GitHub-native equivalent is the manual `Launch Candidate` workflow against `
 
 The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
 
-The Playwright harness now also includes a focused launch-candidate exact flow:
+The Playwright harness now also includes two focused deployed canary lanes behind explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials:
 
-- local profile: client create and fund, contractor join and deliver, client dispute, operator resolve
-- deployed profile: the same exact flow, but only when explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials, OTP codes, and private keys are provided
+- seeded deployed canary: API-authenticated actors plus API-seeded join-ready job state, then browser coverage for contractor join, delivery, dispute, and operator resolution
+- exact deployed canary: full browser auth and browser setup flow through create, fund, join, deliver, dispute, and resolution
 
-Keep that exact flow optional for deployed environments until the staging secret contract is in place. It is meant to make launch-proof runs easier, not to weaken the existing read-only default smoke lane.
+Use the seeded deployed canary as the default staged mutation proof because it is faster and less brittle. Keep the exact deployed flow optional for release-candidate evidence and launch-proof runs rather than making it the default deployed canary lane.
 
 For the exact staging rollout order that combines deployment, smoke, launch readiness, evidence capture, and rollback checkpoints, use [docs/STAGING_EXECUTION_SEQUENCE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/STAGING_EXECUTION_SEQUENCE.md).
 

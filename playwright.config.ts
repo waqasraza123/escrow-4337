@@ -102,8 +102,13 @@ const deployedProjects = [
     ...deployedProjectBase,
   },
   {
-    name: 'deployed-journeys',
-    testMatch: /journeys\/deployed\/.*\.spec\.ts$/,
+    name: 'deployed-seeded',
+    testMatch: /journeys\/deployed\/.*seeded.*\.spec\.ts$/,
+    ...deployedProjectBase,
+  },
+  {
+    name: 'deployed-exact',
+    testMatch: /journeys\/deployed\/.*exact.*\.spec\.ts$/,
     ...deployedProjectBase,
   },
 ];

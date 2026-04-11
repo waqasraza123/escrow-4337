@@ -14,7 +14,7 @@ import { seedJoinReadyJobViaApi } from '../../../fixtures/journey-setup';
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
 
-test('deployed environment can exercise the staged join-to-resolution flow from API-seeded job state', async ({
+test('[@seeded] deployed environment can exercise the staged join-to-resolution flow from API-seeded job state', async ({
   browser,
   deployedJourneyActorFactory,
   request,
@@ -22,7 +22,7 @@ test('deployed environment can exercise the staged join-to-resolution flow from 
 }) => {
   test.skip(
     !deployedFlow,
-    'Set PLAYWRIGHT_DEPLOYED_FLOW_* secrets to run the full staged launch-candidate flow.',
+    'Set PLAYWRIGHT_DEPLOYED_FLOW_* secrets to run the staged seeded launch-candidate flow.',
   );
   test.setTimeout(300_000);
 
