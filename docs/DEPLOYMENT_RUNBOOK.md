@@ -43,14 +43,15 @@ Staging is the first required live-environment checkpoint:
 - `pnpm --filter escrow4334-api db:migrate:status`
 - `pnpm --filter escrow4334-api deployment:validate`
 - `pnpm smoke:deployed`
+- `pnpm e2e:canary:deployed`
 
-Optional deeper proof for the narrowed launch candidate:
+Required launch-candidate evidence for the narrowed launch flow:
 
-- populate `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials and OTP codes
-- run `pnpm e2e:deployed`
-- use the exact-flow spec to exercise create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
+- populate `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials and OTP codes in the target GitHub environment
+- run `pnpm launch:candidate`
+- let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
 
-Staging smoke must stay read-only. Do not use privileged mutations or non-public case data in the workflow.
+`pnpm smoke:deployed` remains read-only. The seeded canary is the default staged mutation proof, and the exact flow stays confined to explicit launch-candidate evidence runs.
 
 ## Production Promotion
 

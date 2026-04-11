@@ -25,17 +25,19 @@ Use `pnpm launch:candidate` as the canonical launch-candidate suite. It runs:
 - `pnpm --filter escrow4334-api db:migrate:status`
 - `pnpm --filter escrow4334-api deployment:validate`
 - `pnpm smoke:deployed` with `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`
+- `pnpm e2e:canary:deployed` with staged `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials
+- `pnpm e2e:canary:deployed:exact` with the same staged `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials
 
 The GitHub-native equivalent is the manual `Launch Candidate` workflow against `staging` or `production`.
 
-The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
+The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, separate seeded and exact canary reports, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
 
 The Playwright harness now also includes two focused deployed canary lanes behind explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials:
 
 - seeded deployed canary: API-authenticated actors plus API-seeded join-ready job state, then browser coverage for contractor join, delivery, dispute, and operator resolution
 - exact deployed canary: full browser auth and browser setup flow through create, fund, join, deliver, dispute, and resolution
 
-Use the seeded deployed canary as the default staged mutation proof because it is faster and less brittle. Keep the exact deployed flow optional for release-candidate evidence and launch-proof runs rather than making it the default deployed canary lane.
+Use the seeded deployed canary as the default staged mutation proof because it is faster and less brittle. The `Deployed Smoke` workflow now runs that seeded lane after read-only smoke. The exact deployed flow stays reserved for `pnpm launch:candidate` and the manual `Launch Candidate` workflow, where it serves as explicit release-candidate evidence rather than the default post-deploy gate.
 
 For the exact staging rollout order that combines deployment, smoke, launch readiness, evidence capture, and rollback checkpoints, use [docs/STAGING_EXECUTION_SEQUENCE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/STAGING_EXECUTION_SEQUENCE.md).
 

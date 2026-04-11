@@ -54,6 +54,7 @@ Required environment contract:
    Canonical GitHub path: let `Deployed Smoke` run automatically for `staging` after CI succeeds on `main`.
    Manual GitHub fallback: run workflow `Deployed Smoke` with input `environment=staging`.
    Local equivalent when you have the staging secret set loaded: `pnpm smoke:deployed`
+   The same workflow now runs `pnpm e2e:canary:deployed` immediately after smoke, so staged post-deploy proof includes one seeded mutation canary by default.
 
 9. Run the launch-candidate gate against the same staging target.
    Canonical GitHub path: run workflow `Launch Candidate` with input `environment=staging`.
@@ -65,8 +66,8 @@ Required environment contract:
     Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
 
 11. Decide whether deeper staged proof is required.
-    If you need full narrowed launch proof, populate `PLAYWRIGHT_DEPLOYED_FLOW_*` secrets and run `pnpm e2e:deployed`.
-    Keep this optional until the exact-flow staging credential contract is intentionally in place.
+    The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.
+    If you need to run the exact browser-auth and browser-setup flow directly outside the launch-candidate wrapper, use `pnpm e2e:canary:deployed:exact`.
 
 ## Exit Criteria
 

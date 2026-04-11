@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { config as loadDotenv } from 'dotenv';
+import { assertRequiredDeployedFlowEnv } from './deployed-flow-env.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -39,6 +40,8 @@ async function main() {
     writeFileSync(resolve(artifactsDir, 'incident-playbook-validation.txt'), `${error}\n`, 'utf8');
     throw new Error(error);
   }
+
+  assertRequiredDeployedFlowEnv();
 
   await runLoggedCommand(
     'verify-ci',
@@ -108,13 +111,39 @@ async function main() {
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
     },
   );
+  const seededCanaryReport = await runJsonCommand(
+    'deployed-seeded-canary',
+    ['pnpm', 'e2e:canary:deployed'],
+    resolve(artifactsDir, 'deployed-seeded-canary.raw.log'),
+    resolve(artifactsDir, 'deployed-seeded-canary.json'),
+    {
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
+  const exactCanaryReport = await runJsonCommand(
+    'deployed-exact-canary',
+    ['pnpm', 'e2e:canary:deployed:exact'],
+    resolve(artifactsDir, 'deployed-exact-canary.raw.log'),
+    resolve(artifactsDir, 'deployed-exact-canary.json'),
+    {
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
+
+  const smokeSummary = summarizePlaywrightReport(smokeReport);
+  const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
+  const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
 
   const blockers = collectBlockers({
     deploymentValidation,
     daemonHealth,
     launchReadiness,
     expectLaunchReady,
-    smokeReport,
+    smokeSummary,
+    seededCanarySummary,
+    exactCanarySummary,
   });
   const summary = {
     generatedAt: new Date().toISOString(),
@@ -149,7 +178,9 @@ async function main() {
       blockers: launchReadiness.blockers,
       warnings: launchReadiness.warnings,
     },
-    smoke: summarizePlaywrightReport(smokeReport),
+    smoke: smokeSummary,
+    seededCanary: seededCanarySummary,
+    exactCanary: exactCanarySummary,
     blockers,
   };
 
@@ -353,7 +384,9 @@ function collectBlockers({
   daemonHealth,
   launchReadiness,
   expectLaunchReady,
-  smokeReport,
+  smokeSummary,
+  seededCanarySummary,
+  exactCanarySummary,
 }) {
   const blockers = [];
 
@@ -371,8 +404,20 @@ function collectBlockers({
     );
   }
 
-  if (summarizePlaywrightReport(smokeReport).failed > 0) {
+  if (smokeSummary.failed > 0) {
     blockers.push('Deployed smoke tests reported failures.');
+  }
+  if (seededCanarySummary.failed > 0) {
+    blockers.push('Seeded deployed canary reported failures.');
+  }
+  if (seededCanarySummary.skipped > 0 || seededCanarySummary.total === 0) {
+    blockers.push('Seeded deployed canary did not execute its required staged mutation path.');
+  }
+  if (exactCanarySummary.failed > 0) {
+    blockers.push('Exact deployed canary reported failures.');
+  }
+  if (exactCanarySummary.skipped > 0 || exactCanarySummary.total === 0) {
+    blockers.push('Exact deployed canary did not execute its required staged launch path.');
   }
 
   return blockers;
@@ -405,7 +450,9 @@ function buildSummaryMarkdown(summary) {
 - Daemon health: ${summary.daemonHealth.status}
 - Runtime profile: ${summary.runtimeProfile.profile}
 - Launch readiness: ${summary.launchReadiness.ready ? 'ready' : 'blocked'}
-- Playwright failures: ${summary.smoke.failed}
+- Smoke failures: ${summary.smoke.failed}
+- Seeded canary failures: ${summary.seededCanary.failed}
+- Exact canary failures: ${summary.exactCanary.failed}
 
 ## Blockers
 
