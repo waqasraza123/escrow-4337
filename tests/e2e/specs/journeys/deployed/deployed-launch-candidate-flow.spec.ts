@@ -3,14 +3,15 @@ import {
   readDeployedLaunchCandidateFlowConfig,
   readDeployedProfileConfig,
 } from '../../../fixtures/deployed-profile';
-import { expect, test } from '../../../fixtures/test';
-import { runLaunchCandidateFlow } from '../../../flows/launch-candidate-flow';
+import { expect, test } from '../../../fixtures/deployed-journeys';
+import { runAuthenticatedLaunchCandidateFlow } from '../../../flows/launch-candidate-flow';
 
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
 
 test('deployed environment can exercise the exact launch-candidate escrow flow when explicit credentials are provided', async ({
   browser,
+  deployedJourneyActorFactory,
   request,
   runId,
 }) => {
@@ -33,14 +34,24 @@ test('deployed environment can exercise the exact launch-candidate escrow flow w
     operatorWallet.address.toLowerCase(),
   );
 
-  const clientContext = await browser.newContext();
-  const contractorContext = await browser.newContext();
-  const operatorContext = await browser.newContext();
+  const clientActor = await deployedJourneyActorFactory('client');
+  const contractorActor = await deployedJourneyActorFactory('contractor');
+  const operatorActor = await deployedJourneyActorFactory('operator');
+
+  const clientContext = await browser.newContext({
+    storageState: clientActor.storageState,
+  });
+  const contractorContext = await browser.newContext({
+    storageState: contractorActor.storageState,
+  });
+  const operatorContext = await browser.newContext({
+    storageState: operatorActor.storageState,
+  });
   const clientPage = await clientContext.newPage();
   const contractorPage = await contractorContext.newPage();
   const operatorPage = await operatorContext.newPage();
 
-  await runLaunchCandidateFlow({
+  await runAuthenticatedLaunchCandidateFlow({
     clientPage,
     contractorPage,
     operatorPage,
@@ -48,19 +59,19 @@ test('deployed environment can exercise the exact launch-candidate escrow flow w
     adminBaseUrl: deployed.adminBaseUrl,
     flow: {
       client: {
-        email: deployedFlow!.client.email,
+        email: clientActor.email,
         otpCode: deployedFlow!.client.otpCode,
-        wallet: new Wallet(deployedFlow!.client.privateKey),
+        wallet: clientActor.wallet,
       },
       contractor: {
-        email: deployedFlow!.contractor.email,
+        email: contractorActor.email,
         otpCode: deployedFlow!.contractor.otpCode,
-        wallet: new Wallet(deployedFlow!.contractor.privateKey),
+        wallet: contractorActor.wallet,
       },
       operator: {
-        email: deployedFlow!.operator.email,
+        email: operatorActor.email,
         otpCode: deployedFlow!.operator.otpCode,
-        wallet: operatorWallet,
+        wallet: operatorActor.wallet,
       },
       currencyAddress: deployedFlow!.currencyAddress,
       jobTitle: `Staged Launch Flow ${runId}`,

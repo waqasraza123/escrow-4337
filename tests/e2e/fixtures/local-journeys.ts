@@ -1,4 +1,3 @@
-import type { StorageState } from '@playwright/test';
 import { Wallet } from 'ethers';
 import { makeTestEmail } from '../data/builders';
 import {
@@ -11,6 +10,7 @@ import {
   webBaseUrl,
   webSessionStorageKey,
 } from './local-profile';
+import { createSessionStorageState } from './session-bootstrap';
 import { expect, test as base } from './test';
 
 type LocalActorApp = 'web' | 'admin';
@@ -19,7 +19,7 @@ export type LocalSessionActor = {
   app: LocalActorApp;
   email: string;
   session: LocalSessionTokens;
-  storageState: StorageState;
+  storageState: ReturnType<typeof createSessionStorageState>;
 };
 
 type LocalSessionFactoryInput = {
@@ -32,27 +32,6 @@ type LocalSessionFactoryInput = {
 type LocalSessionFactory = (
   input: LocalSessionFactoryInput,
 ) => Promise<LocalSessionActor>;
-
-function createSessionStorageState(input: {
-  origin: string;
-  storageKey: string;
-  session: LocalSessionTokens;
-}): StorageState {
-  return {
-    cookies: [],
-    origins: [
-      {
-        origin: input.origin,
-        localStorage: [
-          {
-            name: input.storageKey,
-            value: JSON.stringify(input.session),
-          },
-        ],
-      },
-    ],
-  };
-}
 
 export const test = base.extend<{
   localSessionFactory: LocalSessionFactory;

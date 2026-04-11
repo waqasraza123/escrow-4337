@@ -240,6 +240,141 @@ export async function resolveDisputedMilestone(input: {
   await expect(page.getByText('No active disputes')).toBeVisible();
 }
 
+export async function runAuthenticatedLaunchCandidateFlow(input: {
+  clientPage: Page;
+  contractorPage: Page;
+  operatorPage: Page;
+  webBaseUrl: string;
+  adminBaseUrl: string;
+  flow: LaunchCandidateFlowInput;
+  actorSetup?: {
+    client?: {
+      linkWallet?: boolean;
+      provisionSmartAccount?: boolean;
+    };
+    contractor?: {
+      linkWallet?: boolean;
+    };
+    operator?: {
+      linkWallet?: boolean;
+    };
+  };
+}) {
+  const {
+    adminBaseUrl,
+    clientPage,
+    contractorPage,
+    flow,
+    operatorPage,
+    webBaseUrl,
+    actorSetup,
+  } = input;
+
+  await clientPage.goto(`${webBaseUrl}/app/setup`);
+  await expect(clientPage.getByText(flow.client.email)).toBeVisible();
+  await expect(clientPage.getByText('Console state is current.')).toBeVisible();
+  if (actorSetup?.client?.linkWallet ?? true) {
+    await linkWallet({
+      page: clientPage,
+      wallet: flow.client.wallet,
+      challengeMessage:
+        'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
+      successMessage: 'Wallet linked and ready for smart-account provisioning.',
+    });
+  }
+  if (actorSetup?.client?.provisionSmartAccount ?? true) {
+    await provisionSmartAccount(clientPage, flow.client.wallet.address);
+  }
+
+  const jobId = await createGuidedJob({
+    page: clientPage,
+    webBaseUrl,
+    jobTitle: flow.jobTitle,
+    description: flow.description,
+    contractorEmail: flow.contractor.email,
+    workerAddress: flow.contractor.wallet.address,
+    currencyAddress: flow.currencyAddress,
+  });
+
+  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
+  await expect(clientPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
+  await fundSelectedJob(clientPage);
+  await commitSelectedJobMilestones(clientPage);
+
+  await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
+  await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
+  await expect(contractorPage.getByText(flow.contractor.email)).toBeVisible();
+  await expect(contractorPage.getByText('Console state is current.')).toBeVisible();
+  if (actorSetup?.contractor?.linkWallet ?? true) {
+    await linkWallet({
+      page: contractorPage,
+      wallet: flow.contractor.wallet,
+      challengeMessage:
+        'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
+      successMessage: 'Wallet linked and ready for smart-account provisioning.',
+    });
+  }
+  await contractorPage.getByRole('button', { name: 'Join contract' }).click();
+  await expect(
+    contractorPage.getByText(
+      'Contract joined. Worker delivery is now enabled for this session.',
+    ),
+  ).toBeVisible();
+
+  await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}/deliver`);
+  await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
+  await deliverSelectedMilestone({
+    page: contractorPage,
+    note: flow.deliveryNote,
+    evidenceUrl: flow.deliveryEvidenceUrl,
+  });
+
+  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}/dispute`);
+  await expect(clientPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
+  await openMilestoneDispute({
+    page: clientPage,
+    reason: flow.disputeReason,
+    evidenceUrl: flow.disputeEvidenceUrl,
+  });
+
+  await operatorPage.goto(`${adminBaseUrl}/cases/${jobId}`);
+  await expect(operatorPage.getByText('Operator case loaded.')).toBeVisible();
+  await expect(operatorPage.getByText(flow.operator.email)).toBeVisible();
+  await expect(operatorPage.getByText('Console state is current.')).toBeVisible();
+  if (actorSetup?.operator?.linkWallet ?? true) {
+    await linkWallet({
+      page: operatorPage,
+      wallet: flow.operator.wallet,
+      challengeMessage:
+        'Challenge created. Sign the message with the arbitrator wallet, then paste the signature.',
+      successMessage:
+        'Wallet linked. Arbitrator authority is now available for dispute resolution.',
+    });
+  }
+  await resolveDisputedMilestone({
+    page: operatorPage,
+    action: flow.resolutionAction,
+    note: flow.resolutionNote,
+  });
+
+  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
+  await expect(clientPage.getByText('Resolution')).toBeVisible();
+  await expect(
+    clientPage.getByText(
+      `${flow.resolutionAction}: ${flow.resolutionNote}`,
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    clientPage.getByText(flow.disputeReason, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    clientPage.getByRole('link', { name: flow.disputeEvidenceUrl }),
+  ).toBeVisible();
+
+  return { jobId };
+}
+
 export async function runLaunchCandidateFlow(input: {
   clientPage: Page;
   contractorPage: Page;
@@ -270,33 +405,6 @@ export async function runLaunchCandidateFlow(input: {
     otpCode: flow.client.otpCode,
     afterOtpIssued: onClientOtpIssued,
   });
-  await clientPage.goto(`${webBaseUrl}/app/setup`);
-  await expect(clientPage.getByText(flow.client.email)).toBeVisible();
-  await expect(clientPage.getByText('Console state is current.')).toBeVisible();
-  await linkWallet({
-    page: clientPage,
-    wallet: flow.client.wallet,
-    challengeMessage:
-      'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
-    successMessage: 'Wallet linked and ready for smart-account provisioning.',
-  });
-  await provisionSmartAccount(clientPage, flow.client.wallet.address);
-
-  const jobId = await createGuidedJob({
-    page: clientPage,
-    webBaseUrl,
-    jobTitle: flow.jobTitle,
-    description: flow.description,
-    contractorEmail: flow.contractor.email,
-    workerAddress: flow.contractor.wallet.address,
-    currencyAddress: flow.currencyAddress,
-  });
-
-  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
-  await expect(clientPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
-  await fundSelectedJob(clientPage);
-  await commitSelectedJobMilestones(clientPage);
-
   await signInWithOtp({
     page: contractorPage,
     url: `${webBaseUrl}/app/sign-in`,
@@ -304,77 +412,20 @@ export async function runLaunchCandidateFlow(input: {
     otpCode: flow.contractor.otpCode,
     afterOtpIssued: onContractorOtpIssued,
   });
-  await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
-  await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
-  await expect(contractorPage.getByText(flow.contractor.email)).toBeVisible();
-  await expect(contractorPage.getByText('Console state is current.')).toBeVisible();
-  await linkWallet({
-    page: contractorPage,
-    wallet: flow.contractor.wallet,
-    challengeMessage:
-      'Challenge created. Sign the SIWE message in your wallet, then paste the signature.',
-    successMessage: 'Wallet linked and ready for smart-account provisioning.',
-  });
-  await contractorPage.getByRole('button', { name: 'Join contract' }).click();
-  await expect(
-    contractorPage.getByText(
-      'Contract joined. Worker delivery is now enabled for this session.',
-    ),
-  ).toBeVisible();
-
-  await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}/deliver`);
-  await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
-  await deliverSelectedMilestone({
-    page: contractorPage,
-    note: flow.deliveryNote,
-    evidenceUrl: flow.deliveryEvidenceUrl,
-  });
-
-  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}/dispute`);
-  await expect(clientPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
-  await openMilestoneDispute({
-    page: clientPage,
-    reason: flow.disputeReason,
-    evidenceUrl: flow.disputeEvidenceUrl,
-  });
-
-  await operatorPage.goto(`${adminBaseUrl}/cases/${jobId}`);
-  await expect(operatorPage.getByText('Operator case loaded.')).toBeVisible();
   await signInWithOtp({
     page: operatorPage,
-    url: `${adminBaseUrl}/cases/${jobId}`,
+    url: adminBaseUrl,
     email: flow.operator.email,
     otpCode: flow.operator.otpCode,
     afterOtpIssued: onOperatorOtpIssued,
   });
-  await expect(operatorPage.getByText('Console state is current.')).toBeVisible();
-  await linkWallet({
-    page: operatorPage,
-    wallet: flow.operator.wallet,
-    challengeMessage:
-      'Challenge created. Sign the message with the arbitrator wallet, then paste the signature.',
-    successMessage: 'Wallet linked. Arbitrator authority is now available for dispute resolution.',
-  });
-  await resolveDisputedMilestone({
-    page: operatorPage,
-    action: flow.resolutionAction,
-    note: flow.resolutionNote,
-  });
 
-  await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
-  await expect(clientPage.getByText('Resolution')).toBeVisible();
-  await expect(
-    clientPage.getByText(
-      `${flow.resolutionAction}: ${flow.resolutionNote}`,
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await expect(
-    clientPage.getByText(flow.disputeReason, { exact: true }),
-  ).toBeVisible();
-  await expect(
-    clientPage.getByRole('link', { name: flow.disputeEvidenceUrl }),
-  ).toBeVisible();
-
-  return { jobId };
+  return runAuthenticatedLaunchCandidateFlow({
+    clientPage,
+    contractorPage,
+    operatorPage,
+    webBaseUrl,
+    adminBaseUrl,
+    flow,
+  });
 }
