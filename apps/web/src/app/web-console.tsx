@@ -16,6 +16,7 @@ import {
 import styles from './page.module.css';
 import type {
   AuditBundle,
+  ContractorJoinReadiness,
   JobView,
   JobsListResponse,
   PublicJobView,
@@ -213,6 +214,15 @@ function splitEvidenceUrls(input: string) {
     .filter(Boolean);
 }
 
+function readInviteToken() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const invite = new URLSearchParams(window.location.search).get('invite');
+  return invite?.trim() || null;
+}
+
 function getLifecyclePhaseClassName(phase: LifecycleCard['phase']) {
   switch (phase) {
     case 'ready':
@@ -384,6 +394,14 @@ export function EscrowConsole({
     null,
   );
   const [joinLinkState, setJoinLinkState] = useState<AsyncState>(createIdleState());
+  const [joinReadiness, setJoinReadiness] = useState<ContractorJoinReadiness | null>(
+    null,
+  );
+  const [joinReadinessState, setJoinReadinessState] = useState<AsyncState>(
+    createIdleState(),
+  );
+  const [selectedInviteToken, setSelectedInviteToken] = useState<string | null>(null);
+  const [contractorEmailDraft, setContractorEmailDraft] = useState('');
   const [pendingLifecycleAction, setPendingLifecycleAction] =
     useState<PendingLifecycleAction | null>(null);
 
@@ -415,9 +433,6 @@ export function EscrowConsole({
     () => new Set(walletState?.wallets.map((wallet) => wallet.address) ?? []),
     [walletState],
   );
-  const controlsSelectedWorkerWallet = Boolean(
-    selectedJobView && linkedWalletAddresses.has(selectedJobView.onchain.workerAddress),
-  );
   const controlsSelectedClientWallet = Boolean(
     selectedJobView && linkedWalletAddresses.has(selectedJobView.onchain.clientAddress),
   );
@@ -425,18 +440,23 @@ export function EscrowConsole({
   const pendingContractorEmail =
     selectedJob?.job.contractorParticipation?.contractorEmail?.trim().toLowerCase() ??
     null;
-  const currentUserEmail = profile?.email?.trim().toLowerCase() ?? null;
-  const currentUserMatchesPendingContractorEmail = Boolean(
-    currentUserEmail &&
-      pendingContractorEmail &&
-      currentUserEmail === pendingContractorEmail,
-  );
+  const joinRecoveryEmailHint =
+    joinReadiness?.contractorEmailHint ?? pendingContractorEmail;
   const canJoinSelectedContract =
     Boolean(accessToken) &&
     Boolean(selectedJobView) &&
     !isClientForSelectedJob &&
     selectedContractorParticipation?.status === 'pending' &&
-    controlsSelectedWorkerWallet;
+    selectedInviteToken !== null &&
+    joinReadiness?.status === 'ready';
+  const canManageContractorInvite =
+    Boolean(accessToken) &&
+    Boolean(selectedJobView) &&
+    isClientForSelectedJob &&
+    selectedContractorParticipation?.status === 'pending';
+  const contractorInviteWasSent = Boolean(
+    selectedJob?.job.contractorParticipation?.inviteLastSentAt,
+  );
   const reviewWindowDays = getNumericTerm(selectedJobView, 'reviewWindowDays');
   const disputeModel = getStringTerm(selectedJobView, 'disputeModel');
   const evidenceExpectation = getStringTerm(selectedJobView, 'evidenceExpectation');
@@ -454,6 +474,42 @@ export function EscrowConsole({
     isWorkerForSelectedJob && ['overview', 'contract', 'deliver'].includes(view);
   const showSharedDispute = ['overview', 'contract', 'dispute'].includes(view);
   const showOperatorPosture = ['overview', 'contract', 'dispute'].includes(view);
+  const joinAccessStatusLabel =
+    selectedContractorParticipation?.status === 'joined'
+      ? messages.common.joined
+      : canJoinSelectedContract
+        ? messages.common.readyToJoin
+        : selectedInviteToken
+          ? accessToken
+            ? messages.common.setupRequired
+            : messages.common.shareLinkReady
+          : messages.common.pending;
+  const joinAccessMessage =
+    selectedContractorParticipation?.status === 'joined'
+      ? messages.console.messages.joinAccessJoined
+      : !selectedInviteToken
+        ? messages.console.messages.joinAccessInviteRequired
+        : !accessToken
+          ? messages.console.messages.joinAccessSignedOut(joinRecoveryEmailHint)
+          : joinReadinessState.kind === 'error'
+            ? joinReadinessState.message
+            : joinReadiness?.status === 'wrong_email'
+              ? messages.console.messages.joinAccessWrongEmail(joinRecoveryEmailHint)
+              : joinReadiness?.status === 'wallet_not_linked'
+                ? messages.console.messages.joinAccessWalletNotLinked(
+                    selectedJobView?.onchain.workerAddress ?? '',
+                  )
+                : joinReadiness?.status === 'wrong_wallet'
+                  ? messages.console.messages.joinAccessWrongWallet(
+                      selectedJobView?.onchain.workerAddress ?? '',
+                    )
+                  : joinReadiness?.status === 'invite_invalid'
+                    ? messages.console.messages.joinAccessInviteInvalid
+                    : joinReadiness?.status === 'claimed_by_other'
+                      ? messages.console.messages.joinAccessClaimed
+                      : joinReadiness?.status === 'ready'
+                        ? messages.console.messages.joinAccessReady
+                        : messages.console.messages.joinAccessInviteRequired;
 
   const [createJobState, setCreateJobState] = useState<JobComposerState>(
     createInitialJobComposerState,
@@ -582,6 +638,12 @@ export function EscrowConsole({
   }, [initialJobId]);
 
   useEffect(() => {
+    const routeInviteToken =
+      initialJobId && selectedJobId === initialJobId ? readInviteToken() : null;
+    setSelectedInviteToken(routeInviteToken);
+  }, [initialJobId, selectedJobId, view]);
+
+  useEffect(() => {
     const session = readSession();
     if (!session) {
       return;
@@ -703,7 +765,15 @@ export function EscrowConsole({
     setResolutionAction('release');
     setResolutionNote('');
     setJoinLinkState(createIdleState());
+    setJoinReadiness(null);
+    setJoinReadinessState(createIdleState());
   }, [selectedJobId]);
+
+  useEffect(() => {
+    setContractorEmailDraft(
+      selectedJob?.job.contractorParticipation?.contractorEmail ?? '',
+    );
+  }, [selectedJob?.job.contractorParticipation?.contractorEmail]);
 
   useEffect(() => {
     if (!selectedJobView) {
@@ -722,6 +792,51 @@ export function EscrowConsole({
       return pickInitialMilestoneIndex(selectedJobView);
     });
   }, [selectedJobView]);
+
+  useEffect(() => {
+    if (
+      !accessToken ||
+      !selectedJobView ||
+      selectedContractorParticipation?.status !== 'pending' ||
+      isClientForSelectedJob
+    ) {
+      setJoinReadiness(null);
+      setJoinReadinessState(createIdleState());
+      return;
+    }
+
+    let active = true;
+    setJoinReadinessState(createWorkingState('Checking contractor join readiness...'));
+
+    void webApi
+      .getContractorJoinReadiness(selectedJobView.id, selectedInviteToken, accessToken)
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+        setJoinReadiness(response);
+        setJoinReadinessState(createIdleState());
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        setJoinReadiness(null);
+        setJoinReadinessState(
+          createErrorState(error, 'Failed to check contractor join readiness'),
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    accessToken,
+    isClientForSelectedJob,
+    selectedContractorParticipation?.status,
+    selectedInviteToken,
+    selectedJobView,
+  ]);
 
   async function refreshConsole(token = accessToken) {
     if (!token) {
@@ -890,26 +1005,132 @@ export function EscrowConsole({
   }
 
   async function handleCopyJoinLink() {
-    if (!selectedJobView || typeof window === 'undefined') {
+    if (!accessToken || !selectedJobView || typeof window === 'undefined') {
       return;
     }
 
-    const joinLink = `${window.location.origin}/app/contracts/${selectedJobView.id}`;
     setJoinLinkState(createWorkingState('Copying contractor join link...'));
 
     try {
-      await window.navigator.clipboard.writeText(joinLink);
+      const response = await webApi.inviteContractor(
+        selectedJobView.id,
+        {
+          delivery: 'manual',
+          frontendOrigin: window.location.origin,
+        },
+        accessToken,
+      );
+      const inviteToken = new URL(response.invite.joinUrl).searchParams.get('invite');
+      if (inviteToken) {
+        setSelectedInviteToken(inviteToken);
+      }
+      await window.navigator.clipboard.writeText(response.invite.joinUrl);
+      await refreshSelectedJobContext(selectedJobView.id);
       setJoinLinkState(
         createSuccessState(
-          'Join link copied. Share it with the contractor so they can sign in and link the bound worker wallet.',
+          'Invite link copied. Share it with the contractor so they can sign in with the invited email and link the bound worker wallet.',
+        ),
+      );
+    } catch (error) {
+      setJoinLinkState(createErrorState(error, 'Failed to copy contractor invite'));
+    }
+  }
+
+  async function handleSendInviteEmail(regenerate = false) {
+    if (!accessToken || !selectedJobView || typeof window === 'undefined') {
+      return;
+    }
+
+    setJoinLinkState(
+      createWorkingState(
+        regenerate ? 'Regenerating and sending contractor invite...' : 'Sending contractor invite...',
+      ),
+    );
+
+    try {
+      const response = await webApi.inviteContractor(
+        selectedJobView.id,
+        {
+          delivery: 'email',
+          frontendOrigin: window.location.origin,
+          regenerate,
+        },
+        accessToken,
+      );
+      const inviteToken = new URL(response.invite.joinUrl).searchParams.get('invite');
+      if (inviteToken) {
+        setSelectedInviteToken(inviteToken);
+      }
+      await refreshSelectedJobContext(selectedJobView.id);
+      setJoinLinkState(
+        createSuccessState(
+          regenerate
+            ? 'Invite link rotated and the updated contractor invite email was sent.'
+            : 'Contractor invite email sent.',
+        ),
+      );
+    } catch (error) {
+      setJoinLinkState(createErrorState(error, 'Failed to send contractor invite'));
+    }
+  }
+
+  async function handleRegenerateJoinLink() {
+    if (!accessToken || !selectedJobView || typeof window === 'undefined') {
+      return;
+    }
+
+    setJoinLinkState(createWorkingState('Regenerating contractor join link...'));
+
+    try {
+      const response = await webApi.inviteContractor(
+        selectedJobView.id,
+        {
+          delivery: 'manual',
+          frontendOrigin: window.location.origin,
+          regenerate: true,
+        },
+        accessToken,
+      );
+      const inviteToken = new URL(response.invite.joinUrl).searchParams.get('invite');
+      if (inviteToken) {
+        setSelectedInviteToken(inviteToken);
+      }
+      await window.navigator.clipboard.writeText(response.invite.joinUrl);
+      await refreshSelectedJobContext(selectedJobView.id);
+      setJoinLinkState(
+        createSuccessState(
+          'Join link regenerated and copied. Older contractor invite links should be treated as replaced.',
         ),
       );
     } catch (error) {
       setJoinLinkState(
-        createErrorState(
-          error,
-          `Copy failed. Share this link manually: ${joinLink}`,
+        createErrorState(error, 'Failed to regenerate contractor invite link'),
+      );
+    }
+  }
+
+  async function handleUpdateContractorEmail() {
+    if (!accessToken || !selectedJobView) {
+      return;
+    }
+
+    setJoinLinkState(createWorkingState('Updating pending contractor email...'));
+
+    try {
+      await webApi.updateContractorEmail(
+        selectedJobView.id,
+        contractorEmailDraft,
+        accessToken,
+      );
+      await refreshSelectedJobContext(selectedJobView.id);
+      setJoinLinkState(
+        createSuccessState(
+          'Pending contractor email updated. Previous invite links should be considered invalid until you resend or copy the new join link.',
         ),
+      );
+    } catch (error) {
+      setJoinLinkState(
+        createErrorState(error, 'Failed to update pending contractor email'),
       );
     }
   }
@@ -1181,14 +1402,18 @@ export function EscrowConsole({
   }
 
   async function handleJoinContract() {
-    if (!accessToken || !selectedJobView) {
+    if (!accessToken || !selectedJobView || !selectedInviteToken) {
       return;
     }
 
     setJobActionState(createWorkingState('Joining contract...'));
 
     try {
-      await webApi.joinContractor(selectedJobView.id, accessToken);
+      await webApi.joinContractor(
+        selectedJobView.id,
+        selectedInviteToken,
+        accessToken,
+      );
       await refreshSelectedJobContext(selectedJobView.id);
       setJobActionState(
         createSuccessState(
@@ -2280,47 +2505,72 @@ export function EscrowConsole({
               <article className={styles.timelineCard}>
                 <div className={styles.walletTitleRow}>
                   <strong>{messages.console.selectedJob.contractorJoinAccess}</strong>
-                  <span>
-                    {selectedContractorParticipation?.status === 'joined'
-                      ? messages.common.joined
-                      : canJoinSelectedContract
-                        ? messages.common.readyToJoin
-                        : controlsSelectedWorkerWallet
-                          ? messages.common.walletVerified
-                          : accessToken
-                            ? messages.common.setupRequired
-                            : messages.common.shareLinkReady}
-                  </span>
+                  <span>{joinAccessStatusLabel}</span>
                 </div>
-                <p className={styles.muted}>
-                  {!accessToken
-                    ? messages.console.messages.joinAccessSignedOut
-                    : selectedContractorParticipation?.status === 'joined'
-                      ? messages.console.messages.joinAccessJoined
-                      : pendingContractorEmail && !currentUserMatchesPendingContractorEmail
-                        ? messages.console.messages.joinAccessWrongEmail
-                        : !pendingContractorEmail
-                          ? messages.console.messages.joinAccessNoEmail
-                        : !controlsSelectedWorkerWallet
-                          ? messages.console.messages.joinAccessWallet(
-                              selectedJobView.onchain.workerAddress,
-                            )
-                          : messages.console.messages.joinAccessReady}
-                </p>
+                <p className={styles.muted}>{joinAccessMessage}</p>
                 {selectedJob?.job.contractorParticipation?.contractorEmail ? (
                   <p className={styles.muted}>
                     {`${messages.console.selectedJob.pendingContractorEmail}: `}
                     {selectedJob.job.contractorParticipation.contractorEmail}
                   </p>
                 ) : null}
+                {canManageContractorInvite ? (
+                  <div className={styles.stack}>
+                    <label className={styles.field}>
+                      <span>{messages.console.selectedJob.pendingContractorEmail}</span>
+                      <input
+                        type="email"
+                        value={contractorEmailDraft}
+                        onChange={(event) => setContractorEmailDraft(event.target.value)}
+                      />
+                    </label>
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={handleUpdateContractorEmail}
+                        disabled={
+                          !contractorEmailDraft.trim() ||
+                          contractorEmailDraft.trim().toLowerCase() === pendingContractorEmail
+                        }
+                      >
+                        {messages.console.selectedJob.updateContractorEmail}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleSendInviteEmail(false)}
+                      >
+                        {contractorInviteWasSent
+                          ? messages.console.selectedJob.resendContractorInvite
+                          : messages.console.selectedJob.sendContractorInvite}
+                      </button>
+                    </div>
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={handleCopyJoinLink}
+                      >
+                        {messages.console.selectedJob.copyContractorLink}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={handleRegenerateJoinLink}
+                      >
+                        {messages.console.selectedJob.regenerateContractorLink}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => void handleSendInviteEmail(true)}
+                      >
+                        {messages.console.selectedJob.rotateAndResendContractorInvite}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className={styles.inlineActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={handleCopyJoinLink}
-                  >
-                    {messages.console.selectedJob.copyContractorLink}
-                  </button>
                   {selectedContractorParticipation?.status === 'pending' ? (
                     <button
                       type="button"

@@ -104,6 +104,8 @@ export function createJobView(): JobView {
       contractorEmail: 'worker@example.com',
       status: 'joined',
       joinedAt: 170,
+      inviteLastSentAt: 160,
+      inviteLastSentMode: 'email',
     },
     milestones: [
       {
@@ -148,6 +150,15 @@ export function createCustomJobView(
   return {
     ...base,
     ...override,
+    contractorParticipation:
+      override.contractorParticipation === null
+        ? null
+        : override.contractorParticipation
+          ? {
+              ...base.contractorParticipation,
+              ...override.contractorParticipation,
+            }
+          : base.contractorParticipation,
     onchain: {
       ...base.onchain,
       ...override.onchain,
@@ -232,11 +243,11 @@ export function createCustomAuditBundle(
       job: override.job
         ? {
             ...createCustomJobView(override.job),
-            contractorParticipation: override.job.contractorParticipation
-              ? {
-                  status: override.job.contractorParticipation.status,
-                  joinedAt: override.job.contractorParticipation.joinedAt ?? null,
-                }
+                contractorParticipation: override.job.contractorParticipation
+                  ? {
+                      status: override.job.contractorParticipation.status,
+                      joinedAt: override.job.contractorParticipation.joinedAt ?? null,
+                    }
               : createAuditBundle().bundle.job.contractorParticipation,
           }
         : base.bundle.job,

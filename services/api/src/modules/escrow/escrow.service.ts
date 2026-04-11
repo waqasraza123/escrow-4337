@@ -8,11 +8,16 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
+import { isCorsOriginAllowed, readCorsOrigins } from '../../common/http/cors';
+import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
 import type {
+  ContractorInviteDto,
   CreateJobDto,
+  JoinContractorDto,
+  UpdateContractorEmailDto,
   DeliverMilestoneDto,
   DisputeMilestoneDto,
   FundJobDto,
@@ -27,10 +32,14 @@ import type {
 } from './onchain/escrow-contract.types';
 import { EscrowActorService } from './escrow-actor.service';
 import type {
+  ContractorInviteResponse,
+  ContractorJoinReadinessResponse,
   CreateJobResponse,
   EscrowAuditBundle,
   EscrowAuditEvent,
+  EscrowContractorInviteDeliveryMode,
   EscrowContractorParticipationPublicView,
+  EscrowContractorParticipationView,
   EscrowExecutionRecord,
   FundJobResponse,
   EscrowJobRecord,
@@ -40,8 +49,9 @@ import type {
   JoinContractorResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
+  UpdateContractorEmailResponse,
 } from './escrow.types';
-import { normalizeEvmAddress } from '../../common/evm-address';
+import { EmailService } from '../auth/email.service';
 import { UsersService } from '../users/users.service';
 import { buildEscrowExportDocument } from './escrow-export';
 
@@ -106,6 +116,10 @@ function hashToBytes32(value: unknown) {
   return `0x${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
 
+function createInviteToken() {
+  return randomBytes(24).toString('hex');
+}
+
 @Injectable()
 export class EscrowService {
   constructor(
@@ -114,6 +128,7 @@ export class EscrowService {
     @Inject(ESCROW_CONTRACT_GATEWAY)
     private readonly escrowContractGateway: EscrowContractGateway,
     private readonly escrowActorService: EscrowActorService,
+    private readonly emailService: EmailService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -187,6 +202,12 @@ export class EscrowService {
         status: 'pending',
         joinedUserId: null,
         joinedAt: null,
+        invite: {
+          token: createInviteToken(),
+          tokenIssuedAt: now,
+          lastSentAt: null,
+          lastSentMode: null,
+        },
       },
       milestones: [],
       audit: [],
@@ -238,6 +259,197 @@ export class EscrowService {
       status: job.status,
       escrowId: createdJob.escrowId,
       txHash: createdJob.txHash,
+    };
+  }
+
+  async inviteContractor(
+    userId: string,
+    jobId: string,
+    dto: ContractorInviteDto,
+  ): Promise<ContractorInviteResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    await this.escrowActorService.resolveClientForJob(userId, job);
+    const participation = this.requirePendingContractorParticipation(job);
+    const user = await this.usersService.getRequiredById(userId);
+    const regenerated =
+      dto.regenerate === true || !participation.invite.token;
+    const token = regenerated
+      ? this.rotateInviteToken(participation, Date.now())
+      : participation.invite.token ?? this.rotateInviteToken(participation, Date.now());
+    const joinUrl = this.buildContractorJoinUrl(job.id, token, dto.frontendOrigin);
+    const sentAt = Date.now();
+
+    participation.invite.lastSentAt = sentAt;
+    participation.invite.lastSentMode = dto.delivery;
+    job.updatedAt = sentAt;
+
+    if (dto.delivery === 'email') {
+      await this.emailService.sendContractorInvite({
+        email: participation.contractorEmail,
+        joinUrl,
+        clientEmail: user.email,
+        jobTitle: job.title,
+        workerAddress: job.onchain.workerAddress,
+      });
+    }
+
+    this.appendAudit(job, {
+      type: 'job.contractor_invite_sent',
+      at: sentAt,
+      payload: {
+        jobId: job.id,
+        delivery: dto.delivery,
+        regenerated,
+      },
+    });
+    await this.escrowRepository.save(job);
+
+    return {
+      jobId: job.id,
+      contractorParticipation:
+        this.toContractorParticipationView(participation)!,
+      invite: {
+        contractorEmail: participation.contractorEmail,
+        delivery: dto.delivery,
+        joinUrl,
+        regenerated,
+        sentAt,
+      },
+    };
+  }
+
+  async updateContractorEmail(
+    userId: string,
+    jobId: string,
+    dto: UpdateContractorEmailDto,
+  ): Promise<UpdateContractorEmailResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    await this.escrowActorService.resolveClientForJob(userId, job);
+    const participation = this.requirePendingContractorParticipation(job);
+
+    if (participation.contractorEmail === dto.contractorEmail) {
+      return {
+        jobId: job.id,
+        contractorParticipation:
+          this.toContractorParticipationView(participation)!,
+      };
+    }
+
+    const now = Date.now();
+    participation.contractorEmail = dto.contractorEmail;
+    participation.invite.lastSentAt = null;
+    participation.invite.lastSentMode = null;
+    this.rotateInviteToken(participation, now);
+    job.updatedAt = now;
+    this.appendAudit(job, {
+      type: 'job.contractor_email_updated',
+      at: now,
+      payload: {
+        jobId: job.id,
+      },
+    });
+    await this.escrowRepository.save(job);
+
+    return {
+      jobId: job.id,
+      contractorParticipation:
+        this.toContractorParticipationView(participation)!,
+    };
+  }
+
+  async getContractorJoinReadiness(
+    userId: string,
+    jobId: string,
+    inviteToken?: string,
+  ): Promise<ContractorJoinReadinessResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const participation = this.requireContractorParticipation(job);
+    const user = await this.usersService.getRequiredById(userId);
+    const linkedWalletAddresses = user.wallets.map((wallet) =>
+      normalizeEvmAddress(wallet.address),
+    );
+
+    if (participation.status === 'joined') {
+      return {
+        jobId: job.id,
+        status:
+          participation.joinedUserId === user.id ? 'joined' : 'claimed_by_other',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    if (!inviteToken) {
+      return {
+        jobId: job.id,
+        status: 'invite_required',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    if (!this.matchesInviteToken(participation, inviteToken)) {
+      return {
+        jobId: job.id,
+        status: 'invite_invalid',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    if (user.email !== participation.contractorEmail) {
+      return {
+        jobId: job.id,
+        status: 'wrong_email',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    if (linkedWalletAddresses.length === 0) {
+      return {
+        jobId: job.id,
+        status: 'wallet_not_linked',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    if (!linkedWalletAddresses.includes(job.onchain.workerAddress)) {
+      return {
+        jobId: job.id,
+        status: 'wrong_wallet',
+        contractorEmailHint: this.maskEmail(participation.contractorEmail),
+        workerAddress: job.onchain.workerAddress,
+        linkedWalletAddresses,
+        contractorParticipation:
+          this.toPublicContractorParticipationView(participation)!,
+      };
+    }
+
+    return {
+      jobId: job.id,
+      status: 'ready',
+      contractorEmailHint: this.maskEmail(participation.contractorEmail),
+      workerAddress: job.onchain.workerAddress,
+      linkedWalletAddresses,
+      contractorParticipation:
+        this.toPublicContractorParticipationView(participation)!,
     };
   }
 
@@ -296,6 +508,7 @@ export class EscrowService {
   async joinContractor(
     userId: string,
     jobId: string,
+    dto: JoinContractorDto,
   ): Promise<JoinContractorResponse> {
     const job = await this.getJobOrThrow(jobId);
     const participation = this.requireContractorParticipation(job);
@@ -312,6 +525,12 @@ export class EscrowService {
 
       throw new ConflictException(
         'Contractor participation has already been claimed',
+      );
+    }
+
+    if (!this.matchesInviteToken(participation, dto.inviteToken)) {
+      throw new ForbiddenException(
+        'Contractor invite link is missing or no longer valid',
       );
     }
 
@@ -333,6 +552,8 @@ export class EscrowService {
     participation.status = 'joined';
     participation.joinedUserId = user.id;
     participation.joinedAt = now;
+    participation.invite.token = null;
+    participation.invite.tokenIssuedAt = null;
     job.updatedAt = now;
     this.appendAudit(job, {
       type: 'job.contractor_joined',
@@ -706,7 +927,7 @@ export class EscrowService {
 
   private toContractorParticipationView(
     participation: EscrowJobRecord['contractorParticipation'],
-  ) {
+  ): EscrowContractorParticipationView | null {
     if (!participation) {
       return null;
     }
@@ -715,6 +936,8 @@ export class EscrowService {
       contractorEmail: participation.contractorEmail,
       status: participation.status,
       joinedAt: participation.joinedAt,
+      inviteLastSentAt: participation.invite.lastSentAt,
+      inviteLastSentMode: participation.invite.lastSentMode,
     };
   }
 
@@ -860,6 +1083,107 @@ export class EscrowService {
     }
 
     return job.contractorParticipation;
+  }
+
+  private requirePendingContractorParticipation(job: EscrowJobRecord) {
+    const participation = this.requireContractorParticipation(job);
+
+    if (participation.status === 'joined') {
+      throw new ConflictException('Contractor identity has already been locked');
+    }
+
+    return participation;
+  }
+
+  private rotateInviteToken(
+    participation: EscrowJobRecord['contractorParticipation'],
+    now: number,
+  ) {
+    if (!participation) {
+      throw new ConflictException(
+        'This contract does not support contractor join state',
+      );
+    }
+
+    const token = createInviteToken();
+    participation.invite.token = token;
+    participation.invite.tokenIssuedAt = now;
+    return token;
+  }
+
+  private matchesInviteToken(
+    participation: EscrowJobRecord['contractorParticipation'],
+    inviteToken: string,
+  ) {
+    if (!participation) {
+      return false;
+    }
+
+    const token = participation.invite.token;
+    if (!token) {
+      return false;
+    }
+
+    return token === inviteToken.trim();
+  }
+
+  private buildContractorJoinUrl(
+    jobId: string,
+    inviteToken: string,
+    frontendOrigin: string,
+  ) {
+    const origin = this.resolveFrontendOrigin(frontendOrigin);
+    return `${origin}/app/contracts/${jobId}?invite=${encodeURIComponent(
+      inviteToken,
+    )}`;
+  }
+
+  private resolveFrontendOrigin(frontendOrigin: string) {
+    let origin: string;
+
+    try {
+      origin = new URL(frontendOrigin).origin;
+    } catch {
+      throw new BadRequestException('frontendOrigin must be an absolute origin');
+    }
+
+    const configuredOrigins = readCorsOrigins(process.env.NEST_API_CORS_ORIGINS);
+
+    if (
+      configuredOrigins.length > 0 &&
+      !isCorsOriginAllowed(origin, configuredOrigins)
+    ) {
+      throw new ForbiddenException(
+        'frontendOrigin is not allowed by NEST_API_CORS_ORIGINS',
+      );
+    }
+
+    return origin;
+  }
+
+  private maskEmail(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const [localPart, domainPart] = normalized.split('@');
+
+    if (!localPart || !domainPart) {
+      return normalized;
+    }
+
+    const localPreview =
+      localPart.length <= 2
+        ? `${localPart[0] ?? ''}*`
+        : `${localPart[0] ?? ''}${'*'.repeat(
+            Math.max(localPart.length - 2, 1),
+          )}${localPart[localPart.length - 1] ?? ''}`;
+    const [domainName, ...domainRest] = domainPart.split('.');
+    const maskedDomainName =
+      domainName.length <= 2
+        ? `${domainName[0] ?? ''}*`
+        : `${domainName[0] ?? ''}${'*'.repeat(
+            Math.max(domainName.length - 2, 1),
+          )}${domainName[domainName.length - 1] ?? ''}`;
+
+    return `${localPreview}@${[maskedDomainName, ...domainRest].join('.')}`;
   }
 
   private appendAudit(job: EscrowJobRecord, event: EscrowAuditEvent) {

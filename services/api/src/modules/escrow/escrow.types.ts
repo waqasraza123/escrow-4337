@@ -36,6 +36,22 @@ export type EscrowAuditEvent =
       };
     }
   | {
+      type: 'job.contractor_email_updated';
+      at: number;
+      payload: {
+        jobId: string;
+      };
+    }
+  | {
+      type: 'job.contractor_invite_sent';
+      at: number;
+      payload: {
+        jobId: string;
+        delivery: EscrowContractorInviteDeliveryMode;
+        regenerated: boolean;
+      };
+    }
+  | {
       type: 'job.contractor_joined';
       at: number;
       payload: {
@@ -112,18 +128,29 @@ export type EscrowMilestoneRecord = {
 };
 
 export type EscrowContractorParticipationStatus = 'pending' | 'joined';
+export type EscrowContractorInviteDeliveryMode = 'email' | 'manual';
+
+export type EscrowContractorInviteRecord = {
+  token: string | null;
+  tokenIssuedAt: number | null;
+  lastSentAt: number | null;
+  lastSentMode: EscrowContractorInviteDeliveryMode | null;
+};
 
 export type EscrowContractorParticipationRecord = {
   contractorEmail: string;
   status: EscrowContractorParticipationStatus;
   joinedUserId: string | null;
   joinedAt: number | null;
+  invite: EscrowContractorInviteRecord;
 };
 
 export type EscrowContractorParticipationView = {
   contractorEmail: string;
   status: EscrowContractorParticipationStatus;
   joinedAt: number | null;
+  inviteLastSentAt: number | null;
+  inviteLastSentMode: EscrowContractorInviteDeliveryMode | null;
 };
 
 export type EscrowContractorParticipationPublicView = {
@@ -235,6 +262,16 @@ export type EscrowPublicJobView = Omit<
 
 export type EscrowParticipantRole = 'client' | 'worker';
 
+export type EscrowContractorJoinReadinessStatus =
+  | 'invite_required'
+  | 'invite_invalid'
+  | 'joined'
+  | 'claimed_by_other'
+  | 'wrong_email'
+  | 'wallet_not_linked'
+  | 'wrong_wallet'
+  | 'ready';
+
 export type EscrowJobListItem = {
   job: EscrowJobView;
   participantRoles: EscrowParticipantRole[];
@@ -330,6 +367,32 @@ export type CreateJobResponse = {
 
 export type JoinContractorResponse = {
   jobId: string;
+  contractorParticipation: EscrowContractorParticipationPublicView;
+};
+
+export type ContractorInviteResponse = {
+  jobId: string;
+  contractorParticipation: EscrowContractorParticipationView;
+  invite: {
+    contractorEmail: string;
+    delivery: EscrowContractorInviteDeliveryMode;
+    joinUrl: string;
+    regenerated: boolean;
+    sentAt: number;
+  };
+};
+
+export type UpdateContractorEmailResponse = {
+  jobId: string;
+  contractorParticipation: EscrowContractorParticipationView;
+};
+
+export type ContractorJoinReadinessResponse = {
+  jobId: string;
+  status: EscrowContractorJoinReadinessStatus;
+  contractorEmailHint: string | null;
+  workerAddress: string;
+  linkedWalletAddresses: string[];
   contractorParticipation: EscrowContractorParticipationPublicView;
 };
 

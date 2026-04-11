@@ -338,6 +338,18 @@ function mapContractorParticipation(
         : 'pending',
     joinedUserId: row.contractor_participation_json.joinedUserId ?? null,
     joinedAt: row.contractor_participation_json.joinedAt ?? null,
+    invite: {
+      token: row.contractor_participation_json.invite?.token ?? null,
+      tokenIssuedAt:
+        row.contractor_participation_json.invite?.tokenIssuedAt ?? null,
+      lastSentAt: row.contractor_participation_json.invite?.lastSentAt ?? null,
+      lastSentMode:
+        row.contractor_participation_json.invite?.lastSentMode === 'email'
+          ? 'email'
+          : row.contractor_participation_json.invite?.lastSentMode === 'manual'
+            ? 'manual'
+            : null,
+    },
   };
 }
 

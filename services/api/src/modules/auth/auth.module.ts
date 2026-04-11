@@ -25,6 +25,6 @@ import { SessionsService } from './sessions.service';
     SessionsService,
     AuthGuard,
   ],
-  exports: [AuthGuard, JwtService, SessionsService],
+  exports: [AuthGuard, EmailService, JwtService, SessionsService],
 })
 export class AuthModule {}

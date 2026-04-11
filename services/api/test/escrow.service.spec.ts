@@ -115,7 +115,9 @@ describe('EscrowService', () => {
     expect(milestoneResult.status).toBe('funded');
     expect(milestoneResult.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    const joinResult = await escrowService.joinContractor(
+    const joinResult = await joinAsContractor(
+      escrowService,
+      clientUserId,
       workerUserId,
       createdJob.jobId,
     );
@@ -174,6 +176,7 @@ describe('EscrowService', () => {
       'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_invite_sent',
       'job.contractor_joined',
       'milestone.delivered',
       'milestone.released',
@@ -207,7 +210,12 @@ describe('EscrowService', () => {
         },
       ],
     });
-    await escrowService.joinContractor(workerUserId, createdJob.jobId);
+    await joinAsContractor(
+      escrowService,
+      clientUserId,
+      workerUserId,
+      createdJob.jobId,
+    );
     await escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
       note: 'Implementation delivered for review',
       evidenceUrls: [],
@@ -240,6 +248,160 @@ describe('EscrowService', () => {
     expect(auditBundle.bundle.job.milestones[0]?.disputeEvidenceUrls).toEqual([
       'https://example.com/dispute-proof',
     ]);
+  });
+
+  it('supports contractor invite resend, email correction, and token-based join recovery', async () => {
+    const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail: 'wrong-worker@example.com',
+      workerAddress,
+      currencyAddress,
+      title: 'Invite recovery',
+      description: 'Recover the pending contractor handshake safely.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    const initialInvite = await escrowService.inviteContractor(
+      clientUserId,
+      createdJob.jobId,
+      {
+        delivery: 'manual',
+        frontendOrigin: 'http://localhost:3000',
+      },
+    );
+    const staleInviteToken =
+      new URL(initialInvite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+    const wrongEmailReadiness = await escrowService.getContractorJoinReadiness(
+      workerUserId,
+      createdJob.jobId,
+      staleInviteToken,
+    );
+    expect(wrongEmailReadiness.status).toBe('wrong_email');
+
+    await escrowService.updateContractorEmail(clientUserId, createdJob.jobId, {
+      contractorEmail,
+    });
+
+    const staleReadiness = await escrowService.getContractorJoinReadiness(
+      workerUserId,
+      createdJob.jobId,
+      staleInviteToken,
+    );
+    expect(staleReadiness.status).toBe('invite_invalid');
+
+    const updatedInvite = await escrowService.inviteContractor(
+      clientUserId,
+      createdJob.jobId,
+      {
+        delivery: 'email',
+        frontendOrigin: 'http://localhost:3000',
+        regenerate: true,
+      },
+    );
+    const freshInviteToken =
+      new URL(updatedInvite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+    const readyReadiness = await escrowService.getContractorJoinReadiness(
+      workerUserId,
+      createdJob.jobId,
+      freshInviteToken,
+    );
+    expect(readyReadiness.status).toBe('ready');
+
+    await expect(
+      escrowService.joinContractor(workerUserId, createdJob.jobId, {
+        inviteToken: staleInviteToken,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    const joinResult = await escrowService.joinContractor(
+      workerUserId,
+      createdJob.jobId,
+      {
+        inviteToken: freshInviteToken,
+      },
+    );
+    expect(joinResult.contractorParticipation.status).toBe('joined');
+
+    await expect(
+      escrowService.updateContractorEmail(clientUserId, createdJob.jobId, {
+        contractorEmail: 'another@example.com',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('reports wallet-linked recovery states before contractor join', async () => {
+    const unlinkedEmail = 'unlinked-worker@example.com';
+    const unlinkedJob = await escrowService.createJob(clientUserId, {
+      contractorEmail: unlinkedEmail,
+      workerAddress,
+      currencyAddress,
+      title: 'Join readiness without wallet',
+      description: 'Show the missing-wallet recovery state before join.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const unlinkedInvite = await escrowService.inviteContractor(
+      clientUserId,
+      unlinkedJob.jobId,
+      {
+        delivery: 'manual',
+        frontendOrigin: 'http://localhost:3000',
+      },
+    );
+    const unlinkedInviteToken =
+      new URL(unlinkedInvite.invite.joinUrl).searchParams.get('invite') ?? '';
+    const unlinkedUser = await usersService.getOrCreateByEmail(unlinkedEmail);
+    const walletMissing = await escrowService.getContractorJoinReadiness(
+      unlinkedUser.id,
+      unlinkedJob.jobId,
+      unlinkedInviteToken,
+    );
+    expect(walletMissing.status).toBe('wallet_not_linked');
+
+    const wrongWalletEmail = 'wrong-wallet-worker@example.com';
+    const wrongWalletJob = await escrowService.createJob(clientUserId, {
+      contractorEmail: wrongWalletEmail,
+      workerAddress,
+      currencyAddress,
+      title: 'Join readiness with wrong wallet',
+      description: 'Show the wrong-wallet recovery state before join.',
+      category: 'software-development',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+    const wrongWalletInvite = await escrowService.inviteContractor(
+      clientUserId,
+      wrongWalletJob.jobId,
+      {
+        delivery: 'manual',
+        frontendOrigin: 'http://localhost:3000',
+      },
+    );
+    const wrongWalletInviteToken =
+      new URL(wrongWalletInvite.invite.joinUrl).searchParams.get('invite') ?? '';
+    const wrongWalletUser = await usersService.getOrCreateByEmail(
+      wrongWalletEmail,
+    );
+    await usersService.linkWallet(wrongWalletUser.id, {
+      address: '0x9999999999999999999999999999999999999999',
+      walletKind: 'eoa',
+      verificationMethod: 'siwe',
+      verificationChainId: 84532,
+      verifiedAt: Date.now(),
+    });
+    const wrongWallet = await escrowService.getContractorJoinReadiness(
+      wrongWalletUser.id,
+      wrongWalletJob.jobId,
+      wrongWalletInviteToken,
+    );
+    expect(wrongWallet.status).toBe('wrong_wallet');
   });
 
   it('records failed onchain execution attempts without mutating local job state', async () => {
@@ -341,7 +503,12 @@ describe('EscrowService', () => {
     await escrowService.fundJob(clientUserId, firstJob.jobId, {
       amount: '35',
     });
-    await escrowService.joinContractor(workerUserId, firstJob.jobId);
+    await joinAsContractor(
+      escrowService,
+      clientUserId,
+      workerUserId,
+      firstJob.jobId,
+    );
 
     const otherClient = await usersService.getOrCreateByEmail(
       'other-client@example.com',
@@ -385,7 +552,12 @@ describe('EscrowService', () => {
         currency: 'USDC',
       },
     });
-    await escrowService.joinContractor(workerUserId, secondJob.jobId);
+    await joinAsContractor(
+      escrowService,
+      otherClient.id,
+      workerUserId,
+      secondJob.jobId,
+    );
 
     const clientJobs = await escrowService.listJobsForUser(clientUserId);
     expect(clientJobs.jobs).toHaveLength(1);
@@ -438,7 +610,9 @@ describe('EscrowService', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    const joinResult = await escrowService.joinContractor(
+    const joinResult = await joinAsContractor(
+      escrowService,
+      clientUserId,
       workerUserId,
       createdJob.jobId,
     );
@@ -612,4 +786,22 @@ async function createLinkedUserId(
     await usersService.setDefaultExecutionWallet(user.id, smartAccountAddress);
   }
   return user.id;
+}
+
+async function joinAsContractor(
+  escrowService: EscrowService,
+  clientUserId: string,
+  workerUserId: string,
+  jobId: string,
+) {
+  const invite = await escrowService.inviteContractor(clientUserId, jobId, {
+    delivery: 'manual',
+    frontendOrigin: 'http://localhost:3000',
+  });
+  const inviteToken =
+    new URL(invite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+  return escrowService.joinContractor(workerUserId, jobId, {
+    inviteToken,
+  });
 }

@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { defaultLocalApiPort, resolveLocalApiBaseUrl } from '@escrow4334/frontend-core';
 import {
   renderApp,
   seedJsonStorage,
@@ -23,9 +24,11 @@ import {
 } from '../test/fixtures';
 import { WebI18nProvider } from '../lib/i18n';
 
+const localApiBaseUrl = resolveLocalApiBaseUrl(defaultLocalApiPort);
+
 const { mockedWebApi, mockedInjectedWallet } = vi.hoisted(() => ({
   mockedWebApi: {
-    baseUrl: 'http://localhost:4000',
+    baseUrl: '',
     getRuntimeProfile: vi.fn(),
     startAuth: vi.fn(),
     verifyAuth: vi.fn(),
@@ -40,6 +43,9 @@ const { mockedWebApi, mockedInjectedWallet } = vi.hoisted(() => ({
     setDefaultWallet: vi.fn(),
     listJobs: vi.fn(),
     createJob: vi.fn(),
+    inviteContractor: vi.fn(),
+    updateContractorEmail: vi.fn(),
+    getContractorJoinReadiness: vi.fn(),
     joinContractor: vi.fn(),
     fundJob: vi.fn(),
     setMilestones: vi.fn(),
@@ -86,7 +92,46 @@ function renderHome() {
 describe('web page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedWebApi.baseUrl = localApiBaseUrl;
     mockedWebApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
+    mockedWebApi.inviteContractor.mockResolvedValue({
+      jobId: 'job-1',
+      contractorParticipation: {
+        contractorEmail: 'worker@example.com',
+        status: 'pending',
+        joinedAt: null,
+        inviteLastSentAt: 200,
+        inviteLastSentMode: 'manual',
+      },
+      invite: {
+        contractorEmail: 'worker@example.com',
+        delivery: 'manual',
+        joinUrl: 'http://localhost:3000/app/contracts/job-1?invite=test-invite',
+        regenerated: false,
+        sentAt: 200,
+      },
+    });
+    mockedWebApi.updateContractorEmail.mockResolvedValue({
+      jobId: 'job-1',
+      contractorParticipation: {
+        contractorEmail: 'worker@example.com',
+        status: 'pending',
+        joinedAt: null,
+        inviteLastSentAt: null,
+        inviteLastSentMode: null,
+      },
+    });
+    mockedWebApi.getContractorJoinReadiness.mockResolvedValue({
+      jobId: 'job-1',
+      status: 'ready',
+      contractorEmailHint: 'w****r@e*****e.com',
+      workerAddress: '0xworker',
+      linkedWalletAddresses: ['0xworker'],
+      contractorParticipation: {
+        status: 'pending',
+        joinedAt: null,
+      },
+    });
     mockedInjectedWallet.subscribeInjectedWallet.mockReturnValue(() => {});
     mockedInjectedWallet.readInjectedWalletSnapshot.mockResolvedValue({
       address: null,
@@ -122,7 +167,7 @@ describe('web page', () => {
     ).toBeGreaterThan(0);
 
     await waitFor(() => {
-      expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
+      expect(screen.getByText(localApiBaseUrl)).toBeInTheDocument();
       expect(screen.getAllByText('Current origin allowed').length).toBeGreaterThan(0);
       expect(screen.getAllByText('HTTP target').length).toBeGreaterThan(0);
     });

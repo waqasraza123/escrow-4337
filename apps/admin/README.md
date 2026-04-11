@@ -29,7 +29,7 @@ From the repo root:
 pnpm --filter admin dev
 ```
 
-Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/admin/.env.example) to `apps/admin/.env` and point `NEXT_PUBLIC_API_BASE_URL` at the running API.
+Copy [`.env.example`](/Users/mc/development/blockchain/ethereum/base/Escrow4337/apps/admin/.env.example) to `apps/admin/.env`. Local development derives `NEXT_PUBLIC_API_BASE_URL` from `NEXT_PUBLIC_API_PORT`, and deployed environments can override the full base URL directly.
 
 Run the app-specific quality checks:
 

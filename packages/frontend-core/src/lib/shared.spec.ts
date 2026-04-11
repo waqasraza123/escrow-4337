@@ -3,6 +3,7 @@ import {
   createErrorState,
   createSuccessState,
   createWorkingState,
+  defaultLocalApiPort,
   getLocaleDefinition,
   formatTimestamp,
   localeCookieName,
@@ -13,6 +14,7 @@ import {
   readContentDispositionFilename,
   requestDocument,
   requestJson,
+  resolveLocalApiBaseUrl,
   syncDocumentLocale,
   saveDownloadedDocument,
   describeRuntimeAlignment,
@@ -82,8 +84,9 @@ describe('frontend core helpers', () => {
   });
 
   it('resolves API base URLs and error payloads consistently', async () => {
-    expect(resolveApiBaseUrl('http://localhost:4000///')).toBe(
-      'http://localhost:4000',
+    expect(resolveLocalApiBaseUrl()).toBe(`http://localhost:${defaultLocalApiPort}`);
+    expect(resolveApiBaseUrl('http://localhost:4100///')).toBe(
+      'http://localhost:4100',
     );
 
     const response = new Response(
@@ -102,7 +105,7 @@ describe('frontend core helpers', () => {
 
     await expect(
       requestJson<{ ok: true }>(
-        'http://localhost:4000',
+        resolveLocalApiBaseUrl(),
         '/test',
         {
           method: 'POST',
@@ -113,7 +116,7 @@ describe('frontend core helpers', () => {
     ).resolves.toEqual({ ok: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:4000/test',
+      `${resolveLocalApiBaseUrl()}/test`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ hello: 'world' }),
@@ -139,7 +142,7 @@ describe('frontend core helpers', () => {
     );
 
     await expect(
-      requestDocument('http://localhost:4000', '/jobs/job-123/export'),
+      requestDocument(resolveLocalApiBaseUrl(), '/jobs/job-123/export'),
     ).resolves.toMatchObject({
       filename: 'escrow-job-123-job-history.csv',
       contentType: 'text/csv; charset=utf-8',

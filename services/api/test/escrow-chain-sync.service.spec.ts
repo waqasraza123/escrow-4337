@@ -180,7 +180,7 @@ describe('EscrowChainSyncService', () => {
     expect(report.localComparison).toMatchObject({
       aggregateMatches: true,
       auditDigestMatches: false,
-      localAuditEvents: 6,
+      localAuditEvents: 7,
       chainAuditEvents: 4,
       localStatus: 'in_progress',
       chainDerivedStatus: 'in_progress',
@@ -357,6 +357,7 @@ describe('EscrowChainSyncService', () => {
       'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_invite_sent',
       'job.contractor_joined',
       'milestone.delivered',
       'milestone.disputed',
@@ -498,6 +499,7 @@ describe('EscrowChainSyncService', () => {
       'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_invite_sent',
       'job.contractor_joined',
       'milestone.delivered',
     ]);
@@ -608,7 +610,12 @@ describe('EscrowChainSyncService', () => {
         },
       ],
     });
-    await escrowService.joinContractor(workerUserId, createdJob.jobId);
+    await joinAsContractor(
+      escrowService,
+      clientUserId,
+      workerUserId,
+      createdJob.jobId,
+    );
     await escrowService.deliverMilestone(workerUserId, createdJob.jobId, 0, {
       note: 'Submitted for chain sync.',
       evidenceUrls: ['https://example.com/evidence'],
@@ -740,4 +747,22 @@ async function createLinkedUserId(
   }
 
   return user.id;
+}
+
+async function joinAsContractor(
+  escrowService: EscrowService,
+  clientUserId: string,
+  workerUserId: string,
+  jobId: string,
+) {
+  const invite = await escrowService.inviteContractor(clientUserId, jobId, {
+    delivery: 'manual',
+    frontendOrigin: 'http://localhost:3000',
+  });
+  const inviteToken =
+    new URL(invite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+  return escrowService.joinContractor(workerUserId, jobId, {
+    inviteToken,
+  });
 }

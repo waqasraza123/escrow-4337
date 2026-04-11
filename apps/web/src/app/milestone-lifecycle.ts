@@ -1,4 +1,4 @@
-import type { AuditBundle, JobView } from '../lib/api';
+import type { AuditBundle, JobView, PublicJobView } from '../lib/api';
 
 export type LifecycleAction = AuditBundle['bundle']['executions'][number]['action'];
 
@@ -37,7 +37,8 @@ export type MilestoneTimelineEntry = {
 
 type ExecutionRecord = AuditBundle['bundle']['executions'][number];
 type AuditEvent = AuditBundle['bundle']['audit'][number];
-type MilestoneView = JobView['milestones'][number];
+type JobLike = JobView | PublicJobView;
+type MilestoneView = JobLike['milestones'][number];
 
 export type WebLifecycleMessages = {
   submitting: string;
@@ -235,7 +236,7 @@ function getMilestoneBlockedReason(
   return null;
 }
 
-export function pickInitialMilestoneIndex(job: JobView | null) {
+export function pickInitialMilestoneIndex(job: JobLike | null) {
   if (!job || job.milestones.length === 0) {
     return 0;
   }
@@ -248,7 +249,7 @@ export function pickInitialMilestoneIndex(job: JobView | null) {
 }
 
 export function buildJobLifecycleCards(input: {
-  job: JobView;
+  job: JobLike;
   executions: ExecutionRecord[];
   pendingAction: PendingLifecycleAction | null;
   copy: WebLifecycleMessages;
@@ -293,7 +294,7 @@ export function buildJobLifecycleCards(input: {
 }
 
 export function buildMilestoneLifecycleCards(input: {
-  job: JobView;
+  job: JobLike;
   milestoneIndex: number;
   executions: ExecutionRecord[];
   pendingAction: PendingLifecycleAction | null;

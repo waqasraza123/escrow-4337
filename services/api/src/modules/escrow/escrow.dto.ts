@@ -73,7 +73,31 @@ export const resolveMilestoneSchema = z
   })
   .strict();
 
-export const joinContractorSchema = z.object({}).strict();
+export const contractorInviteSchema = z
+  .object({
+    delivery: z.enum(['email', 'manual']),
+    frontendOrigin: z.string().trim().url().max(2048),
+    regenerate: z.boolean().optional(),
+  })
+  .strict();
+
+export const updateContractorEmailSchema = z
+  .object({
+    contractorEmail: emailSchema,
+  })
+  .strict();
+
+export const contractorJoinReadinessQuerySchema = z
+  .object({
+    inviteToken: z.string().trim().min(1).max(256).optional(),
+  })
+  .strict();
+
+export const joinContractorSchema = z
+  .object({
+    inviteToken: z.string().trim().min(1).max(256),
+  })
+  .strict();
 
 export const exportArtifactQuerySchema = z
   .object({
@@ -90,5 +114,10 @@ export type DeliverMilestoneDto = z.infer<typeof deliverMilestoneSchema>;
 export type ReleaseMilestoneDto = z.infer<typeof releaseMilestoneSchema>;
 export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
 export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;
+export type ContractorInviteDto = z.infer<typeof contractorInviteSchema>;
+export type UpdateContractorEmailDto = z.infer<typeof updateContractorEmailSchema>;
+export type ContractorJoinReadinessQueryDto = z.infer<
+  typeof contractorJoinReadinessQuerySchema
+>;
 export type JoinContractorDto = z.infer<typeof joinContractorSchema>;
 export type ExportArtifactQueryDto = z.infer<typeof exportArtifactQuerySchema>;

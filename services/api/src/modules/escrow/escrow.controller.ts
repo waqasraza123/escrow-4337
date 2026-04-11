@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   ParseIntPipe,
   Post,
@@ -16,6 +17,8 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import * as escrowDto from './escrow.dto';
 import { EscrowService } from './escrow.service';
 import type {
+  ContractorInviteResponse,
+  ContractorJoinReadinessResponse,
   CreateJobResponse,
   EscrowAuditBundle,
   EscrowJobsListResponse,
@@ -23,6 +26,7 @@ import type {
   JoinContractorResponse,
   MilestoneMutationResponse,
   SetMilestonesResponse,
+  UpdateContractorEmailResponse,
 } from './escrow.types';
 
 @Controller('jobs')
@@ -57,6 +61,43 @@ export class EscrowController {
   }
 
   @UseGuards(AuthGuard)
+  @Post(':id/contractor/invite')
+  inviteContractor(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(escrowDto.contractorInviteSchema))
+    dto: escrowDto.ContractorInviteDto,
+  ): Promise<ContractorInviteResponse> {
+    return this.escrowService.inviteContractor(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch(':id/contractor/email')
+  updateContractorEmail(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(escrowDto.updateContractorEmailSchema))
+    dto: escrowDto.UpdateContractorEmailDto,
+  ): Promise<UpdateContractorEmailResponse> {
+    return this.escrowService.updateContractorEmail(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':id/contractor/join-readiness')
+  getContractorJoinReadiness(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(escrowDto.contractorJoinReadinessQuerySchema))
+    query: escrowDto.ContractorJoinReadinessQueryDto,
+  ): Promise<ContractorJoinReadinessResponse> {
+    return this.escrowService.getContractorJoinReadiness(
+      user.id,
+      id,
+      query.inviteToken,
+    );
+  }
+
+  @UseGuards(AuthGuard)
   @Post(':id/contractor/join')
   joinContractor(
     @User() user: ReqUser,
@@ -64,8 +105,7 @@ export class EscrowController {
     @Body(new ZodValidationPipe(escrowDto.joinContractorSchema))
     dto: escrowDto.JoinContractorDto,
   ): Promise<JoinContractorResponse> {
-    void dto;
-    return this.escrowService.joinContractor(user.id, id);
+    return this.escrowService.joinContractor(user.id, id, dto);
   }
 
   @UseGuards(AuthGuard)

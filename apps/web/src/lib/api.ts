@@ -91,6 +91,8 @@ export type JobView = {
     contractorEmail?: string;
     status: 'pending' | 'joined';
     joinedAt: number | null;
+    inviteLastSentAt: number | null;
+    inviteLastSentMode: 'email' | 'manual' | null;
   } | null;
   milestones: Array<{
     title: string;
@@ -124,6 +126,35 @@ export type PublicJobView = Omit<JobView, 'contractorParticipation'> & {
     status: 'pending' | 'joined';
     joinedAt: number | null;
   } | null;
+};
+
+export type ContractorInviteResponse = {
+  jobId: string;
+  contractorParticipation: NonNullable<JobView['contractorParticipation']>;
+  invite: {
+    contractorEmail: string;
+    delivery: 'email' | 'manual';
+    joinUrl: string;
+    regenerated: boolean;
+    sentAt: number;
+  };
+};
+
+export type ContractorJoinReadiness = {
+  jobId: string;
+  status:
+    | 'invite_required'
+    | 'invite_invalid'
+    | 'joined'
+    | 'claimed_by_other'
+    | 'wrong_email'
+    | 'wallet_not_linked'
+    | 'wrong_wallet'
+    | 'ready';
+  contractorEmailHint: string | null;
+  workerAddress: string;
+  linkedWalletAddresses: string[];
+  contractorParticipation: NonNullable<PublicJobView['contractorParticipation']>;
 };
 
 export type JobsListResponse = {
@@ -363,7 +394,61 @@ export const webApi = {
       accessToken,
     );
   },
-  joinContractor(jobId: string, accessToken: string) {
+  inviteContractor(
+    jobId: string,
+    input: {
+      delivery: 'email' | 'manual';
+      frontendOrigin: string;
+      regenerate?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<ContractorInviteResponse>(
+      apiBaseUrl,
+      `/jobs/${jobId}/contractor/invite`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateContractorEmail(
+    jobId: string,
+    contractorEmail: string,
+    accessToken: string,
+  ) {
+    return requestJson<{
+      jobId: string;
+      contractorParticipation: NonNullable<JobView['contractorParticipation']>;
+    }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/contractor/email`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ contractorEmail }),
+      },
+      accessToken,
+    );
+  },
+  getContractorJoinReadiness(
+    jobId: string,
+    inviteToken: string | null,
+    accessToken: string,
+  ) {
+    const search = inviteToken
+      ? `?inviteToken=${encodeURIComponent(inviteToken)}`
+      : '';
+    return requestJson<ContractorJoinReadiness>(
+      apiBaseUrl,
+      `/jobs/${jobId}/contractor/join-readiness${search}`,
+      {
+        method: 'GET',
+      },
+      accessToken,
+    );
+  },
+  joinContractor(jobId: string, inviteToken: string, accessToken: string) {
     return requestJson<{
       jobId: string;
       contractorParticipation: {
@@ -375,7 +460,7 @@ export const webApi = {
       `/jobs/${jobId}/contractor/join`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify({ inviteToken }),
       },
       accessToken,
     );

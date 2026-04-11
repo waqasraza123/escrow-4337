@@ -133,7 +133,12 @@ describe('EscrowHealthService', () => {
         },
       ],
     });
-    await escrowService.joinContractor(workerUserId, disputedJob.jobId);
+    await joinAsContractor(
+      escrowService,
+      clientUserId,
+      workerUserId,
+      disputedJob.jobId,
+    );
     await escrowService.deliverMilestone(workerUserId, disputedJob.jobId, 0, {
       note: 'Submitted for review',
       evidenceUrls: ['https://example.com/evidence'],
@@ -878,4 +883,22 @@ async function createLinkedUserId(
   }
 
   return user.id;
+}
+
+async function joinAsContractor(
+  escrowService: EscrowService,
+  clientUserId: string,
+  workerUserId: string,
+  jobId: string,
+) {
+  const invite = await escrowService.inviteContractor(clientUserId, jobId, {
+    delivery: 'manual',
+    frontendOrigin: 'http://localhost:3000',
+  });
+  const inviteToken =
+    new URL(invite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+  return escrowService.joinContractor(workerUserId, jobId, {
+    inviteToken,
+  });
 }

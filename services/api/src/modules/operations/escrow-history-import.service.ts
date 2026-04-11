@@ -53,6 +53,22 @@ const auditEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('job.contractor_email_updated'),
+    at: z.number().int().nonnegative(),
+    payload: z.object({
+      jobId: z.string().min(1),
+    }),
+  }),
+  z.object({
+    type: z.literal('job.contractor_invite_sent'),
+    at: z.number().int().nonnegative(),
+    payload: z.object({
+      jobId: z.string().min(1),
+      delivery: z.enum(['email', 'manual']),
+      regenerated: z.boolean(),
+    }),
+  }),
+  z.object({
     type: z.literal('job.contractor_joined'),
     at: z.number().int().nonnegative(),
     payload: z.object({

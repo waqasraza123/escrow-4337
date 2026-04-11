@@ -8,8 +8,8 @@ This matrix is the Phase 7 source of truth for local, staging, and production ex
 | --- | --- |
 | API | `services/api/.env.local` with Postgres plus mock email, mock smart-account, and mock escrow execution providers |
 | Worker | Optional local shell process using the same API build and local Postgres profile |
-| Web | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000` |
-| Admin | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000` |
+| Web | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL`, typically derived from `NEXT_PUBLIC_API_PORT=4100` |
+| Admin | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL`, typically derived from `NEXT_PUBLIC_API_PORT=4100` |
 
 - Local is the default development profile.
 - The zero-cost Postgres path in [infra/postgres/README.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/infra/postgres/README.md) remains the expected local database path.

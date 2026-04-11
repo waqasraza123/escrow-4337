@@ -90,7 +90,12 @@ describe('Escrow export support', () => {
         },
       ],
     });
-    await controller.joinContractor(workerUser, createResponse.jobId, {});
+    await inviteAndJoinContractor(
+      controller,
+      clientUser,
+      workerUser,
+      createResponse.jobId,
+    );
     await controller.deliver(workerUser, createResponse.jobId, 0, {
       note: 'Delivery submitted',
       evidenceUrls: ['https://example.com/evidence'],
@@ -131,7 +136,7 @@ describe('Escrow export support', () => {
       throw new Error('Expected JSON export body for job-history artifact');
     }
     const jobHistoryBody = jobHistory.body as EscrowJobHistoryExport;
-    expect(jobHistoryBody.timeline).toHaveLength(14);
+    expect(jobHistoryBody.timeline).toHaveLength(15);
     expect(jobHistoryBody.timeline.map((entry) => entry.label)).toEqual(
       expect.arrayContaining([
         'job.created',
@@ -141,6 +146,7 @@ describe('Escrow export support', () => {
         'fund_job',
         'job.milestones_set',
         'set_milestones',
+        'job.contractor_invite_sent',
         'job.contractor_joined',
         'milestone.delivered',
         'deliver_milestone',
@@ -210,4 +216,22 @@ async function createLinkedUser(
     email: user.email,
     sid: `${user.id}-session`,
   };
+}
+
+async function inviteAndJoinContractor(
+  controller: EscrowController,
+  clientUser: ReqUser,
+  workerUser: ReqUser,
+  jobId: string,
+) {
+  const invite = await controller.inviteContractor(clientUser, jobId, {
+    delivery: 'manual',
+    frontendOrigin: 'http://localhost:3000',
+  });
+  const inviteToken =
+    new URL(invite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+  return controller.joinContractor(workerUser, jobId, {
+    inviteToken,
+  });
 }

@@ -360,6 +360,11 @@ const webMessages = {
         contractorJoinAccess: 'Contractor join access',
         pendingContractorEmail: 'Pending contractor email',
         copyContractorLink: 'Copy contractor link',
+        regenerateContractorLink: 'Regenerate link',
+        sendContractorInvite: 'Send invite email',
+        resendContractorInvite: 'Resend invite email',
+        rotateAndResendContractorInvite: 'Rotate and resend',
+        updateContractorEmail: 'Update contractor email',
         joinContract: 'Join contract',
         noMilestonesTitle: 'No milestones committed yet',
         noMilestonesMessage:
@@ -463,16 +468,22 @@ const webMessages = {
         },
       },
       messages: {
-        joinAccessSignedOut:
-          'Share this contract link with the contractor. They must sign in, use the matching email, and link the bound worker wallet before delivery is enabled.',
+        joinAccessSignedOut: (emailHint: string | null) =>
+          `Sign in with ${emailHint || 'the invited contractor email'} from this invite link before trying to join the contract.`,
         joinAccessJoined:
           'This contract has already been joined by the bound contractor identity.',
-        joinAccessWrongEmail:
-          'Use the matching contractor email from contract setup before joining this contract.',
-        joinAccessNoEmail:
-          'Use the contractor email entered during contract setup before joining this contract.',
-        joinAccessWallet: (wallet: string) =>
+        joinAccessWrongEmail: (emailHint: string | null) =>
+          `This session is signed in with the wrong email. Use ${emailHint || 'the invited contractor email'} from the contractor invite.`,
+        joinAccessInviteRequired:
+          'This page does not include a live contractor invite token. Ask the client to resend or copy a fresh invite link.',
+        joinAccessInviteInvalid:
+          'This contractor invite link is no longer valid. Ask the client to regenerate and resend it.',
+        joinAccessClaimed:
+          'This contract has already been claimed by a different contractor identity.',
+        joinAccessWalletNotLinked: (wallet: string) =>
           `Link ${wallet} before joining this contract.`,
+        joinAccessWrongWallet: (wallet: string) =>
+          `This session has linked wallets, but not the bound worker wallet ${wallet}.`,
         joinAccessReady:
           'This session controls the bound worker wallet and is ready for contractor join.',
         deliveryRequiresWallet: (wallet: string) =>
@@ -904,6 +915,11 @@ const webMessages = {
         contractorJoinAccess: 'إتاحة انضمام المقاول',
         pendingContractorEmail: 'بريد المقاول المعلّق',
         copyContractorLink: 'نسخ رابط المقاول',
+        regenerateContractorLink: 'إعادة توليد الرابط',
+        sendContractorInvite: 'إرسال دعوة بالبريد',
+        resendContractorInvite: 'إعادة إرسال الدعوة',
+        rotateAndResendContractorInvite: 'تبديل الرابط وإعادة الإرسال',
+        updateContractorEmail: 'تحديث بريد المقاول',
         joinContract: 'الانضمام إلى العقد',
         noMilestonesTitle: 'لا توجد مراحل معتمدة بعد',
         noMilestonesMessage:
@@ -1007,16 +1023,22 @@ const webMessages = {
         },
       },
       messages: {
-        joinAccessSignedOut:
-          'شارك رابط العقد هذا مع المقاول. يجب عليه تسجيل الدخول واستخدام البريد المطابق وربط محفظة العامل المحددة قبل تفعيل التسليم.',
+        joinAccessSignedOut: (emailHint: string | null) =>
+          `سجّل الدخول باستخدام ${emailHint || 'بريد المقاول المدعو'} من رابط الدعوة هذا قبل محاولة الانضمام إلى العقد.`,
         joinAccessJoined:
           'تم بالفعل الانضمام إلى هذا العقد بواسطة هوية المقاول المحددة.',
-        joinAccessWrongEmail:
-          'استخدم بريد المقاول المطابق من إعداد العقد قبل الانضمام إلى هذا العقد.',
-        joinAccessNoEmail:
-          'استخدم بريد المقاول الذي تم إدخاله أثناء إعداد العقد قبل الانضمام.',
-        joinAccessWallet: (wallet: string) =>
+        joinAccessWrongEmail: (emailHint: string | null) =>
+          `هذه الجلسة مسجلة ببريد خاطئ. استخدم ${emailHint || 'بريد المقاول المدعو'} من دعوة المقاول.`,
+        joinAccessInviteRequired:
+          'هذه الصفحة لا تحتوي على رمز دعوة مقاول صالح. اطلب من العميل إعادة إرسال أو نسخ رابط دعوة جديد.',
+        joinAccessInviteInvalid:
+          'رابط دعوة المقاول هذا لم يعد صالحاً. اطلب من العميل إعادة توليده وإرساله.',
+        joinAccessClaimed:
+          'تم بالفعل المطالبة بهذا العقد بواسطة هوية مقاول مختلفة.',
+        joinAccessWalletNotLinked: (wallet: string) =>
           `اربط ${wallet} قبل الانضمام إلى هذا العقد.`,
+        joinAccessWrongWallet: (wallet: string) =>
+          `تحتوي هذه الجلسة على محافظ مرتبطة، لكنها لا تشمل محفظة العامل المحددة ${wallet}.`,
         joinAccessReady:
           'تتحكم هذه الجلسة بمحفظة العامل المحددة وهي جاهزة للانضمام.',
         deliveryRequiresWallet: (wallet: string) =>

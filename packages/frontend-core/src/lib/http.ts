@@ -1,6 +1,15 @@
+export const defaultLocalApiPort = '4100';
+
+export function resolveLocalApiBaseUrl(
+  localApiPort = process.env.NEXT_PUBLIC_API_PORT,
+) {
+  const port = localApiPort?.trim() || defaultLocalApiPort;
+  return `http://localhost:${port}`;
+}
+
 export function resolveApiBaseUrl(
   envValue?: string,
-  defaultApiBaseUrl = 'http://localhost:4000',
+  defaultApiBaseUrl = resolveLocalApiBaseUrl(),
 ) {
   return envValue?.trim().replace(/\/+$/, '') || defaultApiBaseUrl;
 }

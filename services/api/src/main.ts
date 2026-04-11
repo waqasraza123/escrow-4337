@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { isCorsOriginAllowed, readCorsOrigins } from './common/http/cors';
+import { readApiPort } from './common/http/port';
 import { readTrustProxyValue } from './common/http/trust-proxy';
 import { AppModule } from './app.module';
 
@@ -21,7 +22,7 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(process.env.NEST_API_PORT ?? 4000);
+  await app.listen(readApiPort());
 }
 
 void bootstrap();

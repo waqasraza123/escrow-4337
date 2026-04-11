@@ -18,6 +18,14 @@ export type EmailDeliveryReceipt = {
   messageId?: string;
 };
 
+export type ContractorInviteEmailInput = {
+  email: string;
+  joinUrl: string;
+  clientEmail?: string;
+  jobTitle: string;
+  workerAddress: string;
+};
+
 export interface EmailProvider {
   readonly providerKind: EmailProviderKind;
   send(message: EmailMessage): Promise<EmailDeliveryReceipt>;

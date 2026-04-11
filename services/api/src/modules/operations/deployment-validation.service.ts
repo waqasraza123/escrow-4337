@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { readPositiveInteger } from '../../common/config/readers';
+import { readApiPort } from '../../common/http/port';
 import { readTrustProxyValue } from '../../common/http/trust-proxy';
 import { AuthConfigService } from '../auth/auth.config';
 import { EmailConfigService } from '../auth/email/email.config';
@@ -210,6 +211,16 @@ export class DeploymentValidationService {
 
   private collectConfigurationChecks() {
     const checks: DeploymentCheck[] = [];
+
+    checks.push(
+      this.captureCheck(
+        'api-port-config',
+        'API listen port is configured',
+        () => {
+          void readApiPort();
+        },
+      ),
+    );
 
     checks.push(
       this.captureCheck(

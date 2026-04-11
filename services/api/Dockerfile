@@ -45,6 +45,9 @@ COPY --from=build /app/services/api ./services/api
 
 WORKDIR /app/services/api
 
-EXPOSE 4000
+ARG NEST_API_PORT=4100
+ENV NEST_API_PORT=${NEST_API_PORT}
+
+EXPOSE ${NEST_API_PORT}
 
 CMD ["node", "dist/main"]

@@ -122,7 +122,12 @@ describe('EscrowController integration', () => {
     expect(milestonesResponse.status).toBe('funded');
     expect(milestonesResponse.txHash).toMatch(/^0x[a-f0-9]{64}$/);
 
-    const joinResponse = await controller.joinContractor(workerUser, jobId, {});
+    const joinResponse = await inviteAndJoinContractor(
+      controller,
+      clientUser,
+      workerUser,
+      jobId,
+    );
     expect(joinResponse.contractorParticipation.status).toBe('joined');
 
     const firstDeliveryResponse = await controller.deliver(
@@ -197,6 +202,7 @@ describe('EscrowController integration', () => {
       'job.contractor_participation_requested',
       'job.funded',
       'job.milestones_set',
+      'job.contractor_invite_sent',
       'job.contractor_joined',
       'milestone.delivered',
       'milestone.disputed',
@@ -294,8 +300,18 @@ describe('EscrowController integration', () => {
         currency: 'USDC',
       },
     });
-    await controller.joinContractor(workerUser, clientCreated.jobId, {});
-    await controller.joinContractor(workerUser, workerCreated.jobId, {});
+    await inviteAndJoinContractor(
+      controller,
+      clientUser,
+      workerUser,
+      clientCreated.jobId,
+    );
+    await inviteAndJoinContractor(
+      controller,
+      otherClient,
+      workerUser,
+      workerCreated.jobId,
+    );
 
     const clientList = await controller.list(clientUser);
     expect(clientList.jobs).toHaveLength(1);
@@ -352,4 +368,22 @@ async function createLinkedUser(
     email: user.email,
     sid: `${user.id}-session`,
   };
+}
+
+async function inviteAndJoinContractor(
+  controller: EscrowController,
+  clientUser: ReqUser,
+  workerUser: ReqUser,
+  jobId: string,
+) {
+  const invite = await controller.inviteContractor(clientUser, jobId, {
+    delivery: 'manual',
+    frontendOrigin: 'http://localhost:3000',
+  });
+  const inviteToken =
+    new URL(invite.invite.joinUrl).searchParams.get('invite') ?? '';
+
+  return controller.joinContractor(workerUser, jobId, {
+    inviteToken,
+  });
 }

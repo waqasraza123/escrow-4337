@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { defaultLocalApiPort, resolveLocalApiBaseUrl } from '@escrow4334/frontend-core';
 import { renderApp, seedJsonStorage } from '@escrow4334/frontend-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -18,9 +19,11 @@ import {
 } from '../test/fixtures';
 import { AdminI18nProvider } from '../lib/i18n';
 
+const localApiBaseUrl = resolveLocalApiBaseUrl(defaultLocalApiPort);
+
 const { mockedAdminApi } = vi.hoisted(() => ({
   mockedAdminApi: {
-    baseUrl: 'http://localhost:4000',
+    baseUrl: '',
     getRuntimeProfile: vi.fn(),
     startAuth: vi.fn(),
     verifyAuth: vi.fn(),
@@ -63,6 +66,7 @@ function renderHome() {
 describe('admin page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedAdminApi.baseUrl = localApiBaseUrl;
     mockedAdminApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
     mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
     mockedAdminApi.getEscrowChainSyncDaemonHealth.mockResolvedValue(null);
@@ -81,7 +85,9 @@ describe('admin page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Dispute review')).toBeInTheDocument();
     expect(screen.getByText('Receipt triage')).toBeInTheDocument();
-    expect(screen.getByText('http://localhost:4000')).toBeInTheDocument();
+    expect(
+      screen.getByText(localApiBaseUrl),
+    ).toBeInTheDocument();
     expect(screen.getByText('Backend profile validation')).toBeInTheDocument();
 
     await waitFor(() => {

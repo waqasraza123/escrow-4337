@@ -71,6 +71,18 @@ function normalizeEscrowJobRecord(
               : 'pending',
           joinedUserId: job.contractorParticipation.joinedUserId ?? null,
           joinedAt: job.contractorParticipation.joinedAt ?? null,
+          invite: {
+            token: job.contractorParticipation.invite?.token ?? null,
+            tokenIssuedAt:
+              job.contractorParticipation.invite?.tokenIssuedAt ?? null,
+            lastSentAt: job.contractorParticipation.invite?.lastSentAt ?? null,
+            lastSentMode:
+              job.contractorParticipation.invite?.lastSentMode === 'email'
+                ? 'email'
+                : job.contractorParticipation.invite?.lastSentMode === 'manual'
+                  ? 'manual'
+                  : null,
+          },
         }
       : null,
     operations: {
