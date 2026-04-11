@@ -34,7 +34,7 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-async function apiJson<T>(
+export async function apiJson<T>(
   apiBaseUrl: string,
   path: string,
   init: RequestInit = {},

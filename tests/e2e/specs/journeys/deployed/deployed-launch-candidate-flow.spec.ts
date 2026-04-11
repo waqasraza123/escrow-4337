@@ -4,12 +4,17 @@ import {
   readDeployedProfileConfig,
 } from '../../../fixtures/deployed-profile';
 import { expect, test } from '../../../fixtures/deployed-journeys';
-import { runAuthenticatedLaunchCandidateFlow } from '../../../flows/launch-candidate-flow';
+import {
+  deliverSelectedMilestone,
+  openMilestoneDispute,
+  resolveDisputedMilestone,
+} from '../../../flows/launch-candidate-flow';
+import { seedJoinReadyJobViaApi } from '../../../fixtures/journey-setup';
 
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
 
-test('deployed environment can exercise the exact launch-candidate escrow flow when explicit credentials are provided', async ({
+test('deployed environment can exercise the staged join-to-resolution flow from API-seeded job state', async ({
   browser,
   deployedJourneyActorFactory,
   request,
@@ -51,40 +56,72 @@ test('deployed environment can exercise the exact launch-candidate escrow flow w
   const contractorPage = await contractorContext.newPage();
   const operatorPage = await operatorContext.newPage();
 
-  await runAuthenticatedLaunchCandidateFlow({
-    clientPage,
-    contractorPage,
-    operatorPage,
-    webBaseUrl: deployed.webBaseUrl,
-    adminBaseUrl: deployed.adminBaseUrl,
-    flow: {
-      client: {
-        email: clientActor.email,
-        otpCode: deployedFlow!.client.otpCode,
-        wallet: clientActor.wallet,
-      },
-      contractor: {
-        email: contractorActor.email,
-        otpCode: deployedFlow!.contractor.otpCode,
-        wallet: contractorActor.wallet,
-      },
-      operator: {
-        email: operatorActor.email,
-        otpCode: deployedFlow!.operator.otpCode,
-        wallet: operatorActor.wallet,
-      },
-      currencyAddress: deployedFlow!.currencyAddress,
-      jobTitle: `Staged Launch Flow ${runId}`,
+  const jobTitle = `Staged Launch Flow ${runId}`;
+  const deliveryEvidenceUrl = `https://example.com/staged-delivery/${runId}`;
+  const disputeReason = `Client requested operator review for staged launch run ${runId}.`;
+  const disputeEvidenceUrl = `https://example.com/staged-dispute/${runId}`;
+  const resolutionNote = `Operator released the staged disputed milestone for run ${runId}.`;
+  const { jobId } = await seedJoinReadyJobViaApi({
+    apiBaseUrl: deployed.apiBaseUrl,
+    client: {
+      session: clientActor.session,
+      wallet: clientActor.wallet,
+    },
+    contractor: {
+      email: contractorActor.email,
+      wallet: contractorActor.wallet,
+      session: contractorActor.session,
+    },
+    job: {
+      title: jobTitle,
       description:
-        'Exact staging proof for the narrowed launch candidate covering create, fund, join, deliver, dispute, and operator resolution.',
-      deliveryNote: `Staged contractor delivery for run ${runId}.`,
-      deliveryEvidenceUrl: `https://example.com/staged-delivery/${runId}`,
-      disputeReason: `Client requested operator review for staged launch run ${runId}.`,
-      disputeEvidenceUrl: `https://example.com/staged-dispute/${runId}`,
-      resolutionAction: 'release',
-      resolutionNote: `Operator released the staged disputed milestone for run ${runId}.`,
+        'Staged canary proving join, delivery, dispute, and operator resolution from API-seeded job setup.',
+      currencyAddress: deployedFlow!.currencyAddress,
     },
   });
+
+  await contractorPage.goto(`${deployed.webBaseUrl}/app/contracts/${jobId}`);
+  await expect(contractorPage.getByRole('heading', { name: jobTitle })).toBeVisible();
+  await expect(contractorPage.getByText(contractorActor.email)).toBeVisible();
+  await contractorPage.getByRole('button', { name: 'Join contract' }).click();
+  await expect(
+    contractorPage.getByText(
+      'Contract joined. Worker delivery is now enabled for this session.',
+    ),
+  ).toBeVisible();
+
+  await contractorPage.goto(`${deployed.webBaseUrl}/app/contracts/${jobId}/deliver`);
+  await deliverSelectedMilestone({
+    page: contractorPage,
+    note: `Staged contractor delivery for run ${runId}.`,
+    evidenceUrl: deliveryEvidenceUrl,
+  });
+
+  await clientPage.goto(`${deployed.webBaseUrl}/app/contracts/${jobId}/dispute`);
+  await openMilestoneDispute({
+    page: clientPage,
+    reason: disputeReason,
+    evidenceUrl: disputeEvidenceUrl,
+  });
+
+  await operatorPage.goto(`${deployed.adminBaseUrl}/cases/${jobId}`);
+  await expect(operatorPage.getByText('Operator case loaded.')).toBeVisible();
+  await expect(operatorPage.getByText(operatorActor.email)).toBeVisible();
+  await resolveDisputedMilestone({
+    page: operatorPage,
+    action: 'release',
+    note: resolutionNote,
+  });
+
+  await clientPage.goto(`${deployed.webBaseUrl}/app/contracts/${jobId}`);
+  await expect(clientPage.getByText('Resolution')).toBeVisible();
+  await expect(
+    clientPage.getByText(`release: ${resolutionNote}`, { exact: true }),
+  ).toBeVisible();
+  await expect(clientPage.getByText(disputeReason, { exact: true })).toBeVisible();
+  await expect(
+    clientPage.getByRole('link', { name: disputeEvidenceUrl }),
+  ).toBeVisible();
 
   await Promise.all([
     clientContext.close(),
