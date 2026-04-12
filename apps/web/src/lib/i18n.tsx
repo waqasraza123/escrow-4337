@@ -387,6 +387,13 @@ const webMessages = {
         disputeModel: 'Dispute model',
         evidenceExpectation: 'Evidence expectation',
         operatorResolution: 'Operator resolution',
+        contractorActivationTitle: 'Contractor activation',
+        operatorAudience: 'Operator',
+        operatorTaskTitle: 'Operator task',
+        nextActionsTitle: 'Next actions',
+        nextActionsCopy:
+          'Use the current role and milestone posture to move the selected contract forward.',
+        currentFocus: 'Current focus',
         contractorJoinAccess: 'Contractor join access',
         pendingContractorEmail: 'Pending contractor email',
         copyContractorLink: 'Copy contractor link',
@@ -438,6 +445,13 @@ const webMessages = {
           'Both participants should see the same selected milestone, current state, and escalation evidence.',
         operatorPostureCopy:
           'Privileged operator workflows are still incomplete. Resolution remains available here only for sessions that already control the configured arbitrator wallet.',
+        operatorTaskWaitingSummary:
+          'A disputed milestone is waiting for arbitrator action.',
+        operatorTaskWaitingDetail:
+          'If this milestone remains disputed, the configured arbitrator wallet can resolve it from the operator console.',
+        operatorTaskIdleSummary: 'No operator action is currently required.',
+        operatorTaskIdleDetail:
+          'Operator review becomes relevant only when a participant escalates the selected milestone into dispute.',
       },
       actions: {
         fundSelectedJob: 'Fund selected job',
@@ -971,6 +985,13 @@ const webMessages = {
         disputeModel: 'نموذج النزاع',
         evidenceExpectation: 'توقعات الإثبات',
         operatorResolution: 'حسم المشغّل',
+        contractorActivationTitle: 'تفعيل المقاول',
+        operatorAudience: 'المشغّل',
+        operatorTaskTitle: 'مهمة المشغّل',
+        nextActionsTitle: 'الخطوات التالية',
+        nextActionsCopy:
+          'استخدم دور الجلسة الحالي ووضع المرحلة لنقل العقد المحدد إلى الخطوة التالية.',
+        currentFocus: 'التركيز الحالي',
         contractorJoinAccess: 'إتاحة انضمام المقاول',
         pendingContractorEmail: 'بريد المقاول المعلّق',
         copyContractorLink: 'نسخ رابط المقاول',
@@ -1022,6 +1043,12 @@ const webMessages = {
           'يجب أن يرى الطرفان المرحلة الحالية نفسها وحالتها وأدلة التصعيد.',
         operatorPostureCopy:
           'تدفقات المشغّل المميّزة لا تزال غير مكتملة. يظل الحسم متاحاً هنا فقط للجلسات التي تتحكم فعلياً بمحفظة المحكّم المهيأة.',
+        operatorTaskWaitingSummary: 'توجد مرحلة متنازع عليها بانتظار إجراء المحكّم.',
+        operatorTaskWaitingDetail:
+          'إذا ظلت هذه المرحلة متنازعاً عليها، يمكن لمحفظة المحكّم المهيأة حسمها من لوحة المشغّل.',
+        operatorTaskIdleSummary: 'لا يوجد إجراء مطلوب من المشغّل حالياً.',
+        operatorTaskIdleDetail:
+          'تصبح مراجعة المشغّل ذات صلة فقط عندما يصعّد أحد المشاركين المرحلة المحددة إلى نزاع.',
       },
       actions: {
         fundSelectedJob: 'تمويل العقد المحدد',

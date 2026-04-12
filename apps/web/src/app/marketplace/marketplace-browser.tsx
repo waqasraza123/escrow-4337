@@ -124,7 +124,9 @@ export function MarketplaceBrowser() {
                     Completed escrow jobs: {profile.completedEscrowCount}
                     {profile.verifiedWalletAddress ? ' • verified wallet' : ''}
                   </p>
-                  <Link href={`/marketplace/profiles/${profile.slug}`}>View profile</Link>
+                  <Link className={styles.cardLink} href={`/marketplace/profiles/${profile.slug}`}>
+                    View profile
+                  </Link>
                 </article>
               ))
             )}
@@ -150,7 +152,10 @@ export function MarketplaceBrowser() {
                   <p>
                     {opportunity.owner.displayName} • {opportunity.applicationCount} applications
                   </p>
-                  <Link href={`/marketplace/opportunities/${opportunity.id}`}>
+                  <Link
+                    className={styles.cardLink}
+                    href={`/marketplace/opportunities/${opportunity.id}`}
+                  >
                     View brief
                   </Link>
                 </article>

@@ -1,6 +1,6 @@
 'use client';
 
-import { supportedLocales } from '@escrow4334/frontend-core';
+import { getLocaleDefinition, supportedLocales } from '@escrow4334/frontend-core';
 import { useWebI18n } from '../lib/i18n';
 
 type LanguageSwitcherProps = {
@@ -20,6 +20,7 @@ export function LanguageSwitcher(props: LanguageSwitcherProps) {
       <div role="group" aria-label={messages.common.currentLanguage}>
         {supportedLocales.map((supportedLocale) => {
           const isActive = supportedLocale === locale;
+          const localeDefinition = getLocaleDefinition(supportedLocale);
 
           return (
             <button
@@ -30,10 +31,11 @@ export function LanguageSwitcher(props: LanguageSwitcherProps) {
               }`.trim()}
               onClick={() => setLocale(supportedLocale)}
               aria-pressed={isActive}
+              lang={localeDefinition.langTag}
+              dir={localeDefinition.dir}
+              title={localeDefinition.englishLabel}
             >
-              {supportedLocale === 'en'
-                ? messages.languageName
-                : messages.languageNativeName}
+              {localeDefinition.nativeLabel}
             </button>
           );
         })}
