@@ -18,6 +18,7 @@ import styles from './page.module.css';
 import type {
   AuditBundle,
   ContractorJoinReadiness,
+  EscrowAuthorityStatus,
   JobView,
   JobsListResponse,
   PublicJobView,
@@ -354,6 +355,47 @@ function getRuntimeProfileText(
   return messages.console.labels.runtimeProfile[profile];
 }
 
+function getChainIngestionStatusLabel(
+  status: RuntimeProfile['operations']['chainIngestion']['status'],
+) {
+  switch (status) {
+    case 'ok':
+      return 'Healthy';
+    case 'warning':
+      return 'Warning';
+    case 'failed':
+      return 'Critical';
+  }
+}
+
+function getAuthoritySourceLabel(source: EscrowAuthorityStatus['source']) {
+  switch (source) {
+    case 'chain_projection':
+      return 'Chain projection';
+    case 'local_fallback':
+      return 'Local fallback';
+  }
+}
+
+function getAuthorityReasonLabel(reason: EscrowAuthorityStatus['reason']) {
+  switch (reason) {
+    case null:
+      return 'Projection is fresh and healthy.';
+    case 'authority_reads_disabled':
+      return 'Authority reads are disabled for this environment.';
+    case 'projection_missing':
+      return 'No onchain projection is available yet.';
+    case 'projection_stale':
+      return 'The latest projection is stale.';
+    case 'projection_degraded':
+      return 'The latest projection is degraded.';
+    case 'projection_older_than_local_state':
+      return 'The local job contains newer onchain activity than the last projection.';
+    default:
+      return reason.replaceAll('_', ' ');
+  }
+}
+
 export function EscrowConsole({
   view = 'overview',
   initialJobId = null,
@@ -531,7 +573,7 @@ export function EscrowConsole({
         : !accessToken
           ? messages.console.messages.joinAccessSignedOut(joinRecoveryEmailHint)
           : joinReadinessState.kind === 'error'
-            ? joinReadinessState.message
+            ? (joinReadinessState.message ?? messages.console.messages.joinAccessInviteRequired)
             : joinReadiness?.status === 'wrong_email'
               ? messages.console.messages.joinAccessWrongEmail(joinRecoveryEmailHint)
               : joinReadiness?.status === 'wallet_not_linked'
@@ -1716,6 +1758,7 @@ export function EscrowConsole({
     runtimeProfile,
     typeof window === 'undefined' ? null : window.location.origin,
   );
+  const runtimeChainIngestion = runtimeProfile?.operations.chainIngestion ?? null;
   const taskBoardCards = useMemo(() => {
     if (!selectedJobView) {
       return [] as TaskBoardCard[];
@@ -1966,6 +2009,41 @@ export function EscrowConsole({
               {runtimeAlignment.corsOriginsLabel}
             </strong>
           </article>
+          <article>
+            <span className={styles.metaLabel}>Chain ingestion</span>
+            <strong>
+              {runtimeChainIngestion
+                ? getChainIngestionStatusLabel(runtimeChainIngestion.status)
+                : messages.common.unavailable}
+            </strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Authority reads</span>
+            <strong>
+              {runtimeChainIngestion
+                ? runtimeChainIngestion.authorityReadsEnabled
+                  ? messages.common.enabled
+                  : messages.common.disabled
+                : messages.common.unavailable}
+            </strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Ingestion lag</span>
+            <strong>
+              {runtimeChainIngestion?.lagBlocks !== null &&
+              runtimeChainIngestion?.lagBlocks !== undefined
+                ? `${runtimeChainIngestion.lagBlocks} blocks`
+                : messages.common.unavailable}
+            </strong>
+          </article>
+          <article>
+            <span className={styles.metaLabel}>Healthy projections</span>
+            <strong>
+              {runtimeChainIngestion
+                ? `${runtimeChainIngestion.projections.healthyJobs}/${runtimeChainIngestion.projections.totalJobs}`
+                : messages.common.unavailable}
+            </strong>
+          </article>
         </div>
         <div className={styles.stack}>
           <StatusNotice
@@ -1980,6 +2058,17 @@ export function EscrowConsole({
             <strong>{runtimeAlignment.transportLabel}</strong>
             <p className={styles.stateText}>{runtimeAlignment.transportMessage}</p>
           </article>
+          {runtimeChainIngestion ? (
+            <article className={styles.statusBanner}>
+              <strong>{`Chain ingestion ${getChainIngestionStatusLabel(runtimeChainIngestion.status)}`}</strong>
+              <p className={styles.stateText}>{runtimeChainIngestion.summary}</p>
+              <p className={styles.stateText}>
+                {`Authority reads ${
+                  runtimeChainIngestion.authorityReadsEnabled ? 'enabled' : 'disabled'
+                } · confirmation depth ${runtimeChainIngestion.confirmationDepth} · latest block ${runtimeChainIngestion.latestBlock ?? 'Unavailable'} · finalized block ${runtimeChainIngestion.finalizedBlock ?? 'Unavailable'} · lag ${runtimeChainIngestion.lagBlocks ?? 'Unavailable'} block(s).`}
+              </p>
+            </article>
+          ) : null}
         </div>
       </section>
       ) : null}
@@ -2779,6 +2868,35 @@ export function EscrowConsole({
                   <span className={styles.roleBadgeMuted}>{messages.common.observer}</span>
                 )}
               </div>
+              {auditBundle?.bundle.authority ? (
+                <article className={styles.timelineCard}>
+                  <div className={styles.timelineHead}>
+                    <strong>{`Audit source: ${getAuthoritySourceLabel(
+                      auditBundle.bundle.authority.source,
+                    )}`}</strong>
+                    <span>
+                      {auditBundle.bundle.authority.authorityReadsEnabled
+                        ? 'Authority reads enabled'
+                        : 'Authority reads disabled'}
+                    </span>
+                  </div>
+                  <p className={styles.muted}>
+                    {getAuthorityReasonLabel(auditBundle.bundle.authority.reason)}
+                  </p>
+                  <small>
+                    {`Projection available ${auditBundle.bundle.authority.projectionAvailable ? 'Yes' : 'No'} · fresh ${auditBundle.bundle.authority.projectionFresh ? 'Yes' : 'No'} · healthy ${auditBundle.bundle.authority.projectionHealthy ? 'Yes' : 'No'}.`}
+                  </small>
+                  <small>
+                    {`Projected at ${
+                      auditBundle.bundle.authority.projectedAt
+                        ? formatDate(auditBundle.bundle.authority.projectedAt)
+                        : 'Unavailable'
+                    } · last block ${
+                      auditBundle.bundle.authority.lastProjectedBlock ?? 'Unavailable'
+                    } · events ${auditBundle.bundle.authority.lastEventCount ?? 'Unavailable'}.`}
+                  </small>
+                </article>
+              ) : null}
               <article
                 className={styles.timelineCard}
                 data-walkthrough-id="contractor-join-access"

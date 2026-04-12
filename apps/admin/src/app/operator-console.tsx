@@ -24,6 +24,8 @@ import {
   type AuditBundle,
   type CaseExportArtifact,
   type CaseExportFormat,
+  type EscrowAuthorityStatus,
+  type EscrowChainIngestionStatus,
   type EscrowChainSyncBatchReport,
   type EscrowChainSyncDaemonHealthReport,
   type EscrowChainSyncDaemonStatus,
@@ -269,6 +271,47 @@ function getChainSyncDaemonHealthStatusLabel(
   }
 }
 
+function getChainIngestionStatusLabel(
+  status: RuntimeProfile['operations']['chainIngestion']['status'],
+) {
+  switch (status) {
+    case 'ok':
+      return 'Healthy';
+    case 'warning':
+      return 'Warning';
+    case 'failed':
+      return 'Critical';
+  }
+}
+
+function getAuthoritySourceLabel(source: EscrowAuthorityStatus['source']) {
+  switch (source) {
+    case 'chain_projection':
+      return 'Chain projection';
+    case 'local_fallback':
+      return 'Local fallback';
+  }
+}
+
+function getAuthorityReasonLabel(reason: EscrowAuthorityStatus['reason']) {
+  switch (reason) {
+    case null:
+      return 'Projection is fresh and healthy.';
+    case 'authority_reads_disabled':
+      return 'Authority reads are disabled for this environment.';
+    case 'projection_missing':
+      return 'No onchain projection is available yet.';
+    case 'projection_stale':
+      return 'The latest projection is stale.';
+    case 'projection_degraded':
+      return 'The latest projection is degraded.';
+    case 'projection_older_than_local_state':
+      return 'The local job contains newer onchain activity than the last projection.';
+    default:
+      return reason.replaceAll('_', ' ');
+  }
+}
+
 function formatFailureBreakdown(
   items: Array<{
     count: number;
@@ -404,6 +447,8 @@ export function OperatorConsole({
   const [chainSyncBatchLimit, setChainSyncBatchLimit] = useState('10');
   const [chainSyncBatchReport, setChainSyncBatchReport] =
     useState<EscrowChainSyncBatchReport | null>(null);
+  const [chainIngestionStatus, setChainIngestionStatus] =
+    useState<EscrowChainIngestionStatus | null>(null);
   const [chainSyncDaemonHealth, setChainSyncDaemonHealth] =
     useState<EscrowChainSyncDaemonHealthReport | null>(null);
   const [staleWorkflowDrafts, setStaleWorkflowDrafts] = useState<Record<string, string>>({});
@@ -416,6 +461,7 @@ export function OperatorConsole({
     useState<AsyncState>(createIdleState());
   const [chainSyncState, setChainSyncState] = useState<AsyncState>(createIdleState());
   const [chainSyncBatchState, setChainSyncBatchState] = useState<AsyncState>(createIdleState());
+  const [chainIngestionState, setChainIngestionState] = useState<AsyncState>(createIdleState());
   const [chainSyncDaemonState, setChainSyncDaemonState] = useState<AsyncState>(createIdleState());
   const [walletActionState, setWalletActionState] = useState<AsyncState>(createIdleState());
   const [resolutionState, setResolutionState] = useState<AsyncState>(createIdleState());
@@ -711,6 +757,7 @@ export function OperatorConsole({
     runtimeProfile,
     typeof window === 'undefined' ? null : window.location.origin,
   );
+  const runtimeChainIngestion = runtimeProfile?.operations.chainIngestion ?? null;
   const selectedResolutionCard = useMemo(
     () =>
       disputedMilestoneCards.find((card) => card.milestoneIndex === resolutionMilestoneIndex) ??
@@ -731,6 +778,8 @@ export function OperatorConsole({
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setChainIngestionStatus(null);
+      setChainIngestionState(createIdleState());
       setChainSyncDaemonHealth(null);
       setChainSyncDaemonState(createIdleState());
       setReconciliationImportReport(null);
@@ -746,6 +795,8 @@ export function OperatorConsole({
     if (!controlsArbitratorWallet) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setChainIngestionStatus(null);
+      setChainIngestionState(createIdleState());
       setChainSyncDaemonHealth(null);
       setChainSyncDaemonState(createIdleState());
       setReconciliationImportReport(null);
@@ -759,6 +810,7 @@ export function OperatorConsole({
     }
 
     void loadEscrowHealth(accessToken, healthReasonFilter);
+    void loadChainIngestionStatus(accessToken);
     void loadChainSyncDaemonStatus(accessToken);
   }, [accessToken, controlsArbitratorWallet, healthReasonFilter]);
 
@@ -873,6 +925,31 @@ export function OperatorConsole({
       setChainSyncDaemonHealth(null);
       setChainSyncDaemonState(
         createErrorState(error, 'Failed to load recurring chain-sync daemon status'),
+      );
+    }
+  }
+
+  async function loadChainIngestionStatus(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setChainIngestionState(createWorkingState('Loading finalized chain ingestion status...'));
+
+    try {
+      const status = await adminApi.getEscrowChainIngestionStatus(token);
+      setChainIngestionStatus(status);
+      setChainIngestionState(
+        createSuccessState(
+          `Loaded finalized ingestion status: ${getChainIngestionStatusLabel(
+            status.status,
+          ).toLowerCase()}.`,
+        ),
+      );
+    } catch (error) {
+      setChainIngestionStatus(null);
+      setChainIngestionState(
+        createErrorState(error, 'Failed to load finalized chain ingestion status'),
       );
     }
   }
@@ -1365,6 +1442,41 @@ export function OperatorConsole({
                 {runtimeProfile?.operator.exportSupport ? 'Available' : 'Unavailable'}
               </strong>
             </article>
+            <article>
+              <span className={styles.metaLabel}>Chain ingestion</span>
+              <strong>
+                {runtimeChainIngestion
+                  ? getChainIngestionStatusLabel(runtimeChainIngestion.status)
+                  : 'Unavailable'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Authority reads</span>
+              <strong>
+                {runtimeChainIngestion
+                  ? runtimeChainIngestion.authorityReadsEnabled
+                    ? 'Enabled'
+                    : 'Disabled'
+                  : 'Unavailable'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Ingestion lag</span>
+              <strong>
+                {runtimeChainIngestion?.lagBlocks !== null &&
+                runtimeChainIngestion?.lagBlocks !== undefined
+                  ? `${runtimeChainIngestion.lagBlocks} blocks`
+                  : 'Unavailable'}
+              </strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Healthy projections</span>
+              <strong>
+                {runtimeChainIngestion
+                  ? `${runtimeChainIngestion.projections.healthyJobs}/${runtimeChainIngestion.projections.totalJobs}`
+                  : 'Unavailable'}
+              </strong>
+            </article>
           </div>
           <div className={styles.stack}>
             <StatusNotice
@@ -1379,6 +1491,17 @@ export function OperatorConsole({
               <strong>{runtimeAlignment.transportLabel}</strong>
               <p className={styles.stateText}>{runtimeAlignment.transportMessage}</p>
             </article>
+            {runtimeChainIngestion ? (
+              <article className={styles.boundaryCard}>
+                <strong>{`Chain ingestion ${getChainIngestionStatusLabel(runtimeChainIngestion.status)}`}</strong>
+                <p className={styles.stateText}>{runtimeChainIngestion.summary}</p>
+                <small>
+                  {`Authority reads ${formatBooleanSummary(
+                    runtimeChainIngestion.authorityReadsEnabled,
+                  )} · confirmation depth ${runtimeChainIngestion.confirmationDepth} · latest block ${runtimeChainIngestion.latestBlock ?? 'Unavailable'} · finalized block ${runtimeChainIngestion.finalizedBlock ?? 'Unavailable'} · lag ${runtimeChainIngestion.lagBlocks ?? 'Unavailable'} block(s).`}
+                </small>
+              </article>
+            ) : null}
             {runtimeProfile?.warnings.map((warning) => (
               <article key={warning} className={styles.boundaryCard}>
                 <strong>Validation warning</strong>
@@ -1875,6 +1998,62 @@ export function OperatorConsole({
                   ) : null}
                 </article>
                 <article className={styles.boundaryCard}>
+                  <strong>Finalized chain ingestion</strong>
+                  <p className={styles.stateText}>
+                    Inspect the finalized-log cursor and the freshness of per-job chain
+                    projections before trusting operator reads.
+                  </p>
+                  <StatusNotice
+                    message={chainIngestionState.message}
+                    messageClassName={styles.stateText}
+                  />
+                  {chainIngestionStatus ? (
+                    <div className={styles.stack}>
+                      <small>
+                        {`Status: ${getChainIngestionStatusLabel(
+                          chainIngestionStatus.status,
+                        )} · authority reads ${formatBooleanSummary(
+                          chainIngestionStatus.authorityReadsEnabled,
+                        )} · ${chainIngestionStatus.summary}`}
+                      </small>
+                      <small>
+                        {`Chain ${chainIngestionStatus.chainId} · contract ${
+                          chainIngestionStatus.contractAddress ?? 'Unavailable'
+                        } · latest block ${chainIngestionStatus.latestBlock ?? 'Unavailable'} · finalized block ${chainIngestionStatus.finalizedBlock ?? 'Unavailable'} · lag ${chainIngestionStatus.lagBlocks ?? 'Unavailable'} block(s).`}
+                      </small>
+                      <small>
+                        {`Cursor: next from ${
+                          chainIngestionStatus.cursor?.nextFromBlock ?? 'Unavailable'
+                        } · last finalized ${
+                          chainIngestionStatus.cursor?.lastFinalizedBlock ?? 'Unavailable'
+                        } · last scanned ${
+                          chainIngestionStatus.cursor?.lastScannedBlock ?? 'Unavailable'
+                        }.`}
+                      </small>
+                      <small>
+                        {`Projections: ${chainIngestionStatus.projections.healthyJobs} healthy · ${chainIngestionStatus.projections.degradedJobs} degraded · ${chainIngestionStatus.projections.staleJobs} stale · ${chainIngestionStatus.projections.projectedJobs}/${chainIngestionStatus.projections.totalJobs} projected.`}
+                      </small>
+                      {chainIngestionStatus.cursor?.lastError ? (
+                        <small>{`Cursor error: ${chainIngestionStatus.cursor.lastError}`}</small>
+                      ) : null}
+                      {chainIngestionStatus.issues.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainIngestionStatus.issues.map((issue, index) => (
+                            <small key={`chain-ingestion-issue-${index}`}>{issue}</small>
+                          ))}
+                        </div>
+                      ) : null}
+                      {chainIngestionStatus.warnings.length > 0 ? (
+                        <div className={styles.stack}>
+                          {chainIngestionStatus.warnings.map((warning, index) => (
+                            <small key={`chain-ingestion-warning-${index}`}>{warning}</small>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </article>
+                <article className={styles.boundaryCard}>
                   <strong>Recurring chain-sync daemon</strong>
                   <p className={styles.stateText}>
                     Inspect the latest shared status published by the bounded recurring chain-audit
@@ -2093,6 +2272,11 @@ export function OperatorConsole({
                       <small>{`Job ${job.jobId} · Updated ${formatTimestamp(job.updatedAt)}`}</small>
                       <small>{`Latest activity ${formatTimestamp(job.latestActivityAt)}`}</small>
                       <small>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions} · Chain sync backlog ${formatBooleanSummary(job.counts.chainSyncBacklog)}`}</small>
+                      <small>
+                        {`Authority: ${getAuthoritySourceLabel(
+                          job.authority.source,
+                        )} · ${getAuthorityReasonLabel(job.authority.reason)}`}
+                      </small>
                       {job.staleForMs !== null ? (
                         <small>{`Stale for ${Math.floor(job.staleForMs / 3_600_000)}h`}</small>
                       ) : null}
@@ -2577,6 +2761,32 @@ export function OperatorConsole({
             </div>
             <StatusNotice message={caseBrief.pressureSummary} messageClassName={styles.stateText} />
             <div className={styles.stack}>
+              <article className={styles.boundaryCard}>
+                <strong>{`Audit source: ${getAuthoritySourceLabel(audit.bundle.authority.source)}`}</strong>
+                <p className={styles.stateText}>
+                  {getAuthorityReasonLabel(audit.bundle.authority.reason)}
+                </p>
+                <small>
+                  {`Authority reads ${formatBooleanSummary(
+                    audit.bundle.authority.authorityReadsEnabled,
+                  )} · projection available ${formatBooleanSummary(
+                    audit.bundle.authority.projectionAvailable,
+                  )} · fresh ${formatBooleanSummary(
+                    audit.bundle.authority.projectionFresh,
+                  )} · healthy ${formatBooleanSummary(
+                    audit.bundle.authority.projectionHealthy,
+                  )}.`}
+                </small>
+                <small>
+                  {`Projected at ${
+                    audit.bundle.authority.projectedAt
+                      ? formatDate(audit.bundle.authority.projectedAt)
+                      : 'Unavailable'
+                  } · last projected block ${
+                    audit.bundle.authority.lastProjectedBlock ?? 'Unavailable'
+                  } · event count ${audit.bundle.authority.lastEventCount ?? 'Unavailable'}.`}
+                </small>
+              </article>
               <div className={styles.inlineActions}>
                 <button
                   type="button"

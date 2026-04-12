@@ -223,6 +223,17 @@ describe('EscrowController integration', () => {
       'deliver_milestone',
       'release_milestone',
     ]);
+    expect(auditResponse.bundle.authority).toEqual({
+      source: 'local_fallback',
+      authorityReadsEnabled: false,
+      projectionAvailable: false,
+      projectionFresh: false,
+      projectionHealthy: false,
+      projectedAt: null,
+      lastProjectedBlock: null,
+      lastEventCount: null,
+      reason: 'authority_reads_disabled',
+    });
   });
 
   it('retains persisted jobs after the escrow module is recreated', async () => {
@@ -267,6 +278,8 @@ describe('EscrowController integration', () => {
     expect(
       auditResponse.bundle.executions.map((execution) => execution.action),
     ).toEqual(['create_job', 'fund_job']);
+    expect(auditResponse.bundle.authority.source).toBe('local_fallback');
+    expect(auditResponse.bundle.authority.reason).toBe('authority_reads_disabled');
   });
 
   it('lists authenticated jobs for the current participant only', async () => {

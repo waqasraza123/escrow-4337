@@ -165,6 +165,18 @@ export type JobsListResponse = {
   }>;
 };
 
+export type EscrowAuthorityStatus = {
+  source: 'chain_projection' | 'local_fallback';
+  authorityReadsEnabled: boolean;
+  projectionAvailable: boolean;
+  projectionFresh: boolean;
+  projectionHealthy: boolean;
+  projectedAt: number | null;
+  lastProjectedBlock: number | null;
+  lastEventCount: number | null;
+  reason: string | null;
+};
+
 export type AuditBundle = {
   bundle: {
     job: PublicJobView;
@@ -189,6 +201,7 @@ export type AuditBundle = {
       failureCode?: string;
       failureMessage?: string;
     }>;
+    authority: EscrowAuthorityStatus;
   };
 };
 
@@ -222,6 +235,33 @@ export type RuntimeProfile = {
     exportSupport: boolean;
   };
   operations: {
+    chainIngestion: {
+      enabled: boolean;
+      authorityReadsEnabled: boolean;
+      status: 'ok' | 'warning' | 'failed';
+      summary: string;
+      confirmationDepth: number;
+      batchBlocks: number;
+      resyncBlocks: number;
+      latestBlock: number | null;
+      finalizedBlock: number | null;
+      lagBlocks: number | null;
+      cursor: {
+        nextFromBlock: number | null;
+        lastFinalizedBlock: number | null;
+        lastScannedBlock: number | null;
+        updatedAt: number | null;
+      };
+      projections: {
+        totalJobs: number;
+        projectedJobs: number;
+        healthyJobs: number;
+        degradedJobs: number;
+        staleJobs: number;
+      };
+      issues: string[];
+      warnings: string[];
+    };
     chainSyncDaemon: {
       status: 'ok' | 'warning' | 'failed';
       summary: string;

@@ -87,9 +87,9 @@ function mockAuthenticatedConsoleLoad(options?: {
   mockedWebApi.getAudit.mockResolvedValue(options?.audit ?? createAuditBundle());
 }
 
-function renderHome() {
+function renderHome(initialLocale: 'en' | 'ar' = 'en') {
   return renderApp(
-    <WebI18nProvider initialLocale="en">
+    <WebI18nProvider initialLocale={initialLocale}>
       <Home />
     </WebI18nProvider>,
   );
@@ -196,6 +196,50 @@ describe('web page', () => {
     });
   });
 
+  it('renders distinct language labels and persists locale changes from the switcher', async () => {
+    const user = userEvent.setup();
+
+    renderHome('en');
+
+    const englishButton = screen.getByRole('button', { name: 'English' });
+    const arabicButton = screen.getByRole('button', { name: 'العربية' });
+
+    expect(englishButton).toHaveAttribute('aria-pressed', 'true');
+    expect(arabicButton).toHaveAttribute('aria-pressed', 'false');
+    expect(arabicButton).toHaveAttribute('lang', 'ar');
+    expect(arabicButton).toHaveAttribute('dir', 'rtl');
+
+    await user.click(arabicButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      expect(screen.getByRole('button', { name: 'العربية' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(document.documentElement.lang).toBe('ar');
+      expect(document.documentElement.dir).toBe('rtl');
+      expect(document.documentElement.dataset.locale).toBe('ar');
+      expect(document.cookie).toContain('escrow4337.locale=ar');
+    });
+  });
+
+  it('keeps both language option labels correct when Arabic starts active', async () => {
+    renderHome('ar');
+
+    expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: 'العربية' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('restores a stored session and renders the selected job workspace', async () => {
     seedJsonStorage(sessionStorageKey, createSessionTokens());
     mockAuthenticatedConsoleLoad();
@@ -220,6 +264,30 @@ describe('web page', () => {
       expect(mockedWebApi.me).toHaveBeenCalledWith('access-token-123');
       expect(mockedWebApi.listJobs).toHaveBeenCalledWith('access-token-123');
       expect(mockedWebApi.getAudit).toHaveBeenCalledWith('job-1');
+    });
+  });
+
+  it('shows chain-ingestion runtime posture and audit authority provenance for the selected job', async () => {
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockAuthenticatedConsoleLoad();
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByText('Chain ingestion Healthy')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Authority reads disabled · confirmation depth 6 · latest block 120 · finalized block 114 · lag 0 block\(s\)\./),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText((content) => content.includes('Audit source: Chain projection')),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Projection available Yes · fresh Yes · healthy Yes\./),
+      ).toBeInTheDocument();
     });
   });
 

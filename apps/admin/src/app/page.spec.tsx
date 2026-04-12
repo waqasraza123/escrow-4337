@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuditBundle,
   createEoaWallet,
+  createEscrowChainIngestionStatus,
   createEscrowHealthReport,
   createResolvedAuditBundle,
   createRuntimeProfile,
@@ -31,6 +32,7 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     logout: vi.fn(),
     me: vi.fn(),
     getEscrowHealth: vi.fn(),
+    getEscrowChainIngestionStatus: vi.fn(),
     getEscrowChainSyncDaemonHealth: vi.fn(),
     importJobHistoryReconciliation: vi.fn(),
     syncEscrowChainAudit: vi.fn(),
@@ -61,9 +63,9 @@ vi.mock('next/navigation', () => ({
 
 import Home from './page';
 
-function renderHome() {
+function renderHome(initialLocale: 'en' | 'ar' = 'en') {
   return renderApp(
-    <AdminI18nProvider initialLocale="en">
+    <AdminI18nProvider initialLocale={initialLocale}>
       <Home />
     </AdminI18nProvider>,
   );
@@ -75,6 +77,9 @@ describe('admin page', () => {
     mockedAdminApi.baseUrl = localApiBaseUrl;
     mockedAdminApi.getRuntimeProfile.mockResolvedValue(createRuntimeProfile());
     mockedAdminApi.getEscrowHealth.mockResolvedValue(createEscrowHealthReport());
+    mockedAdminApi.getEscrowChainIngestionStatus.mockResolvedValue(
+      createEscrowChainIngestionStatus(),
+    );
     mockedAdminApi.getEscrowChainSyncDaemonHealth.mockResolvedValue(null);
   });
 
@@ -113,6 +118,50 @@ describe('admin page', () => {
       expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
       expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
     });
+  });
+
+  it('renders distinct language labels and persists locale changes from the switcher', async () => {
+    const user = userEvent.setup();
+
+    renderHome('en');
+
+    const englishButton = screen.getByRole('button', { name: 'English' });
+    const arabicButton = screen.getByRole('button', { name: 'العربية' });
+
+    expect(englishButton).toHaveAttribute('aria-pressed', 'true');
+    expect(arabicButton).toHaveAttribute('aria-pressed', 'false');
+    expect(arabicButton).toHaveAttribute('lang', 'ar');
+    expect(arabicButton).toHaveAttribute('dir', 'rtl');
+
+    await user.click(arabicButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      expect(screen.getByRole('button', { name: 'العربية' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(document.documentElement.lang).toBe('ar');
+      expect(document.documentElement.dir).toBe('rtl');
+      expect(document.documentElement.dataset.locale).toBe('ar');
+      expect(document.cookie).toContain('escrow4337.locale=ar');
+    });
+  });
+
+  it('keeps both language option labels correct when Arabic starts active', () => {
+    renderHome('ar');
+
+    expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: 'العربية' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('loads an audit bundle and persists recent lookup history', async () => {
@@ -298,6 +347,46 @@ describe('admin page', () => {
     });
     expect(screen.getByText('Operator backlog')).toBeInTheDocument();
     expect(screen.getByText('Open dispute')).toBeInTheDocument();
+  });
+
+  it('shows finalized chain ingestion posture and audit authority provenance to the operator', async () => {
+    const user = userEvent.setup();
+    seedJsonStorage(sessionStorageKey, createSessionTokens());
+    mockedAdminApi.me.mockResolvedValue(
+      createUserProfile([createEoaWallet(createHexAddress('2'))]),
+    );
+    mockedAdminApi.getAudit.mockResolvedValue(
+      createAuditBundle(),
+    );
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Loaded finalized ingestion status: healthy.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Status: Healthy · authority reads No · Escrow chain ingestion is healthy\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Projections: 3 healthy · 0 degraded · 0 stale · 3\/4 projected\./),
+    ).toBeInTheDocument();
+    expect(mockedAdminApi.getEscrowChainIngestionStatus).toHaveBeenCalledWith(
+      'admin-access-token-123',
+    );
+
+    await user.type(screen.getByPlaceholderText('Paste a job UUID'), 'job-123');
+    await user.click(screen.getByRole('button', { name: 'Load public bundle' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Audit source: Chain projection')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Authority reads Yes · projection available Yes · fresh Yes · healthy Yes\./),
+    ).toBeInTheDocument();
   });
 
   it('keeps privileged operator workflows blocked when the session does not control the arbitrator wallet', async () => {

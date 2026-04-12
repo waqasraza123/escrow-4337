@@ -1,5 +1,6 @@
 import type {
   AuditBundle,
+  EscrowChainIngestionStatus,
   EscrowHealthReport,
   RuntimeProfile,
   SessionTokens,
@@ -91,6 +92,33 @@ export function createRuntimeProfile(
       exportSupport: true,
     },
     operations: {
+      chainIngestion: {
+        enabled: true,
+        authorityReadsEnabled: false,
+        status: 'ok',
+        summary: 'Escrow chain ingestion is healthy.',
+        confirmationDepth: 6,
+        batchBlocks: 1000,
+        resyncBlocks: 20,
+        latestBlock: 120,
+        finalizedBlock: 114,
+        lagBlocks: 0,
+        cursor: {
+          nextFromBlock: 115,
+          lastFinalizedBlock: 114,
+          lastScannedBlock: 114,
+          updatedAt: 1_700_000_000_000,
+        },
+        projections: {
+          totalJobs: 4,
+          projectedJobs: 3,
+          healthyJobs: 3,
+          degradedJobs: 0,
+          staleJobs: 0,
+        },
+        issues: [],
+        warnings: [],
+      },
       chainSyncDaemon: {
         status: 'ok',
         summary:
@@ -136,6 +164,18 @@ export function createRuntimeProfile(
       ...overrides.operator,
     },
     operations: {
+      chainIngestion: {
+        ...base.operations.chainIngestion,
+        ...overrides.operations?.chainIngestion,
+        cursor: {
+          ...base.operations.chainIngestion.cursor,
+          ...overrides.operations?.chainIngestion?.cursor,
+        },
+        projections: {
+          ...base.operations.chainIngestion.projections,
+          ...overrides.operations?.chainIngestion?.projections,
+        },
+      },
       chainSyncDaemon: {
         ...base.operations.chainSyncDaemon,
         ...overrides.operations?.chainSyncDaemon,
@@ -202,6 +242,17 @@ export function createEscrowHealthReport(
           contractAddress: '0xcontract',
           escrowId: 'escrow-ops-1',
         },
+        authority: {
+          source: 'local_fallback',
+          authorityReadsEnabled: false,
+          projectionAvailable: false,
+          projectionFresh: false,
+          projectionHealthy: false,
+          projectedAt: null,
+          lastProjectedBlock: null,
+          lastEventCount: null,
+          reason: 'projection_missing',
+        },
       },
     ],
   };
@@ -222,6 +273,76 @@ export function createEscrowHealthReport(
       ...overrides.summary,
     },
     jobs: (overrides.jobs as EscrowHealthReport['jobs'] | undefined) ?? base.jobs,
+  };
+}
+
+export function createEscrowChainIngestionStatus(
+  overrides: DeepPartial<EscrowChainIngestionStatus> = {},
+): EscrowChainIngestionStatus {
+  const base: EscrowChainIngestionStatus = {
+    generatedAt: '2026-04-08T00:00:00.000Z',
+    enabled: true,
+    authorityReadsEnabled: false,
+    chainId: 84532,
+    contractAddress: '0xcontract',
+    confirmations: 6,
+    batchBlocks: 1000,
+    resyncBlocks: 20,
+    latestBlock: 120,
+    finalizedBlock: 114,
+    lagBlocks: 0,
+    cursor: {
+      chainId: 84532,
+      contractAddress: '0xcontract',
+      streamName: 'workstream_escrow',
+      nextFromBlock: 115,
+      lastFinalizedBlock: 114,
+      lastScannedBlock: 114,
+      lastError: null,
+      updatedAt: 1_700_000_000_000,
+    },
+    projections: {
+      totalJobs: 4,
+      projectedJobs: 3,
+      healthyJobs: 3,
+      degradedJobs: 0,
+      staleJobs: 0,
+    },
+    status: 'ok',
+    summary: 'Escrow chain ingestion is healthy.',
+    issues: [],
+    warnings: [],
+  };
+  const baseCursor = base.cursor!;
+
+  const cursor: EscrowChainIngestionStatus['cursor'] =
+    overrides.cursor === null
+      ? null
+      : {
+          chainId: overrides.cursor?.chainId ?? baseCursor.chainId,
+          contractAddress:
+            overrides.cursor?.contractAddress ?? baseCursor.contractAddress,
+          streamName: overrides.cursor?.streamName ?? baseCursor.streamName,
+          nextFromBlock:
+            overrides.cursor?.nextFromBlock ?? baseCursor.nextFromBlock,
+          lastFinalizedBlock:
+            overrides.cursor?.lastFinalizedBlock ?? baseCursor.lastFinalizedBlock,
+          lastScannedBlock:
+            overrides.cursor?.lastScannedBlock ?? baseCursor.lastScannedBlock,
+          lastError: overrides.cursor?.lastError ?? baseCursor.lastError,
+          updatedAt: overrides.cursor?.updatedAt ?? baseCursor.updatedAt,
+        };
+
+  return {
+    ...base,
+    ...overrides,
+    cursor,
+    projections: {
+      ...base.projections,
+      ...overrides.projections,
+    },
+    issues: overrides.issues ?? base.issues,
+    warnings: overrides.warnings ?? base.warnings,
   };
 }
 
@@ -301,6 +422,17 @@ export function createAuditBundle(): AuditBundle {
           milestoneIndex: 1,
         },
       ],
+      authority: {
+        source: 'chain_projection',
+        authorityReadsEnabled: true,
+        projectionAvailable: true,
+        projectionFresh: true,
+        projectionHealthy: true,
+        projectedAt: 500,
+        lastProjectedBlock: 28,
+        lastEventCount: 4,
+        reason: null,
+      },
     },
   };
 }
@@ -343,6 +475,17 @@ export function createQuietAuditBundle(): AuditBundle {
         },
       ],
       executions: [],
+      authority: {
+        source: 'local_fallback',
+        authorityReadsEnabled: true,
+        projectionAvailable: false,
+        projectionFresh: false,
+        projectionHealthy: false,
+        projectedAt: null,
+        lastProjectedBlock: null,
+        lastEventCount: null,
+        reason: 'projection_missing',
+      },
     },
   };
 }

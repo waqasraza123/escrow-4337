@@ -4,76 +4,57 @@
 - 2026-04-12
 
 ## Current Objective
-- Implement authoritative escrow chain ingestion and reconciliation inside `services/api` without creating a separate service.
+- Ship the next production-facing phase after backend chain ingestion: expose authority provenance and finalized-ingestion posture in the operator and client consoles, and lock it down with frontend and API coverage.
 
 ## Last Completed Step
-- Landed finalized-log ingestion, normalized chain-event persistence, per-job onchain projections, authority-aware escrow and marketplace read paths, operator ingestion status, and runtime or launch-readiness wiring; verified the full API test suite.
+- Wired admin and web UI surfaces to the new backend authority metadata and ingestion posture, updated shared frontend fixtures and API types, and extended API audit integration assertions.
 
 ## Current Step
-- Task complete. Waiting for follow-up review or extension work.
+- Task complete. Backend authority is now visible in the real app surfaces and covered by package-level tests.
 
 ## Why This Step Exists
-- The repo needed an internal chain-backed source of truth for escrow lifecycle facts so production reads can distinguish authoritative onchain state from local fallback state.
+- The backend ingestion work was production-useful only if operators and clients could see when reads came from chain projections versus local fallback, and whether finalized ingestion itself was healthy.
 
 ## Changed Files
+- `apps/admin/src/app/operator-case.spec.ts`
+- `apps/admin/src/app/operator-console.tsx`
+- `apps/admin/src/app/page.spec.tsx`
+- `apps/admin/src/lib/api.ts`
+- `apps/admin/src/test/fixtures.ts`
+- `apps/web/src/app/page.spec.tsx`
+- `apps/web/src/app/web-console.tsx`
+- `apps/web/src/lib/api.ts`
+- `apps/web/src/test/fixtures.ts`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
-- `services/api/src/modules/escrow/escrow-export.ts`
-- `services/api/src/modules/escrow/escrow.module.ts`
-- `services/api/src/modules/escrow/escrow.service.ts`
-- `services/api/src/modules/escrow/escrow.types.ts`
-- `services/api/src/modules/marketplace/marketplace.module.ts`
-- `services/api/src/modules/marketplace/marketplace.service.ts`
-- `services/api/src/modules/operations/deployment-validation.service.ts`
-- `services/api/src/modules/operations/escrow-chain-ingestion-status.service.ts`
-- `services/api/src/modules/operations/escrow-chain-log.provider.ts`
-- `services/api/src/modules/operations/escrow-chain-sync-daemon-monitoring.service.ts`
-- `services/api/src/modules/operations/escrow-chain-sync.service.ts`
-- `services/api/src/modules/operations/escrow-health.service.ts`
-- `services/api/src/modules/operations/escrow-health.types.ts`
-- `services/api/src/modules/operations/escrow-onchain-authority.service.ts`
-- `services/api/src/modules/operations/launch-readiness.service.ts`
-- `services/api/src/modules/operations/launch-readiness.types.ts`
-- `services/api/src/modules/operations/operations.config.ts`
-- `services/api/src/modules/operations/operations.controller.ts`
-- `services/api/src/modules/operations/operations.module.ts`
-- `services/api/src/modules/operations/runtime-profile.service.ts`
-- `services/api/src/modules/operations/runtime-profile.types.ts`
-- `services/api/src/persistence/file/file-persistence.store.ts`
-- `services/api/src/persistence/file/file.repositories.ts`
-- `services/api/src/persistence/persistence.types.ts`
-- `services/api/src/persistence/postgres/migrations/012_escrow_chain_ingestion.sql`
-- `services/api/src/persistence/postgres/postgres.repositories.ts`
-- `services/api/test/deployment-validation.service.spec.ts`
-- `services/api/test/escrow-chain-sync-daemon-alerting.service.spec.ts`
-- `services/api/test/escrow-chain-sync.service.spec.ts`
-- `services/api/test/launch-readiness.service.spec.ts`
-- `services/api/test/runtime-profile.service.spec.ts`
+- `services/api/test/escrow.controller.integration.spec.ts`
 
 ## Key Constraints
-- Authority stays split: onchain escrow facts come from projections when healthy; invite state, delivery notes, dispute evidence, operator notes, and marketplace application content stay API-owned.
-- v1 remains inside `services/api` and existing worker commands.
-- Ingestion is finalized-log based with bounded overlap; deep reorg replay is still postponed.
+- Onchain authority remains scoped to escrow lifecycle facts only; invite state, notes, evidence URLs, and other off-chain workflow fields stay API-owned.
+- Admin reads still require an authenticated session that controls the configured arbitrator wallet before protected ingestion or health data is shown.
+- This phase surfaces existing backend capability; it does not widen the product into a broader indexing platform or change public API shapes.
 
 ## Verification Commands
-- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter escrow4334-api test -- --runInBand runtime-profile.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand launch-readiness.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand escrow-chain-sync.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand escrow-health.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand escrow.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand escrow-export.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand deployment-validation.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand`
+- `pnpm --filter escrow4334-api test -- --runInBand escrow.controller.integration.spec.ts`
+- `pnpm --filter admin exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter admin test src/app/page.spec.tsx`
+- `pnpm --filter web test src/app/page.spec.tsx`
+- `pnpm --filter admin test`
+- `pnpm --filter web test`
 
 ## Verification Status
 - Passed:
-  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter escrow4334-api test -- --runInBand`
+  - `pnpm --filter escrow4334-api test -- --runInBand escrow.controller.integration.spec.ts`
+  - `pnpm --filter admin exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx`
+  - `pnpm --filter web test src/app/page.spec.tsx`
+  - `pnpm --filter admin test`
+  - `pnpm --filter web test`
 
 ## Expected Result
-- Escrow reads, exports, operator health, runtime posture, and marketplace trust signals can prefer authoritative finalized-chain projections while preserving local fallback behavior when projection freshness or health is insufficient.
+- Operators can inspect finalized ingestion health and authority provenance directly in the admin console, clients can see whether audit history is chain-projected or falling back locally, and both surfaces have truthful test coverage for those signals.
 
 ## Next Likely Step
-- Add explicit API and browser coverage for the new ingestion status endpoint and for authority provenance on audit or operator views, then validate the worker loop against a real Postgres-backed local chain environment.
+- Validate the ingestion loop against a real Postgres-backed local chain environment, then enable and verify authority reads in staging with live operator workflows and export artifacts.

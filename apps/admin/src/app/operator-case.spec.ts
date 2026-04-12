@@ -89,6 +89,18 @@ function createBundle(
       },
       ...(override.executions ?? []),
     ],
+    authority: {
+      source: 'local_fallback',
+      authorityReadsEnabled: false,
+      projectionAvailable: false,
+      projectionFresh: false,
+      projectionHealthy: false,
+      projectedAt: null,
+      lastProjectedBlock: null,
+      lastEventCount: null,
+      reason: 'authority_reads_disabled',
+      ...override.authority,
+    },
   };
 }
 

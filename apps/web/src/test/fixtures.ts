@@ -11,6 +11,14 @@ import type {
   WalletState,
 } from '../lib/api';
 
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends Array<infer Item>
+    ? Array<DeepPartial<Item>>
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : T[K];
+};
+
 export const sessionStorageKey = 'escrow4337.web.session';
 
 export function createHexAddress(fill: string) {
@@ -222,6 +230,17 @@ export function createAuditBundle(): AuditBundle {
           escrowId: 'escrow-1',
         },
       ],
+      authority: {
+        source: 'chain_projection',
+        authorityReadsEnabled: true,
+        projectionAvailable: true,
+        projectionFresh: true,
+        projectionHealthy: true,
+        projectedAt: 200,
+        lastProjectedBlock: 22,
+        lastEventCount: 2,
+        reason: null,
+      },
     },
   };
 }
@@ -243,16 +262,20 @@ export function createCustomAuditBundle(
       job: override.job
         ? {
             ...createCustomJobView(override.job),
-                contractorParticipation: override.job.contractorParticipation
-                  ? {
-                      status: override.job.contractorParticipation.status,
-                      joinedAt: override.job.contractorParticipation.joinedAt ?? null,
-                    }
-              : createAuditBundle().bundle.job.contractorParticipation,
+            contractorParticipation: override.job.contractorParticipation
+              ? {
+                  status: override.job.contractorParticipation.status,
+                  joinedAt: override.job.contractorParticipation.joinedAt ?? null,
+                }
+              : base.bundle.job.contractorParticipation,
           }
         : base.bundle.job,
       audit: override.audit ?? base.bundle.audit,
       executions: override.executions ?? base.bundle.executions,
+      authority: {
+        ...base.bundle.authority,
+        ...override.authority,
+      },
     },
   };
 }
@@ -283,7 +306,7 @@ export function createCreateJobResponse(overrides: {
 }
 
 export function createRuntimeProfile(
-  overrides: Partial<RuntimeProfile> = {},
+  overrides: DeepPartial<RuntimeProfile> = {},
 ): RuntimeProfile {
   const base: RuntimeProfile = {
     generatedAt: '2026-04-06T00:00:00.000Z',
@@ -307,6 +330,33 @@ export function createRuntimeProfile(
       exportSupport: true,
     },
     operations: {
+      chainIngestion: {
+        enabled: true,
+        authorityReadsEnabled: false,
+        status: 'ok',
+        summary: 'Escrow chain ingestion is healthy.',
+        confirmationDepth: 6,
+        batchBlocks: 1000,
+        resyncBlocks: 20,
+        latestBlock: 120,
+        finalizedBlock: 114,
+        lagBlocks: 0,
+        cursor: {
+          nextFromBlock: 115,
+          lastFinalizedBlock: 114,
+          lastScannedBlock: 114,
+          updatedAt: 1_700_000_000_000,
+        },
+        projections: {
+          totalJobs: 4,
+          projectedJobs: 3,
+          healthyJobs: 3,
+          degradedJobs: 0,
+          staleJobs: 0,
+        },
+        issues: [],
+        warnings: [],
+      },
       chainSyncDaemon: {
         status: 'ok',
         summary:
@@ -352,6 +402,18 @@ export function createRuntimeProfile(
       ...overrides.operator,
     },
     operations: {
+      chainIngestion: {
+        ...base.operations.chainIngestion,
+        ...overrides.operations?.chainIngestion,
+        cursor: {
+          ...base.operations.chainIngestion.cursor,
+          ...overrides.operations?.chainIngestion?.cursor,
+        },
+        projections: {
+          ...base.operations.chainIngestion.projections,
+          ...overrides.operations?.chainIngestion?.projections,
+        },
+      },
       chainSyncDaemon: {
         ...base.operations.chainSyncDaemon,
         ...overrides.operations?.chainSyncDaemon,

@@ -62,6 +62,53 @@ export type VerifyResponse = SessionTokens & {
   user: UserProfile;
 };
 
+export type EscrowAuthorityStatus = {
+  source: 'chain_projection' | 'local_fallback';
+  authorityReadsEnabled: boolean;
+  projectionAvailable: boolean;
+  projectionFresh: boolean;
+  projectionHealthy: boolean;
+  projectedAt: number | null;
+  lastProjectedBlock: number | null;
+  lastEventCount: number | null;
+  reason: string | null;
+};
+
+export type EscrowChainIngestionStatus = {
+  generatedAt: string;
+  enabled: boolean;
+  authorityReadsEnabled: boolean;
+  chainId: number;
+  contractAddress: string | null;
+  confirmations: number;
+  batchBlocks: number;
+  resyncBlocks: number;
+  latestBlock: number | null;
+  finalizedBlock: number | null;
+  lagBlocks: number | null;
+  cursor: null | {
+    chainId: number;
+    contractAddress: string;
+    streamName: 'workstream_escrow';
+    nextFromBlock: number;
+    lastFinalizedBlock: number | null;
+    lastScannedBlock: number | null;
+    lastError: string | null;
+    updatedAt: number;
+  };
+  projections: {
+    totalJobs: number;
+    projectedJobs: number;
+    healthyJobs: number;
+    degradedJobs: number;
+    staleJobs: number;
+  };
+  status: 'ok' | 'warning' | 'failed';
+  summary: string;
+  issues: string[];
+  warnings: string[];
+};
+
 export type RuntimeProfile = {
   generatedAt: string;
   profile: 'local-mock' | 'mixed' | 'deployment-like';
@@ -83,6 +130,33 @@ export type RuntimeProfile = {
     exportSupport: boolean;
   };
   operations: {
+    chainIngestion: {
+      enabled: boolean;
+      authorityReadsEnabled: boolean;
+      status: 'ok' | 'warning' | 'failed';
+      summary: string;
+      confirmationDepth: number;
+      batchBlocks: number;
+      resyncBlocks: number;
+      latestBlock: number | null;
+      finalizedBlock: number | null;
+      lagBlocks: number | null;
+      cursor: {
+        nextFromBlock: number | null;
+        lastFinalizedBlock: number | null;
+        lastScannedBlock: number | null;
+        updatedAt: number | null;
+      };
+      projections: {
+        totalJobs: number;
+        projectedJobs: number;
+        healthyJobs: number;
+        degradedJobs: number;
+        staleJobs: number;
+      };
+      issues: string[];
+      warnings: string[];
+    };
     chainSyncDaemon: {
       status: 'ok' | 'warning' | 'failed';
       summary: string;
@@ -357,6 +431,7 @@ export type EscrowHealthReport = {
       contractAddress: string;
       escrowId: string | null;
     };
+    authority: EscrowAuthorityStatus;
   }>;
 };
 
@@ -459,12 +534,16 @@ export type EscrowChainSyncDaemonHealthReport = {
       | 'run_stalled'
       | 'consecutive_failures'
       | 'consecutive_skips'
-      | 'last_run_failed';
+      | 'last_run_failed'
+      | 'ingestion_missing'
+      | 'ingestion_lagging'
+      | 'projection_backlog';
     severity: 'warning' | 'critical';
     summary: string;
     detail: string | null;
   }>;
   daemon: EscrowChainSyncDaemonStatus | null;
+  ingestion: EscrowChainIngestionStatus | null;
 };
 
 export type EscrowChainSyncReport = {
@@ -620,6 +699,7 @@ export type AuditBundle = {
       failureMessage?: string;
       milestoneIndex?: number;
     }>;
+    authority: EscrowAuthorityStatus;
   };
 };
 
@@ -732,6 +812,14 @@ export const adminApi = {
     return requestJson<EscrowChainSyncDaemonHealthReport>(
       apiBaseUrl,
       '/operations/reconciliation/chain-audit-sync/daemon-health',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getEscrowChainIngestionStatus(accessToken: string) {
+    return requestJson<EscrowChainIngestionStatus>(
+      apiBaseUrl,
+      '/operations/reconciliation/chain-audit-sync/status',
       { method: 'GET' },
       accessToken,
     );
