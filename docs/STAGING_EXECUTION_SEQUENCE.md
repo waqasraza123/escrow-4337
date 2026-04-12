@@ -60,6 +60,7 @@ Required environment contract:
    Canonical GitHub path: run workflow `Launch Candidate` with input `environment=staging`.
    Local equivalent when you have the staging secret set loaded: `pnpm launch:candidate`
    This must keep `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`.
+   The same gate now also runs `pnpm verify:authority:deployed`, which creates a staged escrow job through the deployed API, runs protected reconciliation, and captures public audit/export proof that the staged environment reads from `chain_projection`.
 
 10. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.

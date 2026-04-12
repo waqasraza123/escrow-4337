@@ -27,10 +27,11 @@ Use `pnpm launch:candidate` as the canonical launch-candidate suite. It runs:
 - `pnpm smoke:deployed` with `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`
 - `pnpm e2e:canary:deployed` with staged `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials
 - `pnpm e2e:canary:deployed:exact` with the same staged `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials
+- `pnpm verify:authority:deployed` with the same staged `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials to prove public audit and export reads converge to `chain_projection`
 
 The GitHub-native equivalent is the manual `Launch Candidate` workflow against `staging` or `production`.
 
-The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, separate seeded and exact canary reports, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
+The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, separate seeded and exact canary reports, deployed authority-evidence artifacts, and a generated summary. The GitHub workflow uploads that directory as a workflow artifact.
 
 The Playwright harness now also includes two focused deployed canary lanes behind explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials:
 

@@ -103,6 +103,7 @@
 - Phase 7 repo hardening now exists in-repo: `pnpm verify:ci` is the canonical non-mutating local and CI gate, `pnpm contracts:check` normalizes Foundry checks, GitHub Actions now own `CI` plus `Deployed Smoke` workflows, `services/api/Dockerfile` defines a reusable GHCR-targeted API or worker image contract, Next production builds now skip lint while retaining type validation, and the repo now includes explicit environment, deployment, and focused security-review documents for local, staging, and production posture.
 - Phase 8 launch preparation now exists in-repo: API exposes `GET /operations/launch-readiness` as a machine-readable launch posture, root `pnpm launch:candidate` defines the deployed release-candidate suite, GitHub Actions now include a manual `Launch Candidate` workflow for `staging` or `production`, deployed smoke can enforce launch readiness with `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`, and `docs/LAUNCH_READINESS.md` records launch scope, exclusions, ownership, monitoring posture, rollback posture, and legal or chain assumptions.
 - Phase 8 launch evidence now also exists in-repo: `pnpm launch:candidate` generates an ignored artifact bundle under `artifacts/launch-candidate/...`, captures deployment validation, daemon health, runtime-profile, launch-readiness, and deployed smoke evidence into JSON plus summary artifacts, validates the machine-readable `docs/incident-playbook.json` before passing, and the GitHub `Launch Candidate` workflow uploads that artifact bundle for staged promotion review.
+- Launch-candidate evidence now also includes a dedicated deployed authority proof: `pnpm verify:authority:deployed` uses the staged OTP and wallet secret contract to create a real job through the deployed API, run protected reconciliation as the staged operator, and capture audit/export artifacts that must converge to `chain_projection` before promotion.
 - Repo foundation docs and governance files now exist for durable context, contributor workflow, and execution sequencing.
 - Root `pnpm test` now executes a real API test path instead of failing on an empty Jest contract.
 - Root repo now uses a versioned Git pre-push workflow under `.githooks`, with `scripts/verify-push.sh` as the shared verifier, `scripts/safe-push.sh` as the explicit push wrapper, and `pnpm safe-push` as the AI-friendly command.
@@ -167,6 +168,7 @@
 - Live end-to-end validation of the configured escrow execution relay against real environments.
 - Live execution of the new GitHub Actions `Deployed Smoke` workflow against a real staging environment with populated GitHub Environment secrets.
 - Live execution of the new GitHub Actions `Launch Candidate` workflow or `pnpm launch:candidate` against a real staged environment with launch-readiness evidence capture.
+- Live execution of the new deployed authority evidence runner against a real staged environment with uploaded authority artifacts and reconciled chain-projection proof.
 - Real rollback-drill and alert-delivery evidence captured from an actual staged environment; the repo now defines the artifact contract, but live evidence is still pending.
 - The launch-candidate join handoff now supports tokenized invite send or resend, safe manual link copy or regeneration, and pending contractor email correction before join; there is still no wallet rebinding flow or multi-contractor contract model.
 - Full operator RBAC, richer export workflows beyond the public audit-derived artifacts, and non-arbitrator privileged workflows are not yet implemented; the current admin privileged path is limited to authenticated sessions that link the configured arbitrator wallet and call dispute resolution through the existing protected API.
@@ -214,6 +216,7 @@
 - `git status --short`
 - `pnpm verify:ci`
 - `pnpm verify:chain:local`
+- `pnpm verify:authority:deployed`
 - `pnpm launch:candidate`
 - `pnpm db:up`
 - `pnpm --filter escrow4334-api db:migrate:status`

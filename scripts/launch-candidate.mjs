@@ -141,6 +141,17 @@ async function main() {
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
     },
   );
+  const authorityEvidence = await runJsonCommand(
+    'deployed-authority-evidence',
+    [
+      'node',
+      './scripts/deployed-authority-evidence.mjs',
+      '--artifacts-dir',
+      resolve(artifactsDir, 'authority-evidence'),
+    ],
+    resolve(artifactsDir, 'deployed-authority-evidence.raw.log'),
+    resolve(artifactsDir, 'deployed-authority-evidence.json'),
+  );
 
   const smokeSummary = summarizePlaywrightReport(smokeReport);
   const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
@@ -156,6 +167,7 @@ async function main() {
     seededCanarySummary,
     exactCanarySummary,
     walkthroughCanarySummary,
+    authorityEvidence,
   });
   const summary = {
     generatedAt: new Date().toISOString(),
@@ -194,6 +206,17 @@ async function main() {
     seededCanary: seededCanarySummary,
     exactCanary: exactCanarySummary,
     walkthroughCanary: walkthroughCanarySummary,
+    authorityEvidence: {
+      ok: authorityEvidence.ok,
+      jobId: authorityEvidence.jobId,
+      syncAttempts: authorityEvidence.syncAttempts,
+      auditSource: authorityEvidence.authority.source,
+      ingestionStatus: authorityEvidence.ingestion.status,
+      exportSources: {
+        jobHistory: authorityEvidence.exports.jobHistoryAuthoritySource,
+        disputeCase: authorityEvidence.exports.disputeCaseAuthoritySource,
+      },
+    },
     blockers,
   };
 
@@ -401,6 +424,7 @@ function collectBlockers({
   seededCanarySummary,
   exactCanarySummary,
   walkthroughCanarySummary,
+  authorityEvidence,
 }) {
   const blockers = [];
 
@@ -439,6 +463,15 @@ function collectBlockers({
   if (walkthroughCanarySummary.skipped > 0 || walkthroughCanarySummary.total === 0) {
     blockers.push('Deployed walkthrough canary did not execute its required guided launch path.');
   }
+  if (authorityEvidence.ok !== true) {
+    blockers.push('Deployed authority evidence did not complete successfully.');
+  }
+  if (authorityEvidence.authority?.source !== 'chain_projection') {
+    blockers.push('Deployed authority evidence did not prove chain_projection audit reads.');
+  }
+  if (authorityEvidence.ingestion?.status !== 'ok') {
+    blockers.push('Deployed authority evidence reported unhealthy ingestion posture.');
+  }
 
   return blockers;
 }
@@ -474,6 +507,7 @@ function buildSummaryMarkdown(summary) {
 - Seeded canary failures: ${summary.seededCanary.failed}
 - Exact canary failures: ${summary.exactCanary.failed}
 - Walkthrough canary failures: ${summary.walkthroughCanary.failed}
+- Authority evidence: ${summary.authorityEvidence.auditSource} after ${summary.authorityEvidence.syncAttempts} sync attempt(s)
 
 ## Blockers
 

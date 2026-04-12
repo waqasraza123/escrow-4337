@@ -33,7 +33,7 @@ The machine-readable source of truth is `docs/incident-playbook.json`. `pnpm lau
 - Severity: critical
 - Trigger: configured arbitrator wallet, export support, or launch-scoped operator posture is unavailable.
 - First response: hold promotion until operator authority is restored or the launch scope is explicitly redefined.
-- Evidence: `launch-readiness.json`, `runtime-profile.json`
+- Evidence: `launch-readiness.json`, `runtime-profile.json`, `authority-evidence/summary.json`
 
 ### Frontend runtime mismatch
 
@@ -61,5 +61,6 @@ For a launch candidate, keep the artifact bundle from `pnpm launch:candidate` or
 - runtime-profile output
 - launch-readiness output
 - deployed smoke JSON report
+- authority-evidence summary plus public audit/export proof for the staged resolved job
 
 If an incident is unowned, lacks rollback guidance, or lacks evidence requirements, treat it as a launch blocker.
