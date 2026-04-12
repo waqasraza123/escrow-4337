@@ -1,14 +1,14 @@
 'use client';
 
 import {
+  WalkthroughLauncherMenu,
+  WalkthroughOverlay,
   activateStoredWalkthroughState,
   completeStoredWalkthroughState,
   readStoredWalkthroughState,
   stopStoredWalkthroughState,
-  WalkthroughLauncherMenu,
-  WalkthroughOverlay,
   type StoredWalkthroughState,
-} from '@escrow4334/frontend-core';
+} from '@escrow4334/frontend-core/walkthrough';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 

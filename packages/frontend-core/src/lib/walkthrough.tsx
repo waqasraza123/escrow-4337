@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 
 export type StoredWalkthroughStatus = 'idle' | 'active' | 'stopped' | 'completed';

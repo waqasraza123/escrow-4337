@@ -4,55 +4,64 @@
 - 2026-04-12
 
 ## Current Objective
-- Validate the new launch walkthrough end to end in the real local browser journey and align the exact browser flow with the actual copied contractor invite link.
+- Fix the Next walkthrough import-boundary regression and harden API local startup with a high-signal port preflight.
 
 ## Last Completed Step
-- Added a new Playwright local journey for the walkthrough acceptance path, updated the exact browser flow to use the real copied invite link before contractor join, and granted clipboard permissions to exact local/deployed lanes.
+- Split `@escrow4334/frontend-core` into a server-safe root barrel plus a client-only `./walkthrough` subpath, updated walkthrough consumers in web/admin, and added API dev-port preflight plus clearer `EADDRINUSE` startup handling.
 
 ## Current Step
-- Walkthrough browser acceptance wiring is complete and route-level tests plus Playwright local-journey discovery are passing. Full local browser execution still needs the Docker-backed local Postgres stack.
+- Verification is focused on confirming the Next server-component error is gone and that occupied local API ports now fail fast with actionable guidance.
 
 ## Why This Step Exists
-- The walkthrough needed proof against the real cross-role browser flow, and the exact launch-candidate browser path needed to stop cheating around the contractor invite handoff.
+- The shared walkthrough code was accidentally exported through the root `frontend-core` barrel used by Next server layouts, and API local startup was failing late and noisily when `4100` was already occupied.
 
 ## Changed Files
-- `packages/frontend-core/src/{index.ts,lib/walkthrough.tsx}`
-- `apps/web/src/app/{web-console.tsx,launch-walkthrough.tsx,launch-walkthrough.spec.tsx,page.spec.tsx}`
-- `apps/web/src/app/app/help/launch-flow/page.tsx`
-- `apps/admin/src/app/{operator-console.tsx,operator-walkthrough.tsx,operator-walkthrough.spec.tsx,page.spec.tsx}`
-- `apps/admin/src/app/help/operator-case-flow/page.tsx`
-- `tests/e2e/flows/{launch-candidate-flow.ts,walkthrough.ts}`
-- `tests/e2e/specs/journeys/local/{launch-walkthrough-flow.spec.ts,local-profile-flow.spec.ts}`
-- `tests/e2e/specs/journeys/deployed/deployed-exact-launch-candidate-flow.spec.ts`
+- `packages/frontend-core/src/{index.ts,walkthrough.ts,lib/walkthrough.tsx,lib/shared.spec.ts}`
+- `packages/frontend-core/package.json`
+- `apps/web/src/app/launch-walkthrough.tsx`
+- `apps/admin/src/app/operator-walkthrough.tsx`
+- `services/api/scripts/dev-preflight.mjs`
+- `services/api/src/main.ts`
+- `services/api/package.json`
+- `services/api/README.md`
+- `readme.md`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
 
 ## Key Constraints
-- Do not touch or overwrite unrelated product changes already present in the dirty worktree, especially the broader marketplace-quality-layer edits.
-- Do not claim web repo-wide typecheck is green; the existing `apps/web/src/app/web-console.tsx` message-key typing drift still fails outside this walkthrough slice.
+- Do not touch or overwrite unrelated product changes already present in the dirty worktree.
+- Keep the root `@escrow4334/frontend-core` surface server-safe; all walkthrough imports must stay on the explicit client-only subpath.
+- Keep `4100` as the explicit default local API contract; do not auto-randomize local ports.
 
 ## Verification Commands
-- `pnpm --filter web exec vitest run src/app/page.spec.tsx src/app/launch-walkthrough.spec.tsx`
-- `pnpm --filter admin exec vitest run src/app/page.spec.tsx src/app/operator-walkthrough.spec.tsx`
+- `pnpm --filter @escrow4334/frontend-core test`
+- `pnpm --filter web exec vitest run src/app/launch-walkthrough.spec.tsx`
+- `pnpm --filter admin exec vitest run src/app/operator-walkthrough.spec.tsx`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
+- `NEST_API_PORT=4110 pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
+- `pnpm --filter admin build`
+- `pnpm --filter web build`
+- `pnpm --filter web typecheck`
 - `pnpm --filter admin typecheck`
-- `pnpm exec playwright test --project=local-journeys --list`
-- `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
 - `git diff --check`
 
 ## Verification Status
 - Passed:
-  - `pnpm --filter web exec vitest run src/app/page.spec.tsx src/app/launch-walkthrough.spec.tsx`
-  - `pnpm --filter admin exec vitest run src/app/page.spec.tsx src/app/operator-walkthrough.spec.tsx`
-  - `pnpm --filter admin typecheck`
-  - `pnpm exec playwright test --project=local-journeys --list`
-- Blocked:
-  - `pnpm --filter web exec tsc -p tsconfig.json --noEmit` due pre-existing `apps/web/src/app/web-console.tsx` i18n type errors unrelated to the walkthrough scaffolding
-- Not run:
-  - full local Playwright execution for the new walkthrough journey because this session did not bring up Docker/Postgres
+  - `pnpm --filter @escrow4334/frontend-core test`
+  - `pnpm --filter web exec vitest run src/app/launch-walkthrough.spec.tsx`
+  - `pnpm --filter admin exec vitest run src/app/operator-walkthrough.spec.tsx`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs` with `4100` occupied
+  - `NEST_API_PORT=4110 pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
+  - `pnpm --filter admin build`
   - `git diff --check`
+- Blocked:
+  - `pnpm --filter web build` due an unrelated existing marketplace CSS import error in `src/app/marketplace/{opportunities/[id]/opportunity-detail.tsx,profiles/[slug]/profile-detail.tsx}`
+  - `pnpm --filter web typecheck` and `pnpm --filter admin typecheck` due `.next/types` include drift unrelated to the walkthrough boundary split
 
 ## Expected Result
-- The walkthrough now has browser-level acceptance coverage around the real client, contractor, and operator launch path, and the exact browser flow uses the real invite-link handoff instead of a shortcut.
+- Next server layouts no longer pull hook-based walkthrough code through `@escrow4334/frontend-core`, walkthrough consumers compile from the explicit client-only subpath, and API local startup exits early with clear port-conflict guidance instead of a late Nest stack trace.
 
 ## Next Likely Step
-- Bring up Docker/Postgres and run the new local walkthrough journey for real, then mirror a narrower deployed exact acceptance pass so staged launch evidence also covers the walkthrough-owned invite and role handoff path.
+- Fix the unrelated marketplace CSS imports and the app `typecheck` `.next/types` drift so repo-wide web/admin verification is green again on top of this boundary and preflight hardening.

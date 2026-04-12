@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const port = readApiPort();
   const trustProxy = readTrustProxyValue(process.env.NEST_API_TRUST_PROXY);
 
   if (trustProxy !== undefined) {
@@ -22,7 +23,33 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(readApiPort());
+  try {
+    await app.listen(port);
+  } catch (error) {
+    await app.close().catch(() => undefined);
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'EADDRINUSE'
+    ) {
+      throw new Error(
+        `API startup failed: port ${port} is already in use. Stop the other process or override NEST_API_PORT (or PORT). If you change the API port locally, update NEXT_PUBLIC_API_PORT in apps/web and apps/admin to match.`,
+      );
+    }
+
+    throw error;
+  }
 }
 
-void bootstrap();
+void bootstrap().catch((error) => {
+  if (error instanceof Error && error.message.startsWith('API startup failed:')) {
+    console.error(error.message);
+    process.exit(1);
+    return;
+  }
+
+  console.error(error);
+  process.exit(1);
+});

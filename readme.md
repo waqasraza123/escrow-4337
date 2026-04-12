@@ -151,6 +151,8 @@ This repo is not using Supabase. The current persistence path is NestJS plus dir
 
 Docker is recommended for reproducibility, but it is not required. A native Postgres 16+ instance is also valid if `services/api/.env.local` points `DATABASE_URL` at it.
 
+The local API default remains `4100`. If that port is already occupied on your machine, choose another port deliberately with `NEST_API_PORT` and update `NEXT_PUBLIC_API_PORT` in `apps/web` and `apps/admin` to match. The API dev command now preflights the port and fails early with that guidance.
+
 Current example variables:
 
 ```bash

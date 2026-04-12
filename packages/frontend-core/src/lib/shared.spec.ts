@@ -21,6 +21,7 @@ import {
   resolveApiBaseUrl,
   toErrorMessage,
 } from '../index';
+import * as frontendCore from '../index';
 
 describe('frontend core helpers', () => {
   afterEach(() => {
@@ -252,5 +253,11 @@ describe('frontend core helpers', () => {
       trustProxyLabel: 'Unavailable',
       corsOriginsLabel: 'Unavailable',
     });
+  });
+
+  it('keeps the root export surface server-safe', () => {
+    expect('WalkthroughOverlay' in frontendCore).toBe(false);
+    expect('WalkthroughLauncherMenu' in frontendCore).toBe(false);
+    expect('readStoredWalkthroughState' in frontendCore).toBe(false);
   });
 });
