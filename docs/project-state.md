@@ -133,6 +133,7 @@
 - Non-test API startup should fail immediately on invalid deployment configuration, and backend deployment readiness should be evaluated through `pnpm --filter escrow4334-api deployment:validate` plus `pnpm --filter escrow4334-api db:migrate:status` rather than ad hoc manual checks.
 - API operational CLIs should run from compiled artifacts, and build output must include SQL migrations so deploy-time database operations do not depend on source files or `ts-node`.
 - Local development should remain zero-license-cost by default: direct Postgres, self-hosted locally through Docker Compose or an equivalent native Postgres install, with mock email, smart-account, and escrow providers allowed in development but not in production.
+- Postgres-backed runtime now supports optional `DATABASE_SCHEMA` search-path isolation, which the local chain-ingestion verifier uses when the local role cannot create disposable databases.
 - Shared frontend test support should stay minimal: generic browser render or storage helpers can live in `@escrow4334/frontend-core/testing`, while app-specific API and wallet mocks stay package-local to `apps/web` or `apps/admin`.
 - Browser-hosted frontend profiles should set `NEST_API_CORS_ORIGINS` explicitly instead of assuming same-origin hosting; local profiles should allow the web and admin app origins they actually run on.
 - Frontend product surfaces should use the public runtime-profile contract to distinguish local-mock versus deployment-like backend posture instead of inferring readiness from environment names or manual operator knowledge.
@@ -171,6 +172,7 @@
 - Full operator RBAC, richer export workflows beyond the public audit-derived artifacts, and non-arbitrator privileged workflows are not yet implemented; the current admin privileged path is limited to authenticated sessions that link the configured arbitrator wallet and call dispute resolution through the existing protected API.
 - Stale-job escalation beyond manual operator claims and provider-native retry execution or automated remediation beyond guidance plus status workflow are still pending.
 - Operations health now includes a replay-backed persisted-timeline reconciliation pass, a protected `job-history` import preview, manual job-scoped chain-audit sync, protected batch chain-audit backfill, finalized-log ingestion status, persisted chain projections, a compiled bounded batch runner, a deployment-owned recurring daemon command, webhook-capable daemon health alerting over the shared status snapshot, and explicit `chain_sync_backlog` coverage reporting from persisted per-job sync metadata.
+- Operations now also include a compiled local verification harness that spins a disposable Postgres database plus Anvil chain, deploys the real `WorkstreamEscrow` and `USDCMock` contracts, seeds a stale local job, runs finalized ingestion, and emits a JSON artifact proving authority reads switched to `chain_projection` without losing API-owned audit events.
 - Indexer, subgraph, shared UI package, and infra/deployment modules described in the README.
 
 ## Risks / Watchouts
@@ -211,6 +213,7 @@
 
 - `git status --short`
 - `pnpm verify:ci`
+- `pnpm verify:chain:local`
 - `pnpm launch:candidate`
 - `pnpm db:up`
 - `pnpm --filter escrow4334-api db:migrate:status`

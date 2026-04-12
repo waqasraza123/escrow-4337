@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS escrow_chain_events_escrow_idx
   ON escrow_chain_events (chain_id, contract_address, escrow_id, block_number, log_index);
 
 CREATE TABLE IF NOT EXISTS escrow_onchain_projections (
-  job_id TEXT PRIMARY KEY REFERENCES escrow_jobs(id) ON DELETE CASCADE,
+  job_id UUID PRIMARY KEY REFERENCES escrow_jobs(id) ON DELETE CASCADE,
   chain_id INTEGER NOT NULL,
   contract_address TEXT NOT NULL,
   escrow_id TEXT NOT NULL,

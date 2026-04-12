@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS marketplace_profiles (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   slug TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   headline TEXT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS marketplace_profiles (
 
 CREATE TABLE IF NOT EXISTS marketplace_opportunities (
   id TEXT PRIMARY KEY,
-  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   summary TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS marketplace_opportunities (
 CREATE TABLE IF NOT EXISTS marketplace_applications (
   id TEXT PRIMARY KEY,
   opportunity_id TEXT NOT NULL REFERENCES marketplace_opportunities(id) ON DELETE CASCADE,
-  applicant_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  applicant_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   cover_note TEXT NOT NULL,
   proposed_rate TEXT NULL,
   selected_wallet_address TEXT NOT NULL,

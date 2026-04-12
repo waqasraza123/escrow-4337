@@ -4,57 +4,49 @@
 - 2026-04-12
 
 ## Current Objective
-- Ship the next production-facing phase after backend chain ingestion: expose authority provenance and finalized-ingestion posture in the operator and client consoles, and lock it down with frontend and API coverage.
+- Ship the next production-grade phase after authority surfacing: a real local verification harness that proves finalized chain ingestion and authority reads against disposable Postgres plus Anvil infrastructure.
 
 ## Last Completed Step
-- Wired admin and web UI surfaces to the new backend authority metadata and ingestion posture, updated shared frontend fixtures and API types, and extended API audit integration assertions.
+- Shipped the local chain-ingestion verification phase end to end: root command, isolated Postgres plus Anvil proof runner, schema-aware Postgres isolation fallback, and fresh-install migration fixes uncovered by the verifier.
 
 ## Current Step
-- Task complete. Backend authority is now visible in the real app surfaces and covered by package-level tests.
+- Task complete. Verification passed and produced a real local authority artifact.
 
 ## Why This Step Exists
-- The backend ingestion work was production-useful only if operators and clients could see when reads came from chain projections versus local fallback, and whether finalized ingestion itself was healthy.
+- The authority model is materially more credible once the repo can prove it against a real contract deployment, real logs, real Postgres persistence, and the existing Nest read paths instead of only mocks and unit coverage.
 
 ## Changed Files
-- `apps/admin/src/app/operator-case.spec.ts`
-- `apps/admin/src/app/operator-console.tsx`
-- `apps/admin/src/app/page.spec.tsx`
-- `apps/admin/src/lib/api.ts`
-- `apps/admin/src/test/fixtures.ts`
-- `apps/web/src/app/page.spec.tsx`
-- `apps/web/src/app/web-console.tsx`
-- `apps/web/src/lib/api.ts`
-- `apps/web/src/test/fixtures.ts`
+- `package.json`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
-- `services/api/test/escrow.controller.integration.spec.ts`
+- `services/api/src/modules/operations/escrow-chain-sync-local-verification-runner.ts`
+- `services/api/src/persistence/persistence.config.ts`
+- `services/api/src/persistence/postgres/postgres-database.service.ts`
+- `services/api/src/persistence/postgres/migrations.ts`
+- `services/api/src/persistence/postgres/postgres.repositories.ts`
+- `services/api/src/persistence/postgres/migrations/010_marketplace.sql`
+- `services/api/src/persistence/postgres/migrations/012_escrow_chain_ingestion.sql`
+- `services/api/src/persistence/postgres/migrations/013_marketplace_user_uuid_alignment.sql`
+- `services/api/src/persistence/postgres/migrations/014_escrow_projection_job_uuid_alignment.sql`
 
 ## Key Constraints
-- Onchain authority remains scoped to escrow lifecycle facts only; invite state, notes, evidence URLs, and other off-chain workflow fields stay API-owned.
-- Admin reads still require an authenticated session that controls the configured arbitrator wallet before protected ingestion or health data is shown.
-- This phase surfaces existing backend capability; it does not widen the product into a broader indexing platform or change public API shapes.
+- Keep scope inside `services/api`; do not introduce a separate indexer service or widen the product model.
+- Do not touch unrelated dirty files in `apps/web`, `apps/admin`, `services/api/README.md`, or `services/api/package.json`.
+- The local verifier may use mock email, smart-account, and escrow execution providers, but finalized log ingestion must point at the real temporary Anvil deployment and persisted Postgres state.
 
 ## Verification Commands
-- `pnpm --filter escrow4334-api test -- --runInBand escrow.controller.integration.spec.ts`
-- `pnpm --filter admin exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter admin test src/app/page.spec.tsx`
-- `pnpm --filter web test src/app/page.spec.tsx`
-- `pnpm --filter admin test`
-- `pnpm --filter web test`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- `pnpm build`
+- `pnpm verify:chain:local`
 
 ## Verification Status
 - Passed:
-  - `pnpm --filter escrow4334-api test -- --runInBand escrow.controller.integration.spec.ts`
-  - `pnpm --filter admin exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter admin test src/app/page.spec.tsx`
-  - `pnpm --filter web test src/app/page.spec.tsx`
-  - `pnpm --filter admin test`
-  - `pnpm --filter web test`
+  - `pnpm --filter escrow4334-api exec -- tsc -p tsconfig.json --noEmit`
+  - `pnpm build`
+  - `pnpm verify:chain:local`
 
 ## Expected Result
-- Operators can inspect finalized ingestion health and authority provenance directly in the admin console, clients can see whether audit history is chain-projected or falling back locally, and both surfaces have truthful test coverage for those signals.
+- The repo now generates a JSON artifact showing a stale persisted escrow job being reconciled from real chain events into a healthy onchain projection, with public audit reads switching to `chain_projection` while retaining API-owned audit events.
 
 ## Next Likely Step
-- Validate the ingestion loop against a real Postgres-backed local chain environment, then enable and verify authority reads in staging with live operator workflows and export artifacts.
+- Run the same authority-read verification against staging with live operator auth and export artifacts, then capture rollout evidence before enabling authority reads in production.

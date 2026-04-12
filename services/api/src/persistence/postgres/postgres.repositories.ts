@@ -1718,7 +1718,9 @@ export class PostgresEscrowRepository implements EscrowRepository {
         cursor.lastFinalizedBlock === null
           ? null
           : String(cursor.lastFinalizedBlock),
-        cursor.lastScannedBlock === null ? null : String(cursor.lastScannedBlock),
+        cursor.lastScannedBlock === null
+          ? null
+          : String(cursor.lastScannedBlock),
         cursor.lastError,
         String(cursor.updatedAt),
       ],
@@ -1927,7 +1929,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             chain_audit_json,
             drift_summary_json
           FROM escrow_onchain_projections
-          WHERE ($1::text[] IS NULL OR job_id = ANY($1::text[]))
+          WHERE ($1::uuid[] IS NULL OR job_id = ANY($1::uuid[]))
           ORDER BY projected_at_ms DESC, job_id ASC
         `,
         [jobIds && jobIds.length > 0 ? jobIds : null],
@@ -1988,7 +1990,9 @@ export class PostgresEscrowRepository implements EscrowRepository {
         projection.lastProjectedBlock === null
           ? null
           : String(projection.lastProjectedBlock),
-        projection.lastEventBlock === null ? null : String(projection.lastEventBlock),
+        projection.lastEventBlock === null
+          ? null
+          : String(projection.lastEventBlock),
         projection.lastEventCount,
         projection.digest,
         projection.health,

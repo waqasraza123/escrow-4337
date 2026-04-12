@@ -2,6 +2,13 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import { PersistenceConfigService } from '../persistence.config';
 
+type SearchPathQueryable = {
+  query<T extends QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ): Promise<{ rows: T[] }>;
+};
+
 @Injectable()
 export class PostgresDatabaseService implements OnModuleDestroy {
   private pool: Pool | null = null;
@@ -25,12 +32,28 @@ export class PostgresDatabaseService implements OnModuleDestroy {
     return this.pool;
   }
 
+  private async applySearchPath(client: SearchPathQueryable) {
+    const schema = this.config.databaseSchema;
+    if (!schema) {
+      return;
+    }
+
+    await client.query(`SET search_path TO "${schema}", public`);
+  }
+
   async query<T extends QueryResultRow>(text: string, values: unknown[] = []) {
     const pool = this.getPool();
     if (!pool) {
       throw new Error('Postgres driver is not enabled');
     }
-    return pool.query<T>(text, values);
+
+    const client = await pool.connect();
+    try {
+      await this.applySearchPath(client);
+      return await client.query<T>(text, values);
+    } finally {
+      client.release();
+    }
   }
 
   async transaction<T>(handler: (client: PoolClient) => Promise<T>) {
@@ -42,6 +65,7 @@ export class PostgresDatabaseService implements OnModuleDestroy {
     const client = await pool.connect();
 
     try {
+      await this.applySearchPath(client);
       await client.query('BEGIN');
       const result = await handler(client);
       await client.query('COMMIT');
@@ -60,7 +84,14 @@ export class PostgresDatabaseService implements OnModuleDestroy {
       throw new Error('Postgres driver is not enabled');
     }
 
-    return pool.connect();
+    const client = await pool.connect();
+    try {
+      await this.applySearchPath(client);
+      return client;
+    } catch (error) {
+      client.release();
+      throw error;
+    }
   }
 
   async onModuleDestroy() {
