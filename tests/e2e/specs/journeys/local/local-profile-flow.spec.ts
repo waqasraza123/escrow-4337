@@ -40,6 +40,14 @@ test('local profile supports the full launch-candidate create, join, deliver, di
   const clientContext = await browser.newContext();
   const contractorContext = await browser.newContext();
   const operatorContext = await browser.newContext();
+  await Promise.all([
+    clientContext.grantPermissions(['clipboard-read', 'clipboard-write'], {
+      origin: webBaseUrl,
+    }),
+    contractorContext.grantPermissions(['clipboard-read', 'clipboard-write'], {
+      origin: webBaseUrl,
+    }),
+  ]);
   const clientPage = await clientContext.newPage();
   const contractorPage = await contractorContext.newPage();
   const operatorPage = await operatorContext.newPage();

@@ -4,16 +4,16 @@
 - 2026-04-12
 
 ## Current Objective
-- Add an auto-start first-time walkthrough plus readable manual help for the real launch-candidate client, contractor, and operator flow.
+- Validate the new launch walkthrough end to end in the real local browser journey and align the exact browser flow with the actual copied contractor invite link.
 
 ## Last Completed Step
-- Wired route-aware walkthrough overlays into the live web and admin consoles, added replay/manual triggers plus dedicated help routes, and covered the new behavior with targeted route tests.
+- Added a new Playwright local journey for the walkthrough acceptance path, updated the exact browser flow to use the real copied invite link before contractor join, and granted clipboard permissions to exact local/deployed lanes.
 
 ## Current Step
-- Walkthrough implementation is complete and targeted web/admin route tests are passing. Web repo-wide typecheck is still blocked by the pre-existing unrelated `apps/web/src/app/web-console.tsx` i18n typing drift.
+- Walkthrough browser acceptance wiring is complete and route-level tests plus Playwright local-journey discovery are passing. Full local browser execution still needs the Docker-backed local Postgres stack.
 
 ## Why This Step Exists
-- First-time users needed guided confidence through the real escrow launch flow: sign-in, wallet setup, job creation, funding, contractor join, delivery, dispute, and operator resolution.
+- The walkthrough needed proof against the real cross-role browser flow, and the exact launch-candidate browser path needed to stop cheating around the contractor invite handoff.
 
 ## Changed Files
 - `packages/frontend-core/src/{index.ts,lib/walkthrough.tsx}`
@@ -21,6 +21,9 @@
 - `apps/web/src/app/app/help/launch-flow/page.tsx`
 - `apps/admin/src/app/{operator-console.tsx,operator-walkthrough.tsx,operator-walkthrough.spec.tsx,page.spec.tsx}`
 - `apps/admin/src/app/help/operator-case-flow/page.tsx`
+- `tests/e2e/flows/{launch-candidate-flow.ts,walkthrough.ts}`
+- `tests/e2e/specs/journeys/local/{launch-walkthrough-flow.spec.ts,local-profile-flow.spec.ts}`
+- `tests/e2e/specs/journeys/deployed/deployed-exact-launch-candidate-flow.spec.ts`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
 
@@ -32,6 +35,7 @@
 - `pnpm --filter web exec vitest run src/app/page.spec.tsx src/app/launch-walkthrough.spec.tsx`
 - `pnpm --filter admin exec vitest run src/app/page.spec.tsx src/app/operator-walkthrough.spec.tsx`
 - `pnpm --filter admin typecheck`
+- `pnpm exec playwright test --project=local-journeys --list`
 - `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
 - `git diff --check`
 
@@ -40,13 +44,15 @@
   - `pnpm --filter web exec vitest run src/app/page.spec.tsx src/app/launch-walkthrough.spec.tsx`
   - `pnpm --filter admin exec vitest run src/app/page.spec.tsx src/app/operator-walkthrough.spec.tsx`
   - `pnpm --filter admin typecheck`
+  - `pnpm exec playwright test --project=local-journeys --list`
 - Blocked:
   - `pnpm --filter web exec tsc -p tsconfig.json --noEmit` due pre-existing `apps/web/src/app/web-console.tsx` i18n type errors unrelated to the walkthrough scaffolding
-- Not yet run:
+- Not run:
+  - full local Playwright execution for the new walkthrough journey because this session did not bring up Docker/Postgres
   - `git diff --check`
 
 ## Expected Result
-- First-time client, contractor, and operator users can either follow the auto-start walkthrough or open a manual help page to complete the real supported launch-candidate flow with clear next actions and obvious replay/stop controls.
+- The walkthrough now has browser-level acceptance coverage around the real client, contractor, and operator launch path, and the exact browser flow uses the real invite-link handoff instead of a shortcut.
 
 ## Next Likely Step
-- Add browser-level validation in the seeded local launch-candidate Playwright journey with the walkthrough enabled, so the coachmarks are exercised against the real client, contractor, and operator path in one end-to-end run.
+- Bring up Docker/Postgres and run the new local walkthrough journey for real, then mirror a narrower deployed exact acceptance pass so staged launch evidence also covers the walkthrough-owned invite and role handoff path.

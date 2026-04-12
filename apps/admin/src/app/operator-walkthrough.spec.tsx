@@ -78,7 +78,7 @@ describe('operator walkthrough', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Stop walkthrough' })).toBeInTheDocument();
-    expect(screen.getByText('Operator walkthrough • 1/5')).toBeInTheDocument();
+    expect(screen.getByText('Operator walkthrough • 1/4')).toBeInTheDocument();
   });
 
   it('arms the operator walkthrough from the manual page', async () => {

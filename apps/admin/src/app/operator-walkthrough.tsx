@@ -63,7 +63,7 @@ function buildOperatorStep(
       return {
         id: stepId,
         index: 1,
-        total: 5,
+        total: 4,
         title: 'Start on the operator case page',
         body: context.accessToken
           ? 'This is the operator case review for the disputed job.'
@@ -78,7 +78,7 @@ function buildOperatorStep(
       return {
         id: stepId,
         index: 2,
-        total: 5,
+        total: 4,
         title: 'Link the configured arbitrator wallet',
         body: 'Resolution stays blocked until this session controls the configured arbitrator wallet.',
         targetId: 'operator-session-panel',
@@ -95,8 +95,8 @@ function buildOperatorStep(
       }
       return {
         id: stepId,
-        index: 4,
-        total: 5,
+        index: 3,
+        total: 4,
         title: 'Review and resolve the disputed milestone',
         body: 'Review the disputed milestone and receipts, choose the outcome, explain it in the note, and submit the decision.',
         targetId: 'operator-resolution-panel',
@@ -108,8 +108,8 @@ function buildOperatorStep(
       }
       return {
         id: stepId,
-        index: 5,
-        total: 5,
+        index: 4,
+        total: 4,
         title: 'Resolution confirmed',
         body: 'The active dispute is gone from this case. The client can now verify the final resolved state from the contract page.',
         targetId: 'operator-case-brief',
@@ -120,7 +120,7 @@ function buildOperatorStep(
       return {
         id: stepId,
         index: 1,
-        total: 5,
+        total: 1,
         title: 'Open an operator case review',
         body: 'Load a case route with an active dispute so the operator walkthrough can guide the live resolution flow.',
         targetId: 'operator-case-lookup',

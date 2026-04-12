@@ -196,6 +196,25 @@ export async function fundSelectedJob(page: Page) {
   await expect(page.getByText('Funding confirmed')).toBeVisible();
 }
 
+export async function copyContractorJoinLink(page: Page) {
+  await page.getByRole('button', { name: 'Copy contractor link' }).click();
+  await expect(
+    page.getByText(
+      'Invite link copied. Share it with the contractor so they can sign in with the invited email and link the bound worker wallet.',
+    ),
+  ).toBeVisible();
+
+  const clipboardText = await page.evaluate(async () => {
+    return window.navigator.clipboard.readText();
+  });
+
+  if (!clipboardText || !clipboardText.includes('/app/contracts/')) {
+    throw new Error('Expected copied contractor join link in browser clipboard.');
+  }
+
+  return clipboardText;
+}
+
 export async function deliverSelectedMilestone(input: {
   page: Page;
   note: string;
@@ -298,10 +317,11 @@ export async function runAuthenticatedLaunchCandidateFlow(input: {
 
   await clientPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
   await expect(clientPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
-  await fundSelectedJob(clientPage);
   await commitSelectedJobMilestones(clientPage);
+  await fundSelectedJob(clientPage);
+  const contractorJoinUrl = await copyContractorJoinLink(clientPage);
 
-  await contractorPage.goto(`${webBaseUrl}/app/contracts/${jobId}`);
+  await contractorPage.goto(contractorJoinUrl);
   await expect(contractorPage.getByRole('heading', { name: flow.jobTitle })).toBeVisible();
   await expect(contractorPage.getByText(flow.contractor.email)).toBeVisible();
   await expect(contractorPage.getByText('Console state is current.')).toBeVisible();

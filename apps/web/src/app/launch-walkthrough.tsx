@@ -314,7 +314,7 @@ function buildContractorStep(
         return {
           id: stepId,
           index: 1,
-          total: 5,
+          total: 6,
           title: 'Start from the invite-linked contract',
           body: 'This confirms you are on the right contract. Sign in with the invited email first, then reopen this invite link.',
           targetId: 'contractor-join-access',
@@ -330,7 +330,7 @@ function buildContractorStep(
         return {
           id: stepId,
           index: 2,
-          total: 5,
+          total: 6,
           title: 'Wait for join readiness',
           body: 'You’re ready when this card stops showing blockers and the Join button becomes available.',
           targetId: 'contractor-join-access',
@@ -341,7 +341,7 @@ function buildContractorStep(
       return {
         id: stepId,
         index: 3,
-        total: 5,
+        total: 6,
         title: 'Join the contract',
         body: 'Joining binds this session to the invited contractor identity.',
         targetId: 'contractor-join-access',
@@ -353,8 +353,8 @@ function buildContractorStep(
       }
       return {
         id: stepId,
-        index: 4,
-        total: 5,
+        index: 5,
+        total: 6,
         title: 'Move into delivery',
         body: 'Worker delivery is now enabled for this session. Open the delivery route next.',
         targetId: 'worker-workspace-panel',
@@ -374,8 +374,8 @@ function buildContractorStep(
       }
       return {
         id: stepId,
-        index: 5,
-        total: 5,
+        index: 6,
+        total: 6,
         title: 'Submit delivery clearly',
         body: 'Submit a clear delivery note and evidence so the client can review confidently.',
         targetId: 'delivery-card',
@@ -387,8 +387,8 @@ function buildContractorStep(
       }
       return {
         id: stepId,
-        index: 5,
-        total: 5,
+        index: 6,
+        total: 6,
         title: 'Delivery submitted',
         body: 'Your first contractor actions are complete. The client can now review or dispute this milestone.',
         targetId: 'delivery-card',
@@ -402,7 +402,7 @@ function buildContractorStep(
       return {
         id: stepId,
         index: 2,
-        total: 5,
+        total: 6,
         title: 'Return to the invite-linked contract',
         body: 'Your session is ready. Reopen the invite-linked contract so the join flow can continue.',
         targetId: 'access-panel',
@@ -413,6 +413,23 @@ function buildContractorStep(
           }
           router.push(contractorState.lastRoute);
         },
+        stopHint: 'You can restart it anytime from Walkthrough or Help.',
+      };
+    case 'contractor-join-ready':
+      if (context.view !== 'contract' || context.contractorJoined) {
+        return null;
+      }
+      return {
+        id: stepId,
+        index: context.canJoinSelectedContract ? 4 : 3,
+        total: 6,
+        title: context.canJoinSelectedContract
+          ? 'Join the contract'
+          : 'Wait for join readiness',
+        body: context.canJoinSelectedContract
+          ? 'Joining binds this session to the invited contractor identity.'
+          : 'You’re ready when this card stops showing blockers and the Join button becomes available.',
+        targetId: 'contractor-join-access',
         stopHint: 'You can restart it anytime from Walkthrough or Help.',
       };
     default:
@@ -481,6 +498,7 @@ export function useEscrowLaunchWalkthrough(props: EscrowWalkthroughProps) {
     () => [
       'contractor-entry',
       'contractor-return-to-contract',
+      'contractor-join-ready',
       'contractor-open-deliver',
       'contractor-deliver',
       'contractor-finish',
@@ -664,6 +682,20 @@ export function useEscrowLaunchWalkthrough(props: EscrowWalkthroughProps) {
 
     if (
       stepId === 'contractor-return-to-contract' &&
+      props.view === 'contract' &&
+      !props.contractorJoined
+    ) {
+      setContractorState(
+        activateStoredWalkthroughState(contractorWalkthroughStorageKey, {
+          lastStep: 'contractor-join-ready',
+          lastRoute: currentRoute,
+        }),
+      );
+      return;
+    }
+
+    if (
+      stepId === 'contractor-join-ready' &&
       props.view === 'contract' &&
       props.contractorJoined
     ) {
@@ -862,6 +894,7 @@ export function useEscrowLaunchWalkthrough(props: EscrowWalkthroughProps) {
             onSelect: () => {
               setClientState(startClientWalkthrough(currentRoute));
               setNotice(null);
+              router.push('/app/sign-in');
             },
           },
           {
