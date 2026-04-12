@@ -12,6 +12,9 @@ import type {
   EscrowRepository,
   MarketplaceRepository,
 } from '../../persistence/persistence.types';
+import type {
+  EscrowMilestoneRecord,
+} from '../escrow/escrow.types';
 import { EscrowActorService } from '../escrow/escrow-actor.service';
 import { EscrowService } from '../escrow/escrow.service';
 import { UsersService } from '../users/users.service';
@@ -21,18 +24,26 @@ import type {
   CreateMarketplaceOpportunityDto,
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
-  UpdateModerationDto,
   UpdateMarketplaceOpportunityDto,
+  UpdateMarketplaceProofsDto,
+  UpdateMarketplaceScreeningDto,
+  UpdateModerationDto,
   UpsertMarketplaceProfileDto,
 } from './marketplace.dto';
 import type {
-  ApplicationStatus,
   EscrowReadinessStatus,
   HireApplicationResponse,
+  MarketplaceApplicationDossier,
+  MarketplaceApplicationDossierResponse,
   MarketplaceApplicationRecord,
   MarketplaceApplicationView,
   MarketplaceApplicationsListResponse,
   MarketplaceClientSummary,
+  MarketplaceCryptoReadiness,
+  MarketplaceEscrowStats,
+  MarketplaceFitBreakdownEntry,
+  MarketplaceMatchesResponse,
+  MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
   MarketplaceOpportunityDetailView,
   MarketplaceOpportunityRecord,
@@ -43,7 +54,11 @@ import type {
   MarketplaceProfileResponse,
   MarketplaceProfilesListResponse,
   MarketplaceProfileView,
+  MarketplaceScreeningAnswer,
+  MarketplaceScreeningQuestion,
+  MarketplaceTalentProofArtifact,
   MarketplaceTalentSummary,
+  MarketplaceVerificationLevel,
   ModerationStatus,
 } from './marketplace.types';
 
@@ -55,6 +70,38 @@ function normalizeTextArray(values: string[]) {
         .filter(Boolean),
     ),
   );
+}
+
+function normalizeProofArtifacts(
+  values: Array<
+    MarketplaceTalentProofArtifact | (Omit<MarketplaceTalentProofArtifact, 'jobId'> & {
+      jobId?: string | null;
+    })
+  >,
+): MarketplaceTalentProofArtifact[] {
+  return values.map((artifact) => ({
+    ...artifact,
+    id: artifact.id.trim(),
+    label: artifact.label.trim(),
+    url: artifact.url.trim(),
+    jobId: artifact.jobId?.trim() || null,
+  }));
+}
+
+function normalizeScreeningQuestions(values: MarketplaceScreeningQuestion[]) {
+  return values.map((question) => ({
+    ...question,
+    id: question.id.trim(),
+    prompt: question.prompt.trim(),
+  }));
+}
+
+function normalizeScreeningAnswers(values: MarketplaceScreeningAnswer[]) {
+  return values.map((answer) => ({
+    ...answer,
+    questionId: answer.questionId.trim(),
+    answer: answer.answer.trim(),
+  }));
 }
 
 function containsQuery(haystack: string, query?: string) {
@@ -73,6 +120,46 @@ function compareModerationStatus(left: ModerationStatus, right: ModerationStatus
   } as const;
 
   return order[left] - order[right];
+}
+
+function roundPercent(numerator: number, denominator: number) {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Math.round((numerator / denominator) * 100);
+}
+
+function pickAverageContractValueBand(values: number[]) {
+  if (values.length === 0) {
+    return 'unknown' as const;
+  }
+
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  if (average < 1000) {
+    return 'small' as const;
+  }
+  if (average < 5000) {
+    return 'medium' as const;
+  }
+  return 'large' as const;
+}
+
+function toNumberAmount(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function milestoneDeliveredOnTime(milestone: EscrowMilestoneRecord) {
+  if (!milestone.dueAt || !milestone.deliveredAt) {
+    return null;
+  }
+
+  return milestone.deliveredAt <= milestone.dueAt;
 }
 
 @Injectable()
@@ -99,9 +186,7 @@ export class MarketplaceService {
     dto: UpsertMarketplaceProfileDto,
   ): Promise<MarketplaceProfileResponse> {
     const now = Date.now();
-    const existingBySlug = await this.marketplaceRepository.getProfileBySlug(
-      dto.slug,
-    );
+    const existingBySlug = await this.marketplaceRepository.getProfileBySlug(dto.slug);
 
     if (existingBySlug && existingBySlug.userId !== userId) {
       throw new ConflictException('Marketplace slug is already in use');
@@ -115,11 +200,15 @@ export class MarketplaceService {
       headline: dto.headline,
       bio: dto.bio,
       skills: normalizeTextArray(dto.skills),
+      specialties: normalizeTextArray(dto.specialties),
+      portfolioUrls: normalizeTextArray(dto.portfolioUrls),
       rateMin: dto.rateMin ?? null,
       rateMax: dto.rateMax ?? null,
       timezone: dto.timezone,
       availability: dto.availability,
-      portfolioUrls: normalizeTextArray(dto.portfolioUrls),
+      preferredEngagements: Array.from(new Set(dto.preferredEngagements)),
+      proofArtifacts: existing?.proofArtifacts ?? [],
+      cryptoReadiness: dto.cryptoReadiness,
       moderationStatus: existing?.moderationStatus ?? 'visible',
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -133,8 +222,41 @@ export class MarketplaceService {
       throw new BadRequestException('Profile minimum rate cannot exceed maximum rate');
     }
 
+    const nextPortfolioArtifacts = normalizeProofArtifacts(
+      dto.portfolioUrls.map((url, index) => ({
+        id: `portfolio-${index + 1}`,
+        label: `Portfolio ${index + 1}`,
+        url,
+        kind: 'portfolio',
+        jobId: null,
+      })),
+    );
+    const nonPortfolioProofs = existing?.proofArtifacts.filter(
+      (artifact) => artifact.kind !== 'portfolio',
+    ) ?? [];
+    profile.proofArtifacts = [...nextPortfolioArtifacts, ...nonPortfolioProofs];
+
     await this.marketplaceRepository.saveProfile(profile);
 
+    return {
+      profile: await this.toProfileView(profile),
+    };
+  }
+
+  async updateProfileProofs(
+    userId: string,
+    dto: UpdateMarketplaceProofsDto,
+  ): Promise<MarketplaceProfileResponse> {
+    const profile = await this.requireProfileByUserId(userId);
+    const portfolioProofs = profile.proofArtifacts.filter(
+      (artifact) => artifact.kind === 'portfolio',
+    );
+    profile.proofArtifacts = [
+      ...portfolioProofs,
+      ...normalizeProofArtifacts(dto.proofArtifacts.filter((artifact) => artifact.kind !== 'portfolio')),
+    ];
+    profile.updatedAt = Date.now();
+    await this.marketplaceRepository.saveProfile(profile);
     return {
       profile: await this.toProfileView(profile),
     };
@@ -157,19 +279,15 @@ export class MarketplaceService {
     );
 
     const filtered = rankedProfiles
-      .filter(({ profile, view }) => {
-        if (
-          query.availability &&
-          profile.availability !== query.availability
-        ) {
+      .filter(({ profile }) => {
+        if (query.availability && profile.availability !== query.availability) {
           return false;
         }
 
         if (
           query.skill &&
-          !profile.skills.some(
-            (skill) =>
-              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
+          ![...profile.skills, ...profile.specialties].some(
+            (skill) => skill.toLowerCase() === query.skill?.trim().toLowerCase(),
           )
         ) {
           return false;
@@ -180,18 +298,24 @@ export class MarketplaceService {
           profile.headline,
           profile.bio,
           ...profile.skills,
+          ...profile.specialties,
         ].join(' ');
 
         return containsQuery(searchable, query.q);
       })
       .sort((left, right) => {
+        if (
+          right.view.escrowStats.completionCount !== left.view.escrowStats.completionCount
+        ) {
+          return (
+            right.view.escrowStats.completionCount -
+            left.view.escrowStats.completionCount
+          );
+        }
         if (right.view.completedEscrowCount !== left.view.completedEscrowCount) {
           return right.view.completedEscrowCount - left.view.completedEscrowCount;
         }
-        if (right.profile.updatedAt !== left.profile.updatedAt) {
-          return right.profile.updatedAt - left.profile.updatedAt;
-        }
-        return left.profile.slug.localeCompare(right.profile.slug);
+        return right.profile.updatedAt - left.profile.updatedAt;
       })
       .slice(0, query.limit)
       .map(({ view }) => view);
@@ -235,11 +359,19 @@ export class MarketplaceService {
       category: dto.category.trim().toLowerCase(),
       currencyAddress: dto.currencyAddress,
       requiredSkills: normalizeTextArray(dto.requiredSkills),
+      mustHaveSkills: normalizeTextArray(dto.mustHaveSkills),
+      outcomes: normalizeTextArray(dto.outcomes),
+      acceptanceCriteria: normalizeTextArray(dto.acceptanceCriteria),
+      screeningQuestions: normalizeScreeningQuestions(dto.screeningQuestions),
       visibility: dto.visibility,
       status: 'draft',
       budgetMin: dto.budgetMin ?? null,
       budgetMax: dto.budgetMax ?? null,
       timeline: dto.timeline,
+      desiredStartAt: dto.desiredStartAt ?? null,
+      timezoneOverlapHours: dto.timezoneOverlapHours ?? null,
+      engagementType: dto.engagementType,
+      cryptoReadinessRequired: dto.cryptoReadinessRequired,
       moderationStatus: 'visible',
       publishedAt: null,
       hiredApplicationId: null,
@@ -277,12 +409,33 @@ export class MarketplaceService {
       requiredSkills: dto.requiredSkills
         ? normalizeTextArray(dto.requiredSkills)
         : opportunity.requiredSkills,
+      mustHaveSkills: dto.mustHaveSkills
+        ? normalizeTextArray(dto.mustHaveSkills)
+        : opportunity.mustHaveSkills,
+      outcomes: dto.outcomes ? normalizeTextArray(dto.outcomes) : opportunity.outcomes,
+      acceptanceCriteria: dto.acceptanceCriteria
+        ? normalizeTextArray(dto.acceptanceCriteria)
+        : opportunity.acceptanceCriteria,
+      screeningQuestions: dto.screeningQuestions
+        ? normalizeScreeningQuestions(dto.screeningQuestions)
+        : opportunity.screeningQuestions,
       visibility: dto.visibility ?? opportunity.visibility,
       budgetMin:
         dto.budgetMin !== undefined ? dto.budgetMin ?? null : opportunity.budgetMin,
       budgetMax:
         dto.budgetMax !== undefined ? dto.budgetMax ?? null : opportunity.budgetMax,
       timeline: dto.timeline ?? opportunity.timeline,
+      desiredStartAt:
+        dto.desiredStartAt !== undefined
+          ? dto.desiredStartAt ?? null
+          : opportunity.desiredStartAt,
+      timezoneOverlapHours:
+        dto.timezoneOverlapHours !== undefined
+          ? dto.timezoneOverlapHours ?? null
+          : opportunity.timezoneOverlapHours,
+      engagementType: dto.engagementType ?? opportunity.engagementType,
+      cryptoReadinessRequired:
+        dto.cryptoReadinessRequired ?? opportunity.cryptoReadinessRequired,
       updatedAt: Date.now(),
     };
 
@@ -291,6 +444,35 @@ export class MarketplaceService {
 
     return {
       opportunity: await this.toOpportunityView(next),
+    };
+  }
+
+  async updateOpportunityScreening(
+    userId: string,
+    opportunityId: string,
+    dto: UpdateMarketplaceScreeningDto,
+  ): Promise<MarketplaceOpportunityResponse> {
+    const opportunity = await this.requireOpportunity(opportunityId);
+    this.assertOpportunityOwner(userId, opportunity);
+    opportunity.outcomes = normalizeTextArray(dto.outcomes);
+    opportunity.acceptanceCriteria = normalizeTextArray(dto.acceptanceCriteria);
+    opportunity.mustHaveSkills = normalizeTextArray(dto.mustHaveSkills);
+    opportunity.screeningQuestions = normalizeScreeningQuestions(
+      dto.screeningQuestions,
+    );
+    opportunity.desiredStartAt =
+      dto.desiredStartAt !== undefined ? dto.desiredStartAt ?? null : opportunity.desiredStartAt;
+    opportunity.timezoneOverlapHours =
+      dto.timezoneOverlapHours !== undefined
+        ? dto.timezoneOverlapHours ?? null
+        : opportunity.timezoneOverlapHours;
+    opportunity.engagementType = dto.engagementType ?? opportunity.engagementType;
+    opportunity.cryptoReadinessRequired =
+      dto.cryptoReadinessRequired ?? opportunity.cryptoReadinessRequired;
+    opportunity.updatedAt = Date.now();
+    await this.marketplaceRepository.saveOpportunity(opportunity);
+    return {
+      opportunity: await this.toOpportunityView(opportunity),
     };
   }
 
@@ -379,9 +561,8 @@ export class MarketplaceService {
 
         if (
           query.skill &&
-          !opportunity.requiredSkills.some(
-            (skill) =>
-              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
+          ![...opportunity.requiredSkills, ...opportunity.mustHaveSkills].some(
+            (skill) => skill.toLowerCase() === query.skill?.trim().toLowerCase(),
           )
         ) {
           return false;
@@ -393,6 +574,8 @@ export class MarketplaceService {
           opportunity.description,
           opportunity.category,
           ...opportunity.requiredSkills,
+          ...opportunity.mustHaveSkills,
+          ...opportunity.outcomes,
         ].join(' ');
 
         return containsQuery(searchable, query.q);
@@ -447,6 +630,44 @@ export class MarketplaceService {
     };
   }
 
+  async getOpportunityMatches(
+    userId: string,
+    opportunityId: string,
+  ): Promise<MarketplaceMatchesResponse> {
+    const opportunity = await this.requireOpportunity(opportunityId);
+    this.assertOpportunityOwner(userId, opportunity);
+    const applications = (await this.marketplaceRepository.listApplications()).filter(
+      (application) => application.opportunityId === opportunityId,
+    );
+    const dossiers = await Promise.all(
+      applications.map((application) => this.buildApplicationDossier(application)),
+    );
+    return {
+      matches: dossiers.sort(
+        (left, right) =>
+          right.matchSummary.fitScore - left.matchSummary.fitScore ||
+          left.applicationId.localeCompare(right.applicationId),
+      ),
+    };
+  }
+
+  async getApplicationDossier(
+    userId: string,
+    applicationId: string,
+  ): Promise<MarketplaceApplicationDossierResponse> {
+    const application = await this.requireApplication(applicationId);
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    if (
+      application.applicantUserId !== userId &&
+      opportunity.ownerUserId !== userId
+    ) {
+      throw new ForbiddenException('You do not have access to this application dossier');
+    }
+    return {
+      dossier: await this.buildApplicationDossier(application),
+    };
+  }
+
   async applyToOpportunity(
     userId: string,
     opportunityId: string,
@@ -477,9 +698,15 @@ export class MarketplaceService {
       applicant,
       dto.selectedWalletAddress,
     );
-    if (!selectedWallet || !isEoaWallet(selectedWallet) || selectedWallet.verificationMethod !== 'siwe') {
+    if (
+      !selectedWallet ||
+      !isEoaWallet(selectedWallet) ||
+      selectedWallet.verificationMethod !== 'siwe'
+    ) {
       throw new ForbiddenException('Applications require a linked SIWE-verified wallet');
     }
+
+    this.validateScreeningAnswers(opportunity.screeningQuestions, dto.screeningAnswers);
 
     const applications = await this.marketplaceRepository.listApplications();
     const existing = applications.find(
@@ -504,10 +731,17 @@ export class MarketplaceService {
       coverNote: dto.coverNote,
       proposedRate: dto.proposedRate ?? null,
       selectedWalletAddress: selectedWallet.address,
+      screeningAnswers: normalizeScreeningAnswers(dto.screeningAnswers),
+      deliveryApproach: dto.deliveryApproach,
+      milestonePlanSummary: dto.milestonePlanSummary,
+      estimatedStartAt: dto.estimatedStartAt ?? null,
+      relevantProofArtifacts: normalizeProofArtifacts(dto.relevantProofArtifacts),
       portfolioUrls:
         dto.portfolioUrls.length > 0
           ? normalizeTextArray(dto.portfolioUrls)
-          : profile.portfolioUrls,
+          : profile.proofArtifacts
+              .filter((artifact) => artifact.kind === 'portfolio')
+              .map((artifact) => artifact.url),
       status: 'submitted',
       hiredJobId: null,
       createdAt: existing?.createdAt ?? now,
@@ -602,6 +836,13 @@ export class MarketplaceService {
     this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
+    const dossier = await this.buildApplicationDossier(application);
+    if (dossier.matchSummary.missingRequirements.length > 0) {
+      throw new ConflictException(
+        'This application still has unmet required hiring criteria',
+      );
+    }
+
     const applicantUser = await this.usersService.getRequiredById(
       application.applicantUserId,
     );
@@ -610,7 +851,11 @@ export class MarketplaceService {
       applicantUser,
       application.selectedWalletAddress,
     );
-    if (!selectedWallet || !isEoaWallet(selectedWallet) || selectedWallet.verificationMethod !== 'siwe') {
+    if (
+      !selectedWallet ||
+      !isEoaWallet(selectedWallet) ||
+      selectedWallet.verificationMethod !== 'siwe'
+    ) {
       throw new ConflictException(
         'The hired application no longer has a valid SIWE-verified wallet',
       );
@@ -628,6 +873,21 @@ export class MarketplaceService {
           opportunityId: opportunity.id,
           applicationId: application.id,
           visibility: opportunity.visibility,
+          fitScore: dossier.matchSummary.fitScore,
+          riskFlags: dossier.matchSummary.riskFlags,
+        },
+        hiringSpec: {
+          outcomes: opportunity.outcomes,
+          acceptanceCriteria: opportunity.acceptanceCriteria,
+          mustHaveSkills: opportunity.mustHaveSkills,
+          engagementType: opportunity.engagementType,
+          cryptoReadinessRequired: opportunity.cryptoReadinessRequired,
+        },
+        proposal: {
+          screeningAnswers: application.screeningAnswers,
+          deliveryApproach: application.deliveryApproach,
+          milestonePlanSummary: application.milestonePlanSummary,
+          estimatedStartAt: application.estimatedStartAt,
         },
         budgetMin: opportunity.budgetMin,
         budgetMax: opportunity.budgetMax,
@@ -865,11 +1125,17 @@ export class MarketplaceService {
     profile: MarketplaceProfileRecord,
   ): Promise<MarketplaceProfileView> {
     const user = await this.usersService.getRequiredById(profile.userId);
-    const completedEscrowCount = await this.countCompletedWorkerEscrows(user);
+    const escrowStats = await this.getEscrowStats(user);
+    const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
     return {
       ...profile,
-      verifiedWalletAddress: this.getVerifiedWalletAddress(user),
-      completedEscrowCount,
+      verifiedWalletAddress,
+      verificationLevel: this.computeVerificationLevel(
+        verifiedWalletAddress,
+        escrowStats,
+      ),
+      escrowStats,
+      completedEscrowCount: escrowStats.completionCount,
       isComplete: this.isProfileComplete(profile),
     };
   }
@@ -905,13 +1171,21 @@ export class MarketplaceService {
       );
 
     if (viewerUserId && viewerUserId === opportunity.ownerUserId) {
+      const sortedApplications = await Promise.all(
+        applications.map(async (application) => ({
+          application,
+          view: await this.toApplicationView(application),
+        })),
+      );
       return {
         ...base,
-        applications: await Promise.all(
-          applications
-            .sort((left, right) => right.updatedAt - left.updatedAt)
-            .map((application) => this.toApplicationView(application)),
-        ),
+        applications: sortedApplications
+          .sort(
+            (left, right) =>
+              right.view.fitScore - left.view.fitScore ||
+              right.application.updatedAt - left.application.updatedAt,
+          )
+          .map(({ view }) => view),
       };
     }
 
@@ -926,10 +1200,16 @@ export class MarketplaceService {
     );
     const opportunity = await this.requireOpportunity(application.opportunityId);
     const owner = await this.usersService.getRequiredById(opportunity.ownerUserId);
+    const applicantSummary = await this.toTalentSummary(applicantUser);
+    const dossier = await this.buildApplicationDossier(
+      application,
+      opportunity,
+      applicantSummary,
+    );
 
     return {
       ...application,
-      applicant: await this.toTalentSummary(applicantUser),
+      applicant: applicantSummary,
       opportunity: {
         id: opportunity.id,
         title: opportunity.title,
@@ -941,6 +1221,10 @@ export class MarketplaceService {
           owner.email.split('@')[0] ??
           owner.id,
       },
+      fitScore: dossier.matchSummary.fitScore,
+      fitBreakdown: dossier.matchSummary.fitBreakdown,
+      riskFlags: dossier.matchSummary.riskFlags,
+      dossier,
     };
   }
 
@@ -956,15 +1240,317 @@ export class MarketplaceService {
 
   private async toTalentSummary(user: UserRecord): Promise<MarketplaceTalentSummary> {
     const profile = await this.marketplaceRepository.getProfileByUserId(user.id);
+    const escrowStats = await this.getEscrowStats(user);
+    const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
 
     return {
       userId: user.id,
       displayName: profile?.displayName ?? user.email.split('@')[0] ?? user.id,
       profileSlug: profile?.slug ?? null,
       headline: profile?.headline ?? 'Marketplace applicant',
-      verifiedWalletAddress: this.getVerifiedWalletAddress(user),
-      completedEscrowCount: await this.countCompletedWorkerEscrows(user),
+      specialties: profile?.specialties ?? [],
+      verifiedWalletAddress,
+      verificationLevel: this.computeVerificationLevel(verifiedWalletAddress, escrowStats),
+      cryptoReadiness: profile?.cryptoReadiness ?? this.deriveCryptoReadiness(user),
+      escrowStats,
+      completedEscrowCount: escrowStats.completionCount,
     };
+  }
+
+  private async buildApplicationDossier(
+    application: MarketplaceApplicationRecord,
+    opportunityOverride?: MarketplaceOpportunityRecord,
+    applicantSummaryOverride?: MarketplaceTalentSummary,
+  ): Promise<MarketplaceApplicationDossier> {
+    const opportunity =
+      opportunityOverride ?? (await this.requireOpportunity(application.opportunityId));
+    const applicantUser = await this.usersService.getRequiredById(
+      application.applicantUserId,
+    );
+    const applicantSummary =
+      applicantSummaryOverride ?? (await this.toTalentSummary(applicantUser));
+    const screeningMap = new Map(
+      application.screeningAnswers.map((answer) => [answer.questionId, answer.answer]),
+    );
+    const applicantSkills = await this.getApplicantSkills(application.applicantUserId);
+    const normalizedApplicantSkills = applicantSkills.map((skill) => skill.toLowerCase());
+    const normalizedRequiredSkills = opportunity.requiredSkills.map((skill) =>
+      skill.toLowerCase(),
+    );
+    const normalizedMustHaveSkills = opportunity.mustHaveSkills.map((skill) =>
+      skill.toLowerCase(),
+    );
+    const overlap = opportunity.requiredSkills.filter((skill) =>
+      normalizedApplicantSkills.includes(skill.toLowerCase()),
+    );
+    const mustHaveSkillGaps = opportunity.mustHaveSkills.filter(
+      (skill) => !normalizedApplicantSkills.includes(skill.toLowerCase()),
+    );
+    const answeredRequiredCount = opportunity.screeningQuestions.filter(
+      (question) => !question.required || screeningMap.get(question.id),
+    ).length;
+    const totalQuestions = opportunity.screeningQuestions.length;
+    const requiredMissingQuestions = opportunity.screeningQuestions
+      .filter((question) => question.required && !screeningMap.get(question.id))
+      .map((question) => `Missing answer: ${question.prompt}`);
+    const categoryExperience = applicantSummary.escrowStats.completedByCategory.find(
+      (entry) => entry.category === opportunity.category,
+    )?.count ?? 0;
+    const readinessGap =
+      this.cryptoReadinessRank(applicantSummary.cryptoReadiness) <
+      this.cryptoReadinessRank(opportunity.cryptoReadinessRequired);
+
+    const fitBreakdown: MarketplaceFitBreakdownEntry[] = [
+      {
+        factor: 'must_have_skills',
+        score: roundPercent(
+          normalizedMustHaveSkills.length - mustHaveSkillGaps.length,
+          normalizedMustHaveSkills.length || 1,
+        ),
+        weight: 30,
+        summary:
+          mustHaveSkillGaps.length === 0
+            ? 'Applicant covers every must-have skill.'
+            : `Missing must-have skills: ${mustHaveSkillGaps.join(', ')}`,
+      },
+      {
+        factor: 'category_overlap',
+        score: categoryExperience > 0 ? Math.min(100, categoryExperience * 25) : 25,
+        weight: 15,
+        summary:
+          categoryExperience > 0
+            ? `${categoryExperience} completed escrow jobs in ${opportunity.category}.`
+            : `No prior escrow history in ${opportunity.category}.`,
+      },
+      {
+        factor: 'escrow_track_record',
+        score:
+          Math.max(
+            0,
+            applicantSummary.escrowStats.completionRate -
+              applicantSummary.escrowStats.disputeRate,
+          ),
+        weight: 25,
+        summary: `${applicantSummary.escrowStats.completionCount} completed, ${applicantSummary.escrowStats.disputeRate}% dispute rate, ${applicantSummary.escrowStats.onTimeDeliveryRate}% on-time delivery.`,
+      },
+      {
+        factor: 'screening_quality',
+        score: roundPercent(answeredRequiredCount, totalQuestions || 1),
+        weight: 15,
+        summary:
+          totalQuestions === 0
+            ? 'No screening questions required.'
+            : `${answeredRequiredCount}/${totalQuestions} screening requirements covered.`,
+      },
+      {
+        factor: 'crypto_readiness',
+        score: readinessGap ? 20 : 100,
+        weight: 10,
+        summary: readinessGap
+          ? `${applicantSummary.cryptoReadiness} does not meet required ${opportunity.cryptoReadinessRequired}.`
+          : `${applicantSummary.cryptoReadiness} meets required ${opportunity.cryptoReadinessRequired}.`,
+      },
+      {
+        factor: 'proposal_quality',
+        score:
+          application.deliveryApproach.length > 40 &&
+          application.milestonePlanSummary.length > 40
+            ? 100
+            : 60,
+        weight: 5,
+        summary: 'Delivery approach and milestone summary are present.',
+      },
+    ];
+
+    const fitScore = Math.round(
+      fitBreakdown.reduce(
+        (sum, entry) => sum + (entry.score * entry.weight) / 100,
+        0,
+      ),
+    );
+    const missingRequirements = [...requiredMissingQuestions];
+    if (mustHaveSkillGaps.length > 0) {
+      missingRequirements.push(`Missing skills: ${mustHaveSkillGaps.join(', ')}`);
+    }
+    if (readinessGap) {
+      missingRequirements.push(
+        `Crypto readiness gap: requires ${opportunity.cryptoReadinessRequired}`,
+      );
+    }
+
+    const riskFlags: string[] = [];
+    if (mustHaveSkillGaps.length > 0) {
+      riskFlags.push('must_have_skill_gap');
+    }
+    if (requiredMissingQuestions.length > 0) {
+      riskFlags.push('missing_required_screening_answer');
+    }
+    if (applicantSummary.escrowStats.disputeRate >= 25) {
+      riskFlags.push('high_dispute_rate');
+    }
+    if (applicantSummary.escrowStats.completionCount === 0) {
+      riskFlags.push('no_completed_escrow_history');
+    }
+    if (readinessGap) {
+      riskFlags.push('crypto_readiness_gap');
+    }
+
+    const matchSummary: MarketplaceMatchSummary = {
+      fitScore,
+      requirementCoverage: roundPercent(
+        normalizedRequiredSkills.length - mustHaveSkillGaps.length,
+        normalizedRequiredSkills.length || 1,
+      ),
+      skillOverlap: overlap,
+      mustHaveSkillGaps,
+      riskFlags,
+      missingRequirements,
+      fitBreakdown,
+    };
+
+    const recommendation: MarketplaceApplicationDossier['recommendation'] =
+      missingRequirements.length > 0 || fitScore < 60
+        ? 'risky'
+        : fitScore >= 80
+          ? 'strong_match'
+          : 'review';
+
+    const whyShortlisted = [
+      overlap.length > 0
+        ? `Skill overlap: ${overlap.join(', ')}`
+        : 'Limited skill overlap with the brief.',
+      `${applicantSummary.escrowStats.completionCount} completed escrow jobs.`,
+      `${applicantSummary.verificationLevel} verification level.`,
+    ];
+
+    return {
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      recommendation,
+      matchSummary,
+      whyShortlisted,
+    };
+  }
+
+  private async getApplicantSkills(userId: string) {
+    const profile = await this.marketplaceRepository.getProfileByUserId(userId);
+    if (!profile) {
+      return [];
+    }
+
+    return [...profile.skills, ...profile.specialties];
+  }
+
+  private validateScreeningAnswers(
+    questions: MarketplaceScreeningQuestion[],
+    answers: MarketplaceScreeningAnswer[],
+  ) {
+    const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.answer]));
+    for (const question of questions) {
+      if (question.required && !answerMap.get(question.id)?.trim()) {
+        throw new BadRequestException(
+          `Missing required screening answer for "${question.prompt}"`,
+        );
+      }
+    }
+  }
+
+  private async getEscrowStats(user: UserRecord): Promise<MarketplaceEscrowStats> {
+    const addresses = user.wallets.map((wallet) => wallet.address);
+    if (addresses.length === 0) {
+      return {
+        totalContracts: 0,
+        completionCount: 0,
+        disputeCount: 0,
+        completionRate: 0,
+        disputeRate: 0,
+        onTimeDeliveryRate: 0,
+        averageContractValueBand: 'unknown',
+        completedByCategory: [],
+      };
+    }
+
+    const jobs = (await this.escrowRepository.listByParticipantAddresses(addresses)).filter(
+      (job) => addresses.includes(job.onchain.workerAddress),
+    );
+    const completedJobs = jobs.filter(
+      (job) => job.status === 'completed' || job.status === 'resolved',
+    );
+    const disputedJobs = jobs.filter((job) =>
+      job.milestones.some(
+        (milestone) =>
+          milestone.status === 'disputed' ||
+          milestone.resolutionAction === 'refund' ||
+          milestone.disputedAt,
+      ),
+    );
+    const milestoneDeliverySignals = jobs
+      .flatMap((job) => job.milestones.map((milestone) => milestoneDeliveredOnTime(milestone)))
+      .filter((value): value is boolean => value !== null);
+    const categoryCounts = new Map<string, number>();
+    for (const job of completedJobs) {
+      categoryCounts.set(job.category, (categoryCounts.get(job.category) ?? 0) + 1);
+    }
+    const fundedAmounts = jobs
+      .map((job) => toNumberAmount(job.fundedAmount))
+      .filter((value): value is number => value !== null);
+
+    return {
+      totalContracts: jobs.length,
+      completionCount: completedJobs.length,
+      disputeCount: disputedJobs.length,
+      completionRate: roundPercent(completedJobs.length, jobs.length || 1),
+      disputeRate: roundPercent(disputedJobs.length, jobs.length || 1),
+      onTimeDeliveryRate: roundPercent(
+        milestoneDeliverySignals.filter(Boolean).length,
+        milestoneDeliverySignals.length || 1,
+      ),
+      averageContractValueBand: pickAverageContractValueBand(fundedAmounts),
+      completedByCategory: Array.from(categoryCounts.entries())
+        .map(([category, count]) => ({ category, count }))
+        .sort((left, right) => right.count - left.count),
+    };
+  }
+
+  private computeVerificationLevel(
+    verifiedWalletAddress: string | null,
+    escrowStats: MarketplaceEscrowStats,
+  ): MarketplaceVerificationLevel {
+    if (
+      verifiedWalletAddress &&
+      escrowStats.completionCount >= 2 &&
+      escrowStats.onTimeDeliveryRate >= 70
+    ) {
+      return 'wallet_escrow_and_delivery';
+    }
+    if (verifiedWalletAddress && escrowStats.completionCount >= 1) {
+      return 'wallet_and_escrow_history';
+    }
+    return 'wallet_verified';
+  }
+
+  private deriveCryptoReadiness(user: UserRecord): MarketplaceCryptoReadiness {
+    if (user.defaultExecutionWalletAddress) {
+      const executionWallet = this.usersService.findWallet(
+        user,
+        user.defaultExecutionWalletAddress,
+      );
+      if (executionWallet && isSmartAccountWallet(executionWallet)) {
+        const eoaCount = user.wallets.filter((wallet) => isEoaWallet(wallet)).length;
+        return eoaCount > 0 ? 'escrow_power_user' : 'smart_account_ready';
+      }
+    }
+
+    return this.getVerifiedWalletAddress(user) ? 'wallet_only' : 'wallet_only';
+  }
+
+  private cryptoReadinessRank(value: MarketplaceCryptoReadiness) {
+    const order: Record<MarketplaceCryptoReadiness, number> = {
+      wallet_only: 0,
+      smart_account_ready: 1,
+      escrow_power_user: 2,
+    };
+    return order[value];
   }
 
   private isProfileComplete(profile: MarketplaceProfileRecord) {
@@ -974,8 +1560,9 @@ export class MarketplaceService {
       profile.headline.length > 0 &&
       profile.bio.length > 0 &&
       profile.skills.length > 0 &&
-      profile.portfolioUrls.length > 0 &&
-      profile.timezone.length > 0
+      profile.timezone.length > 0 &&
+      profile.preferredEngagements.length > 0 &&
+      profile.proofArtifacts.length > 0
     );
   }
 
@@ -985,20 +1572,6 @@ export class MarketplaceService {
         (wallet) => isEoaWallet(wallet) && wallet.verificationMethod === 'siwe',
       )?.address ?? null
     );
-  }
-
-  private async countCompletedWorkerEscrows(user: UserRecord) {
-    const addresses = user.wallets.map((wallet) => wallet.address);
-    if (addresses.length === 0) {
-      return 0;
-    }
-
-    const jobs = await this.escrowRepository.listByParticipantAddresses(addresses);
-    return jobs.filter(
-      (job) =>
-        (job.status === 'completed' || job.status === 'resolved') &&
-        addresses.includes(job.onchain.workerAddress),
-    ).length;
   }
 
   private async getEscrowReadiness(userId: string): Promise<EscrowReadinessStatus> {

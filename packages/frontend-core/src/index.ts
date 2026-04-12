@@ -5,3 +5,4 @@ export * from './lib/i18n';
 export * from './lib/runtime';
 export * from './lib/storage';
 export * from './lib/ui';
+export * from './lib/walkthrough';

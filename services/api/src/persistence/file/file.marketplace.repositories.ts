@@ -2,6 +2,9 @@ import type {
   MarketplaceApplicationRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceScreeningAnswer,
+  MarketplaceScreeningQuestion,
+  MarketplaceTalentProofArtifact,
 } from '../../modules/marketplace/marketplace.types';
 import type { MarketplaceRepository } from '../persistence.types';
 import { FilePersistenceStore } from './file-persistence.store';
@@ -10,16 +13,47 @@ function cloneValue<T>(value: T): T {
   return structuredClone(value);
 }
 
+function normalizeTextList(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()))).filter(Boolean);
+}
+
+function normalizeProofArtifacts(values: MarketplaceTalentProofArtifact[]) {
+  return values.map((artifact) => ({
+    ...artifact,
+    id: artifact.id.trim(),
+    label: artifact.label.trim(),
+    url: artifact.url.trim(),
+    jobId: artifact.jobId?.trim() || null,
+  }));
+}
+
+function normalizeScreeningQuestions(values: MarketplaceScreeningQuestion[]) {
+  return values.map((question) => ({
+    ...question,
+    id: question.id.trim(),
+    prompt: question.prompt.trim(),
+  }));
+}
+
+function normalizeScreeningAnswers(values: MarketplaceScreeningAnswer[]) {
+  return values.map((answer) => ({
+    ...answer,
+    questionId: answer.questionId.trim(),
+    answer: answer.answer.trim(),
+  }));
+}
+
 function normalizeProfile(
   profile: MarketplaceProfileRecord,
 ): MarketplaceProfileRecord {
   return {
     ...profile,
     slug: profile.slug.trim().toLowerCase(),
-    skills: Array.from(new Set(profile.skills.map((skill) => skill.trim()))).filter(Boolean),
-    portfolioUrls: Array.from(
-      new Set(profile.portfolioUrls.map((url) => url.trim())),
-    ).filter(Boolean),
+    skills: normalizeTextList(profile.skills),
+    specialties: normalizeTextList(profile.specialties),
+    portfolioUrls: normalizeTextList(profile.portfolioUrls),
+    preferredEngagements: Array.from(new Set(profile.preferredEngagements)),
+    proofArtifacts: normalizeProofArtifacts(profile.proofArtifacts),
   };
 }
 
@@ -29,9 +63,11 @@ function normalizeOpportunity(
   return {
     ...opportunity,
     category: opportunity.category.trim().toLowerCase(),
-    requiredSkills: Array.from(
-      new Set(opportunity.requiredSkills.map((skill) => skill.trim())),
-    ).filter(Boolean),
+    requiredSkills: normalizeTextList(opportunity.requiredSkills),
+    mustHaveSkills: normalizeTextList(opportunity.mustHaveSkills),
+    outcomes: normalizeTextList(opportunity.outcomes),
+    acceptanceCriteria: normalizeTextList(opportunity.acceptanceCriteria),
+    screeningQuestions: normalizeScreeningQuestions(opportunity.screeningQuestions),
   };
 }
 
@@ -40,9 +76,11 @@ function normalizeApplication(
 ): MarketplaceApplicationRecord {
   return {
     ...application,
-    portfolioUrls: Array.from(
-      new Set(application.portfolioUrls.map((url) => url.trim())),
-    ).filter(Boolean),
+    screeningAnswers: normalizeScreeningAnswers(application.screeningAnswers),
+    relevantProofArtifacts: normalizeProofArtifacts(application.relevantProofArtifacts),
+    portfolioUrls: normalizeTextList(application.portfolioUrls),
+    deliveryApproach: application.deliveryApproach.trim(),
+    milestonePlanSummary: application.milestonePlanSummary.trim(),
   };
 }
 

@@ -49,6 +49,16 @@ export class MarketplaceController {
     return this.marketplaceService.upsertProfile(user.id, body);
   }
 
+  @UseGuards(AuthGuard)
+  @Post('profiles/me/proofs')
+  updateProofs(
+    @User() user: ReqUser,
+    @Body(new ZodValidationPipe(marketplaceDto.updateMarketplaceProofsSchema))
+    body: marketplaceDto.UpdateMarketplaceProofsDto,
+  ) {
+    return this.marketplaceService.updateProfileProofs(user.id, body);
+  }
+
   @Get('opportunities')
   listOpportunities(
     @Query(
@@ -102,6 +112,19 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('opportunities/:id/screening')
+  updateOpportunityScreening(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.updateMarketplaceScreeningSchema),
+    )
+    body: marketplaceDto.UpdateMarketplaceScreeningDto,
+  ) {
+    return this.marketplaceService.updateOpportunityScreening(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('opportunities/:id/pause')
   pauseOpportunity(@User() user: ReqUser, @Param('id') id: string) {
     return this.marketplaceService.pauseOpportunity(user.id, id);
@@ -114,6 +137,12 @@ export class MarketplaceController {
     @Param('id') id: string,
   ) {
     return this.marketplaceService.getOpportunityApplications(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('opportunities/:id/matches')
+  getOpportunityMatches(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getOpportunityMatches(user.id, id);
   }
 
   @UseGuards(AuthGuard)
@@ -131,6 +160,12 @@ export class MarketplaceController {
   @Get('applications/mine')
   listMyApplications(@User() user: ReqUser) {
     return this.marketplaceService.listMyApplications(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('applications/:id/dossier')
+  getApplicationDossier(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getApplicationDossier(user.id, id);
   }
 
   @UseGuards(AuthGuard)

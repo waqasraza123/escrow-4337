@@ -53,6 +53,12 @@ vi.mock('../lib/api', () => ({
   adminApi: mockedAdminApi,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
 import Home from './page';
 
 function renderHome() {

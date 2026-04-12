@@ -69,6 +69,12 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../lib/injected-wallet', () => mockedInjectedWallet);
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
 import Home from './app/page';
 
 function mockAuthenticatedConsoleLoad(options?: {

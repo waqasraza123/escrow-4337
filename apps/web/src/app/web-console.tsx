@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   createErrorState,
@@ -48,6 +49,7 @@ import {
   type PendingLifecycleAction,
 } from './milestone-lifecycle';
 import { LanguageSwitcher } from './language-switcher';
+import { useEscrowLaunchWalkthrough } from './launch-walkthrough';
 
 type WalletConnectionState = {
   status: 'checking' | 'unavailable' | 'disconnected' | 'connected';
@@ -85,6 +87,16 @@ type CreatedJobResult = {
   jobId: string;
   escrowId: string;
   txHash: string;
+};
+
+type TaskBoardCard = {
+  id: string;
+  audienceLabel: string;
+  title: string;
+  summary: string;
+  detail: string;
+  phase: LifecycleCard['phase'];
+  context?: string;
 };
 
 export type EscrowConsoleView =
@@ -319,6 +331,22 @@ function getMilestoneStatusLabel(
   return messages.console.labels.milestoneStatus[status];
 }
 
+function pickPrimaryLifecycleCard(cards: Array<LifecycleCard | null>) {
+  const candidates = cards.filter((card): card is LifecycleCard => Boolean(card));
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  for (const phase of ['ready', 'failed', 'pending', 'blocked'] as const) {
+    const match = candidates.find((card) => card.phase === phase);
+    if (match) {
+      return match;
+    }
+  }
+
+  return candidates[0] ?? null;
+}
+
 function getRuntimeProfileText(
   profile: RuntimeProfile['profile'],
   messages: ReturnType<typeof useWebI18n>['messages'],
@@ -460,6 +488,17 @@ export function EscrowConsole({
   const reviewWindowDays = getNumericTerm(selectedJobView, 'reviewWindowDays');
   const disputeModel = getStringTerm(selectedJobView, 'disputeModel');
   const evidenceExpectation = getStringTerm(selectedJobView, 'evidenceExpectation');
+  const contractorJoined = selectedContractorParticipation?.status === 'joined';
+  const deliverySubmitted = Boolean(
+    selectedMilestone &&
+      ['delivered', 'released', 'disputed', 'refunded'].includes(selectedMilestone.status),
+  );
+  const disputeOpened = selectedMilestone?.status === 'disputed';
+  const resolutionPresent = Boolean(
+    selectedMilestone?.resolutionAction ||
+      selectedMilestone?.status === 'released' ||
+      selectedMilestone?.status === 'refunded',
+  );
   const showRuntime = ['overview', 'sign-in', 'setup', 'new-contract'].includes(view);
   const showAccess = ['overview', 'sign-in', 'setup', 'new-contract'].includes(view);
   const showSetup = ['overview', 'setup', 'new-contract', 'contract', 'deliver', 'dispute'].includes(
@@ -1677,6 +1716,134 @@ export function EscrowConsole({
     runtimeProfile,
     typeof window === 'undefined' ? null : window.location.origin,
   );
+  const taskBoardCards = useMemo(() => {
+    if (!selectedJobView) {
+      return [] as TaskBoardCard[];
+    }
+
+    const cards: TaskBoardCard[] = [];
+    const selectedMilestoneLabel = selectedMilestone
+      ? messages.common.milestoneNumber(
+          selectedMilestoneIndex + 1,
+          selectedMilestone.title,
+        )
+      : messages.console.selectedJob.noMilestoneSelected;
+
+    if (isClientForSelectedJob) {
+      const clientCard = pickPrimaryLifecycleCard([
+        fundJobCard,
+        commitMilestonesCard,
+        releaseCard,
+        disputeCard,
+      ]);
+
+      if (clientCard) {
+        cards.push({
+          id: 'client-next-step',
+          audienceLabel: messages.console.labels.role.client,
+          title: clientCard.title,
+          summary: clientCard.summary,
+          detail: clientCard.detail,
+          phase: clientCard.phase,
+          context: selectedMilestone ? selectedMilestoneLabel : undefined,
+        });
+      }
+    }
+
+    if (selectedContractorParticipation?.status === 'pending') {
+      cards.push({
+        id: 'contractor-activation',
+        audienceLabel: messages.console.labels.role.worker,
+        title: messages.console.selectedJob.contractorActivationTitle,
+        summary: joinAccessStatusLabel,
+        detail: joinAccessMessage,
+        phase: canJoinSelectedContract ? 'ready' : 'blocked',
+        context: previewHash(selectedJobView.onchain.workerAddress),
+      });
+    } else if (isWorkerForSelectedJob) {
+      const workerCard = pickPrimaryLifecycleCard([deliveryCard]);
+
+      if (workerCard) {
+        cards.push({
+          id: 'worker-next-step',
+          audienceLabel: messages.console.labels.role.worker,
+          title: workerCard.title,
+          summary: workerCard.summary,
+          detail: workerCard.detail,
+          phase: workerCard.phase,
+          context: selectedMilestoneLabel,
+        });
+      }
+    }
+
+    if (resolveCard) {
+      cards.push({
+        id: 'operator-resolution',
+        audienceLabel: messages.console.selectedJob.operatorAudience,
+        title: resolveCard.title,
+        summary: resolveCard.summary,
+        detail: resolveCard.detail,
+        phase: resolveCard.phase,
+        context: selectedMilestoneLabel,
+      });
+    } else {
+      cards.push({
+        id: 'operator-posture',
+        audienceLabel: messages.console.selectedJob.operatorAudience,
+        title: messages.console.selectedJob.operatorTaskTitle,
+        summary:
+          selectedMilestone?.status === 'disputed'
+            ? messages.console.selectedJob.operatorTaskWaitingSummary
+            : messages.console.selectedJob.operatorTaskIdleSummary,
+        detail:
+          selectedMilestone?.status === 'disputed'
+            ? messages.console.selectedJob.operatorTaskWaitingDetail
+            : messages.console.selectedJob.operatorTaskIdleDetail,
+        phase: selectedMilestone?.status === 'disputed' ? 'pending' : 'confirmed',
+        context: selectedMilestoneLabel,
+      });
+    }
+
+    return cards;
+  }, [
+    canJoinSelectedContract,
+    commitMilestonesCard,
+    deliveryCard,
+    disputeCard,
+    fundJobCard,
+    isClientForSelectedJob,
+    isWorkerForSelectedJob,
+    joinAccessMessage,
+    joinAccessStatusLabel,
+    messages,
+    releaseCard,
+    resolveCard,
+    selectedContractorParticipation?.status,
+    selectedJobView,
+    selectedMilestone,
+    selectedMilestoneIndex,
+  ]);
+
+  const walkthrough = useEscrowLaunchWalkthrough({
+    view,
+    accessToken,
+    otpIssued: startState.kind === 'success',
+    hasLinkedEoa,
+    hasProvisionedDefaultWallet,
+    composerStep,
+    createdJobId: createdJobResult?.jobId ?? null,
+    selectedJobId,
+    isClientForSelectedJob,
+    isWorkerForSelectedJob,
+    contractorInviteWasSent,
+    canManageContractorInvite,
+    inviteTokenPresent: selectedInviteToken !== null,
+    canJoinSelectedContract,
+    contractorJoined,
+    deliverySubmitted,
+    disputeOpened,
+    resolutionPresent,
+  });
 
   return (
     <div className={styles.console}>
@@ -1685,6 +1852,12 @@ export function EscrowConsole({
           <span className={styles.topBarLabel}>{messages.console.topBarLabel}</span>
           <p className={styles.topBarMeta}>{messages.console.topBarMeta}</p>
         </div>
+        <div className={styles.inlineActions}>
+          {walkthrough.launcher}
+          <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
+            Read the manual
+          </Link>
+        </div>
         <LanguageSwitcher
           className={styles.languageSwitcher}
           labelClassName={styles.languageSwitcherLabel}
@@ -1692,6 +1865,12 @@ export function EscrowConsole({
           optionActiveClassName={styles.languageSwitcherOptionActive}
         />
       </div>
+      {walkthrough.notice ? (
+        <StatusNotice
+          message={walkthrough.notice}
+          messageClassName={styles.stateText}
+        />
+      ) : null}
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{frame.eyebrow}</p>
@@ -1807,7 +1986,7 @@ export function EscrowConsole({
 
       {showAccess ? (
       <div className={styles.grid}>
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="access-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.common.profile}</p>
@@ -1861,7 +2040,7 @@ export function EscrowConsole({
           </div>
         </section>
 
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="setup-readiness-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.common.profile}</p>
@@ -1933,7 +2112,7 @@ export function EscrowConsole({
 
       {showSetup ? (
       <div className={styles.grid}>
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="browser-wallet-link-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.console.frames.setup.eyebrow}</p>
@@ -1979,7 +2158,7 @@ export function EscrowConsole({
             </div>
           </div>
         </section>
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="smart-account-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.console.wallet.walletLink}</p>
@@ -2062,7 +2241,7 @@ export function EscrowConsole({
           </div>
         </section>
 
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="guided-composer-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.console.wallet.provisioning}</p>
@@ -2419,7 +2598,10 @@ export function EscrowConsole({
               </button>
             </div>
             {createdJobResult ? (
-              <div className={styles.composerSummaryCard}>
+              <div
+                className={styles.composerSummaryCard}
+                data-walkthrough-id="job-created-summary"
+              >
                 <div className={styles.walletTitleRow}>
                   <strong>{messages.console.composer.jobCreated}</strong>
                   <span className={styles.ltrValue} data-ltr="true">
@@ -2459,7 +2641,7 @@ export function EscrowConsole({
         ) : null}
 
         {showJobIndex ? (
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="selected-job-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>{messages.console.portfolio.title}</p>
@@ -2597,6 +2779,47 @@ export function EscrowConsole({
                   <span className={styles.roleBadgeMuted}>{messages.common.observer}</span>
                 )}
               </div>
+              <article
+                className={styles.timelineCard}
+                data-walkthrough-id="contractor-join-access"
+              >
+                <div className={styles.workspaceHead}>
+                  <div>
+                    <h3>{messages.console.selectedJob.nextActionsTitle}</h3>
+                    <p className={styles.muted}>
+                      {messages.console.selectedJob.nextActionsCopy}
+                    </p>
+                  </div>
+                </div>
+                <div className={styles.taskBoard}>
+                  {taskBoardCards.map((card) => (
+                    <article
+                      key={card.id}
+                      className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
+                        card.phase,
+                      )}`}
+                    >
+                      <div className={styles.timelineHead}>
+                        <strong>{card.title}</strong>
+                        <span className={styles.lifecycleState}>
+                          {getLifecyclePhaseLabel(card.phase, messages)}
+                        </span>
+                      </div>
+                      <small>{card.audienceLabel}</small>
+                      <p>{card.summary}</p>
+                      <p className={styles.muted}>{card.detail}</p>
+                      {card.context ? (
+                        <div className={styles.taskCardContext}>
+                          <span className={styles.metaLabel}>
+                            {messages.console.selectedJob.currentFocus}
+                          </span>
+                          <strong>{card.context}</strong>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </article>
               <article className={styles.timelineCard}>
                 <div className={styles.walletTitleRow}>
                   <strong>{messages.console.selectedJob.contractorJoinAccess}</strong>
@@ -2747,6 +2970,7 @@ export function EscrowConsole({
                     </div>
                     {fundJobCard ? (
                       <article
+                        data-walkthrough-id="fund-job-card"
                         className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
                           fundJobCard.phase,
                         )}`}
@@ -2801,6 +3025,7 @@ export function EscrowConsole({
 
                     {commitMilestonesCard ? (
                       <article
+                        data-walkthrough-id="commit-milestones-card"
                         className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
                           commitMilestonesCard.phase,
                         )}`}
@@ -2957,7 +3182,10 @@ export function EscrowConsole({
                 ) : null}
 
                 {showWorkerWorkspace ? (
-                  <div className={styles.actionPanel}>
+                  <div
+                    className={styles.actionPanel}
+                    data-walkthrough-id="worker-workspace-panel"
+                  >
                     <div className={styles.workspaceHead}>
                       <div>
                         <h3>{messages.console.selectedJob.workerWorkspace}</h3>
@@ -2968,6 +3196,7 @@ export function EscrowConsole({
                     </div>
                     {deliveryCard ? (
                       <article
+                        data-walkthrough-id="delivery-card"
                         className={`${styles.lifecycleCard} ${getLifecyclePhaseClassName(
                           deliveryCard.phase,
                         )}`}
@@ -3041,7 +3270,10 @@ export function EscrowConsole({
                 ) : null}
 
                 {showSharedDispute ? (
-                <div className={styles.actionPanel}>
+                <div
+                  className={styles.actionPanel}
+                  data-walkthrough-id="shared-dispute-panel"
+                >
                   <div className={styles.workspaceHead}>
                     <div>
                       <h3>{messages.console.selectedJob.sharedDisputePosture}</h3>
@@ -3212,7 +3444,10 @@ export function EscrowConsole({
             </div>
 
             <div className={styles.stack}>
-              <div className={styles.auditPanel}>
+              <div
+                className={styles.auditPanel}
+                data-walkthrough-id="selected-milestone-context"
+              >
                 <div className={styles.lifecycleHead}>
                   <div>
                     <h3>{messages.console.selectedJob.selectedMilestone}</h3>
@@ -3421,6 +3656,7 @@ export function EscrowConsole({
         )}
       </section>
       ) : null}
+      {walkthrough.overlay}
     </div>
   );
 }

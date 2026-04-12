@@ -7,8 +7,12 @@ import {
   webApi,
   type JobView,
   type MarketplaceApplication,
+  type MarketplaceApplicationDossier,
+  type MarketplaceCryptoReadiness,
+  type MarketplaceEngagementType,
   type MarketplaceOpportunity,
   type MarketplaceProfile,
+  type MarketplaceProofArtifact,
   type SessionTokens,
   type UserProfile,
 } from '../../lib/api';
@@ -21,11 +25,15 @@ type ProfileDraft = {
   headline: string;
   bio: string;
   skills: string;
+  specialties: string;
   rateMin: string;
   rateMax: string;
   timezone: string;
   availability: 'open' | 'limited' | 'unavailable';
+  preferredEngagements: string;
+  cryptoReadiness: MarketplaceCryptoReadiness;
   portfolioUrls: string;
+  externalProofUrls: string;
 };
 
 type OpportunityDraft = {
@@ -35,10 +43,28 @@ type OpportunityDraft = {
   category: string;
   currencyAddress: string;
   requiredSkills: string;
+  mustHaveSkills: string;
+  outcomes: string;
+  acceptanceCriteria: string;
+  screeningQuestions: string;
   visibility: 'public' | 'private';
   budgetMin: string;
   budgetMax: string;
   timeline: string;
+  desiredStartAt: string;
+  timezoneOverlapHours: string;
+  engagementType: MarketplaceEngagementType;
+  cryptoReadinessRequired: MarketplaceCryptoReadiness;
+};
+
+type ApplicationDraft = {
+  coverNote: string;
+  proposedRate: string;
+  deliveryApproach: string;
+  milestonePlanSummary: string;
+  estimatedStartAt: string;
+  relevantProofUrls: string;
+  screeningAnswers: Record<string, string>;
 };
 
 function readSession(): SessionTokens | null {
@@ -78,6 +104,24 @@ function splitList(input: string) {
     .filter(Boolean);
 }
 
+function toDateInput(value: number | null) {
+  if (!value) {
+    return '';
+  }
+
+  const iso = new Date(value).toISOString();
+  return iso.slice(0, 16);
+}
+
+function fromDateInput(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function createEmptyProfileDraft(): ProfileDraft {
   return {
     slug: '',
@@ -85,11 +129,15 @@ function createEmptyProfileDraft(): ProfileDraft {
     headline: '',
     bio: '',
     skills: '',
+    specialties: '',
     rateMin: '',
     rateMax: '',
     timezone: 'UTC',
     availability: 'open',
+    preferredEngagements: 'fixed_scope',
+    cryptoReadiness: 'wallet_only',
     portfolioUrls: '',
+    externalProofUrls: '',
   };
 }
 
@@ -101,11 +149,70 @@ function createEmptyOpportunityDraft(): OpportunityDraft {
     category: 'software-development',
     currencyAddress: '',
     requiredSkills: '',
+    mustHaveSkills: '',
+    outcomes: '',
+    acceptanceCriteria: '',
+    screeningQuestions: '',
     visibility: 'public',
     budgetMin: '',
     budgetMax: '',
     timeline: '',
+    desiredStartAt: '',
+    timezoneOverlapHours: '',
+    engagementType: 'fixed_scope',
+    cryptoReadinessRequired: 'wallet_only',
   };
+}
+
+function createApplicationDraft(
+  opportunity: MarketplaceOpportunity,
+  profile: MarketplaceProfile | null,
+): ApplicationDraft {
+  const screeningAnswers = Object.fromEntries(
+    opportunity.screeningQuestions.map((question) => [question.id, '']),
+  );
+
+  return {
+    coverNote:
+      'I meet the brief requirements and I am ready to move this into escrow.',
+    proposedRate: '',
+    deliveryApproach:
+      'I will align on acceptance criteria first, then deliver against milestone checkpoints.',
+    milestonePlanSummary:
+      'Milestone 1 covers scope alignment and first delivery. Milestone 2 covers validation and handoff.',
+    estimatedStartAt: '',
+    relevantProofUrls:
+      profile?.proofArtifacts
+        .filter((artifact) => artifact.kind !== 'portfolio')
+        .map((artifact) => artifact.url)
+        .join('\n') ?? '',
+    screeningAnswers,
+  };
+}
+
+function parseProofUrls(input: string, kind: MarketplaceProofArtifact['kind']) {
+  return splitList(input).map((url, index) => ({
+    id: `${kind}-${index + 1}`,
+    label:
+      kind === 'external_case_study'
+        ? `Case study ${index + 1}`
+        : `Proof ${index + 1}`,
+    url,
+    kind,
+    jobId: null,
+  }));
+}
+
+function parseScreeningQuestions(input: string) {
+  return splitList(input).map((prompt, index) => ({
+    id: `screening-${index + 1}`,
+    prompt,
+    required: true,
+  }));
+}
+
+function formatPercent(value: number) {
+  return `${value}%`;
 }
 
 export function MarketplaceWorkspace() {
@@ -131,10 +238,16 @@ export function MarketplaceWorkspace() {
   const [applicationsByOpportunity, setApplicationsByOpportunity] = useState<
     Record<string, MarketplaceApplication[]>
   >({});
-  const [applyNotes, setApplyNotes] = useState<Record<string, string>>({});
+  const [matchesByOpportunity, setMatchesByOpportunity] = useState<
+    Record<string, MarketplaceApplicationDossier[]>
+  >({});
+  const [applicationDrafts, setApplicationDrafts] = useState<
+    Record<string, ApplicationDraft>
+  >({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
   const activeContracts = contracts.filter(
     (job) => job.status !== 'completed' && job.status !== 'resolved',
   );
@@ -149,6 +262,9 @@ export function MarketplaceWorkspace() {
     (application) =>
       application.status !== 'withdrawn' && application.status !== 'rejected',
   );
+  const strongMatches = Object.values(matchesByOpportunity)
+    .flat()
+    .filter((match) => match.recommendation === 'strong_match').length;
 
   async function loadWorkspace(nextTokens: SessionTokens | null = tokens) {
     setLoading(true);
@@ -165,6 +281,7 @@ export function MarketplaceWorkspace() {
         setMyApplications([]);
         setContracts([]);
         setApplicationsByOpportunity({});
+        setMatchesByOpportunity({});
         return;
       }
 
@@ -186,19 +303,41 @@ export function MarketplaceWorkspace() {
       setContracts(jobs.jobs.map((entry) => entry.job));
 
       if (myProfileResult?.profile) {
+        const externalProofs = myProfileResult.profile.proofArtifacts
+          .filter((artifact) => artifact.kind === 'external_case_study')
+          .map((artifact) => artifact.url)
+          .join('\n');
         setProfileDraft({
           slug: myProfileResult.profile.slug,
           displayName: myProfileResult.profile.displayName,
           headline: myProfileResult.profile.headline,
           bio: myProfileResult.profile.bio,
           skills: myProfileResult.profile.skills.join(', '),
+          specialties: myProfileResult.profile.specialties.join(', '),
           rateMin: myProfileResult.profile.rateMin ?? '',
           rateMax: myProfileResult.profile.rateMax ?? '',
           timezone: myProfileResult.profile.timezone,
           availability: myProfileResult.profile.availability,
+          preferredEngagements:
+            myProfileResult.profile.preferredEngagements.join(', '),
+          cryptoReadiness: myProfileResult.profile.cryptoReadiness,
           portfolioUrls: myProfileResult.profile.portfolioUrls.join('\n'),
+          externalProofUrls: externalProofs,
         });
       }
+
+      setApplicationDrafts((current) => {
+        const nextDrafts = { ...current };
+        for (const opportunity of publicFeed.opportunities) {
+          if (!nextDrafts[opportunity.id]) {
+            nextDrafts[opportunity.id] = createApplicationDraft(
+              opportunity,
+              myProfileResult?.profile ?? null,
+            );
+          }
+        }
+        return nextDrafts;
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load workspace');
     } finally {
@@ -236,16 +375,32 @@ export function MarketplaceWorkspace() {
         headline: profileDraft.headline,
         bio: profileDraft.bio,
         skills: splitList(profileDraft.skills),
+        specialties: splitList(profileDraft.specialties),
         rateMin: profileDraft.rateMin || null,
         rateMax: profileDraft.rateMax || null,
         timezone: profileDraft.timezone,
         availability: profileDraft.availability,
+        preferredEngagements: splitList(
+          profileDraft.preferredEngagements,
+        ) as MarketplaceEngagementType[],
+        cryptoReadiness: profileDraft.cryptoReadiness,
         portfolioUrls: splitList(profileDraft.portfolioUrls),
       },
       tokens.accessToken,
     );
+    if (splitList(profileDraft.externalProofUrls).length > 0) {
+      await webApi.updateMarketplaceProofs(
+        {
+          proofArtifacts: parseProofUrls(
+            profileDraft.externalProofUrls,
+            'external_case_study',
+          ),
+        },
+        tokens.accessToken,
+      );
+    }
     setProfile(response.profile);
-    setMessage('Marketplace profile saved.');
+    setMessage('Marketplace profile and proof artifacts saved.');
     await loadWorkspace(tokens);
   }
 
@@ -264,15 +419,27 @@ export function MarketplaceWorkspace() {
         category: opportunityDraft.category,
         currencyAddress: opportunityDraft.currencyAddress,
         requiredSkills: splitList(opportunityDraft.requiredSkills),
+        mustHaveSkills: splitList(opportunityDraft.mustHaveSkills),
+        outcomes: splitList(opportunityDraft.outcomes),
+        acceptanceCriteria: splitList(opportunityDraft.acceptanceCriteria),
+        screeningQuestions: parseScreeningQuestions(
+          opportunityDraft.screeningQuestions,
+        ),
         visibility: opportunityDraft.visibility,
         budgetMin: opportunityDraft.budgetMin || null,
         budgetMax: opportunityDraft.budgetMax || null,
         timeline: opportunityDraft.timeline,
+        desiredStartAt: fromDateInput(opportunityDraft.desiredStartAt),
+        timezoneOverlapHours: opportunityDraft.timezoneOverlapHours
+          ? Number(opportunityDraft.timezoneOverlapHours)
+          : null,
+        engagementType: opportunityDraft.engagementType,
+        cryptoReadinessRequired: opportunityDraft.cryptoReadinessRequired,
       },
       tokens.accessToken,
     );
     setOpportunityDraft(createEmptyOpportunityDraft());
-    setMessage('Marketplace brief created as draft.');
+    setMessage('Decision-ready marketplace brief created as draft.');
     await loadWorkspace(tokens);
   }
 
@@ -301,10 +468,17 @@ export function MarketplaceWorkspace() {
       return;
     }
 
-    const response = await webApi.listOpportunityApplications(id, tokens.accessToken);
+    const [applicationsResponse, matchesResponse] = await Promise.all([
+      webApi.listOpportunityApplications(id, tokens.accessToken),
+      webApi.listOpportunityMatches(id, tokens.accessToken),
+    ]);
     setApplicationsByOpportunity((current) => ({
       ...current,
-      [id]: response.applications,
+      [id]: applicationsResponse.applications,
+    }));
+    setMatchesByOpportunity((current) => ({
+      ...current,
+      [id]: matchesResponse.matches,
     }));
   }
 
@@ -335,7 +509,25 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
-  async function handleApplyToOpportunity(opportunityId: string) {
+  function updateApplicationDraft(
+    opportunityId: string,
+    updater: (draft: ApplicationDraft) => ApplicationDraft,
+  ) {
+    setApplicationDrafts((current) => {
+      const existing =
+        current[opportunityId] ??
+        createApplicationDraft(
+          publicOpportunities.find((opportunity) => opportunity.id === opportunityId)!,
+          profile,
+        );
+      return {
+        ...current,
+        [opportunityId]: updater(existing),
+      };
+    });
+  }
+
+  async function handleApplyToOpportunity(opportunity: MarketplaceOpportunity) {
     if (!tokens || !user) {
       setError('Sign in and restore a session before applying.');
       return;
@@ -351,20 +543,34 @@ export function MarketplaceWorkspace() {
       return;
     }
 
+    const draft =
+      applicationDrafts[opportunity.id] ?? createApplicationDraft(opportunity, profile);
     await webApi.applyToMarketplaceOpportunity(
-      opportunityId,
+      opportunity.id,
       {
-        coverNote:
-          applyNotes[opportunityId] ??
-          'Interested in this brief and ready to convert into escrow.',
-        proposedRate: null,
+        coverNote: draft.coverNote,
+        proposedRate: draft.proposedRate || null,
         selectedWalletAddress,
+        screeningAnswers: opportunity.screeningQuestions.map((question) => ({
+          questionId: question.id,
+          answer: draft.screeningAnswers[question.id]?.trim() ?? '',
+        })),
+        deliveryApproach: draft.deliveryApproach,
+        milestonePlanSummary: draft.milestonePlanSummary,
+        estimatedStartAt: fromDateInput(draft.estimatedStartAt),
+        relevantProofArtifacts: parseProofUrls(
+          draft.relevantProofUrls,
+          'external_case_study',
+        ),
         portfolioUrls: profile?.portfolioUrls ?? [],
       },
       tokens.accessToken,
     );
-    setMessage('Application submitted.');
-    setApplyNotes((current) => ({ ...current, [opportunityId]: '' }));
+    setMessage('Structured application submitted.');
+    setApplicationDrafts((current) => ({
+      ...current,
+      [opportunity.id]: createApplicationDraft(opportunity, profile),
+    }));
     await loadWorkspace(tokens);
   }
 
@@ -384,7 +590,8 @@ export function MarketplaceWorkspace() {
         <div className={styles.topBarContent}>
           <span className={styles.topBarLabel}>Marketplace workspace</span>
           <p className={styles.topBarMeta}>
-            Publish curated briefs, manage applications, and convert hires into escrow.
+            Write decision-ready briefs, submit structured proposals, and review
+            dossier-ranked applicants before escrow.
           </p>
         </div>
         <div className={styles.inlineActions}>
@@ -422,8 +629,8 @@ export function MarketplaceWorkspace() {
         <section className={styles.panel}>
           <h2>Session required for hiring actions</h2>
           <p className={styles.stateText}>
-            The public marketplace is open to browse, but profile editing, brief publishing,
-            applications, and hiring still use the authenticated product session.
+            Public browse is open, but structured profiles, briefs, proposals, and
+            hires still use the authenticated product session.
           </p>
         </section>
       ) : null}
@@ -448,6 +655,10 @@ export function MarketplaceWorkspace() {
               <strong>{reviewableApplications}</strong>
             </article>
             <article>
+              <span className={styles.metaLabel}>Strong matches loaded</span>
+              <strong>{strongMatches}</strong>
+            </article>
+            <article>
               <span className={styles.metaLabel}>Hires to escrow</span>
               <strong>{hiredOpportunities.length}</strong>
             </article>
@@ -468,7 +679,7 @@ export function MarketplaceWorkspace() {
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.panelEyebrow}>Talent</span>
-              <h2>Marketplace profile</h2>
+              <h2>Credibility profile</h2>
             </div>
           </div>
           <div className={styles.stack}>
@@ -477,10 +688,7 @@ export function MarketplaceWorkspace() {
               <input
                 value={profileDraft.slug}
                 onChange={(event) =>
-                  setProfileDraft((current) => ({
-                    ...current,
-                    slug: event.target.value,
-                  }))
+                  setProfileDraft((current) => ({ ...current, slug: event.target.value }))
                 }
               />
             </label>
@@ -514,25 +722,61 @@ export function MarketplaceWorkspace() {
                 rows={4}
                 value={profileDraft.bio}
                 onChange={(event) =>
-                  setProfileDraft((current) => ({
-                    ...current,
-                    bio: event.target.value,
-                  }))
+                  setProfileDraft((current) => ({ ...current, bio: event.target.value }))
                 }
               />
             </label>
             <label className={styles.field}>
               <span>Skills</span>
               <input
-                placeholder="typescript, react, design-systems"
+                placeholder="typescript, react, design systems"
                 value={profileDraft.skills}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({ ...current, skills: event.target.value }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Specialties</span>
+              <input
+                placeholder="marketplaces, fintech, onboarding"
+                value={profileDraft.specialties}
                 onChange={(event) =>
                   setProfileDraft((current) => ({
                     ...current,
-                    skills: event.target.value,
+                    specialties: event.target.value,
                   }))
                 }
               />
+            </label>
+            <label className={styles.field}>
+              <span>Preferred engagements</span>
+              <input
+                placeholder="fixed_scope, milestone_retainer"
+                value={profileDraft.preferredEngagements}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    preferredEngagements: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Crypto readiness</span>
+              <select
+                value={profileDraft.cryptoReadiness}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    cryptoReadiness: event.target.value as MarketplaceCryptoReadiness,
+                  }))
+                }
+              >
+                <option value="wallet_only">Wallet only</option>
+                <option value="smart_account_ready">Smart account ready</option>
+                <option value="escrow_power_user">Escrow power user</option>
+              </select>
             </label>
             <label className={styles.field}>
               <span>Portfolio URLs</span>
@@ -547,11 +791,46 @@ export function MarketplaceWorkspace() {
                 }
               />
             </label>
+            <label className={styles.field}>
+              <span>External proof URLs</span>
+              <textarea
+                rows={3}
+                value={profileDraft.externalProofUrls}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    externalProofUrls: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            {profile ? (
+              <section className={styles.summaryGrid}>
+                <article>
+                  <span className={styles.metaLabel}>Verification level</span>
+                  <strong>{profile.verificationLevel}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Completion rate</span>
+                  <strong>{formatPercent(profile.escrowStats.completionRate)}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>Dispute rate</span>
+                  <strong>{formatPercent(profile.escrowStats.disputeRate)}</strong>
+                </article>
+                <article>
+                  <span className={styles.metaLabel}>On-time delivery</span>
+                  <strong>{formatPercent(profile.escrowStats.onTimeDeliveryRate)}</strong>
+                </article>
+              </section>
+            ) : null}
             <div className={styles.inlineActions}>
               <button type="button" onClick={() => void handleSaveProfile()}>
                 Save profile
               </button>
-              {profile ? <Link href={`/marketplace/profiles/${profile.slug}`}>View public profile</Link> : null}
+              {profile ? (
+                <Link href={`/marketplace/profiles/${profile.slug}`}>View public profile</Link>
+              ) : null}
             </div>
           </div>
         </article>
@@ -560,7 +839,7 @@ export function MarketplaceWorkspace() {
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.panelEyebrow}>Client</span>
-              <h2>Create brief</h2>
+              <h2>Create hiring spec</h2>
             </div>
           </div>
           <div className={styles.stack}>
@@ -602,18 +881,6 @@ export function MarketplaceWorkspace() {
               />
             </label>
             <label className={styles.field}>
-              <span>Category</span>
-              <input
-                value={opportunityDraft.category}
-                onChange={(event) =>
-                  setOpportunityDraft((current) => ({
-                    ...current,
-                    category: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className={styles.field}>
               <span>Visibility</span>
               <select
                 value={opportunityDraft.visibility}
@@ -629,6 +896,18 @@ export function MarketplaceWorkspace() {
               </select>
             </label>
             <label className={styles.field}>
+              <span>Category</span>
+              <input
+                value={opportunityDraft.category}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
               <span>Settlement token address</span>
               <input
                 value={opportunityDraft.currencyAddress}
@@ -639,6 +918,139 @@ export function MarketplaceWorkspace() {
                   }))
                 }
               />
+            </label>
+            <label className={styles.field}>
+              <span>Required skills</span>
+              <input
+                value={opportunityDraft.requiredSkills}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    requiredSkills: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Must-have skills</span>
+              <input
+                value={opportunityDraft.mustHaveSkills}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    mustHaveSkills: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Outcomes</span>
+              <textarea
+                rows={3}
+                value={opportunityDraft.outcomes}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    outcomes: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Acceptance criteria</span>
+              <textarea
+                rows={3}
+                value={opportunityDraft.acceptanceCriteria}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    acceptanceCriteria: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Screening questions</span>
+              <textarea
+                rows={3}
+                value={opportunityDraft.screeningQuestions}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    screeningQuestions: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Timeline</span>
+              <input
+                value={opportunityDraft.timeline}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    timeline: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Desired start</span>
+              <input
+                type="datetime-local"
+                value={opportunityDraft.desiredStartAt}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    desiredStartAt: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Timezone overlap hours</span>
+              <input
+                value={opportunityDraft.timezoneOverlapHours}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    timezoneOverlapHours: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Engagement type</span>
+              <select
+                value={opportunityDraft.engagementType}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    engagementType: event.target.value as MarketplaceEngagementType,
+                  }))
+                }
+              >
+                <option value="fixed_scope">Fixed scope</option>
+                <option value="milestone_retainer">Milestone retainer</option>
+                <option value="advisory">Advisory</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>Required crypto readiness</span>
+              <select
+                value={opportunityDraft.cryptoReadinessRequired}
+                onChange={(event) =>
+                  setOpportunityDraft((current) => ({
+                    ...current,
+                    cryptoReadinessRequired:
+                      event.target.value as MarketplaceCryptoReadiness,
+                  }))
+                }
+              >
+                <option value="wallet_only">Wallet only</option>
+                <option value="smart_account_ready">Smart account ready</option>
+                <option value="escrow_power_user">Escrow power user</option>
+              </select>
             </label>
             <label className={styles.field}>
               <span>Budget minimum</span>
@@ -664,30 +1076,6 @@ export function MarketplaceWorkspace() {
                 }
               />
             </label>
-            <label className={styles.field}>
-              <span>Timeline</span>
-              <input
-                value={opportunityDraft.timeline}
-                onChange={(event) =>
-                  setOpportunityDraft((current) => ({
-                    ...current,
-                    timeline: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Required skills</span>
-              <input
-                value={opportunityDraft.requiredSkills}
-                onChange={(event) =>
-                  setOpportunityDraft((current) => ({
-                    ...current,
-                    requiredSkills: event.target.value,
-                  }))
-                }
-              />
-            </label>
             <div className={styles.inlineActions}>
               <button type="button" onClick={() => void handleCreateOpportunity()}>
                 Create draft brief
@@ -701,7 +1089,7 @@ export function MarketplaceWorkspace() {
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
-              <span className={styles.panelEyebrow}>Pipeline</span>
+              <span className={styles.panelEyebrow}>Client</span>
               <h2>My opportunities</h2>
             </div>
           </div>
@@ -716,6 +1104,12 @@ export function MarketplaceWorkspace() {
                     <p className={styles.stateText}>
                       {opportunity.visibility} • {opportunity.status} • {opportunity.applicationCount} applications
                     </p>
+                    <p className={styles.stateText}>
+                      Must-haves: {opportunity.mustHaveSkills.join(' • ') || 'None listed'}
+                    </p>
+                    <p className={styles.stateText}>
+                      Outcomes: {opportunity.outcomes.join(' • ') || 'None listed'}
+                    </p>
                     <div className={styles.inlineActions}>
                       <Link href={`/marketplace/opportunities/${opportunity.id}`}>View public brief</Link>
                       {opportunity.hiredJobId ? (
@@ -725,7 +1119,7 @@ export function MarketplaceWorkspace() {
                         type="button"
                         onClick={() => void handleLoadApplications(opportunity.id)}
                       >
-                        Load applications
+                        Load review board
                       </button>
                       {opportunity.status === 'draft' || opportunity.status === 'paused' ? (
                         <button
@@ -746,9 +1140,24 @@ export function MarketplaceWorkspace() {
                     </div>
                     {(applicationsByOpportunity[opportunity.id] ?? []).map((application) => (
                       <div key={application.id} className={styles.walletCard}>
-                        <strong>{application.applicant.displayName}</strong>
+                        <strong>
+                          {application.applicant.displayName} • fit {application.fitScore}
+                        </strong>
                         <p className={styles.stateText}>{application.applicant.headline}</p>
-                        <p className={styles.stateText}>Status: {application.status}</p>
+                        <p className={styles.stateText}>
+                          Status: {application.status} • {application.dossier.recommendation}
+                        </p>
+                        <p className={styles.stateText}>
+                          Risk flags: {application.riskFlags.join(', ') || 'none'}
+                        </p>
+                        <p className={styles.stateText}>
+                          Missing requirements:{' '}
+                          {application.dossier.matchSummary.missingRequirements.join(' | ') ||
+                            'none'}
+                        </p>
+                        <p className={styles.stateText}>
+                          Why shortlisted: {application.dossier.whyShortlisted.join(' | ')}
+                        </p>
                         <div className={styles.inlineActions}>
                           <button
                             type="button"
@@ -776,6 +1185,9 @@ export function MarketplaceWorkspace() {
                           </button>
                           <button
                             type="button"
+                            disabled={
+                              application.dossier.matchSummary.missingRequirements.length > 0
+                            }
                             onClick={() =>
                               void handleApplicationDecision(
                                 'hire',
@@ -784,11 +1196,30 @@ export function MarketplaceWorkspace() {
                               )
                             }
                           >
-                            Hire to escrow
+                            Hire into escrow
                           </button>
                         </div>
                       </div>
                     ))}
+                    {(matchesByOpportunity[opportunity.id] ?? []).length > 0 ? (
+                      <div className={styles.stack}>
+                        <span className={styles.metaLabel}>Match board</span>
+                        {(matchesByOpportunity[opportunity.id] ?? []).map((match) => (
+                          <div key={match.applicationId} className={styles.walletCard}>
+                            <strong>
+                              {match.recommendation} • fit {match.matchSummary.fitScore}
+                            </strong>
+                            <p className={styles.stateText}>
+                              Skill overlap: {match.matchSummary.skillOverlap.join(' • ') || 'none'}
+                            </p>
+                            <p className={styles.stateText}>
+                              Requirement gaps:{' '}
+                              {match.matchSummary.mustHaveSkillGaps.join(' • ') || 'none'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               ))
@@ -805,30 +1236,30 @@ export function MarketplaceWorkspace() {
           </div>
           <div className={styles.stack}>
             {myApplications.length === 0 ? (
-              <p className={styles.stateText}>No marketplace applications yet.</p>
+              <p className={styles.stateText}>No applications yet.</p>
             ) : (
               myApplications.map((application) => (
-                <article key={application.id} className={styles.walletCard}>
+                <article key={application.id} className={styles.actionPanel}>
                   <strong>{application.opportunity.title}</strong>
                   <p className={styles.stateText}>
-                    {application.opportunity.ownerDisplayName} • {application.status}
+                    {application.status} • fit {application.fitScore} •{' '}
+                    {application.dossier.recommendation}
                   </p>
-                  <div className={styles.inlineActions}>
-                    <Link href={`/marketplace/opportunities/${application.opportunity.id}`}>
-                      View brief
-                    </Link>
-                    {application.hiredJobId ? (
-                      <Link href={`/app/contracts/${application.hiredJobId}`}>View contract</Link>
-                    ) : null}
-                    {application.status !== 'withdrawn' && application.status !== 'hired' ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleWithdrawApplication(application.id)}
-                      >
-                        Withdraw
-                      </button>
-                    ) : null}
-                  </div>
+                  <p className={styles.stateText}>
+                    Missing requirements:{' '}
+                    {application.dossier.matchSummary.missingRequirements.join(' | ') ||
+                      'none'}
+                  </p>
+                  {application.hiredJobId ? (
+                    <Link href={`/app/contracts/${application.hiredJobId}`}>View contract</Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleWithdrawApplication(application.id)}
+                    >
+                      Withdraw
+                    </button>
+                  )}
                 </article>
               ))
             )}
@@ -840,66 +1271,105 @@ export function MarketplaceWorkspace() {
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
-              <span className={styles.panelEyebrow}>Browse</span>
-              <h2>Open opportunities</h2>
+              <span className={styles.panelEyebrow}>Discover</span>
+              <h2>Open briefs</h2>
             </div>
           </div>
           <div className={styles.stack}>
             {publicOpportunities.length === 0 ? (
-              <p className={styles.stateText}>No public opportunities live right now.</p>
+              <p className={styles.stateText}>No public briefs available.</p>
             ) : (
-              publicOpportunities.map((opportunity) => (
-                <article key={opportunity.id} className={styles.walletCard}>
-                  <strong>{opportunity.title}</strong>
-                  <p className={styles.stateText}>{opportunity.summary}</p>
-                  <div className={styles.inlineActions}>
-                    <Link href={`/marketplace/opportunities/${opportunity.id}`}>Details</Link>
-                    {tokens ? (
-                      <>
-                        <input
-                          value={applyNotes[opportunity.id] ?? ''}
-                          onChange={(event) =>
-                            setApplyNotes((current) => ({
-                              ...current,
-                              [opportunity.id]: event.target.value,
-                            }))
-                          }
-                          placeholder="Add a short application note"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleApplyToOpportunity(opportunity.id)}
-                        >
-                          Apply
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </article>
-
-        <article className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.panelEyebrow}>Escrow</span>
-              <h2>Active contracts</h2>
-            </div>
-          </div>
-          <div className={styles.stack}>
-            {contracts.length === 0 ? (
-              <p className={styles.stateText}>No escrow contracts loaded for this session.</p>
-            ) : (
-              contracts.map((job) => (
-                <article key={job.id} className={styles.walletCard}>
-                  <strong>{job.title}</strong>
-                  <p className={styles.stateText}>
-                    {job.status} • {job.category} • funded {job.fundedAmount ?? '—'}
-                  </p>
-                </article>
-              ))
+              publicOpportunities.map((opportunity) => {
+                const draft =
+                  applicationDrafts[opportunity.id] ??
+                  createApplicationDraft(opportunity, profile);
+                return (
+                  <article key={opportunity.id} className={styles.actionPanel}>
+                    <div className={styles.stack}>
+                      <strong>{opportunity.title}</strong>
+                      <p className={styles.stateText}>{opportunity.summary}</p>
+                      <p className={styles.stateText}>
+                        Must-haves: {opportunity.mustHaveSkills.join(' • ') || 'None listed'}
+                      </p>
+                      <p className={styles.stateText}>
+                        Required crypto readiness: {opportunity.cryptoReadinessRequired}
+                      </p>
+                      <div className={styles.inlineActions}>
+                        <Link href={`/marketplace/opportunities/${opportunity.id}`}>View public brief</Link>
+                      </div>
+                      {tokens && user?.id !== opportunity.owner.userId ? (
+                        <div className={styles.stack}>
+                          <label className={styles.field}>
+                            <span>Cover note</span>
+                            <textarea
+                              rows={3}
+                              value={draft.coverNote}
+                              onChange={(event) =>
+                                updateApplicationDraft(opportunity.id, (current) => ({
+                                  ...current,
+                                  coverNote: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className={styles.field}>
+                            <span>Delivery approach</span>
+                            <textarea
+                              rows={3}
+                              value={draft.deliveryApproach}
+                              onChange={(event) =>
+                                updateApplicationDraft(opportunity.id, (current) => ({
+                                  ...current,
+                                  deliveryApproach: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className={styles.field}>
+                            <span>Milestone plan summary</span>
+                            <textarea
+                              rows={3}
+                              value={draft.milestonePlanSummary}
+                              onChange={(event) =>
+                                updateApplicationDraft(opportunity.id, (current) => ({
+                                  ...current,
+                                  milestonePlanSummary: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          {opportunity.screeningQuestions.map((question) => (
+                            <label key={question.id} className={styles.field}>
+                              <span>{question.prompt}</span>
+                              <textarea
+                                rows={2}
+                                value={draft.screeningAnswers[question.id] ?? ''}
+                                onChange={(event) =>
+                                  updateApplicationDraft(opportunity.id, (current) => ({
+                                    ...current,
+                                    screeningAnswers: {
+                                      ...current.screeningAnswers,
+                                      [question.id]: event.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </label>
+                          ))}
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              onClick={() => void handleApplyToOpportunity(opportunity)}
+                            >
+                              Submit structured application
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })
             )}
           </div>
         </article>

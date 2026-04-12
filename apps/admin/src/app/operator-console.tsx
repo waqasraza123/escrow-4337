@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
 import {
@@ -44,6 +45,7 @@ import {
   getRecentLookupSuggestions,
 } from './operator-case';
 import { LanguageSwitcher } from './language-switcher';
+import { useOperatorLaunchWalkthrough } from './operator-walkthrough';
 import { useAdminI18n } from '../lib/i18n';
 
 const historyKey = 'escrow4337.admin.recent-lookups';
@@ -716,6 +718,14 @@ export function OperatorConsole({
       null,
     [disputedMilestoneCards, resolutionMilestoneIndex],
   );
+  const walkthrough = useOperatorLaunchWalkthrough({
+    view,
+    accessToken,
+    controlsArbitratorWallet,
+    hasDisputedMilestone: disputedMilestoneCards.length > 0,
+    caseLoaded: Boolean(audit),
+    currentJobId: audit?.bundle.job.id ?? initialJobId ?? null,
+  });
 
   useEffect(() => {
     if (!accessToken) {
@@ -1241,6 +1251,12 @@ export function OperatorConsole({
           <span className={styles.topBarLabel}>{messages.topBar.label}</span>
           <p className={styles.topBarMeta}>{messages.topBar.meta}</p>
         </div>
+        <div className={styles.inlineActions}>
+          {walkthrough.launcher}
+          <Link href="/help/operator-case-flow" className={styles.secondaryButton}>
+            Read the manual
+          </Link>
+        </div>
         <LanguageSwitcher
           className={styles.languageSwitcher}
           labelClassName={styles.languageSwitcherLabel}
@@ -1248,6 +1264,12 @@ export function OperatorConsole({
           optionActiveClassName={styles.languageSwitcherOptionActive}
         />
       </div>
+      {walkthrough.notice ? (
+        <StatusNotice
+          message={walkthrough.notice}
+          messageClassName={styles.stateText}
+        />
+      ) : null}
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{frame.eyebrow}</p>
@@ -1285,7 +1307,7 @@ export function OperatorConsole({
       </section>
 
       <div className={styles.grid}>
-        <section className={styles.panel}>
+        <section className={styles.panel} data-walkthrough-id="operator-session-panel">
           <header className={styles.panelHeader}>
             <div>
               <p className={styles.panelEyebrow}>Runtime</p>
@@ -2470,7 +2492,7 @@ export function OperatorConsole({
         </section>
       ) : null}
 
-      <section className={styles.panel}>
+      <section className={styles.panel} data-walkthrough-id="operator-case-lookup">
         <header className={styles.panelHeader}>
           <div>
             <p className={styles.panelEyebrow}>Audit Lookup</p>
@@ -2515,7 +2537,7 @@ export function OperatorConsole({
 
       {audit && caseBrief ? (
         <>
-          <section className={styles.panel}>
+          <section className={styles.panel} data-walkthrough-id="operator-case-brief">
             <header className={styles.panelHeader}>
               <div>
                 <p className={styles.panelEyebrow}>Case Brief</p>
@@ -2600,7 +2622,7 @@ export function OperatorConsole({
           </section>
 
           <div className={styles.grid}>
-            <section className={styles.panel}>
+            <section className={styles.panel} data-walkthrough-id="operator-resolution-panel">
               <header className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelEyebrow}>Dispute Review</p>
@@ -2934,6 +2956,7 @@ export function OperatorConsole({
           </div>
         </section>
       )}
+      {walkthrough.overlay}
     </div>
   );
 }

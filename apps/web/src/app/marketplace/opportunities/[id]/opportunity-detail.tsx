@@ -12,6 +12,14 @@ type OpportunityDetailProps = {
   id: string;
 };
 
+function formatDateTime(value: number | null) {
+  if (!value) {
+    return 'Not specified';
+  }
+
+  return new Date(value).toLocaleString();
+}
+
 export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
   const [opportunity, setOpportunity] = useState<MarketplaceOpportunityDetail | null>(
     null,
@@ -47,7 +55,9 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
         <div className={styles.topBar}>
           <div className={styles.topBarContent}>
             <span className={styles.topBarLabel}>Marketplace opportunity</span>
-            <p className={styles.topBarMeta}>Public brief detail before escrow conversion.</p>
+            <p className={styles.topBarMeta}>
+              Decision-ready brief detail before escrow conversion.
+            </p>
           </div>
           <div className={styles.inlineActions}>
             <Link href="/marketplace">Back to marketplace</Link>
@@ -97,7 +107,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                 <div className={styles.panelHeader}>
                   <div>
                     <span className={styles.panelEyebrow}>Brief</span>
-                    <h2>Scope</h2>
+                    <h2>Scope and outcomes</h2>
                   </div>
                 </div>
                 <p className={styles.stateText}>{opportunity.description}</p>
@@ -122,17 +132,63 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                     <span className={styles.metaLabel}>Settlement token</span>
                     <strong>{opportunity.currencyAddress}</strong>
                   </article>
+                  <article>
+                    <span className={styles.metaLabel}>Desired start</span>
+                    <strong>{formatDateTime(opportunity.desiredStartAt)}</strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Timezone overlap</span>
+                    <strong>
+                      {opportunity.timezoneOverlapHours === null
+                        ? 'Not specified'
+                        : `${opportunity.timezoneOverlapHours} hours`}
+                    </strong>
+                  </article>
                 </div>
               </article>
+
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>Fit</span>
-                    <h2>Required skills</h2>
+                    <span className={styles.panelEyebrow}>Hiring spec</span>
+                    <h2>Fit requirements</h2>
                   </div>
                 </div>
                 <div className={styles.stack}>
-                  <p className={styles.stateText}>{opportunity.requiredSkills.join(' • ')}</p>
+                  <p className={styles.stateText}>
+                    Required skills: {opportunity.requiredSkills.join(' • ')}
+                  </p>
+                  <p className={styles.stateText}>
+                    Must-have skills: {opportunity.mustHaveSkills.join(' • ') || 'None listed'}
+                  </p>
+                  <p className={styles.stateText}>
+                    Engagement type: {opportunity.engagementType}
+                  </p>
+                  <p className={styles.stateText}>
+                    Crypto readiness required: {opportunity.cryptoReadinessRequired}
+                  </p>
+                  <span className={styles.metaLabel}>Outcomes</span>
+                  {opportunity.outcomes.map((item) => (
+                    <p key={item} className={styles.stateText}>
+                      {item}
+                    </p>
+                  ))}
+                  <span className={styles.metaLabel}>Acceptance criteria</span>
+                  {opportunity.acceptanceCriteria.map((item) => (
+                    <p key={item} className={styles.stateText}>
+                      {item}
+                    </p>
+                  ))}
+                  <span className={styles.metaLabel}>Screening questions</span>
+                  {opportunity.screeningQuestions.length === 0 ? (
+                    <p className={styles.stateText}>No screening questions specified.</p>
+                  ) : (
+                    opportunity.screeningQuestions.map((question) => (
+                      <p key={question.id} className={styles.stateText}>
+                        {question.prompt}
+                      </p>
+                    ))
+                  )}
                   <Link href="/app/marketplace">Apply from workspace</Link>
                 </div>
               </article>

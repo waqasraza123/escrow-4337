@@ -26,7 +26,7 @@ vi.mock('../../lib/api', () => ({
 import MarketplaceWorkspacePage from '../app/marketplace/page';
 
 describe('marketplace workspace', () => {
-  it('renders pipeline metrics and hired contract links for an authenticated session', async () => {
+  it('renders dossier-oriented pipeline metrics and hiring quality fields for an authenticated session', async () => {
     seedJsonStorage(sessionStorageKey, {
       accessToken: 'access-token-123',
       refreshToken: 'refresh-token-123',
@@ -41,20 +41,30 @@ describe('marketplace workspace', () => {
           category: 'software-development',
           currencyAddress: '0x4444444444444444444444444444444444444444',
           requiredSkills: ['typescript'],
+          mustHaveSkills: ['typescript'],
+          outcomes: ['Launch dashboard'],
+          acceptanceCriteria: ['Responsive UI'],
+          screeningQuestions: [
+            { id: 'q1', prompt: 'How do you handle milestone reviews?', required: true },
+          ],
           visibility: 'public',
           status: 'published',
           budgetMin: '1000',
           budgetMax: '2000',
           timeline: '2 weeks',
+          desiredStartAt: null,
+          timezoneOverlapHours: 4,
+          engagementType: 'fixed_scope',
+          cryptoReadinessRequired: 'wallet_only',
           publishedAt: 10,
           hiredApplicationId: null,
           hiredJobId: null,
           createdAt: 10,
           updatedAt: 10,
           owner: {
-            userId: 'client-1',
-            displayName: 'Client One',
-            profileSlug: 'client-one',
+            userId: 'client-2',
+            displayName: 'Client Two',
+            profileSlug: 'client-two',
           },
           escrowReadiness: 'ready',
           applicationCount: 1,
@@ -76,12 +86,35 @@ describe('marketplace workspace', () => {
         headline: 'Hiring through escrow',
         bio: 'Client bio',
         skills: ['product'],
+        specialties: ['marketplace'],
         rateMin: null,
         rateMax: null,
         timezone: 'UTC',
         availability: 'open',
+        preferredEngagements: ['fixed_scope'],
         portfolioUrls: ['https://example.com/client'],
+        proofArtifacts: [
+          {
+            id: 'portfolio-1',
+            label: 'Portfolio 1',
+            url: 'https://example.com/client',
+            kind: 'portfolio',
+            jobId: null,
+          },
+        ],
+        cryptoReadiness: 'escrow_power_user',
         verifiedWalletAddress: '0x1111111111111111111111111111111111111111',
+        verificationLevel: 'wallet_verified',
+        escrowStats: {
+          totalContracts: 0,
+          completionCount: 0,
+          disputeCount: 0,
+          completionRate: 0,
+          disputeRate: 0,
+          onTimeDeliveryRate: 0,
+          averageContractValueBand: 'unknown',
+          completedByCategory: [],
+        },
         completedEscrowCount: 0,
         isComplete: true,
       },
@@ -96,11 +129,19 @@ describe('marketplace workspace', () => {
           category: 'software-development',
           currencyAddress: '0x4444444444444444444444444444444444444444',
           requiredSkills: ['typescript'],
+          mustHaveSkills: ['typescript'],
+          outcomes: ['Launch workspace'],
+          acceptanceCriteria: ['Client acceptance'],
+          screeningQuestions: [],
           visibility: 'private',
           status: 'hired',
           budgetMin: '1200',
           budgetMax: '2400',
           timeline: '2 weeks',
+          desiredStartAt: null,
+          timezoneOverlapHours: 3,
+          engagementType: 'fixed_scope',
+          cryptoReadinessRequired: 'wallet_only',
           publishedAt: 20,
           hiredApplicationId: 'app-1',
           hiredJobId: 'job-123',
@@ -124,6 +165,11 @@ describe('marketplace workspace', () => {
           coverNote: 'Ready to build',
           proposedRate: '120',
           selectedWalletAddress: '0x3333333333333333333333333333333333333333',
+          screeningAnswers: [],
+          deliveryApproach: 'Plan and execute.',
+          milestonePlanSummary: 'Two milestones.',
+          estimatedStartAt: null,
+          relevantProofArtifacts: [],
           portfolioUrls: ['https://example.com/work'],
           status: 'hired',
           hiredJobId: 'job-123',
@@ -134,7 +180,20 @@ describe('marketplace workspace', () => {
             displayName: 'Builder One',
             profileSlug: 'builder-one',
             headline: 'Full-stack contractor',
+            specialties: ['marketplaces'],
             verifiedWalletAddress: '0x3333333333333333333333333333333333333333',
+            verificationLevel: 'wallet_verified',
+            cryptoReadiness: 'wallet_only',
+            escrowStats: {
+              totalContracts: 2,
+              completionCount: 2,
+              disputeCount: 0,
+              completionRate: 100,
+              disputeRate: 0,
+              onTimeDeliveryRate: 100,
+              averageContractValueBand: 'medium',
+              completedByCategory: [{ category: 'software-development', count: 2 }],
+            },
             completedEscrowCount: 2,
           },
           opportunity: {
@@ -143,6 +202,24 @@ describe('marketplace workspace', () => {
             visibility: 'private',
             status: 'hired',
             ownerDisplayName: 'Client One',
+          },
+          fitScore: 88,
+          fitBreakdown: [],
+          riskFlags: [],
+          dossier: {
+            applicationId: 'app-1',
+            opportunityId: 'opp-1',
+            recommendation: 'strong_match',
+            matchSummary: {
+              fitScore: 88,
+              requirementCoverage: 100,
+              skillOverlap: ['typescript'],
+              mustHaveSkillGaps: [],
+              riskFlags: [],
+              missingRequirements: [],
+              fitBreakdown: [],
+            },
+            whyShortlisted: ['Strong overlap'],
           },
         },
       ],
@@ -189,14 +266,18 @@ describe('marketplace workspace', () => {
       expect(screen.getByText('Marketplace pipeline')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Hires to escrow')).toBeInTheDocument();
+    expect(screen.getByText('Strong matches loaded')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Active contracts' }),
+      screen.getByRole('heading', { name: 'Credibility profile' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Create hiring spec' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Must-have skills')).toBeInTheDocument();
+    expect(screen.getByLabelText('Screening questions')).toBeInTheDocument();
+    expect(screen.getByLabelText('External proof URLs')).toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'View contract' })[0],
     ).toHaveAttribute('href', '/app/contracts/job-123');
-    expect(screen.getByLabelText('Visibility')).toBeInTheDocument();
-    expect(screen.getByLabelText('Budget minimum')).toBeInTheDocument();
   });
 });

@@ -264,6 +264,75 @@ export type ApplicationStatus =
   | 'withdrawn'
   | 'hired';
 export type ModerationStatus = 'visible' | 'hidden' | 'suspended';
+export type MarketplaceVerificationLevel =
+  | 'wallet_verified'
+  | 'wallet_and_escrow_history'
+  | 'wallet_escrow_and_delivery';
+export type MarketplaceCryptoReadiness =
+  | 'wallet_only'
+  | 'smart_account_ready'
+  | 'escrow_power_user';
+export type MarketplaceEngagementType =
+  | 'fixed_scope'
+  | 'milestone_retainer'
+  | 'advisory';
+export type MarketplaceProofArtifact = {
+  id: string;
+  label: string;
+  url: string;
+  kind: 'portfolio' | 'escrow_delivery' | 'escrow_case' | 'external_case_study';
+  jobId: string | null;
+};
+export type MarketplaceEscrowStats = {
+  totalContracts: number;
+  completionCount: number;
+  disputeCount: number;
+  completionRate: number;
+  disputeRate: number;
+  onTimeDeliveryRate: number;
+  averageContractValueBand: 'small' | 'medium' | 'large' | 'unknown';
+  completedByCategory: Array<{
+    category: string;
+    count: number;
+  }>;
+};
+export type MarketplaceScreeningQuestion = {
+  id: string;
+  prompt: string;
+  required: boolean;
+};
+export type MarketplaceScreeningAnswer = {
+  questionId: string;
+  answer: string;
+};
+export type MarketplaceFitBreakdownEntry = {
+  factor:
+    | 'must_have_skills'
+    | 'category_overlap'
+    | 'escrow_track_record'
+    | 'screening_quality'
+    | 'crypto_readiness'
+    | 'proposal_quality';
+  score: number;
+  weight: number;
+  summary: string;
+};
+export type MarketplaceMatchSummary = {
+  fitScore: number;
+  requirementCoverage: number;
+  skillOverlap: string[];
+  mustHaveSkillGaps: string[];
+  riskFlags: string[];
+  missingRequirements: string[];
+  fitBreakdown: MarketplaceFitBreakdownEntry[];
+};
+export type MarketplaceApplicationDossier = {
+  applicationId: string;
+  opportunityId: string;
+  recommendation: 'strong_match' | 'review' | 'risky';
+  matchSummary: MarketplaceMatchSummary;
+  whyShortlisted: string[];
+};
 
 export type MarketplaceProfile = {
   userId: string;
@@ -272,12 +341,18 @@ export type MarketplaceProfile = {
   headline: string;
   bio: string;
   skills: string[];
+  specialties: string[];
   rateMin: string | null;
   rateMax: string | null;
   timezone: string;
   availability: MarketplaceAvailability;
+  preferredEngagements: MarketplaceEngagementType[];
   portfolioUrls: string[];
+  proofArtifacts: MarketplaceProofArtifact[];
+  cryptoReadiness: MarketplaceCryptoReadiness;
   verifiedWalletAddress: string | null;
+  verificationLevel: MarketplaceVerificationLevel;
+  escrowStats: MarketplaceEscrowStats;
   completedEscrowCount: number;
   isComplete: boolean;
 };
@@ -290,11 +365,19 @@ export type MarketplaceOpportunity = {
   category: string;
   currencyAddress: string;
   requiredSkills: string[];
+  mustHaveSkills: string[];
+  outcomes: string[];
+  acceptanceCriteria: string[];
+  screeningQuestions: MarketplaceScreeningQuestion[];
   visibility: OpportunityVisibility;
   status: OpportunityStatus;
   budgetMin: string | null;
   budgetMax: string | null;
   timeline: string;
+  desiredStartAt: number | null;
+  timezoneOverlapHours: number | null;
+  engagementType: MarketplaceEngagementType;
+  cryptoReadinessRequired: MarketplaceCryptoReadiness;
   publishedAt: number | null;
   hiredApplicationId: string | null;
   hiredJobId: string | null;
@@ -315,6 +398,11 @@ export type MarketplaceApplication = {
   coverNote: string;
   proposedRate: string | null;
   selectedWalletAddress: string;
+  screeningAnswers: MarketplaceScreeningAnswer[];
+  deliveryApproach: string;
+  milestonePlanSummary: string;
+  estimatedStartAt: number | null;
+  relevantProofArtifacts: MarketplaceProofArtifact[];
   portfolioUrls: string[];
   status: ApplicationStatus;
   hiredJobId: string | null;
@@ -325,7 +413,11 @@ export type MarketplaceApplication = {
     displayName: string;
     profileSlug: string | null;
     headline: string;
+    specialties: string[];
     verifiedWalletAddress: string | null;
+    verificationLevel: MarketplaceVerificationLevel;
+    cryptoReadiness: MarketplaceCryptoReadiness;
+    escrowStats: MarketplaceEscrowStats;
     completedEscrowCount: number;
   };
   opportunity: {
@@ -335,6 +427,10 @@ export type MarketplaceApplication = {
     status: OpportunityStatus;
     ownerDisplayName: string;
   };
+  fitScore: number;
+  fitBreakdown: MarketplaceFitBreakdownEntry[];
+  riskFlags: string[];
+  dossier: MarketplaceApplicationDossier;
 };
 
 export type MarketplaceOpportunityDetail = MarketplaceOpportunity & {
@@ -712,10 +808,13 @@ export const webApi = {
       headline: string;
       bio: string;
       skills: string[];
+      specialties: string[];
       rateMin: string | null;
       rateMax: string | null;
       timezone: string;
       availability: MarketplaceAvailability;
+      preferredEngagements: MarketplaceEngagementType[];
+      cryptoReadiness: MarketplaceCryptoReadiness;
       portfolioUrls: string[];
     },
     accessToken: string,
@@ -723,6 +822,22 @@ export const webApi = {
     return requestJson<{ profile: MarketplaceProfile }>(
       apiBaseUrl,
       '/marketplace/profiles',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceProofs(
+    input: {
+      proofArtifacts: MarketplaceProofArtifact[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ profile: MarketplaceProfile }>(
+      apiBaseUrl,
+      '/marketplace/profiles/me/proofs',
       {
         method: 'POST',
         body: JSON.stringify(input),
@@ -771,16 +886,48 @@ export const webApi = {
       category: string;
       currencyAddress: string;
       requiredSkills: string[];
+      mustHaveSkills: string[];
+      outcomes: string[];
+      acceptanceCriteria: string[];
+      screeningQuestions: MarketplaceScreeningQuestion[];
       visibility: OpportunityVisibility;
       budgetMin: string | null;
       budgetMax: string | null;
       timeline: string;
+      desiredStartAt: number | null;
+      timezoneOverlapHours: number | null;
+      engagementType: MarketplaceEngagementType;
+      cryptoReadinessRequired: MarketplaceCryptoReadiness;
     },
     accessToken: string,
   ) {
     return requestJson<{ opportunity: MarketplaceOpportunity }>(
       apiBaseUrl,
       '/marketplace/opportunities',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceOpportunityScreening(
+    id: string,
+    input: {
+      outcomes: string[];
+      acceptanceCriteria: string[];
+      mustHaveSkills: string[];
+      screeningQuestions: MarketplaceScreeningQuestion[];
+      desiredStartAt: number | null;
+      timezoneOverlapHours: number | null;
+      engagementType?: MarketplaceEngagementType;
+      cryptoReadinessRequired?: MarketplaceCryptoReadiness;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ opportunity: MarketplaceOpportunity }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/screening`,
       {
         method: 'POST',
         body: JSON.stringify(input),
@@ -818,12 +965,25 @@ export const webApi = {
       accessToken,
     );
   },
+  listOpportunityMatches(id: string, accessToken: string) {
+    return requestJson<{ matches: MarketplaceApplicationDossier[] }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/matches`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
   applyToMarketplaceOpportunity(
     id: string,
     input: {
       coverNote: string;
       proposedRate: string | null;
       selectedWalletAddress: string;
+      screeningAnswers: MarketplaceScreeningAnswer[];
+      deliveryApproach: string;
+      milestonePlanSummary: string;
+      estimatedStartAt: number | null;
+      relevantProofArtifacts: MarketplaceProofArtifact[];
       portfolioUrls: string[];
     },
     accessToken: string,
@@ -842,6 +1002,14 @@ export const webApi = {
     return requestJson<{ applications: MarketplaceApplication[] }>(
       apiBaseUrl,
       '/marketplace/applications/mine',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getMarketplaceApplicationDossier(id: string, accessToken: string) {
+    return requestJson<{ dossier: MarketplaceApplicationDossier }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/dossier`,
       { method: 'GET' },
       accessToken,
     );

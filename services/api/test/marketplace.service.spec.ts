@@ -11,6 +11,7 @@ import { configureFilePersistence } from './support/test-persistence';
 const clientAddress = '0x1111111111111111111111111111111111111111';
 const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const applicantAddress = '0x3333333333333333333333333333333333333333';
+const weakerApplicantAddress = '0x7777777777777777777777777777777777777777';
 const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 
@@ -23,6 +24,7 @@ describe('MarketplaceService', () => {
   let cleanupPersistence: (() => void) | undefined;
   let clientUserId: string;
   let applicantUserId: string;
+  let weakerApplicantUserId: string;
   let arbitratorUserId: string;
 
   beforeEach(async () => {
@@ -48,6 +50,11 @@ describe('MarketplaceService', () => {
       'applicant@example.com',
       applicantAddress,
     );
+    weakerApplicantUserId = await createLinkedUserId(
+      usersService,
+      'weaker@example.com',
+      weakerApplicantAddress,
+    );
     arbitratorUserId = await createLinkedUserId(
       usersService,
       'arbitrator@example.com',
@@ -61,44 +68,54 @@ describe('MarketplaceService', () => {
     cleanupPersistence = undefined;
   });
 
-  it('supports publish, apply, shortlist, and hire into a normal escrow job', async () => {
-    await marketplaceService.upsertProfile(clientUserId, {
-      slug: 'startup-client',
-      displayName: 'Startup Client',
-      headline: 'We hire builders',
-      bio: 'Funding product work through escrow.',
-      skills: ['product', 'design'],
-      rateMin: null,
-      rateMax: null,
-      timezone: 'UTC',
-      availability: 'open',
-      portfolioUrls: ['https://example.com/client'],
-    });
-    await marketplaceService.upsertProfile(applicantUserId, {
-      slug: 'great-builder',
-      displayName: 'Great Builder',
-      headline: 'Full-stack contractor',
-      bio: 'I ship MVPs quickly.',
-      skills: ['typescript', 'design-systems'],
-      rateMin: '90',
-      rateMax: '140',
-      timezone: 'UTC+1',
-      availability: 'open',
-      portfolioUrls: ['https://example.com/builder'],
-    });
+  it('supports publish, apply, shortlist, dossier review, and hire into a normal escrow job', async () => {
+    await marketplaceService.upsertProfile(
+      clientUserId,
+      buildProfileInput({
+        slug: 'startup-client',
+        displayName: 'Startup Client',
+        headline: 'We hire builders',
+        bio: 'Funding product work through escrow.',
+        skills: ['product', 'design'],
+        specialties: ['hiring'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'escrow_power_user',
+        portfolioUrls: ['https://example.com/client'],
+      }),
+    );
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'great-builder',
+        displayName: 'Great Builder',
+        headline: 'Full-stack contractor',
+        bio: 'I ship MVPs quickly.',
+        skills: ['typescript', 'design-systems', 'react'],
+        specialties: ['marketplaces', 'escrow'],
+        rateMin: '90',
+        rateMax: '140',
+        timezone: 'UTC+1',
+        preferredEngagements: ['fixed_scope', 'milestone_retainer'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/builder'],
+      }),
+    );
 
-    const created = await marketplaceService.createOpportunity(clientUserId, {
-      title: 'Founding product engineer',
-      summary: 'Ship the first client portal.',
-      description: 'We need a contractor to build the first milestone-based portal.',
-      category: 'software-development',
-      currencyAddress,
-      requiredSkills: ['typescript', 'react'],
-      visibility: 'public',
-      budgetMin: '1000',
-      budgetMax: '2500',
-      timeline: '2 weeks',
-    });
+    const created = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Founding product engineer',
+        summary: 'Ship the first client portal.',
+        description: 'We need a contractor to build the first milestone-based portal.',
+        mustHaveSkills: ['typescript', 'react'],
+        outcomes: ['Ship a client portal', 'Integrate escrow dashboards'],
+        acceptanceCriteria: ['Responsive UI', 'Wallet-aware onboarding'],
+        screeningQuestions: [
+          { id: 'q1', prompt: 'Describe a similar escrow-adjacent build.', required: true },
+        ],
+        cryptoReadinessRequired: 'wallet_only',
+      }),
+    );
 
     const published = await marketplaceService.publishOpportunity(
       clientUserId,
@@ -110,12 +127,15 @@ describe('MarketplaceService', () => {
     await marketplaceService.applyToOpportunity(
       applicantUserId,
       created.opportunity.id,
-      {
-        coverNote: 'I can deliver this in two milestones.',
-        proposedRate: '125',
+      buildApplicationInput({
         selectedWalletAddress: applicantAddress,
-        portfolioUrls: ['https://example.com/portal-work'],
-      },
+        screeningAnswers: [
+          {
+            questionId: 'q1',
+            answer: 'Built milestone-based contractor onboarding with wallet verification.',
+          },
+        ],
+      }),
     );
 
     const applications = await marketplaceService.getOpportunityApplications(
@@ -125,6 +145,17 @@ describe('MarketplaceService', () => {
     expect(applications.applications).toHaveLength(1);
     expect(applications.applications[0]?.status).toBe('submitted');
     expect(applications.applications[0]?.applicant.profileSlug).toBe('great-builder');
+    expect(applications.applications[0]?.fitScore).toBeGreaterThan(0);
+    expect(applications.applications[0]?.riskFlags).toContain(
+      'no_completed_escrow_history',
+    );
+
+    const dossier = await marketplaceService.getApplicationDossier(
+      clientUserId,
+      applications.applications[0]!.id,
+    );
+    expect(dossier.dossier.matchSummary.missingRequirements).toHaveLength(0);
+    expect(dossier.dossier.recommendation).toBe('review');
 
     const shortlisted = await marketplaceService.shortlistApplication(
       clientUserId,
@@ -143,6 +174,10 @@ describe('MarketplaceService', () => {
     expect(auditBundle.bundle.job.title).toBe('Founding product engineer');
     expect(auditBundle.bundle.job.onchain.workerAddress).toBe(applicantAddress);
     expect(auditBundle.bundle.job.contractorParticipation?.status).toBe('pending');
+    expect(auditBundle.bundle.job.termsJSON.marketplace).toMatchObject({
+      opportunityId: created.opportunity.id,
+      applicationId: applications.applications[0]!.id,
+    });
 
     const myApplications = await marketplaceService.listMyApplications(applicantUserId);
     expect(myApplications.applications[0]?.status).toBe('hired');
@@ -151,19 +186,123 @@ describe('MarketplaceService', () => {
     );
   });
 
+  it('ranks stronger applicants ahead of weaker ones using deterministic dossier scoring', async () => {
+    await marketplaceService.upsertProfile(
+      clientUserId,
+      buildProfileInput({
+        slug: 'ranking-client',
+        displayName: 'Ranking Client',
+        headline: 'Hiring for a specific build',
+        bio: 'Needs strong fit signals.',
+        skills: ['product'],
+        specialties: ['marketplace'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'escrow_power_user',
+        portfolioUrls: ['https://example.com/client'],
+      }),
+    );
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'strong-match',
+        displayName: 'Strong Match',
+        headline: 'Matches must-haves',
+        bio: 'Experienced in escrow workflows.',
+        skills: ['typescript', 'react', 'wallets'],
+        specialties: ['software-development', 'marketplaces'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'smart_account_ready',
+        portfolioUrls: ['https://example.com/strong'],
+      }),
+    );
+    await marketplaceService.upsertProfile(
+      weakerApplicantUserId,
+      buildProfileInput({
+        slug: 'weaker-match',
+        displayName: 'Weaker Match',
+        headline: 'Partial fit only',
+        bio: 'Generalist without matching proof.',
+        skills: ['design'],
+        specialties: ['branding'],
+        preferredEngagements: ['advisory'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/weaker'],
+      }),
+    );
+
+    const created = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Escrow client dashboard',
+        summary: 'Build a quality hiring board',
+        description: 'Needs exact fit for a crypto-native workflow.',
+        mustHaveSkills: ['typescript', 'react'],
+        screeningQuestions: [
+          { id: 'q1', prompt: 'How would you structure milestone delivery?', required: true },
+        ],
+        cryptoReadinessRequired: 'smart_account_ready',
+      }),
+    );
+    await marketplaceService.publishOpportunity(clientUserId, created.opportunity.id);
+
+    await marketplaceService.applyToOpportunity(
+      applicantUserId,
+      created.opportunity.id,
+      buildApplicationInput({
+        selectedWalletAddress: applicantAddress,
+        screeningAnswers: [
+          {
+            questionId: 'q1',
+            answer: 'I define milestone acceptance upfront and validate against delivery artifacts.',
+          },
+        ],
+      }),
+    );
+    await marketplaceService.applyToOpportunity(
+      weakerApplicantUserId,
+      created.opportunity.id,
+      buildApplicationInput({
+        selectedWalletAddress: weakerApplicantAddress,
+        screeningAnswers: [{ questionId: 'q1', answer: 'I usually figure it out later.' }],
+        deliveryApproach: 'I will adapt as I go.',
+        milestonePlanSummary: 'One vague phase.',
+      }),
+    );
+
+    const matches = await marketplaceService.getOpportunityMatches(
+      clientUserId,
+      created.opportunity.id,
+    );
+    expect(matches.matches).toHaveLength(2);
+    expect(matches.matches[0]?.matchSummary.fitScore).toBeGreaterThan(
+      matches.matches[1]?.matchSummary.fitScore ?? 0,
+    );
+    expect(matches.matches[0]?.recommendation).toMatch(/strong_match|review/);
+    expect(matches.matches[1]?.matchSummary.riskFlags).toContain(
+      'must_have_skill_gap',
+    );
+    expect(matches.matches[1]?.matchSummary.missingRequirements.length).toBeGreaterThan(
+      0,
+    );
+  });
+
   it('requires arbitrator control for moderation actions', async () => {
-    await marketplaceService.upsertProfile(applicantUserId, {
-      slug: 'moderated-builder',
-      displayName: 'Moderated Builder',
-      headline: 'Freelancer profile',
-      bio: 'Visible until moderation changes it.',
-      skills: ['typescript'],
-      rateMin: '80',
-      rateMax: '120',
-      timezone: 'UTC',
-      availability: 'open',
-      portfolioUrls: ['https://example.com/moderated'],
-    });
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'moderated-builder',
+        displayName: 'Moderated Builder',
+        headline: 'Freelancer profile',
+        bio: 'Visible until moderation changes it.',
+        skills: ['typescript'],
+        specialties: ['frontend'],
+        rateMin: '80',
+        rateMax: '120',
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/moderated'],
+      }),
+    );
 
     await expect(
       marketplaceService.moderateProfile(clientUserId, applicantUserId, {
@@ -187,43 +326,45 @@ describe('MarketplaceService', () => {
   });
 
   it('reports moderation dashboard metrics for aging briefs and hire conversion', async () => {
-    await marketplaceService.upsertProfile(clientUserId, {
-      slug: 'metrics-client',
-      displayName: 'Metrics Client',
-      headline: 'Publishing briefs',
-      bio: 'Tracks marketplace funnel activity.',
-      skills: ['product'],
-      rateMin: null,
-      rateMax: null,
-      timezone: 'UTC',
-      availability: 'open',
-      portfolioUrls: ['https://example.com/metrics-client'],
-    });
-    await marketplaceService.upsertProfile(applicantUserId, {
-      slug: 'metrics-builder',
-      displayName: 'Metrics Builder',
-      headline: 'Applies to marketplace briefs',
-      bio: 'Delivers work through escrow.',
-      skills: ['typescript'],
-      rateMin: '100',
-      rateMax: '160',
-      timezone: 'UTC',
-      availability: 'open',
-      portfolioUrls: ['https://example.com/metrics-builder'],
-    });
+    await marketplaceService.upsertProfile(
+      clientUserId,
+      buildProfileInput({
+        slug: 'metrics-client',
+        displayName: 'Metrics Client',
+        headline: 'Publishing briefs',
+        bio: 'Tracks marketplace funnel activity.',
+        skills: ['product'],
+        specialties: ['hiring'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'escrow_power_user',
+        portfolioUrls: ['https://example.com/metrics-client'],
+      }),
+    );
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'metrics-builder',
+        displayName: 'Metrics Builder',
+        headline: 'Applies to marketplace briefs',
+        bio: 'Delivers work through escrow.',
+        skills: ['typescript'],
+        specialties: ['software-development'],
+        rateMin: '100',
+        rateMax: '160',
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/metrics-builder'],
+      }),
+    );
 
-    const agedOpportunity = await marketplaceService.createOpportunity(clientUserId, {
-      title: 'Aged brief',
-      summary: 'Needs attention',
-      description: 'Published long enough to show in aging.',
-      category: 'software-development',
-      currencyAddress,
-      requiredSkills: ['typescript'],
-      visibility: 'public',
-      budgetMin: '1000',
-      budgetMax: '2000',
-      timeline: '2 weeks',
-    });
+    const agedOpportunity = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Aged brief',
+        summary: 'Needs attention',
+        description: 'Published long enough to show in aging.',
+      }),
+    );
     await marketplaceService.publishOpportunity(clientUserId, agedOpportunity.opportunity.id);
 
     const storedAgedOpportunity = await marketplaceRepository.getOpportunityById(
@@ -236,25 +377,22 @@ describe('MarketplaceService', () => {
       updatedAt: Date.now(),
     });
 
-    const hiredOpportunity = await marketplaceService.createOpportunity(clientUserId, {
-      title: 'Hired brief',
-      summary: 'Converts into escrow',
-      description: 'This brief should count toward hire conversion.',
-      category: 'software-development',
-      currencyAddress,
-      requiredSkills: ['typescript'],
-      visibility: 'public',
-      budgetMin: '1200',
-      budgetMax: '2400',
-      timeline: '2 weeks',
-    });
+    const hiredOpportunity = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Hired brief',
+        summary: 'Converts into escrow',
+        description: 'This brief should count toward hire conversion.',
+      }),
+    );
     await marketplaceService.publishOpportunity(clientUserId, hiredOpportunity.opportunity.id);
-    await marketplaceService.applyToOpportunity(applicantUserId, hiredOpportunity.opportunity.id, {
-      coverNote: 'Ready to build this.',
-      proposedRate: '125',
-      selectedWalletAddress: applicantAddress,
-      portfolioUrls: ['https://example.com/hired-brief'],
-    });
+    await marketplaceService.applyToOpportunity(
+      applicantUserId,
+      hiredOpportunity.opportunity.id,
+      buildApplicationInput({
+        selectedWalletAddress: applicantAddress,
+      }),
+    );
     const hiredApplications = await marketplaceService.getOpportunityApplications(
       clientUserId,
       hiredOpportunity.opportunity.id,
@@ -275,6 +413,131 @@ describe('MarketplaceService', () => {
     expect(dashboard.agingOpportunities[0]?.title).toBe('Aged brief');
   });
 });
+
+function buildProfileInput(
+  overrides: Partial<{
+    slug: string;
+    displayName: string;
+    headline: string;
+    bio: string;
+    skills: string[];
+    specialties: string[];
+    rateMin: string | null;
+    rateMax: string | null;
+    timezone: string;
+    availability: 'open' | 'limited' | 'unavailable';
+    preferredEngagements: Array<'fixed_scope' | 'milestone_retainer' | 'advisory'>;
+    cryptoReadiness: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+    portfolioUrls: string[];
+  }>,
+) {
+  return {
+    slug: 'default-profile',
+    displayName: 'Default Profile',
+    headline: 'Default headline',
+    bio: 'Default profile bio.',
+    skills: ['typescript'],
+    specialties: ['software-development'],
+    rateMin: null,
+    rateMax: null,
+    timezone: 'UTC',
+    availability: 'open' as const,
+    preferredEngagements: ['fixed_scope'] as Array<
+      'fixed_scope' | 'milestone_retainer' | 'advisory'
+    >,
+    cryptoReadiness: 'wallet_only' as const,
+    portfolioUrls: ['https://example.com/default'],
+    ...overrides,
+  };
+}
+
+function buildOpportunityInput(
+  overrides: Partial<{
+    title: string;
+    summary: string;
+    description: string;
+    category: string;
+    currencyAddress: string;
+    requiredSkills: string[];
+    mustHaveSkills: string[];
+    outcomes: string[];
+    acceptanceCriteria: string[];
+    screeningQuestions: Array<{ id: string; prompt: string; required: boolean }>;
+    visibility: 'public' | 'private';
+    budgetMin: string | null;
+    budgetMax: string | null;
+    timeline: string;
+    desiredStartAt: number | null;
+    timezoneOverlapHours: number | null;
+    engagementType: 'fixed_scope' | 'milestone_retainer' | 'advisory';
+    cryptoReadinessRequired: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+  }>,
+) {
+  return {
+    title: 'Marketplace brief',
+    summary: 'Structured hiring summary',
+    description: 'Detailed hiring description.',
+    category: 'software-development',
+    currencyAddress,
+    requiredSkills: ['typescript'],
+    mustHaveSkills: ['typescript'],
+    outcomes: ['Deliver a working milestone'],
+    acceptanceCriteria: ['Pass client review'],
+    screeningQuestions: [],
+    visibility: 'public' as const,
+    budgetMin: '1000',
+    budgetMax: '2500',
+    timeline: '2 weeks',
+    desiredStartAt: null,
+    timezoneOverlapHours: 3,
+    engagementType: 'fixed_scope' as const,
+    cryptoReadinessRequired: 'wallet_only' as const,
+    ...overrides,
+  };
+}
+
+function buildApplicationInput(
+  overrides: Partial<{
+    coverNote: string;
+    proposedRate: string | null;
+    selectedWalletAddress: string;
+    screeningAnswers: Array<{ questionId: string; answer: string }>;
+    deliveryApproach: string;
+    milestonePlanSummary: string;
+    estimatedStartAt: number | null;
+    relevantProofArtifacts: Array<{
+      id: string;
+      label: string;
+      url: string;
+      kind: 'portfolio' | 'escrow_delivery' | 'escrow_case' | 'external_case_study';
+      jobId: string | null;
+    }>;
+    portfolioUrls: string[];
+  }>,
+) {
+  return {
+    coverNote: 'I can deliver this in two milestones with clear acceptance criteria.',
+    proposedRate: '125',
+    selectedWalletAddress: applicantAddress,
+    screeningAnswers: [],
+    deliveryApproach:
+      'I de-risk scope first, then deliver milestone checkpoints tied to acceptance criteria.',
+    milestonePlanSummary:
+      'Milestone 1 covers planning and foundation. Milestone 2 covers delivery and handoff.',
+    estimatedStartAt: null,
+    relevantProofArtifacts: [
+      {
+        id: 'proof-1',
+        label: 'Case study',
+        url: 'https://example.com/case-study',
+        kind: 'external_case_study' as const,
+        jobId: null,
+      },
+    ],
+    portfolioUrls: ['https://example.com/portal-work'],
+    ...overrides,
+  };
+}
 
 async function createLinkedUserId(
   usersService: UsersService,
