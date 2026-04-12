@@ -4,12 +4,16 @@ import type {
   SessionRecord,
 } from '../../modules/auth/auth.types';
 import type {
+  EscrowAuthoritySource,
+  EscrowChainCursorRecord,
+  EscrowChainEventRecord,
   EscrowChainSyncRecord,
   EscrowContractorParticipationRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
   EscrowStaleWorkflowRecord,
+  EscrowOnchainProjectionRecord,
 } from '../../modules/escrow/escrow.types';
 import type {
   EoaUserWalletRecord,
@@ -101,6 +105,54 @@ function normalizeEscrowJobRecord(
         : null,
       staleWorkflow: job.operations?.staleWorkflow ?? null,
     },
+  };
+}
+
+function chainCursorStorageKey(input: {
+  chainId: number;
+  contractAddress: string;
+  streamName: EscrowChainCursorRecord['streamName'];
+}) {
+  return `${input.chainId}:${input.contractAddress.toLowerCase()}:${input.streamName}`;
+}
+
+function chainEventStorageKey(event: EscrowChainEventRecord) {
+  return `${event.chainId}:${event.contractAddress.toLowerCase()}:${event.transactionHash.toLowerCase()}:${event.logIndex}`;
+}
+
+function normalizeChainCursorRecord(
+  cursor: EscrowChainCursorRecord,
+): EscrowChainCursorRecord {
+  return {
+    ...cursor,
+    contractAddress: cursor.contractAddress.toLowerCase(),
+    streamName: 'workstream_escrow',
+    lastError: cursor.lastError ?? null,
+  };
+}
+
+function normalizeChainEventRecord(
+  event: EscrowChainEventRecord,
+): EscrowChainEventRecord {
+  return {
+    ...event,
+    contractAddress: event.contractAddress.toLowerCase(),
+    escrowId: String(event.escrowId),
+    transactionHash: event.transactionHash.toLowerCase(),
+    blockHash: event.blockHash.toLowerCase(),
+  };
+}
+
+function normalizeOnchainProjectionRecord(
+  projection: EscrowOnchainProjectionRecord,
+): EscrowOnchainProjectionRecord {
+  return {
+    ...projection,
+    contractAddress: projection.contractAddress.toLowerCase(),
+    escrowId: String(projection.escrowId),
+    lastProjectedBlock: projection.lastProjectedBlock ?? null,
+    lastEventBlock: projection.lastEventBlock ?? null,
+    degradedReason: projection.degradedReason ?? null,
   };
 }
 
@@ -388,6 +440,137 @@ export class FileEscrowRepository implements EscrowRepository {
   async save(job: EscrowJobRecord) {
     await this.store.write((data) => {
       data.escrowJobs[job.id] = cloneValue(normalizeEscrowJobRecord(job));
+    });
+  }
+
+  async getChainCursor(input: {
+    chainId: number;
+    contractAddress: string;
+    streamName: EscrowChainCursorRecord['streamName'];
+  }) {
+    return this.store.read((data) => {
+      const cursor = data.escrowChainCursors[chainCursorStorageKey(input)];
+      return cursor ? cloneValue(normalizeChainCursorRecord(cursor)) : null;
+    });
+  }
+
+  async saveChainCursor(cursor: EscrowChainCursorRecord) {
+    await this.store.write((data) => {
+      const normalized = normalizeChainCursorRecord(cursor);
+      data.escrowChainCursors[chainCursorStorageKey(normalized)] =
+        cloneValue(normalized);
+    });
+  }
+
+  async upsertChainEvents(events: EscrowChainEventRecord[]) {
+    await this.store.write((data) => {
+      for (const event of events) {
+        const normalized = normalizeChainEventRecord(event);
+        data.escrowChainEvents[chainEventStorageKey(normalized)] =
+          cloneValue(normalized);
+      }
+    });
+  }
+
+  async replaceChainEventsInRange(input: {
+    chainId: number;
+    contractAddress: string;
+    fromBlock: number;
+    toBlock: number;
+    events: EscrowChainEventRecord[];
+  }) {
+    await this.store.write((data) => {
+      const contractAddress = input.contractAddress.toLowerCase();
+      for (const [key, event] of Object.entries(data.escrowChainEvents)) {
+        if (
+          event.chainId === input.chainId &&
+          event.contractAddress.toLowerCase() === contractAddress &&
+          event.blockNumber >= input.fromBlock &&
+          event.blockNumber <= input.toBlock
+        ) {
+          delete data.escrowChainEvents[key];
+        }
+      }
+
+      for (const event of input.events) {
+        const normalized = normalizeChainEventRecord(event);
+        data.escrowChainEvents[chainEventStorageKey(normalized)] =
+          cloneValue(normalized);
+      }
+    });
+  }
+
+  async listChainEvents(input: {
+    chainId: number;
+    contractAddress: string;
+    escrowId?: string;
+    fromBlock?: number;
+    toBlock?: number;
+  }) {
+    const contractAddress = input.contractAddress.toLowerCase();
+
+    return this.store.read((data) =>
+      Object.values(data.escrowChainEvents)
+        .filter((event) => {
+          if (event.chainId !== input.chainId) {
+            return false;
+          }
+          if (event.contractAddress.toLowerCase() !== contractAddress) {
+            return false;
+          }
+          if (input.escrowId !== undefined && event.escrowId !== input.escrowId) {
+            return false;
+          }
+          if (
+            input.fromBlock !== undefined &&
+            event.blockNumber < input.fromBlock
+          ) {
+            return false;
+          }
+          if (input.toBlock !== undefined && event.blockNumber > input.toBlock) {
+            return false;
+          }
+          return true;
+        })
+        .sort(
+          (left, right) =>
+            left.blockNumber - right.blockNumber ||
+            left.logIndex - right.logIndex ||
+            left.transactionHash.localeCompare(right.transactionHash),
+        )
+        .map((event) => cloneValue(normalizeChainEventRecord(event))),
+    );
+  }
+
+  async getOnchainProjection(jobId: string) {
+    return this.store.read((data) => {
+      const projection = data.escrowOnchainProjections[jobId];
+      return projection
+        ? cloneValue(normalizeOnchainProjectionRecord(projection))
+        : null;
+    });
+  }
+
+  async listOnchainProjections(jobIds?: string[]) {
+    const jobIdSet = jobIds ? new Set(jobIds) : null;
+
+    return this.store.read((data) =>
+      Object.values(data.escrowOnchainProjections)
+        .filter((projection) =>
+          jobIdSet ? jobIdSet.has(projection.jobId) : true,
+        )
+        .sort((left, right) => right.projectedAt - left.projectedAt)
+        .map((projection) =>
+          cloneValue(normalizeOnchainProjectionRecord(projection)),
+        ),
+    );
+  }
+
+  async saveOnchainProjection(projection: EscrowOnchainProjectionRecord) {
+    await this.store.write((data) => {
+      data.escrowOnchainProjections[projection.jobId] = cloneValue(
+        normalizeOnchainProjectionRecord(projection),
+      );
     });
   }
 }

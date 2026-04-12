@@ -5,6 +5,39 @@ import { readPositiveInteger } from '../../common/config/readers';
 
 @Injectable()
 export class OperationsConfigService {
+  get escrowIngestionEnabled() {
+    const raw =
+      process.env.OPERATIONS_ESCROW_INGESTION_ENABLED?.trim().toLowerCase();
+    return raw !== '0' && raw !== 'false' && raw !== 'no';
+  }
+
+  get escrowIngestionConfirmations() {
+    return readPositiveInteger(
+      process.env.OPERATIONS_ESCROW_INGESTION_CONFIRMATIONS,
+      6,
+    );
+  }
+
+  get escrowIngestionBatchBlocks() {
+    return readPositiveInteger(
+      process.env.OPERATIONS_ESCROW_INGESTION_BATCH_BLOCKS,
+      1_000,
+    );
+  }
+
+  get escrowIngestionResyncBlocks() {
+    return readPositiveInteger(
+      process.env.OPERATIONS_ESCROW_INGESTION_RESYNC_BLOCKS,
+      20,
+    );
+  }
+
+  get escrowAuthorityReadsEnabled() {
+    const raw =
+      process.env.OPERATIONS_ESCROW_AUTHORITY_READS_ENABLED?.trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes';
+  }
+
   get escrowBatchSyncAlertStateFilePath() {
     return (
       process.env.OPERATIONS_ESCROW_BATCH_SYNC_ALERT_STATE_FILE?.trim() ||

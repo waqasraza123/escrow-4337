@@ -4,64 +4,76 @@
 - 2026-04-12
 
 ## Current Objective
-- Fix the Next walkthrough import-boundary regression and harden API local startup with a high-signal port preflight.
+- Implement authoritative escrow chain ingestion and reconciliation inside `services/api` without creating a separate service.
 
 ## Last Completed Step
-- Split `@escrow4334/frontend-core` into a server-safe root barrel plus a client-only `./walkthrough` subpath, updated walkthrough consumers in web/admin, and added API dev-port preflight plus clearer `EADDRINUSE` startup handling.
+- Landed finalized-log ingestion, normalized chain-event persistence, per-job onchain projections, authority-aware escrow and marketplace read paths, operator ingestion status, and runtime or launch-readiness wiring; verified the full API test suite.
 
 ## Current Step
-- Verification is focused on confirming the Next server-component error is gone and that occupied local API ports now fail fast with actionable guidance.
+- Task complete. Waiting for follow-up review or extension work.
 
 ## Why This Step Exists
-- The shared walkthrough code was accidentally exported through the root `frontend-core` barrel used by Next server layouts, and API local startup was failing late and noisily when `4100` was already occupied.
+- The repo needed an internal chain-backed source of truth for escrow lifecycle facts so production reads can distinguish authoritative onchain state from local fallback state.
 
 ## Changed Files
-- `packages/frontend-core/src/{index.ts,walkthrough.ts,lib/walkthrough.tsx,lib/shared.spec.ts}`
-- `packages/frontend-core/package.json`
-- `apps/web/src/app/launch-walkthrough.tsx`
-- `apps/admin/src/app/operator-walkthrough.tsx`
-- `services/api/scripts/dev-preflight.mjs`
-- `services/api/src/main.ts`
-- `services/api/package.json`
-- `services/api/README.md`
-- `readme.md`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
+- `services/api/src/modules/escrow/escrow-export.ts`
+- `services/api/src/modules/escrow/escrow.module.ts`
+- `services/api/src/modules/escrow/escrow.service.ts`
+- `services/api/src/modules/escrow/escrow.types.ts`
+- `services/api/src/modules/marketplace/marketplace.module.ts`
+- `services/api/src/modules/marketplace/marketplace.service.ts`
+- `services/api/src/modules/operations/deployment-validation.service.ts`
+- `services/api/src/modules/operations/escrow-chain-ingestion-status.service.ts`
+- `services/api/src/modules/operations/escrow-chain-log.provider.ts`
+- `services/api/src/modules/operations/escrow-chain-sync-daemon-monitoring.service.ts`
+- `services/api/src/modules/operations/escrow-chain-sync.service.ts`
+- `services/api/src/modules/operations/escrow-health.service.ts`
+- `services/api/src/modules/operations/escrow-health.types.ts`
+- `services/api/src/modules/operations/escrow-onchain-authority.service.ts`
+- `services/api/src/modules/operations/launch-readiness.service.ts`
+- `services/api/src/modules/operations/launch-readiness.types.ts`
+- `services/api/src/modules/operations/operations.config.ts`
+- `services/api/src/modules/operations/operations.controller.ts`
+- `services/api/src/modules/operations/operations.module.ts`
+- `services/api/src/modules/operations/runtime-profile.service.ts`
+- `services/api/src/modules/operations/runtime-profile.types.ts`
+- `services/api/src/persistence/file/file-persistence.store.ts`
+- `services/api/src/persistence/file/file.repositories.ts`
+- `services/api/src/persistence/persistence.types.ts`
+- `services/api/src/persistence/postgres/migrations/012_escrow_chain_ingestion.sql`
+- `services/api/src/persistence/postgres/postgres.repositories.ts`
+- `services/api/test/deployment-validation.service.spec.ts`
+- `services/api/test/escrow-chain-sync-daemon-alerting.service.spec.ts`
+- `services/api/test/escrow-chain-sync.service.spec.ts`
+- `services/api/test/launch-readiness.service.spec.ts`
+- `services/api/test/runtime-profile.service.spec.ts`
 
 ## Key Constraints
-- Do not touch or overwrite unrelated product changes already present in the dirty worktree.
-- Keep the root `@escrow4334/frontend-core` surface server-safe; all walkthrough imports must stay on the explicit client-only subpath.
-- Keep `4100` as the explicit default local API contract; do not auto-randomize local ports.
+- Authority stays split: onchain escrow facts come from projections when healthy; invite state, delivery notes, dispute evidence, operator notes, and marketplace application content stay API-owned.
+- v1 remains inside `services/api` and existing worker commands.
+- Ingestion is finalized-log based with bounded overlap; deep reorg replay is still postponed.
 
 ## Verification Commands
-- `pnpm --filter @escrow4334/frontend-core test`
-- `pnpm --filter web exec vitest run src/app/launch-walkthrough.spec.tsx`
-- `pnpm --filter admin exec vitest run src/app/operator-walkthrough.spec.tsx`
 - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
-- `NEST_API_PORT=4110 pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
-- `pnpm --filter admin build`
-- `pnpm --filter web build`
-- `pnpm --filter web typecheck`
-- `pnpm --filter admin typecheck`
-- `git diff --check`
+- `pnpm --filter escrow4334-api test -- --runInBand runtime-profile.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand launch-readiness.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand escrow-chain-sync.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand escrow-health.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand escrow.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand escrow-export.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand deployment-validation.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand`
 
 ## Verification Status
 - Passed:
-  - `pnpm --filter @escrow4334/frontend-core test`
-  - `pnpm --filter web exec vitest run src/app/launch-walkthrough.spec.tsx`
-  - `pnpm --filter admin exec vitest run src/app/operator-walkthrough.spec.tsx`
   - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs` with `4100` occupied
-  - `NEST_API_PORT=4110 pnpm --filter escrow4334-api exec node ./scripts/dev-preflight.mjs`
-  - `pnpm --filter admin build`
-  - `git diff --check`
-- Blocked:
-  - `pnpm --filter web build` due an unrelated existing marketplace CSS import error in `src/app/marketplace/{opportunities/[id]/opportunity-detail.tsx,profiles/[slug]/profile-detail.tsx}`
-  - `pnpm --filter web typecheck` and `pnpm --filter admin typecheck` due `.next/types` include drift unrelated to the walkthrough boundary split
+  - `pnpm --filter escrow4334-api test -- --runInBand`
 
 ## Expected Result
-- Next server layouts no longer pull hook-based walkthrough code through `@escrow4334/frontend-core`, walkthrough consumers compile from the explicit client-only subpath, and API local startup exits early with clear port-conflict guidance instead of a late Nest stack trace.
+- Escrow reads, exports, operator health, runtime posture, and marketplace trust signals can prefer authoritative finalized-chain projections while preserving local fallback behavior when projection freshness or health is insufficient.
 
 ## Next Likely Step
-- Fix the unrelated marketplace CSS imports and the app `typecheck` `.next/types` drift so repo-wide web/admin verification is green again on top of this boundary and preflight hardening.
+- Add explicit API and browser coverage for the new ingestion status endpoint and for authority provenance on audit or operator views, then validate the worker loop against a real Postgres-backed local chain environment.

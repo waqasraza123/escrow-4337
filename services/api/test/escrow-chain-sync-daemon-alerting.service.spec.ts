@@ -206,6 +206,7 @@ function createOkReport(): EscrowChainSyncDaemonHealthReport {
       maxConsecutiveSkips: 6,
     },
     issues: [],
+    ingestion: null,
     daemon: {
       updatedAt: '2026-04-09T00:00:00.000Z',
       worker: {
@@ -251,6 +252,7 @@ function createWarningReport(): EscrowChainSyncDaemonHealthReport {
         detail: 'RPC timed out',
       },
     ],
+    ingestion: null,
     daemon: {
       ...base.daemon!,
       heartbeat: {
@@ -279,6 +281,7 @@ function createFailedReport(): EscrowChainSyncDaemonHealthReport {
         detail: 'The daemon recorded 4 consecutive failures.',
       },
     ],
+    ingestion: null,
     daemon: {
       ...base.daemon!,
       heartbeat: {

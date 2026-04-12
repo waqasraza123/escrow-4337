@@ -17,6 +17,8 @@ export type LaunchReadinessCheck = {
     | 'cors-origins'
     | 'trust-proxy'
     | 'operator-authority'
+    | 'chain-ingestion-config'
+    | 'chain-ingestion-health'
     | 'chain-sync-daemon-config'
     | 'chain-sync-daemon-health';
   owner: LaunchReadinessOwner;

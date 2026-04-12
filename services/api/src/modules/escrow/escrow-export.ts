@@ -133,6 +133,7 @@ function buildJobHistoryExport(
     schemaVersion: EXPORT_SCHEMA_VERSION,
     artifact: 'job-history',
     exportedAt,
+    authority: bundle.authority,
     job: bundle.job,
     summary: {
       milestoneCount: bundle.job.milestones.length,
@@ -208,6 +209,7 @@ function buildDisputeCaseExport(
     schemaVersion: EXPORT_SCHEMA_VERSION,
     artifact: 'dispute-case',
     exportedAt,
+    authority: bundle.authority,
     job: bundle.job,
     summary: {
       disputeCount: disputes.length,

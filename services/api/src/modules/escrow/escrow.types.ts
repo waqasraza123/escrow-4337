@@ -223,6 +223,148 @@ export type EscrowChainSyncRecord = {
   lastErrorMessage?: string;
 };
 
+export type EscrowChainStreamName = 'workstream_escrow';
+
+export type EscrowOnchainEventName =
+  | 'JobCreated'
+  | 'EscrowFunded'
+  | 'MilestonesSet'
+  | 'MilestoneDelivered'
+  | 'MilestoneReleased'
+  | 'DisputeOpened'
+  | 'DisputeResolved';
+
+export type EscrowChainCursorRecord = {
+  chainId: number;
+  contractAddress: string;
+  streamName: EscrowChainStreamName;
+  nextFromBlock: number;
+  lastFinalizedBlock: number | null;
+  lastScannedBlock: number | null;
+  lastError: string | null;
+  updatedAt: number;
+};
+
+export type EscrowChainEventPayload =
+  | {
+      eventName: 'JobCreated';
+      clientAddress: string;
+      jobHash: string;
+    }
+  | {
+      eventName: 'EscrowFunded';
+      amount: string;
+      currencyAddress: string;
+    }
+  | {
+      eventName: 'MilestonesSet';
+      count: number;
+    }
+  | {
+      eventName: 'MilestoneDelivered';
+      milestoneIndex: number;
+      deliverableHash: string;
+    }
+  | {
+      eventName: 'MilestoneReleased';
+      milestoneIndex: number;
+      amount: string;
+    }
+  | {
+      eventName: 'DisputeOpened';
+      milestoneIndex: number;
+      reasonHash: string;
+    }
+  | {
+      eventName: 'DisputeResolved';
+      milestoneIndex: number;
+      splitBpsClient: number;
+    };
+
+export type EscrowChainEventRecord = {
+  chainId: number;
+  contractAddress: string;
+  escrowId: string;
+  transactionHash: string;
+  logIndex: number;
+  blockNumber: number;
+  blockHash: string;
+  blockTimeMs: number;
+  payload: EscrowChainEventPayload;
+};
+
+export type EscrowOnchainProjectedMilestoneRecord = {
+  status: MilestoneStatus;
+  deliveredAt: number | null;
+  disputedAt: number | null;
+  releasedAt: number | null;
+  resolvedAt: number | null;
+  resolutionAction: 'release' | 'refund' | null;
+};
+
+export type EscrowProjectionDriftSummary = {
+  aggregateMatches: boolean;
+  auditDigestMatches: boolean;
+  localStatus: JobStatus;
+  projectedStatus: JobStatus;
+  localFundedAmount: string | null;
+  projectedFundedAmount: string | null;
+  localAuditEvents: number;
+  projectedAuditEvents: number;
+  mismatchedMilestones: Array<{
+    index: number;
+    localStatus: MilestoneStatus | null;
+    projectedStatus: MilestoneStatus | null;
+  }>;
+};
+
+export type EscrowAuthoritySource = 'chain_projection' | 'local_fallback';
+
+export type EscrowAuthorityStatus = {
+  source: EscrowAuthoritySource;
+  authorityReadsEnabled: boolean;
+  projectionAvailable: boolean;
+  projectionFresh: boolean;
+  projectionHealthy: boolean;
+  projectedAt: number | null;
+  lastProjectedBlock: number | null;
+  lastEventCount: number | null;
+  reason: string | null;
+};
+
+export type EscrowOnchainProjectionRecord = {
+  jobId: string;
+  chainId: number;
+  contractAddress: string;
+  escrowId: string;
+  projectedAt: number;
+  lastProjectedBlock: number | null;
+  lastEventBlock: number | null;
+  lastEventCount: number;
+  digest: string;
+  health: 'healthy' | 'degraded';
+  degradedReason: string | null;
+  fundedAmount: string | null;
+  status: JobStatus;
+  milestones: EscrowOnchainProjectedMilestoneRecord[];
+  chainAudit: Array<
+    Extract<
+      EscrowAuditEvent,
+      {
+        type:
+          | 'job.created'
+          | 'job.funded'
+          | 'job.milestones_set'
+          | 'milestone.delivered'
+          | 'milestone.released'
+          | 'milestone.disputed'
+          | 'milestone.resolved';
+      }
+    >
+  >;
+  driftSummary: EscrowProjectionDriftSummary;
+};
+
 export type EscrowJobRecord = {
   id: string;
   title: string;
@@ -286,6 +428,7 @@ export type EscrowAuditBundle = {
     job: EscrowPublicJobView;
     audit: EscrowAuditEvent[];
     executions: EscrowExecutionRecord[];
+    authority: EscrowAuthorityStatus;
   };
 };
 
@@ -308,6 +451,7 @@ export type EscrowJobHistoryExport = {
   schemaVersion: 1;
   artifact: 'job-history';
   exportedAt: string;
+  authority: EscrowAuthorityStatus;
   job: EscrowPublicJobView;
   summary: {
     milestoneCount: number;
@@ -324,6 +468,7 @@ export type EscrowDisputeCaseExport = {
   schemaVersion: 1;
   artifact: 'dispute-case';
   exportedAt: string;
+  authority: EscrowAuthorityStatus;
   job: EscrowPublicJobView;
   summary: {
     disputeCount: number;

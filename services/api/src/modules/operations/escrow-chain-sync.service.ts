@@ -14,8 +14,14 @@ import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
 import type {
   EscrowAuditEvent,
+  EscrowChainCursorRecord,
+  EscrowChainEventPayload,
+  EscrowChainEventRecord,
   EscrowChainSyncRecord,
   EscrowJobRecord,
+  EscrowOnchainProjectedMilestoneRecord,
+  EscrowOnchainProjectionRecord,
+  JobStatus,
   MilestoneStatus,
 } from '../escrow/escrow.types';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
@@ -25,6 +31,7 @@ import {
   type EscrowChainLog,
   type EscrowChainLogProvider,
 } from './escrow-chain-log.provider';
+import { EscrowChainIngestionStatusService } from './escrow-chain-ingestion-status.service';
 import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daemon-monitoring.service';
 import { EscrowChainSyncDaemonStatusService } from './escrow-chain-sync-daemon-status.service';
 import type {
@@ -41,6 +48,7 @@ import { OperationsConfigService } from './operations.config';
 import { EscrowReconciliationService } from './escrow-reconciliation.service';
 
 const MINOR_UNIT_SCALE = 1_000_000n;
+const streamName = 'workstream_escrow' as const;
 const contractInterface = new utils.Interface([
   'event JobCreated(uint256 indexed escrowId, address indexed client, bytes32 jobHash)',
   'event EscrowFunded(uint256 indexed escrowId, uint256 amount, address currency)',
@@ -61,10 +69,45 @@ const chainEventTopics = [
 ];
 
 type ParsedChainAuditEvent = {
-  event: EscrowAuditEvent;
+  event: Extract<
+    EscrowAuditEvent,
+    {
+      type:
+        | 'job.created'
+        | 'job.funded'
+        | 'job.milestones_set'
+        | 'milestone.delivered'
+        | 'milestone.released'
+        | 'milestone.disputed'
+        | 'milestone.resolved';
+    }
+  >;
   fallbackAt: number;
   blockNumber: number;
   txHash: string;
+};
+
+type ProjectionBuildResult = {
+  projection: EscrowOnchainProjectionRecord;
+  mergedJob: EscrowJobRecord;
+  issues: EscrowChainSyncIssue[];
+  chainReconciliation: EscrowChainSyncReport['chainReconciliation'];
+  localComparison: EscrowChainSyncReport['localComparison'];
+};
+
+type ChainStreamContext = {
+  chainId: number;
+  contractAddress: string;
+};
+
+type BuildSyncReportContext = {
+  fetchedLogs: number;
+  duplicateLogs: number;
+  latestBlock: number;
+  fromBlock: number;
+  toBlock: number;
+  persistProjection: boolean;
+  now: number;
 };
 
 type EscrowChainSyncBatchSelection = {
@@ -223,6 +266,17 @@ function dedupeLogs(logs: EscrowChainLog[]) {
   };
 }
 
+function sortChainEvents(
+  left: EscrowChainEventRecord,
+  right: EscrowChainEventRecord,
+) {
+  return (
+    left.blockNumber - right.blockNumber ||
+    left.logIndex - right.logIndex ||
+    left.transactionHash.localeCompare(right.transactionHash)
+  );
+}
+
 function eventMatchKey(event: EscrowAuditEvent) {
   return `${event.type}:${stableSerialize(event.payload)}`;
 }
@@ -306,6 +360,158 @@ function toAggregateMismatchSummary(
   };
 }
 
+function isOnchainAuditEventType(type: EscrowAuditEvent['type']) {
+  return (
+    type === 'job.created' ||
+    type === 'job.funded' ||
+    type === 'job.milestones_set' ||
+    type === 'milestone.delivered' ||
+    type === 'milestone.released' ||
+    type === 'milestone.disputed' ||
+    type === 'milestone.resolved'
+  );
+}
+
+function compareAuditEvents(left: EscrowAuditEvent, right: EscrowAuditEvent) {
+  return left.at - right.at || left.type.localeCompare(right.type);
+}
+
+function mergeLocalAndChainAudit(
+  localAudit: EscrowAuditEvent[],
+  chainAudit: EscrowOnchainProjectionRecord['chainAudit'],
+) {
+  return [
+    ...localAudit.filter((event) => !isOnchainAuditEventType(event.type)),
+    ...chainAudit,
+  ].sort(compareAuditEvents);
+}
+
+function createProjectedMilestone(): EscrowOnchainProjectedMilestoneRecord {
+  return {
+    status: 'pending',
+    deliveredAt: null,
+    disputedAt: null,
+    releasedAt: null,
+    resolvedAt: null,
+    resolutionAction: null,
+  };
+}
+
+function ensureProjectedMilestone(
+  milestones: EscrowOnchainProjectedMilestoneRecord[],
+  index: number,
+) {
+  while (milestones.length <= index) {
+    milestones.push(createProjectedMilestone());
+  }
+
+  return milestones[index]!;
+}
+
+function deriveExpectedJobStatus(
+  milestones: Array<Pick<EscrowOnchainProjectedMilestoneRecord, 'status'>>,
+  fundedAmount: string | null,
+): JobStatus {
+  const milestoneStatuses = milestones.map((milestone) => milestone.status);
+
+  if (milestoneStatuses.includes('disputed')) {
+    return 'disputed';
+  }
+
+  const allFinal =
+    milestoneStatuses.length > 0 &&
+    milestoneStatuses.every(
+      (status) => status === 'released' || status === 'refunded',
+    );
+
+  if (allFinal) {
+    return milestoneStatuses.includes('refunded') ? 'resolved' : 'completed';
+  }
+
+  if (
+    milestoneStatuses.some(
+      (status) =>
+        status === 'delivered' ||
+        status === 'released' ||
+        status === 'refunded',
+    )
+  ) {
+    return 'in_progress';
+  }
+
+  if (fundedAmount !== null) {
+    return 'funded';
+  }
+
+  return 'draft';
+}
+
+function mergeProjectedMilestones(
+  localJob: EscrowJobRecord,
+  projection: EscrowOnchainProjectionRecord,
+) {
+  return Array.from(
+    { length: Math.max(localJob.milestones.length, projection.milestones.length) },
+    (_, index) => {
+      const local =
+        localJob.milestones[index] ??
+        ({
+          title: `Milestone ${index + 1}`,
+          deliverable: '',
+          amount: '0',
+          status: 'pending',
+        } satisfies EscrowJobRecord['milestones'][number]);
+      const projected = projection.milestones[index];
+
+      if (!projected) {
+        return structuredClone(local);
+      }
+
+      return {
+        ...structuredClone(local),
+        status: projected.status,
+        deliveredAt: projected.deliveredAt ?? undefined,
+        disputedAt: projected.disputedAt ?? undefined,
+        releasedAt: projected.releasedAt ?? undefined,
+        resolvedAt: projected.resolvedAt ?? undefined,
+        resolutionAction: projected.resolutionAction ?? undefined,
+      };
+    },
+  );
+}
+
+function mergeProjectionIntoJob(
+  localJob: EscrowJobRecord,
+  projection: EscrowOnchainProjectionRecord,
+): EscrowJobRecord {
+  const mergedJob = cloneJob(localJob);
+  mergedJob.fundedAmount = projection.fundedAmount;
+  mergedJob.status = projection.status;
+  mergedJob.updatedAt = Math.max(localJob.updatedAt, projection.projectedAt);
+  mergedJob.audit = mergeLocalAndChainAudit(localJob.audit, projection.chainAudit);
+  mergedJob.milestones = mergeProjectedMilestones(localJob, projection);
+  return mergedJob;
+}
+
+function projectionShape(projection: EscrowOnchainProjectionRecord) {
+  return {
+    chainId: projection.chainId,
+    contractAddress: projection.contractAddress,
+    escrowId: projection.escrowId,
+    lastProjectedBlock: projection.lastProjectedBlock,
+    lastEventBlock: projection.lastEventBlock,
+    lastEventCount: projection.lastEventCount,
+    digest: projection.digest,
+    health: projection.health,
+    degradedReason: projection.degradedReason,
+    fundedAmount: projection.fundedAmount,
+    status: projection.status,
+    milestones: projection.milestones,
+    chainAudit: projection.chainAudit,
+    driftSummary: projection.driftSummary,
+  };
+}
+
 @Injectable()
 export class EscrowChainSyncService {
   constructor(
@@ -320,6 +526,7 @@ export class EscrowChainSyncService {
     private readonly reconciliationService: EscrowReconciliationService,
     private readonly daemonStatusService: EscrowChainSyncDaemonStatusService,
     private readonly daemonMonitoringService: EscrowChainSyncDaemonMonitoringService,
+    private readonly ingestionStatusService: EscrowChainIngestionStatusService,
   ) {}
 
   async syncJobAudit(
@@ -343,19 +550,51 @@ export class EscrowChainSyncService {
     }
 
     const latestBlock = await this.readLatestBlockNumber();
+    const fromBlock = this.resolveFromBlock(localJob, input.fromBlock);
+    const toBlock = input.toBlock ?? latestBlock;
+    if (toBlock < fromBlock) {
+      throw new BadRequestException(
+        'toBlock must be greater than or equal to fromBlock',
+      );
+    }
+    if (toBlock - fromBlock > this.operationsConfig.escrowSyncMaxRangeBlocks) {
+      throw new BadRequestException(
+        `Requested block range exceeds the configured max of ${this.operationsConfig.escrowSyncMaxRangeBlocks} blocks`,
+      );
+    }
 
-    return this.syncPersistedJobAudit(
-      localJob,
+    const fetchedLogs = await this.readLogs(localJob, fromBlock, toBlock);
+    const { unique, duplicateCount } = dedupeLogs(fetchedLogs);
+    const fetchedEvents = await this.toChainEventRecords(
       {
-        fromBlock: input.fromBlock,
-        toBlock: input.toBlock,
-        persist: input.persist,
+        chainId: localJob.onchain.chainId,
+        contractAddress: localJob.onchain.contractAddress,
       },
-      {
-        latestBlock,
-        now,
-      },
+      unique,
     );
+
+    if (input.persist === true) {
+      await this.escrowRepository.upsertChainEvents(fetchedEvents);
+    }
+
+    const chainEvents =
+      input.persist === true
+        ? await this.escrowRepository.listChainEvents({
+            chainId: localJob.onchain.chainId,
+            contractAddress: localJob.onchain.contractAddress,
+            escrowId: localJob.onchain.escrowId,
+          })
+        : fetchedEvents;
+
+    return this.buildSyncReport(localJob, chainEvents, {
+      fetchedLogs: fetchedLogs.length,
+      duplicateLogs: duplicateCount,
+      latestBlock,
+      fromBlock,
+      toBlock,
+      persistProjection: input.persist === true,
+      now,
+    });
   }
 
   async syncBatch(
@@ -369,6 +608,10 @@ export class EscrowChainSyncService {
     now = Date.now(),
   ): Promise<EscrowChainSyncBatchReport> {
     await this.requireOperatorAccess(userId);
+
+    if (input.persist === true && this.operationsConfig.escrowIngestionEnabled) {
+      await this.ingestFinalizedRange(now);
+    }
 
     const scope = input.scope ?? 'attention';
     const limit = this.resolveBatchLimit(
@@ -409,6 +652,9 @@ export class EscrowChainSyncService {
       input.limit,
       this.operationsConfig.escrowBatchSyncLimit,
     );
+    if (this.operationsConfig.escrowIngestionEnabled) {
+      await this.ingestFinalizedRange(now);
+    }
     const selection = await this.selectAllBatchJobs(limit);
 
     return this.runBatchSelection(
@@ -435,6 +681,11 @@ export class EscrowChainSyncService {
   ): Promise<EscrowChainSyncDaemonHealthReport> {
     await this.requireOperatorAccess(userId);
     return this.daemonMonitoringService.getReport();
+  }
+
+  async getIngestionStatus(userId: string) {
+    await this.requireOperatorAccess(userId);
+    return this.ingestionStatusService.getStatus();
   }
 
   private async runBatchSelection(
@@ -561,6 +812,33 @@ export class EscrowChainSyncService {
       throw new ConflictException('Job does not have an onchain escrow id');
     }
 
+    const requestedRange =
+      typeof input.fromBlock === 'number' || typeof input.toBlock === 'number';
+    if (!requestedRange) {
+      const storedEvents = await this.escrowRepository.listChainEvents({
+        chainId: localJob.onchain.chainId,
+        contractAddress: localJob.onchain.contractAddress,
+        escrowId: localJob.onchain.escrowId,
+      });
+
+      if (storedEvents.length > 0) {
+        const sortedEvents = [...storedEvents].sort(sortChainEvents);
+        const fromBlock = sortedEvents[0]?.blockNumber ?? 0;
+        const toBlock =
+          sortedEvents[sortedEvents.length - 1]?.blockNumber ?? fromBlock;
+
+        return this.buildSyncReport(localJob, sortedEvents, {
+          fetchedLogs: sortedEvents.length,
+          duplicateLogs: 0,
+          latestBlock: context.latestBlock,
+          fromBlock,
+          toBlock,
+          persistProjection: input.persist === true,
+          now: context.now,
+        });
+      }
+    }
+
     const fromBlock = this.resolveFromBlock(localJob, input.fromBlock);
     const toBlock = input.toBlock ?? context.latestBlock;
     if (toBlock < fromBlock) {
@@ -576,32 +854,130 @@ export class EscrowChainSyncService {
 
     const logs = await this.readLogs(localJob, fromBlock, toBlock);
     const dedupedLogs = dedupeLogs(logs);
+    const chainEvents = await this.toChainEventRecords(
+      {
+        chainId: localJob.onchain.chainId,
+        contractAddress: localJob.onchain.contractAddress,
+      },
+      dedupedLogs.unique,
+    );
+
+    if (input.persist === true) {
+      await this.escrowRepository.upsertChainEvents(chainEvents);
+    }
+
+    return this.buildSyncReport(localJob, chainEvents, {
+      fetchedLogs: logs.length,
+      duplicateLogs: dedupedLogs.duplicateCount,
+      latestBlock: context.latestBlock,
+      fromBlock,
+      toBlock,
+      persistProjection: input.persist === true,
+      now: context.now,
+    });
+  }
+
+  private async buildSyncReport(
+    localJob: EscrowJobRecord,
+    chainEvents: EscrowChainEventRecord[],
+    context: BuildSyncReportContext,
+  ): Promise<EscrowChainSyncReport> {
+    const result = this.buildProjectionFromChainEvents(
+      localJob,
+      chainEvents,
+      context.now,
+    );
+    const existingProjection = context.persistProjection
+      ? await this.escrowRepository.getOnchainProjection(localJob.id)
+      : null;
+    const projectionChanged =
+      existingProjection === null ||
+      stableSerialize(projectionShape(existingProjection)) !==
+        stableSerialize(projectionShape(result.projection));
+    const localAggregateChanged =
+      !result.localComparison.aggregateMatches ||
+      !result.localComparison.auditDigestMatches;
+    const blocked =
+      result.issues.some((issue) => issue.severity === 'critical') ||
+      chainEvents.length === 0;
+    const applied =
+      context.persistProjection &&
+      !blocked &&
+      (projectionChanged || localAggregateChanged);
+
+    const report: EscrowChainSyncReport = {
+      syncedAt: new Date(context.now).toISOString(),
+      mode: applied ? 'persisted' : 'preview',
+      job: {
+        jobId: localJob.id,
+        title: localJob.title,
+        chainId: localJob.onchain.chainId,
+        contractAddress: localJob.onchain.contractAddress,
+        escrowId: localJob.onchain.escrowId ?? '',
+      },
+      range: {
+        fromBlock: context.fromBlock,
+        toBlock: context.toBlock,
+        latestBlock: context.latestBlock,
+        lookbackBlocks: this.operationsConfig.escrowSyncLookbackBlocks,
+      },
+      normalization: {
+        fetchedLogs: context.fetchedLogs,
+        duplicateLogs: context.duplicateLogs,
+        uniqueLogs: chainEvents.length,
+        auditEvents: result.projection.chainAudit.length,
+        auditChanged:
+          !result.localComparison.auditDigestMatches ||
+          !result.localComparison.aggregateMatches,
+      },
+      issues: result.issues,
+      chainReconciliation: result.chainReconciliation,
+      localComparison: result.localComparison,
+      persistence: {
+        requested: context.persistProjection,
+        applied,
+        blocked: context.persistProjection && blocked,
+        blockedReason:
+          context.persistProjection && blocked
+            ? 'Critical ingestion issues must be resolved before persisting chain-derived audit state.'
+            : null,
+      },
+    };
+
+    if (context.persistProjection && !blocked) {
+      await this.escrowRepository.saveOnchainProjection(result.projection);
+    }
+
+    const jobForMetadata =
+      context.persistProjection && !blocked && localAggregateChanged
+        ? result.mergedJob
+        : cloneJob(localJob);
+    jobForMetadata.operations.chainSync = summarizeChainSyncRecord(report);
+    await this.escrowRepository.save(jobForMetadata);
+
+    return report;
+  }
+
+  private buildProjectionFromChainEvents(
+    localJob: EscrowJobRecord,
+    chainEvents: EscrowChainEventRecord[],
+    now: number,
+  ): ProjectionBuildResult {
     const issues: EscrowChainSyncIssue[] = [];
-    const blockTimestampCache = new Map<number, number>();
+    const sortedEvents = [...chainEvents].sort(sortChainEvents);
+    const projectedMilestones: EscrowOnchainProjectedMilestoneRecord[] = [];
     const parsedAuditEvents: ParsedChainAuditEvent[] = [];
+    let fundedAmount: string | null = null;
 
-    for (const log of dedupedLogs.unique) {
-      const parsed = contractInterface.parseLog({
-        topics: log.topics,
-        data: log.data,
-      });
-      const fallbackAt = await this.getBlockTimestamp(
-        log.blockNumber,
-        blockTimestampCache,
-      );
-
-      switch (parsed.name) {
+    for (const event of sortedEvents) {
+      switch (event.payload.eventName) {
         case 'JobCreated': {
           const clientAddress = normalizeEvmAddress(
-            readParsedStringArg(parsed.args, 'client'),
+            event.payload.clientAddress,
           );
-          const jobHash = readParsedStringArg(
-            parsed.args,
-            'jobHash',
-          ).toLowerCase();
+          const jobHash = event.payload.jobHash.toLowerCase();
           if (
-            clientAddress !==
-            normalizeEvmAddress(localJob.onchain.clientAddress)
+            clientAddress !== normalizeEvmAddress(localJob.onchain.clientAddress)
           ) {
             issues.push({
               code: 'job_created_client_mismatch',
@@ -611,8 +987,8 @@ export class EscrowChainSyncService {
               detail: `Expected ${normalizeEvmAddress(
                 localJob.onchain.clientAddress,
               )} but received ${clientAddress}.`,
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
+              blockNumber: event.blockNumber,
+              txHash: event.transactionHash,
             });
           }
           if (jobHash !== localJob.jobHash.toLowerCase()) {
@@ -622,30 +998,30 @@ export class EscrowChainSyncService {
               summary:
                 'The onchain JobCreated hash does not match the persisted local job hash.',
               detail: `Expected ${localJob.jobHash.toLowerCase()} but received ${jobHash}.`,
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
+              blockNumber: event.blockNumber,
+              txHash: event.transactionHash,
             });
           }
 
           parsedAuditEvents.push({
             event: {
               type: 'job.created',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
                 category: localJob.category,
-                escrowId: localJob.onchain.escrowId,
+                escrowId: localJob.onchain.escrowId ?? '',
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
         }
         case 'EscrowFunded': {
           const currencyAddress = normalizeEvmAddress(
-            readParsedStringArg(parsed.args, 'currency'),
+            event.payload.currencyAddress,
           );
           if (
             currencyAddress !==
@@ -659,97 +1035,121 @@ export class EscrowChainSyncService {
               detail: `Expected ${normalizeEvmAddress(
                 localJob.onchain.currencyAddress,
               )} but received ${currencyAddress}.`,
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
+              blockNumber: event.blockNumber,
+              txHash: event.transactionHash,
             });
           }
 
+          fundedAmount = formatMinorUnits(event.payload.amount);
           parsedAuditEvents.push({
             event: {
               type: 'job.funded',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
-                amount: formatMinorUnits(
-                  readParsedNumberishStringArg(parsed.args, 'amount'),
-                ),
+                amount: fundedAmount,
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
         }
-        case 'MilestonesSet':
+        case 'MilestonesSet': {
+          for (let index = 0; index < event.payload.count; index += 1) {
+            ensureProjectedMilestone(projectedMilestones, index);
+          }
           parsedAuditEvents.push({
             event: {
               type: 'job.milestones_set',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
-                count: readParsedIntegerArg(parsed.args, 'count'),
+                count: event.payload.count,
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
-        case 'MilestoneDelivered':
+        }
+        case 'MilestoneDelivered': {
+          const milestone = ensureProjectedMilestone(
+            projectedMilestones,
+            event.payload.milestoneIndex,
+          );
+          milestone.status = 'delivered';
+          milestone.deliveredAt = event.blockTimeMs;
           parsedAuditEvents.push({
             event: {
               type: 'milestone.delivered',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+                milestoneIndex: event.payload.milestoneIndex,
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
-        case 'MilestoneReleased':
+        }
+        case 'MilestoneReleased': {
+          const milestone = ensureProjectedMilestone(
+            projectedMilestones,
+            event.payload.milestoneIndex,
+          );
+          milestone.status = 'released';
+          milestone.releasedAt = event.blockTimeMs;
           parsedAuditEvents.push({
             event: {
               type: 'milestone.released',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+                milestoneIndex: event.payload.milestoneIndex,
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
-        case 'DisputeOpened':
+        }
+        case 'DisputeOpened': {
+          const milestone = ensureProjectedMilestone(
+            projectedMilestones,
+            event.payload.milestoneIndex,
+          );
+          milestone.status = 'disputed';
+          milestone.disputedAt = event.blockTimeMs;
           parsedAuditEvents.push({
             event: {
               type: 'milestone.disputed',
-              at: fallbackAt,
+              at: event.blockTimeMs,
               payload: {
                 jobId: localJob.id,
-                milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+                milestoneIndex: event.payload.milestoneIndex,
               },
             },
-            fallbackAt,
-            blockNumber: log.blockNumber,
-            txHash: log.transactionHash,
+            fallbackAt: event.blockTimeMs,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
           });
           break;
+        }
         case 'DisputeResolved': {
-          const splitBpsClient = readParsedIntegerArg(
-            parsed.args,
-            'splitBpsClient',
+          const milestone = ensureProjectedMilestone(
+            projectedMilestones,
+            event.payload.milestoneIndex,
           );
           let action: 'release' | 'refund' | null = null;
-          if (splitBpsClient === 0) {
+          if (event.payload.splitBpsClient === 0) {
             action = 'release';
-          } else if (splitBpsClient === 10_000) {
+          } else if (event.payload.splitBpsClient === 10_000) {
             action = 'refund';
           } else {
             issues.push({
@@ -757,26 +1157,32 @@ export class EscrowChainSyncService {
               severity: 'critical',
               summary:
                 'The onchain dispute resolution uses a partial client split that the persisted audit model cannot represent.',
-              detail: `splitBpsClient=${splitBpsClient}. Only 0 (release) and 10000 (refund) are currently representable.`,
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
+              detail: `splitBpsClient=${event.payload.splitBpsClient}. Only 0 (release) and 10000 (refund) are currently representable.`,
+              blockNumber: event.blockNumber,
+              txHash: event.transactionHash,
             });
           }
 
           if (action) {
+            milestone.status = action === 'release' ? 'released' : 'refunded';
+            milestone.resolvedAt = event.blockTimeMs;
+            milestone.resolutionAction = action;
+            if (action === 'release') {
+              milestone.releasedAt = event.blockTimeMs;
+            }
             parsedAuditEvents.push({
               event: {
                 type: 'milestone.resolved',
-                at: fallbackAt,
+                at: event.blockTimeMs,
                 payload: {
                   jobId: localJob.id,
-                  milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+                  milestoneIndex: event.payload.milestoneIndex,
                   action,
                 },
               },
-              fallbackAt,
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
+              fallbackAt: event.blockTimeMs,
+              blockNumber: event.blockNumber,
+              txHash: event.transactionHash,
             });
           }
           break;
@@ -784,7 +1190,7 @@ export class EscrowChainSyncService {
       }
     }
 
-    if (parsedAuditEvents.length === 0) {
+    if (sortedEvents.length === 0) {
       issues.push({
         code: 'no_chain_events_found',
         severity: 'critical',
@@ -795,7 +1201,7 @@ export class EscrowChainSyncService {
         blockNumber: null,
         txHash: null,
       });
-    } else if (parsedAuditEvents[0]?.event.type !== 'job.created') {
+    } else if (sortedEvents[0]?.payload.eventName !== 'JobCreated') {
       issues.push({
         code: 'job_created_log_missing',
         severity: 'critical',
@@ -803,79 +1209,304 @@ export class EscrowChainSyncService {
           'The scanned contract events do not include the expected JobCreated log for this escrow.',
         detail:
           'The block range may begin too late, or the persisted escrow id does not match the deployed contract history.',
-        blockNumber: parsedAuditEvents[0]?.blockNumber ?? null,
-        txHash: parsedAuditEvents[0]?.txHash ?? null,
+        blockNumber: sortedEvents[0]?.blockNumber ?? null,
+        txHash: sortedEvents[0]?.transactionHash ?? null,
       });
     }
 
-    const chainAudit = applyStableAuditTimestamps(
-      parsedAuditEvents,
-      localJob.audit,
-    );
-    const chainDerivedJob = cloneJob(localJob);
-    chainDerivedJob.audit = chainAudit;
-    if (chainAudit.length > 0) {
-      chainDerivedJob.updatedAt = Math.max(
-        localJob.updatedAt,
-        chainAudit[chainAudit.length - 1]?.at ?? localJob.updatedAt,
-      );
-    }
-
-    const chainReconciliation =
-      this.reconciliationService.buildReport(chainDerivedJob);
-    const localComparison = toAggregateMismatchSummary(
-      localJob,
-      chainDerivedJob,
-    );
-    const auditChanged = !localComparison.auditDigestMatches;
-    const blocked =
-      issues.some((issue) => issue.severity === 'critical') ||
-      chainAudit.length === 0;
-
-    let applied = false;
-    applied = input.persist === true && !blocked && auditChanged;
-    const report: EscrowChainSyncReport = {
-      syncedAt: new Date(context.now).toISOString(),
-      mode: applied ? 'persisted' : 'preview',
-      job: {
-        jobId: localJob.id,
-        title: localJob.title,
-        chainId: localJob.onchain.chainId,
-        contractAddress: localJob.onchain.contractAddress,
-        escrowId: localJob.onchain.escrowId,
-      },
-      range: {
-        fromBlock,
-        toBlock,
-        latestBlock: context.latestBlock,
-        lookbackBlocks: this.operationsConfig.escrowSyncLookbackBlocks,
-      },
-      normalization: {
-        fetchedLogs: logs.length,
-        duplicateLogs: dedupedLogs.duplicateCount,
-        uniqueLogs: dedupedLogs.unique.length,
-        auditEvents: chainAudit.length,
-        auditChanged,
-      },
-      issues,
-      chainReconciliation,
-      localComparison,
-      persistence: {
-        requested: input.persist === true,
-        applied,
-        blocked: input.persist === true && blocked,
-        blockedReason:
-          input.persist === true && blocked
-            ? 'Critical ingestion issues must be resolved before persisting chain-derived audit state.'
-            : null,
+    const chainAudit = applyStableAuditTimestamps(parsedAuditEvents, localJob.audit);
+    const projectedStatus = deriveExpectedJobStatus(projectedMilestones, fundedAmount);
+    const lastProjectedBlock =
+      sortedEvents[sortedEvents.length - 1]?.blockNumber ?? null;
+    const lastEventBlock = lastProjectedBlock;
+    const projection: EscrowOnchainProjectionRecord = {
+      jobId: localJob.id,
+      chainId: localJob.onchain.chainId,
+      contractAddress: localJob.onchain.contractAddress,
+      escrowId: localJob.onchain.escrowId ?? '',
+      projectedAt: now,
+      lastProjectedBlock,
+      lastEventBlock,
+      lastEventCount: sortedEvents.length,
+      digest: digest({
+        fundedAmount,
+        projectedStatus,
+        projectedMilestones,
+        chainAudit,
+      }),
+      health: issues.some((issue) => issue.severity === 'critical')
+        ? 'degraded'
+        : 'healthy',
+      degradedReason:
+        issues.find((issue) => issue.severity === 'critical')?.code ?? null,
+      fundedAmount,
+      status: projectedStatus,
+      milestones: projectedMilestones,
+      chainAudit,
+      driftSummary: {
+        aggregateMatches: true,
+        auditDigestMatches: true,
+        localStatus: localJob.status,
+        projectedStatus,
+        localFundedAmount: localJob.fundedAmount,
+        projectedFundedAmount: fundedAmount,
+        localAuditEvents: localJob.audit.length,
+        projectedAuditEvents: chainAudit.length,
+        mismatchedMilestones: [],
       },
     };
+    const mergedJob = mergeProjectionIntoJob(localJob, projection);
+    const localComparison = toAggregateMismatchSummary(localJob, mergedJob);
+    projection.driftSummary = {
+      aggregateMatches: localComparison.aggregateMatches,
+      auditDigestMatches: localComparison.auditDigestMatches,
+      localStatus: localComparison.localStatus,
+      projectedStatus: projection.status,
+      localFundedAmount: localComparison.localFundedAmount,
+      projectedFundedAmount: localComparison.chainDerivedFundedAmount,
+      localAuditEvents: localComparison.localAuditEvents,
+      projectedAuditEvents: localComparison.chainAuditEvents,
+      mismatchedMilestones: localComparison.mismatchedMilestones.map(
+        (milestone) => ({
+          index: milestone.index,
+          localStatus: milestone.localStatus,
+          projectedStatus: milestone.chainDerivedStatus,
+        }),
+      ),
+    };
 
-    const jobForMetadata = applied ? chainDerivedJob : cloneJob(localJob);
-    jobForMetadata.operations.chainSync = summarizeChainSyncRecord(report);
-    await this.escrowRepository.save(jobForMetadata);
+    return {
+      projection,
+      mergedJob,
+      issues,
+      chainReconciliation: this.reconciliationService.buildReport(mergedJob),
+      localComparison,
+    };
+  }
 
-    return report;
+  private async ingestFinalizedRange(now: number) {
+    const contractAddress = this.readConfiguredContractAddress();
+    const chainId = this.escrowContractConfig.chainId;
+    const latestBlock = await this.readLatestBlockNumber();
+    const finalizedBlock = Math.max(
+      0,
+      latestBlock - this.operationsConfig.escrowIngestionConfirmations,
+    );
+    const existingCursor = await this.escrowRepository.getChainCursor({
+      chainId,
+      contractAddress,
+      streamName,
+    });
+    const cursor: EscrowChainCursorRecord =
+      existingCursor ?? {
+        chainId,
+        contractAddress,
+        streamName,
+        nextFromBlock: 0,
+        lastFinalizedBlock: null,
+        lastScannedBlock: null,
+        lastError: null,
+        updatedAt: now,
+      };
+
+    if (finalizedBlock < cursor.nextFromBlock) {
+      await this.escrowRepository.saveChainCursor({
+        ...cursor,
+        lastFinalizedBlock: finalizedBlock,
+        updatedAt: now,
+      });
+      return;
+    }
+
+    const toBlock = Math.min(
+      finalizedBlock,
+      cursor.nextFromBlock + this.operationsConfig.escrowIngestionBatchBlocks - 1,
+    );
+    const fromBlock = Math.max(
+      0,
+      cursor.nextFromBlock - this.operationsConfig.escrowIngestionResyncBlocks,
+    );
+
+    try {
+      const logs = await this.readContractLogs(contractAddress, fromBlock, toBlock);
+      const deduped = dedupeLogs(logs);
+      const events = await this.toChainEventRecords(
+        {
+          chainId,
+          contractAddress,
+        },
+        deduped.unique,
+      );
+
+      await this.escrowRepository.replaceChainEventsInRange({
+        chainId,
+        contractAddress,
+        fromBlock,
+        toBlock,
+        events,
+      });
+      await this.escrowRepository.saveChainCursor({
+        chainId,
+        contractAddress,
+        streamName,
+        nextFromBlock: toBlock + 1,
+        lastFinalizedBlock: finalizedBlock,
+        lastScannedBlock: toBlock,
+        lastError: null,
+        updatedAt: now,
+      });
+
+      const jobs = await this.escrowRepository.listAll();
+      const jobsByEscrowId = new Map<string, EscrowJobRecord>();
+      for (const job of jobs) {
+        if (
+          job.onchain.chainId === chainId &&
+          normalizeEvmAddress(job.onchain.contractAddress) ===
+            normalizeEvmAddress(contractAddress) &&
+          job.onchain.escrowId
+        ) {
+          jobsByEscrowId.set(job.onchain.escrowId, job);
+        }
+      }
+
+      const affectedEscrowIds = Array.from(
+        new Set(events.map((event) => event.escrowId)),
+      );
+      for (const escrowId of affectedEscrowIds) {
+        const job = jobsByEscrowId.get(escrowId);
+        if (!job) {
+          continue;
+        }
+
+        const persistedEvents = await this.escrowRepository.listChainEvents({
+          chainId,
+          contractAddress,
+          escrowId,
+        });
+        if (persistedEvents.length === 0) {
+          continue;
+        }
+
+        const sortedEvents = [...persistedEvents].sort(sortChainEvents);
+        await this.buildSyncReport(job, sortedEvents, {
+          fetchedLogs: sortedEvents.length,
+          duplicateLogs: 0,
+          latestBlock,
+          fromBlock: sortedEvents[0]?.blockNumber ?? fromBlock,
+          toBlock: sortedEvents[sortedEvents.length - 1]?.blockNumber ?? toBlock,
+          persistProjection: true,
+          now,
+        });
+      }
+    } catch (error) {
+      await this.escrowRepository.saveChainCursor({
+        ...cursor,
+        lastFinalizedBlock: finalizedBlock,
+        lastScannedBlock: cursor.lastScannedBlock,
+        lastError: error instanceof Error ? error.message : 'Chain ingestion failed',
+        updatedAt: now,
+      });
+      throw error;
+    }
+  }
+
+  private async toChainEventRecords(
+    context: ChainStreamContext,
+    logs: EscrowChainLog[],
+  ): Promise<EscrowChainEventRecord[]> {
+    const blockTimestampCache = new Map<number, number>();
+    const records = await Promise.all(
+      logs.map((log) =>
+        this.toChainEventRecord(context, log, blockTimestampCache),
+      ),
+    );
+    return records.sort(sortChainEvents);
+  }
+
+  private async toChainEventRecord(
+    context: ChainStreamContext,
+    log: EscrowChainLog,
+    blockTimestampCache: Map<number, number>,
+  ): Promise<EscrowChainEventRecord> {
+    const parsed = contractInterface.parseLog({
+      topics: log.topics,
+      data: log.data,
+    });
+    const escrowId = readParsedNumberishStringArg(parsed.args, 'escrowId');
+    const blockTimeMs = await this.getBlockTimestamp(
+      log.blockNumber,
+      blockTimestampCache,
+    );
+
+    let payload: EscrowChainEventPayload;
+    switch (parsed.name) {
+      case 'JobCreated':
+        payload = {
+          eventName: 'JobCreated',
+          clientAddress: normalizeEvmAddress(
+            readParsedStringArg(parsed.args, 'client'),
+          ),
+          jobHash: readParsedStringArg(parsed.args, 'jobHash').toLowerCase(),
+        };
+        break;
+      case 'EscrowFunded':
+        payload = {
+          eventName: 'EscrowFunded',
+          amount: readParsedNumberishStringArg(parsed.args, 'amount'),
+          currencyAddress: normalizeEvmAddress(
+            readParsedStringArg(parsed.args, 'currency'),
+          ),
+        };
+        break;
+      case 'MilestonesSet':
+        payload = {
+          eventName: 'MilestonesSet',
+          count: readParsedIntegerArg(parsed.args, 'count'),
+        };
+        break;
+      case 'MilestoneDelivered':
+        payload = {
+          eventName: 'MilestoneDelivered',
+          milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+          deliverableHash: readParsedStringArg(parsed.args, 'deliverableHash'),
+        };
+        break;
+      case 'MilestoneReleased':
+        payload = {
+          eventName: 'MilestoneReleased',
+          milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+          amount: readParsedNumberishStringArg(parsed.args, 'amount'),
+        };
+        break;
+      case 'DisputeOpened':
+        payload = {
+          eventName: 'DisputeOpened',
+          milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+          reasonHash: readParsedStringArg(parsed.args, 'reasonHash'),
+        };
+        break;
+      case 'DisputeResolved':
+        payload = {
+          eventName: 'DisputeResolved',
+          milestoneIndex: readParsedIntegerArg(parsed.args, 'mid'),
+          splitBpsClient: readParsedIntegerArg(parsed.args, 'splitBpsClient'),
+        };
+        break;
+      default:
+        throw new Error(`Unsupported escrow event ${parsed.name}`);
+    }
+
+    return {
+      chainId: context.chainId,
+      contractAddress: context.contractAddress,
+      escrowId,
+      transactionHash: log.transactionHash,
+      logIndex: log.logIndex,
+      blockNumber: log.blockNumber,
+      blockHash: log.blockHash,
+      blockTimeMs,
+      payload,
+    };
   }
 
   private async selectBatchJobs(
@@ -992,6 +1623,23 @@ export class EscrowChainSyncService {
     }
   }
 
+  private async readContractLogs(
+    contractAddress: string,
+    fromBlock: number,
+    toBlock: number,
+  ) {
+    try {
+      return await this.chainLogProvider.getLogs({
+        contractAddress,
+        fromBlock,
+        toBlock,
+        eventTopics: chainEventTopics,
+      });
+    } catch (error) {
+      throw this.mapProviderError(error);
+    }
+  }
+
   private async getBlockTimestamp(
     blockNumber: number,
     cache: Map<number, number>,
@@ -1017,6 +1665,16 @@ export class EscrowChainSyncService {
         ? error.message
         : 'Failed to query escrow chain logs';
     return new ServiceUnavailableException(message);
+  }
+
+  private readConfiguredContractAddress() {
+    try {
+      return this.escrowContractConfig.contractAddress;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Escrow chain ingestion requires a configured contract address',
+      );
+    }
   }
 
   private async requireOperatorAccess(userId: string) {

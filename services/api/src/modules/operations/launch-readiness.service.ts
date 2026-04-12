@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daemon-monitoring.service';
+import { EscrowChainIngestionStatusService } from './escrow-chain-ingestion-status.service';
 import type {
   LaunchReadinessChainSyncHealthSnapshot,
   LaunchReadinessCheck,
@@ -12,12 +13,14 @@ export class LaunchReadinessService {
   constructor(
     private readonly runtimeProfile: RuntimeProfileService,
     private readonly daemonMonitoring: EscrowChainSyncDaemonMonitoringService,
+    private readonly ingestionStatus: EscrowChainIngestionStatusService,
   ) {}
 
   async getReport(): Promise<LaunchReadinessReport> {
-    const profile = this.runtimeProfile.getProfile();
+    const profile = await this.runtimeProfile.getProfile();
     const daemonHealth = await this.readDaemonHealth();
-    const checks = this.buildChecks(profile, daemonHealth);
+    const chainIngestion = await this.ingestionStatus.getStatus();
+    const checks = this.buildChecks(profile, daemonHealth, chainIngestion);
     const blockers = checks
       .filter((check) => check.blocker)
       .map((check) => check.summary);
@@ -34,10 +37,10 @@ export class LaunchReadinessService {
         supportedSurfaces: [
           'OTP-authenticated API, web, and admin flows backed by Postgres and relay providers.',
           'Arbitrator-wallet-linked operator resolution, export, and operations-health workflows.',
+          'Finalized contract-log ingestion with persisted chain projections for authoritative escrow read paths.',
           'Recurring chain-sync daemon monitoring and alerting over persisted worker status.',
         ],
         exclusions: [
-          'No external indexer-backed reconciliation or independent chain source of truth yet.',
           'No non-arbitrator privileged operator role model beyond the linked arbitrator wallet.',
           'No automated execution retry, self-healing remediation, or incident paging evidence without live staging validation.',
         ],
@@ -49,8 +52,9 @@ export class LaunchReadinessService {
   }
 
   private buildChecks(
-    profile: ReturnType<RuntimeProfileService['getProfile']>,
+    profile: Awaited<ReturnType<RuntimeProfileService['getProfile']>>,
     daemonHealth: LaunchReadinessChainSyncHealthSnapshot,
+    chainIngestion: Awaited<ReturnType<EscrowChainIngestionStatusService['getStatus']>>,
   ): LaunchReadinessCheck[] {
     const daemonPosture = profile.operations.chainSyncDaemon;
     const checks: LaunchReadinessCheck[] = [
@@ -147,6 +151,27 @@ export class LaunchReadinessService {
         blocker:
           !profile.operator.arbitratorAddress ||
           !profile.operator.exportSupport,
+      },
+      {
+        id: 'chain-ingestion-config',
+        owner: 'worker',
+        status: chainIngestion.enabled ? 'ok' : 'failed',
+        summary: chainIngestion.enabled
+          ? 'Escrow chain ingestion is enabled.'
+          : 'Escrow chain ingestion is disabled.',
+        details:
+          chainIngestion.enabled
+            ? undefined
+            : 'Launch scope now expects finalized chain ingestion to be enabled.',
+        blocker: !chainIngestion.enabled,
+      },
+      {
+        id: 'chain-ingestion-health',
+        owner: 'worker',
+        status: chainIngestion.status,
+        summary: chainIngestion.summary,
+        details: chainIngestion.issues[0] ?? chainIngestion.warnings[0],
+        blocker: chainIngestion.status === 'failed',
       },
       {
         id: 'chain-sync-daemon-config',

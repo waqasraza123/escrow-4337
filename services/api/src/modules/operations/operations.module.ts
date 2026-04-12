@@ -17,12 +17,14 @@ import { EscrowChainSyncDaemonStatusService } from './escrow-chain-sync-daemon-s
 import { EscrowChainSyncDaemonAlertStateService } from './escrow-chain-sync-daemon-alert-state.service';
 import { EscrowChainSyncDaemonAlertingService } from './escrow-chain-sync-daemon-alerting.service';
 import { EscrowChainSyncDaemonMonitoringService } from './escrow-chain-sync-daemon-monitoring.service';
+import { EscrowChainIngestionStatusService } from './escrow-chain-ingestion-status.service';
 import { EscrowChainSyncRunLockService } from './escrow-chain-sync-run-lock.service';
 import { EscrowHealthService } from './escrow-health.service';
 import { EscrowHistoryImportService } from './escrow-history-import.service';
 import { LaunchReadinessService } from './launch-readiness.service';
 import { OperationsConfigService } from './operations.config';
 import { OperationsController } from './operations.controller';
+import { EscrowOnchainAuthorityService } from './escrow-onchain-authority.service';
 import { EscrowReconciliationService } from './escrow-reconciliation.service';
 import { RuntimeProfileService } from './runtime-profile.service';
 
@@ -47,9 +49,11 @@ import { RuntimeProfileService } from './runtime-profile.service';
     EscrowChainSyncService,
     EscrowChainSyncDaemonAlertStateService,
     EscrowChainSyncDaemonAlertingService,
+    EscrowChainIngestionStatusService,
     EscrowChainSyncDaemonStatusService,
     EscrowChainSyncDaemonMonitoringService,
     EscrowChainSyncRunLockService,
+    EscrowOnchainAuthorityService,
     EscrowReconciliationService,
     EscrowHistoryImportService,
     LaunchReadinessService,
@@ -63,9 +67,11 @@ import { RuntimeProfileService } from './runtime-profile.service';
     EscrowChainSyncDaemonDeploymentService,
     EscrowChainSyncDaemonAlertingService,
     EscrowChainSyncDaemonMonitoringService,
+    EscrowChainIngestionStatusService,
     EscrowHealthService,
     EscrowHistoryImportService,
     LaunchReadinessService,
+    EscrowOnchainAuthorityService,
     EscrowReconciliationService,
     RuntimeProfileService,
   ],

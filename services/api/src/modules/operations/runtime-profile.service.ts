@@ -5,6 +5,7 @@ import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.c
 import { PersistenceConfigService } from '../../persistence/persistence.config';
 import { SmartAccountConfigService } from '../wallet/provisioning/smart-account.config';
 import { EscrowChainSyncDaemonDeploymentService } from './escrow-chain-sync-daemon-deployment.service';
+import { EscrowChainIngestionStatusService } from './escrow-chain-ingestion-status.service';
 import type { BackendRuntimeProfile } from './runtime-profile.types';
 
 @Injectable()
@@ -15,9 +16,10 @@ export class RuntimeProfileService {
     private readonly persistenceConfig: PersistenceConfigService,
     private readonly smartAccountConfig: SmartAccountConfigService,
     private readonly daemonDeployment: EscrowChainSyncDaemonDeploymentService,
+    private readonly ingestionStatus: EscrowChainIngestionStatusService,
   ) {}
 
-  getProfile(): BackendRuntimeProfile {
+  async getProfile(): Promise<BackendRuntimeProfile> {
     const environment = {
       nodeEnv: process.env.NODE_ENV || 'development',
       persistenceDriver: this.persistenceConfig.driver,
@@ -30,6 +32,7 @@ export class RuntimeProfileService {
       escrowMode: this.escrowConfig.mode,
     };
     const daemonPosture = this.daemonDeployment.getPosture();
+    const chainIngestion = await this.ingestionStatus.getStatus();
     const warnings: string[] = [];
 
     if (environment.persistenceDriver !== 'postgres') {
@@ -62,7 +65,12 @@ export class RuntimeProfileService {
       );
     }
 
-    warnings.push(...daemonPosture.issues, ...daemonPosture.warnings);
+    warnings.push(
+      ...chainIngestion.issues,
+      ...chainIngestion.warnings,
+      ...daemonPosture.issues,
+      ...daemonPosture.warnings,
+    );
 
     const allRelaysEnabled =
       environment.persistenceDriver === 'postgres' &&
@@ -92,6 +100,27 @@ export class RuntimeProfileService {
         exportSupport: true,
       },
       operations: {
+        chainIngestion: {
+          enabled: chainIngestion.enabled,
+          authorityReadsEnabled: chainIngestion.authorityReadsEnabled,
+          status: chainIngestion.status,
+          summary: chainIngestion.summary,
+          confirmationDepth: chainIngestion.confirmations,
+          batchBlocks: chainIngestion.batchBlocks,
+          resyncBlocks: chainIngestion.resyncBlocks,
+          latestBlock: chainIngestion.latestBlock,
+          finalizedBlock: chainIngestion.finalizedBlock,
+          lagBlocks: chainIngestion.lagBlocks,
+          cursor: {
+            nextFromBlock: chainIngestion.cursor?.nextFromBlock ?? null,
+            lastFinalizedBlock: chainIngestion.cursor?.lastFinalizedBlock ?? null,
+            lastScannedBlock: chainIngestion.cursor?.lastScannedBlock ?? null,
+            updatedAt: chainIngestion.cursor?.updatedAt ?? null,
+          },
+          projections: chainIngestion.projections,
+          issues: chainIngestion.issues,
+          warnings: chainIngestion.warnings,
+        },
         chainSyncDaemon: daemonPosture,
       },
       warnings,

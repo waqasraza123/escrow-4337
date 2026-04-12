@@ -1,4 +1,7 @@
-import type { EscrowChainSyncDaemonHealthReport } from '../src/modules/operations/escrow-health.types';
+import type {
+  EscrowChainIngestionStatus,
+  EscrowChainSyncDaemonHealthReport,
+} from '../src/modules/operations/escrow-health.types';
 import { LaunchReadinessService } from '../src/modules/operations/launch-readiness.service';
 import type { BackendRuntimeProfile } from '../src/modules/operations/runtime-profile.types';
 
@@ -28,6 +31,33 @@ describe('LaunchReadinessService', () => {
         exportSupport: true,
       },
       operations: {
+        chainIngestion: {
+          enabled: true,
+          authorityReadsEnabled: false,
+          status: 'ok',
+          summary: 'Escrow chain ingestion is healthy.',
+          confirmationDepth: 6,
+          batchBlocks: 1000,
+          resyncBlocks: 20,
+          latestBlock: 100,
+          finalizedBlock: 94,
+          lagBlocks: 0,
+          cursor: {
+            nextFromBlock: 95,
+            lastFinalizedBlock: 94,
+            lastScannedBlock: 94,
+            updatedAt: 1_700_000_000_000,
+          },
+          projections: {
+            totalJobs: 0,
+            projectedJobs: 0,
+            healthyJobs: 0,
+            degradedJobs: 0,
+            staleJobs: 0,
+          },
+          issues: [],
+          warnings: [],
+        },
         chainSyncDaemon: {
           status: 'ok',
           summary: 'Recurring chain-sync daemon deployment posture is aligned.',
@@ -56,6 +86,46 @@ describe('LaunchReadinessService', () => {
     };
   }
 
+  function createIngestionStatus(
+    overrides: Partial<EscrowChainIngestionStatus> = {},
+  ): EscrowChainIngestionStatus {
+    return {
+      generatedAt: '2026-04-09T00:00:00.000Z',
+      enabled: true,
+      authorityReadsEnabled: false,
+      chainId: 84532,
+      contractAddress: '0x1111111111111111111111111111111111111111',
+      confirmations: 6,
+      batchBlocks: 1000,
+      resyncBlocks: 20,
+      latestBlock: 100,
+      finalizedBlock: 94,
+      lagBlocks: 0,
+      cursor: {
+        chainId: 84532,
+        contractAddress: '0x1111111111111111111111111111111111111111',
+        streamName: 'workstream_escrow',
+        nextFromBlock: 95,
+        lastFinalizedBlock: 94,
+        lastScannedBlock: 94,
+        lastError: null,
+        updatedAt: 1_700_000_000_000,
+      },
+      projections: {
+        totalJobs: 0,
+        projectedJobs: 0,
+        healthyJobs: 0,
+        degradedJobs: 0,
+        staleJobs: 0,
+      },
+      status: 'ok',
+      summary: 'Escrow chain ingestion is healthy.',
+      issues: [],
+      warnings: [],
+      ...overrides,
+    };
+  }
+
   function createDaemonHealth(
     overrides: Partial<EscrowChainSyncDaemonHealthReport> = {},
   ): EscrowChainSyncDaemonHealthReport {
@@ -73,6 +143,7 @@ describe('LaunchReadinessService', () => {
       },
       issues: [],
       daemon: null,
+      ingestion: createIngestionStatus(),
       ...overrides,
     };
   }
@@ -80,13 +151,17 @@ describe('LaunchReadinessService', () => {
   function createService(
     runtimeProfile = createRuntimeProfile(),
     daemonHealth = createDaemonHealth(),
+    ingestionStatus = createIngestionStatus(),
   ) {
     return new LaunchReadinessService(
       {
-        getProfile: jest.fn().mockReturnValue(runtimeProfile),
+        getProfile: jest.fn().mockResolvedValue(runtimeProfile),
       } as never,
       {
         getReport: jest.fn().mockResolvedValue(daemonHealth),
+      } as never,
+      {
+        getStatus: jest.fn().mockResolvedValue(ingestionStatus),
       } as never,
     );
   }
@@ -102,6 +177,12 @@ describe('LaunchReadinessService', () => {
     );
     expect(
       report.checks.find((check) => check.id === 'backend-profile'),
+    ).toMatchObject({
+      status: 'ok',
+      blocker: false,
+    });
+    expect(
+      report.checks.find((check) => check.id === 'chain-ingestion-health'),
     ).toMatchObject({
       status: 'ok',
       blocker: false,
@@ -157,6 +238,7 @@ describe('LaunchReadinessService', () => {
         corsOrigins: ['https://web.example.com'],
       },
       operations: {
+        chainIngestion: createRuntimeProfile().operations.chainIngestion,
         chainSyncDaemon: {
           ...createRuntimeProfile().operations.chainSyncDaemon,
           status: 'failed',
@@ -183,10 +265,17 @@ describe('LaunchReadinessService', () => {
         },
       ],
     });
+    const ingestionStatus = createIngestionStatus({
+      status: 'warning',
+      summary: 'Escrow chain ingestion is lagging behind finalized chain head.',
+      warnings: ['Escrow chain ingestion is 120 block(s) behind the finalized head.'],
+      lagBlocks: 120,
+    });
 
     const report = await createService(
       runtimeProfile,
       daemonHealth,
+      ingestionStatus,
     ).getReport();
 
     expect(report.ready).toBe(false);
@@ -198,6 +287,9 @@ describe('LaunchReadinessService', () => {
     );
     expect(report.warnings).toContain(
       'Trusted proxy handling is not explicitly configured.',
+    );
+    expect(report.warnings).toContain(
+      'Escrow chain ingestion is lagging behind finalized chain head.',
     );
   });
 });

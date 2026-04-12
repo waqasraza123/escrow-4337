@@ -52,6 +52,7 @@ import type {
   UpdateContractorEmailResponse,
 } from './escrow.types';
 import { EmailService } from '../auth/email.service';
+import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
 import { UsersService } from '../users/users.service';
 import { buildEscrowExportDocument } from './escrow-export';
 
@@ -130,6 +131,7 @@ export class EscrowService {
     private readonly escrowActorService: EscrowActorService,
     private readonly emailService: EmailService,
     private readonly usersService: UsersService,
+    private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
   ) {}
 
   async listJobsForUser(userId: string): Promise<EscrowJobsListResponse> {
@@ -147,9 +149,16 @@ export class EscrowService {
     const jobs =
       await this.escrowRepository.listByParticipantAddresses(addresses);
 
+    const mergedJobs = await Promise.all(
+      jobs.map(async (job) => ({
+        job,
+        merged: await this.escrowOnchainAuthority.mergeJob(job),
+      })),
+    );
+
     return {
-      jobs: jobs
-        .map((job) => {
+      jobs: mergedJobs
+        .map(({ job, merged }) => {
           const participantRoles = this.resolveParticipantRoles(job, user);
 
           if (participantRoles.length === 0) {
@@ -157,7 +166,7 @@ export class EscrowService {
           }
 
           return {
-            job: this.toJobView(job),
+            job: this.toJobView(merged.job),
             participantRoles,
           };
         })
@@ -876,16 +885,18 @@ export class EscrowService {
 
   async getAuditBundle(jobId: string): Promise<EscrowAuditBundle> {
     const job = await this.getJobOrThrow(jobId);
-    const { audit, executions, ...jobView } = cloneValue(job);
+    const merged = await this.escrowOnchainAuthority.mergeJob(job);
+    const { audit, executions, ...jobView } = cloneValue(merged.job);
 
     return {
       bundle: {
         job: this.toPublicJobViewFromRecord({
           ...jobView,
-          contractorParticipation: job.contractorParticipation,
+          contractorParticipation: merged.job.contractorParticipation,
         }),
         audit,
         executions,
+        authority: merged.authority,
       },
     };
   }

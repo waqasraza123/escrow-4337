@@ -17,6 +17,7 @@ describe('DeploymentValidationService', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     process.env.NODE_ENV = 'production';
+    process.env.NEST_API_PORT = '4100';
     process.env.JWT_SECRET = 'test_jwt_secret_for_integration_123';
     process.env.DATABASE_URL =
       'postgresql://escrow:escrow@localhost:5432/escrow';
@@ -191,6 +192,7 @@ describe('DeploymentValidationService', () => {
 
   it('allows a zero-cost local development profile to validate runtime configuration', () => {
     process.env.NODE_ENV = 'development';
+    process.env.NEST_API_PORT = '4100';
     process.env.AUTH_EMAIL_MODE = 'mock';
     delete process.env.AUTH_EMAIL_RELAY_BASE_URL;
     process.env.WALLET_SMART_ACCOUNT_MODE = 'mock';
@@ -237,6 +239,7 @@ describe('DeploymentValidationService', () => {
             maxConsecutiveSkips: 6,
           },
           issues: [],
+          ingestion: null,
           daemon: null,
         }),
       } as unknown as EscrowChainSyncDaemonMonitoringService,

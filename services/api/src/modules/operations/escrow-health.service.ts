@@ -15,6 +15,7 @@ import type {
   EscrowJobRecord,
 } from '../escrow/escrow.types';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
+import { EscrowOnchainAuthorityService } from './escrow-onchain-authority.service';
 import type {
   EscrowAttentionReason,
   EscrowFailureGuidance,
@@ -415,6 +416,7 @@ export class EscrowHealthService {
     private readonly escrowContractConfig: EscrowContractConfigService,
     private readonly operationsConfig: OperationsConfigService,
     private readonly reconciliationService: EscrowReconciliationService,
+    private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
   ) {}
 
   async getReport(
@@ -434,10 +436,13 @@ export class EscrowHealthService {
       this.operationsConfig.escrowHealthMaxLimit,
     );
 
-    const allAttentionJobs = jobs
-      .map((job) =>
-        this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
+    const allAttentionJobs = (
+      await Promise.all(
+        jobs.map((job) =>
+          this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
+        ),
       )
+    )
       .filter((job) => job.reasons.length > 0)
       .sort((left, right) => {
         const leftPriority = attentionPriority(left.reasons);
@@ -531,7 +536,12 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
+      job: await this.buildJobSummary(
+        job,
+        staleCutoff,
+        chainSyncBacklogCutoff,
+        now,
+      ),
     };
   }
 
@@ -580,7 +590,7 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(
+      job: await this.buildJobSummary(
         job,
         staleCutoff,
         chainSyncBacklogCutoff,
@@ -632,7 +642,7 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(
+      job: await this.buildJobSummary(
         job,
         staleCutoff,
         chainSyncBacklogCutoff,
@@ -672,7 +682,7 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(
+      job: await this.buildJobSummary(
         job,
         staleCutoff,
         chainSyncBacklogCutoff,
@@ -723,7 +733,7 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(
+      job: await this.buildJobSummary(
         job,
         staleCutoff,
         chainSyncBacklogCutoff,
@@ -759,11 +769,16 @@ export class EscrowHealthService {
     await this.escrowRepository.save(job);
 
     return {
-      job: this.buildJobSummary(job, staleCutoff, chainSyncBacklogCutoff, now),
+      job: await this.buildJobSummary(
+        job,
+        staleCutoff,
+        chainSyncBacklogCutoff,
+        now,
+      ),
     };
   }
 
-  private buildJobSummary(
+  private async buildJobSummary(
     job: EscrowJobRecord,
     staleCutoff: number,
     chainSyncBacklogCutoff: number,
@@ -771,15 +786,17 @@ export class EscrowHealthService {
     failedExecutionDiagnostics = buildFailedExecutionDiagnostics(
       job.executions,
     ),
-  ): EscrowHealthJob {
-    const latestActivity = latestActivityAt(job);
-    const openDisputes = job.milestones.filter(
+  ): Promise<EscrowHealthJob> {
+    const merged = await this.escrowOnchainAuthority.mergeJob(job, now);
+    const effectiveJob = merged.job;
+    const latestActivity = latestActivityAt(effectiveJob);
+    const openDisputes = effectiveJob.milestones.filter(
       (milestone) => milestone.status === 'disputed',
     ).length;
-    const failedExecutions = job.executions.filter(
+    const failedExecutions = effectiveJob.executions.filter(
       (execution) => execution.status === 'failed',
     ).length;
-    const reconciliation = this.reconciliationService.buildReport(job);
+    const reconciliation = this.reconciliationService.buildReport(effectiveJob);
     const failureGuidance = failedExecutionDiagnostics
       ? inferFailureGuidance(failedExecutions, failedExecutionDiagnostics)
       : null;
@@ -807,18 +824,18 @@ export class EscrowHealthService {
     }
 
     if (
-      job.status !== 'completed' &&
-      job.status !== 'resolved' &&
+      effectiveJob.status !== 'completed' &&
+      effectiveJob.status !== 'resolved' &&
       latestActivity <= staleCutoff
     ) {
       reasons.add('stale_job');
     }
 
     return {
-      jobId: job.id,
-      title: job.title,
-      status: job.status,
-      updatedAt: job.updatedAt,
+      jobId: effectiveJob.id,
+      title: effectiveJob.title,
+      status: effectiveJob.status,
+      updatedAt: effectiveJob.updatedAt,
       latestActivityAt: latestActivity,
       staleForMs:
         reasons.has('stale_job') && latestActivity < now
@@ -833,34 +850,35 @@ export class EscrowHealthService {
       },
       chainSync,
       executionFailureWorkflow:
-        job.operations.executionFailureWorkflow && failedExecutionDiagnostics
+        effectiveJob.operations.executionFailureWorkflow && failedExecutionDiagnostics
           ? {
               claimedByUserId:
-                job.operations.executionFailureWorkflow.claimedByUserId,
+                effectiveJob.operations.executionFailureWorkflow.claimedByUserId,
               claimedByEmail:
-                job.operations.executionFailureWorkflow.claimedByEmail,
-              claimedAt: job.operations.executionFailureWorkflow.claimedAt,
+                effectiveJob.operations.executionFailureWorkflow.claimedByEmail,
+              claimedAt: effectiveJob.operations.executionFailureWorkflow.claimedAt,
               status: normalizeFailureWorkflowStatus(
-                job.operations.executionFailureWorkflow.status,
+                effectiveJob.operations.executionFailureWorkflow.status,
               ),
               acknowledgedFailureAt:
-                job.operations.executionFailureWorkflow.acknowledgedFailureAt ??
+                effectiveJob.operations.executionFailureWorkflow
+                  .acknowledgedFailureAt ??
                 null,
-              note: job.operations.executionFailureWorkflow.note ?? null,
-              updatedAt: job.operations.executionFailureWorkflow.updatedAt,
+              note: effectiveJob.operations.executionFailureWorkflow.note ?? null,
+              updatedAt: effectiveJob.operations.executionFailureWorkflow.updatedAt,
               latestFailureNeedsAcknowledgement:
-                (job.operations.executionFailureWorkflow
+                (effectiveJob.operations.executionFailureWorkflow
                   .acknowledgedFailureAt ?? 0) <
                 failedExecutionDiagnostics.latestFailureAt,
             }
           : null,
-      staleWorkflow: job.operations.staleWorkflow
+      staleWorkflow: effectiveJob.operations.staleWorkflow
         ? {
-            claimedByUserId: job.operations.staleWorkflow.claimedByUserId,
-            claimedByEmail: job.operations.staleWorkflow.claimedByEmail,
-            claimedAt: job.operations.staleWorkflow.claimedAt,
-            note: job.operations.staleWorkflow.note ?? null,
-            updatedAt: job.operations.staleWorkflow.updatedAt,
+            claimedByUserId: effectiveJob.operations.staleWorkflow.claimedByUserId,
+            claimedByEmail: effectiveJob.operations.staleWorkflow.claimedByEmail,
+            claimedAt: effectiveJob.operations.staleWorkflow.claimedAt,
+            note: effectiveJob.operations.staleWorkflow.note ?? null,
+            updatedAt: effectiveJob.operations.staleWorkflow.updatedAt,
           }
         : null,
       latestFailedExecution:
@@ -869,10 +887,11 @@ export class EscrowHealthService {
       failureGuidance,
       reconciliation,
       onchain: {
-        chainId: job.onchain.chainId,
-        contractAddress: job.onchain.contractAddress,
-        escrowId: job.onchain.escrowId,
+        chainId: effectiveJob.onchain.chainId,
+        contractAddress: effectiveJob.onchain.contractAddress,
+        escrowId: effectiveJob.onchain.escrowId,
       },
+      authority: merged.authority,
     };
   }
 

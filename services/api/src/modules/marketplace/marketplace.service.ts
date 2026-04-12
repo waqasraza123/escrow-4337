@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY, MARKETPLACE_REPOSITORY } from '../../persistence/persistence.tokens';
 import type {
   EscrowRepository,
@@ -17,6 +18,7 @@ import type {
 } from '../escrow/escrow.types';
 import { EscrowActorService } from '../escrow/escrow-actor.service';
 import { EscrowService } from '../escrow/escrow.service';
+import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
 import { UsersService } from '../users/users.service';
 import { isEoaWallet, isSmartAccountWallet, type UserRecord } from '../users/users.types';
 import type {
@@ -172,6 +174,7 @@ export class MarketplaceService {
     private readonly usersService: UsersService,
     private readonly escrowService: EscrowService,
     private readonly escrowActorService: EscrowActorService,
+    private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
   ) {}
 
   async getMyProfile(userId: string): Promise<MarketplaceProfileResponse> {
@@ -1456,7 +1459,9 @@ export class MarketplaceService {
   }
 
   private async getEscrowStats(user: UserRecord): Promise<MarketplaceEscrowStats> {
-    const addresses = user.wallets.map((wallet) => wallet.address);
+    const addresses = user.wallets.map((wallet) =>
+      normalizeEvmAddress(wallet.address),
+    );
     if (addresses.length === 0) {
       return {
         totalContracts: 0,
@@ -1470,8 +1475,10 @@ export class MarketplaceService {
       };
     }
 
-    const jobs = (await this.escrowRepository.listByParticipantAddresses(addresses)).filter(
-      (job) => addresses.includes(job.onchain.workerAddress),
+    const jobs = await Promise.all(
+      (await this.escrowRepository.listByParticipantAddresses(addresses))
+        .filter((job) => addresses.includes(normalizeEvmAddress(job.onchain.workerAddress)))
+        .map(async (job) => (await this.escrowOnchainAuthority.mergeJob(job)).job),
     );
     const completedJobs = jobs.filter(
       (job) => job.status === 'completed' || job.status === 'resolved',

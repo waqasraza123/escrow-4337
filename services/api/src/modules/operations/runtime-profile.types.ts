@@ -25,6 +25,34 @@ export type ChainSyncDaemonRuntimePosture = {
   warnings: string[];
 };
 
+export type ChainIngestionRuntimePosture = {
+  enabled: boolean;
+  authorityReadsEnabled: boolean;
+  status: 'ok' | 'warning' | 'failed';
+  summary: string;
+  confirmationDepth: number;
+  batchBlocks: number;
+  resyncBlocks: number;
+  latestBlock: number | null;
+  finalizedBlock: number | null;
+  lagBlocks: number | null;
+  cursor: {
+    nextFromBlock: number | null;
+    lastFinalizedBlock: number | null;
+    lastScannedBlock: number | null;
+    updatedAt: number | null;
+  };
+  projections: {
+    totalJobs: number;
+    projectedJobs: number;
+    healthyJobs: number;
+    degradedJobs: number;
+    staleJobs: number;
+  };
+  issues: string[];
+  warnings: string[];
+};
+
 export type BackendRuntimeProfile = {
   generatedAt: string;
   profile: RuntimeProfileKind;
@@ -46,6 +74,7 @@ export type BackendRuntimeProfile = {
     exportSupport: boolean;
   };
   operations: {
+    chainIngestion: ChainIngestionRuntimePosture;
     chainSyncDaemon: ChainSyncDaemonRuntimePosture;
   };
   warnings: string[];

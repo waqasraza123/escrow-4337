@@ -49,6 +49,7 @@ describe('EscrowChainSyncService', () => {
       ESCROW_ARBITRATOR_ADDRESS: arbitratorAddress,
       OPERATIONS_ESCROW_SYNC_LOOKBACK_BLOCKS: '20',
       OPERATIONS_ESCROW_SYNC_MAX_RANGE_BLOCKS: '100',
+      OPERATIONS_ESCROW_INGESTION_ENABLED: 'false',
     };
 
     const persistence = configureFilePersistence();
@@ -181,7 +182,7 @@ describe('EscrowChainSyncService', () => {
       aggregateMatches: true,
       auditDigestMatches: false,
       localAuditEvents: 7,
-      chainAuditEvents: 4,
+      chainAuditEvents: 7,
       localStatus: 'in_progress',
       chainDerivedStatus: 'in_progress',
     });
@@ -260,10 +261,13 @@ describe('EscrowChainSyncService', () => {
     });
     expect(report.localComparison.auditDigestMatches).toBe(false);
     expect(persisted.audit.map((event) => event.type)).toEqual([
+      'milestone.delivered',
+      'job.contractor_participation_requested',
       'job.created',
       'job.funded',
       'job.milestones_set',
-      'milestone.delivered',
+      'job.contractor_invite_sent',
+      'job.contractor_joined',
     ]);
     expect(persisted.operations.chainSync).toMatchObject({
       lastOutcome: 'succeeded',
@@ -489,10 +493,13 @@ describe('EscrowChainSyncService', () => {
       ]),
     );
     expect(persistedFirst.audit.map((event) => event.type)).toEqual([
+      'milestone.delivered',
+      'job.contractor_participation_requested',
       'job.created',
       'job.funded',
       'job.milestones_set',
-      'milestone.delivered',
+      'job.contractor_invite_sent',
+      'job.contractor_joined',
     ]);
     expect(persistedSecond.audit.map((event) => event.type)).toEqual([
       'job.created',
@@ -578,10 +585,13 @@ describe('EscrowChainSyncService', () => {
     ]);
     expect(mockChainProvider.getLogs.mock.calls).toHaveLength(2);
     expect(persistedNewest.audit.map((event) => event.type)).toEqual([
+      'milestone.delivered',
+      'job.contractor_participation_requested',
       'job.created',
       'job.funded',
       'job.milestones_set',
-      'milestone.delivered',
+      'job.contractor_invite_sent',
+      'job.contractor_joined',
     ]);
     expect(untouchedOldest.updatedAt).toBe(1_000);
   });

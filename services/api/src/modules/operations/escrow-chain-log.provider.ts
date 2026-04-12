@@ -17,7 +17,7 @@ export interface EscrowChainLogProvider {
   getLatestBlockNumber(): Promise<number>;
   getLogs(input: {
     contractAddress: string;
-    escrowId: string;
+    escrowId?: string;
     fromBlock: number;
     toBlock: number;
     eventTopics: string[];
@@ -41,7 +41,7 @@ export class JsonRpcEscrowChainLogProvider implements EscrowChainLogProvider {
 
   async getLogs(input: {
     contractAddress: string;
-    escrowId: string;
+    escrowId?: string;
     fromBlock: number;
     toBlock: number;
     eventTopics: string[];
@@ -50,7 +50,9 @@ export class JsonRpcEscrowChainLogProvider implements EscrowChainLogProvider {
       address: input.contractAddress,
       fromBlock: input.fromBlock,
       toBlock: input.toBlock,
-      topics: [input.eventTopics, encodeEscrowIdTopic(input.escrowId)],
+      topics: input.escrowId
+        ? [input.eventTopics, encodeEscrowIdTopic(input.escrowId)]
+        : [input.eventTopics],
     });
 
     return logs.map((log) => ({

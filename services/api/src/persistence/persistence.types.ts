@@ -5,6 +5,11 @@ import type {
 } from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type {
+  EscrowChainCursorRecord,
+  EscrowChainEventRecord,
+  EscrowOnchainProjectionRecord,
+} from '../modules/escrow/escrow.types';
+import type {
   MarketplaceApplicationRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
@@ -51,6 +56,34 @@ export interface EscrowRepository {
   listAll(): Promise<EscrowJobRecord[]>;
   listByParticipantAddresses(addresses: string[]): Promise<EscrowJobRecord[]>;
   save(job: EscrowJobRecord): Promise<void>;
+  getChainCursor(input: {
+    chainId: number;
+    contractAddress: string;
+    streamName: EscrowChainCursorRecord['streamName'];
+  }): Promise<EscrowChainCursorRecord | null>;
+  saveChainCursor(cursor: EscrowChainCursorRecord): Promise<void>;
+  upsertChainEvents(events: EscrowChainEventRecord[]): Promise<void>;
+  replaceChainEventsInRange(input: {
+    chainId: number;
+    contractAddress: string;
+    fromBlock: number;
+    toBlock: number;
+    events: EscrowChainEventRecord[];
+  }): Promise<void>;
+  listChainEvents(input: {
+    chainId: number;
+    contractAddress: string;
+    escrowId?: string;
+    fromBlock?: number;
+    toBlock?: number;
+  }): Promise<EscrowChainEventRecord[]>;
+  getOnchainProjection(
+    jobId: string,
+  ): Promise<EscrowOnchainProjectionRecord | null>;
+  listOnchainProjections(
+    jobIds?: string[],
+  ): Promise<EscrowOnchainProjectionRecord[]>;
+  saveOnchainProjection(projection: EscrowOnchainProjectionRecord): Promise<void>;
 }
 
 export interface MarketplaceRepository {
@@ -80,12 +113,15 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 12;
+  version: 13;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
   sessions: Record<string, SessionRecord>;
   escrowJobs: Record<string, EscrowJobRecord>;
+  escrowChainCursors: Record<string, EscrowChainCursorRecord>;
+  escrowChainEvents: Record<string, EscrowChainEventRecord>;
+  escrowOnchainProjections: Record<string, EscrowOnchainProjectionRecord>;
   marketplaceProfiles: Record<string, MarketplaceProfileRecord>;
   marketplaceOpportunities: Record<string, MarketplaceOpportunityRecord>;
   marketplaceApplications: Record<string, MarketplaceApplicationRecord>;

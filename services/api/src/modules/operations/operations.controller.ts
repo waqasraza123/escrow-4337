@@ -70,6 +70,12 @@ export class OperationsController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('reconciliation/chain-audit-sync/status')
+  getChainAuditIngestionStatus(@User() user: ReqUser) {
+    return this.escrowChainSync.getIngestionStatus(user.id);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('reconciliation/chain-audit-sync')
   syncChainAudit(
     @User() user: ReqUser,

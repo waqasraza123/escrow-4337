@@ -1,6 +1,8 @@
 import type { EscrowContractAction } from '../escrow/onchain/escrow-contract.types';
 import type {
   EscrowAuditEvent,
+  EscrowAuthorityStatus,
+  EscrowChainCursorRecord,
   EscrowChainSyncOutcome,
   EscrowFailureRemediationStatus,
   JobStatus,
@@ -144,6 +146,7 @@ export type EscrowHealthJob = {
     contractAddress: string;
     escrowId: string | null;
   };
+  authority: EscrowAuthorityStatus;
 };
 
 export type EscrowStaleWorkflowMutationResponse = {
@@ -355,10 +358,39 @@ export type EscrowChainSyncDaemonHealthIssue = {
     | 'run_stalled'
     | 'consecutive_failures'
     | 'consecutive_skips'
-    | 'last_run_failed';
+    | 'last_run_failed'
+    | 'ingestion_missing'
+    | 'ingestion_lagging'
+    | 'projection_backlog';
   severity: 'warning' | 'critical';
   summary: string;
   detail: string | null;
+};
+
+export type EscrowChainIngestionStatus = {
+  generatedAt: string;
+  enabled: boolean;
+  authorityReadsEnabled: boolean;
+  chainId: number;
+  contractAddress: string | null;
+  confirmations: number;
+  batchBlocks: number;
+  resyncBlocks: number;
+  latestBlock: number | null;
+  finalizedBlock: number | null;
+  lagBlocks: number | null;
+  cursor: EscrowChainCursorRecord | null;
+  projections: {
+    totalJobs: number;
+    projectedJobs: number;
+    healthyJobs: number;
+    degradedJobs: number;
+    staleJobs: number;
+  };
+  status: 'ok' | 'warning' | 'failed';
+  summary: string;
+  issues: string[];
+  warnings: string[];
 };
 
 export type EscrowChainSyncDaemonHealthReport = {
@@ -375,6 +407,7 @@ export type EscrowChainSyncDaemonHealthReport = {
   };
   issues: EscrowChainSyncDaemonHealthIssue[];
   daemon: EscrowChainSyncDaemonStatus | null;
+  ingestion: EscrowChainIngestionStatus | null;
 };
 
 export type EscrowHealthReport = {

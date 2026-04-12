@@ -6,6 +6,9 @@ import type {
 } from '../../modules/auth/auth.types';
 import type {
   EscrowAuditEvent,
+  EscrowChainCursorRecord,
+  EscrowChainEventPayload,
+  EscrowChainEventRecord,
   EscrowChainSyncRecord,
   EscrowContractorParticipationRecord,
   EscrowFailureRemediationStatus,
@@ -14,6 +17,9 @@ import type {
   EscrowJobRecord,
   EscrowMilestoneRecord,
   EscrowOnchainState,
+  EscrowOnchainProjectedMilestoneRecord,
+  EscrowOnchainProjectionRecord,
+  EscrowProjectionDriftSummary,
   EscrowStaleWorkflowRecord,
 } from '../../modules/escrow/escrow.types';
 import type { UserRecord } from '../../modules/users/users.types';
@@ -168,6 +174,63 @@ type ExecutionRow = QueryResultRow & {
   escrow_id: string | null;
   failure_code: string | null;
   failure_message: string | null;
+};
+
+type ChainCursorRow = QueryResultRow & {
+  chain_id: number;
+  contract_address: string;
+  stream_name: EscrowChainCursorRecord['streamName'];
+  next_from_block: string;
+  last_finalized_block: string | null;
+  last_scanned_block: string | null;
+  last_error: string | null;
+  updated_at_ms: string;
+};
+
+type ChainEventRow = QueryResultRow & {
+  chain_id: number;
+  contract_address: string;
+  escrow_id: string;
+  transaction_hash: string;
+  log_index: number;
+  block_number: string;
+  block_hash: string;
+  block_time_ms: string;
+  event_name: EscrowChainEventPayload['eventName'];
+  payload_json: EscrowChainEventPayload;
+};
+
+type OnchainProjectionRow = QueryResultRow & {
+  job_id: string;
+  chain_id: number;
+  contract_address: string;
+  escrow_id: string;
+  projected_at_ms: string;
+  last_projected_block: string | null;
+  last_event_block: string | null;
+  last_event_count: number;
+  projection_digest: string;
+  projection_health: EscrowOnchainProjectionRecord['health'];
+  degraded_reason: string | null;
+  funded_amount: string | null;
+  status: EscrowJobRecord['status'];
+  milestones_json: EscrowOnchainProjectedMilestoneRecord[];
+  chain_audit_json: Array<
+    Extract<
+      EscrowAuditEvent,
+      {
+        type:
+          | 'job.created'
+          | 'job.funded'
+          | 'job.milestones_set'
+          | 'milestone.delivered'
+          | 'milestone.released'
+          | 'milestone.disputed'
+          | 'milestone.resolved';
+      }
+    >
+  >;
+  drift_summary_json: EscrowProjectionDriftSummary;
 };
 
 function asNumber(value: string | null) {
@@ -397,6 +460,56 @@ function mapExecution(row: ExecutionRow): EscrowExecutionRecord {
     escrowId: row.escrow_id ?? undefined,
     failureCode: row.failure_code ?? undefined,
     failureMessage: row.failure_message ?? undefined,
+  };
+}
+
+function mapChainCursor(row: ChainCursorRow): EscrowChainCursorRecord {
+  return {
+    chainId: row.chain_id,
+    contractAddress: row.contract_address,
+    streamName: row.stream_name,
+    nextFromBlock: Number(row.next_from_block),
+    lastFinalizedBlock: asNumber(row.last_finalized_block) ?? null,
+    lastScannedBlock: asNumber(row.last_scanned_block) ?? null,
+    lastError: row.last_error ?? null,
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapChainEvent(row: ChainEventRow): EscrowChainEventRecord {
+  return {
+    chainId: row.chain_id,
+    contractAddress: row.contract_address,
+    escrowId: row.escrow_id,
+    transactionHash: row.transaction_hash,
+    logIndex: row.log_index,
+    blockNumber: Number(row.block_number),
+    blockHash: row.block_hash,
+    blockTimeMs: Number(row.block_time_ms),
+    payload: row.payload_json,
+  };
+}
+
+function mapOnchainProjection(
+  row: OnchainProjectionRow,
+): EscrowOnchainProjectionRecord {
+  return {
+    jobId: row.job_id,
+    chainId: row.chain_id,
+    contractAddress: row.contract_address,
+    escrowId: row.escrow_id,
+    projectedAt: Number(row.projected_at_ms),
+    lastProjectedBlock: asNumber(row.last_projected_block) ?? null,
+    lastEventBlock: asNumber(row.last_event_block) ?? null,
+    lastEventCount: row.last_event_count,
+    digest: row.projection_digest,
+    health: row.projection_health,
+    degradedReason: row.degraded_reason ?? null,
+    fundedAmount: row.funded_amount,
+    status: row.status,
+    milestones: row.milestones_json,
+    chainAudit: row.chain_audit_json,
+    driftSummary: row.drift_summary_json,
   };
 }
 
@@ -1545,6 +1658,348 @@ export class PostgresEscrowRepository implements EscrowRepository {
 
       return jobs;
     });
+  }
+
+  async getChainCursor(input: {
+    chainId: number;
+    contractAddress: string;
+    streamName: EscrowChainCursorRecord['streamName'];
+  }) {
+    return this.db.transaction(async (client) => {
+      const result = await client.query<ChainCursorRow>(
+        `
+          SELECT
+            chain_id,
+            contract_address,
+            stream_name,
+            next_from_block,
+            last_finalized_block,
+            last_scanned_block,
+            last_error,
+            updated_at_ms
+          FROM escrow_chain_cursors
+          WHERE chain_id = $1 AND contract_address = $2 AND stream_name = $3
+          LIMIT 1
+        `,
+        [input.chainId, input.contractAddress, input.streamName],
+      );
+
+      return result.rows[0] ? mapChainCursor(result.rows[0]) : null;
+    });
+  }
+
+  async saveChainCursor(cursor: EscrowChainCursorRecord) {
+    await this.db.query(
+      `
+        INSERT INTO escrow_chain_cursors (
+          chain_id,
+          contract_address,
+          stream_name,
+          next_from_block,
+          last_finalized_block,
+          last_scanned_block,
+          last_error,
+          updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (chain_id, contract_address, stream_name) DO UPDATE
+        SET
+          next_from_block = EXCLUDED.next_from_block,
+          last_finalized_block = EXCLUDED.last_finalized_block,
+          last_scanned_block = EXCLUDED.last_scanned_block,
+          last_error = EXCLUDED.last_error,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        cursor.chainId,
+        cursor.contractAddress,
+        cursor.streamName,
+        String(cursor.nextFromBlock),
+        cursor.lastFinalizedBlock === null
+          ? null
+          : String(cursor.lastFinalizedBlock),
+        cursor.lastScannedBlock === null ? null : String(cursor.lastScannedBlock),
+        cursor.lastError,
+        String(cursor.updatedAt),
+      ],
+    );
+  }
+
+  async upsertChainEvents(events: EscrowChainEventRecord[]) {
+    if (events.length === 0) {
+      return;
+    }
+
+    await this.db.transaction(async (client) => {
+      for (const event of events) {
+        await client.query(
+          `
+            INSERT INTO escrow_chain_events (
+              chain_id,
+              contract_address,
+              escrow_id,
+              transaction_hash,
+              log_index,
+              block_number,
+              block_hash,
+              block_time_ms,
+              event_name,
+              payload_json
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+            ON CONFLICT (chain_id, contract_address, transaction_hash, log_index) DO UPDATE
+            SET
+              escrow_id = EXCLUDED.escrow_id,
+              block_number = EXCLUDED.block_number,
+              block_hash = EXCLUDED.block_hash,
+              block_time_ms = EXCLUDED.block_time_ms,
+              event_name = EXCLUDED.event_name,
+              payload_json = EXCLUDED.payload_json
+          `,
+          [
+            event.chainId,
+            event.contractAddress,
+            event.escrowId,
+            event.transactionHash,
+            event.logIndex,
+            String(event.blockNumber),
+            event.blockHash,
+            String(event.blockTimeMs),
+            event.payload.eventName,
+            JSON.stringify(event.payload),
+          ],
+        );
+      }
+    });
+  }
+
+  async replaceChainEventsInRange(input: {
+    chainId: number;
+    contractAddress: string;
+    fromBlock: number;
+    toBlock: number;
+    events: EscrowChainEventRecord[];
+  }) {
+    await this.db.transaction(async (client) => {
+      await client.query(
+        `
+          DELETE FROM escrow_chain_events
+          WHERE chain_id = $1
+            AND contract_address = $2
+            AND block_number >= $3
+            AND block_number <= $4
+        `,
+        [
+          input.chainId,
+          input.contractAddress,
+          String(input.fromBlock),
+          String(input.toBlock),
+        ],
+      );
+
+      for (const event of input.events) {
+        await client.query(
+          `
+            INSERT INTO escrow_chain_events (
+              chain_id,
+              contract_address,
+              escrow_id,
+              transaction_hash,
+              log_index,
+              block_number,
+              block_hash,
+              block_time_ms,
+              event_name,
+              payload_json
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+          `,
+          [
+            event.chainId,
+            event.contractAddress,
+            event.escrowId,
+            event.transactionHash,
+            event.logIndex,
+            String(event.blockNumber),
+            event.blockHash,
+            String(event.blockTimeMs),
+            event.payload.eventName,
+            JSON.stringify(event.payload),
+          ],
+        );
+      }
+    });
+  }
+
+  async listChainEvents(input: {
+    chainId: number;
+    contractAddress: string;
+    escrowId?: string;
+    fromBlock?: number;
+    toBlock?: number;
+  }) {
+    return this.db.transaction(async (client) => {
+      const result = await client.query<ChainEventRow>(
+        `
+          SELECT
+            chain_id,
+            contract_address,
+            escrow_id,
+            transaction_hash,
+            log_index,
+            block_number,
+            block_hash,
+            block_time_ms,
+            event_name,
+            payload_json
+          FROM escrow_chain_events
+          WHERE chain_id = $1
+            AND contract_address = $2
+            AND ($3::text IS NULL OR escrow_id = $3)
+            AND ($4::bigint IS NULL OR block_number >= $4)
+            AND ($5::bigint IS NULL OR block_number <= $5)
+          ORDER BY block_number ASC, log_index ASC, transaction_hash ASC
+        `,
+        [
+          input.chainId,
+          input.contractAddress,
+          input.escrowId ?? null,
+          input.fromBlock === undefined ? null : String(input.fromBlock),
+          input.toBlock === undefined ? null : String(input.toBlock),
+        ],
+      );
+
+      return result.rows.map(mapChainEvent);
+    });
+  }
+
+  async getOnchainProjection(jobId: string) {
+    return this.db.transaction(async (client) => {
+      const result = await client.query<OnchainProjectionRow>(
+        `
+          SELECT
+            job_id,
+            chain_id,
+            contract_address,
+            escrow_id,
+            projected_at_ms,
+            last_projected_block,
+            last_event_block,
+            last_event_count,
+            projection_digest,
+            projection_health,
+            degraded_reason,
+            funded_amount,
+            status,
+            milestones_json,
+            chain_audit_json,
+            drift_summary_json
+          FROM escrow_onchain_projections
+          WHERE job_id = $1
+          LIMIT 1
+        `,
+        [jobId],
+      );
+
+      return result.rows[0] ? mapOnchainProjection(result.rows[0]) : null;
+    });
+  }
+
+  async listOnchainProjections(jobIds?: string[]) {
+    return this.db.transaction(async (client) => {
+      const result = await client.query<OnchainProjectionRow>(
+        `
+          SELECT
+            job_id,
+            chain_id,
+            contract_address,
+            escrow_id,
+            projected_at_ms,
+            last_projected_block,
+            last_event_block,
+            last_event_count,
+            projection_digest,
+            projection_health,
+            degraded_reason,
+            funded_amount,
+            status,
+            milestones_json,
+            chain_audit_json,
+            drift_summary_json
+          FROM escrow_onchain_projections
+          WHERE ($1::text[] IS NULL OR job_id = ANY($1::text[]))
+          ORDER BY projected_at_ms DESC, job_id ASC
+        `,
+        [jobIds && jobIds.length > 0 ? jobIds : null],
+      );
+
+      return result.rows.map(mapOnchainProjection);
+    });
+  }
+
+  async saveOnchainProjection(projection: EscrowOnchainProjectionRecord) {
+    await this.db.query(
+      `
+        INSERT INTO escrow_onchain_projections (
+          job_id,
+          chain_id,
+          contract_address,
+          escrow_id,
+          projected_at_ms,
+          last_projected_block,
+          last_event_block,
+          last_event_count,
+          projection_digest,
+          projection_health,
+          degraded_reason,
+          funded_amount,
+          status,
+          milestones_json,
+          chain_audit_json,
+          drift_summary_json
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb, $16::jsonb
+        )
+        ON CONFLICT (job_id) DO UPDATE
+        SET
+          chain_id = EXCLUDED.chain_id,
+          contract_address = EXCLUDED.contract_address,
+          escrow_id = EXCLUDED.escrow_id,
+          projected_at_ms = EXCLUDED.projected_at_ms,
+          last_projected_block = EXCLUDED.last_projected_block,
+          last_event_block = EXCLUDED.last_event_block,
+          last_event_count = EXCLUDED.last_event_count,
+          projection_digest = EXCLUDED.projection_digest,
+          projection_health = EXCLUDED.projection_health,
+          degraded_reason = EXCLUDED.degraded_reason,
+          funded_amount = EXCLUDED.funded_amount,
+          status = EXCLUDED.status,
+          milestones_json = EXCLUDED.milestones_json,
+          chain_audit_json = EXCLUDED.chain_audit_json,
+          drift_summary_json = EXCLUDED.drift_summary_json
+      `,
+      [
+        projection.jobId,
+        projection.chainId,
+        projection.contractAddress,
+        projection.escrowId,
+        String(projection.projectedAt),
+        projection.lastProjectedBlock === null
+          ? null
+          : String(projection.lastProjectedBlock),
+        projection.lastEventBlock === null ? null : String(projection.lastEventBlock),
+        projection.lastEventCount,
+        projection.digest,
+        projection.health,
+        projection.degradedReason,
+        projection.fundedAmount,
+        projection.status,
+        JSON.stringify(projection.milestones),
+        JSON.stringify(projection.chainAudit),
+        JSON.stringify(projection.driftSummary),
+      ],
+    );
   }
 
   async save(job: EscrowJobRecord) {

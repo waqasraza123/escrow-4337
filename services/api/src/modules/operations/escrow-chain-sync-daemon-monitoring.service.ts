@@ -4,6 +4,7 @@ import type {
   EscrowChainSyncDaemonHealthReport,
   EscrowChainSyncDaemonStatus,
 } from './escrow-health.types';
+import { EscrowChainIngestionStatusService } from './escrow-chain-ingestion-status.service';
 import { EscrowChainSyncDaemonStatusService } from './escrow-chain-sync-daemon-status.service';
 import { OperationsConfigService } from './operations.config';
 
@@ -11,6 +12,7 @@ import { OperationsConfigService } from './operations.config';
 export class EscrowChainSyncDaemonMonitoringService {
   constructor(
     private readonly daemonStatusService: EscrowChainSyncDaemonStatusService,
+    private readonly ingestionStatusService: EscrowChainIngestionStatusService,
     private readonly operationsConfig: OperationsConfigService,
   ) {}
 
@@ -18,9 +20,11 @@ export class EscrowChainSyncDaemonMonitoringService {
     now = Date.now(),
   ): Promise<EscrowChainSyncDaemonHealthReport> {
     const daemon = await this.daemonStatusService.getStatus();
+    const ingestion = await this.ingestionStatusService.getStatus(now);
     const issues = daemon
       ? this.evaluateDaemon(daemon, now)
       : this.missingDaemon();
+    issues.push(...this.evaluateIngestion(ingestion));
     const status = highestStatus(issues);
 
     return {
@@ -41,6 +45,7 @@ export class EscrowChainSyncDaemonMonitoringService {
       },
       issues,
       daemon,
+      ingestion,
     };
   }
 
@@ -137,6 +142,53 @@ export class EscrowChainSyncDaemonMonitoringService {
         summary:
           'The recurring chain-sync daemon has exceeded the consecutive skip threshold.',
         detail: `The daemon recorded ${daemon.heartbeat.consecutiveSkips} consecutive skipped runs, exceeding the configured max of ${this.operationsConfig.escrowBatchSyncDaemonMaxConsecutiveSkips}.`,
+      });
+    }
+
+    return issues;
+  }
+
+  private evaluateIngestion(
+    ingestion: Awaited<ReturnType<EscrowChainIngestionStatusService['getStatus']>>,
+  ): EscrowChainSyncDaemonHealthIssue[] {
+    const issues: EscrowChainSyncDaemonHealthIssue[] = [];
+
+    if (ingestion.enabled && !ingestion.cursor) {
+      issues.push({
+        code: 'ingestion_missing',
+        severity: this.operationsConfig.escrowBatchSyncDaemonRequired
+          ? 'critical'
+          : 'warning',
+        summary: 'Escrow chain ingestion has not established a cursor yet.',
+        detail:
+          'The recurring worker is publishing health, but finalized log ingestion has not persisted any cursor progress.',
+      });
+    }
+
+    if (
+      ingestion.enabled &&
+      typeof ingestion.lagBlocks === 'number' &&
+      ingestion.lagBlocks >
+        this.operationsConfig.escrowIngestionBatchBlocks * 2
+    ) {
+      issues.push({
+        code: 'ingestion_lagging',
+        severity: 'warning',
+        summary: 'Escrow chain ingestion is lagging behind finalized chain head.',
+        detail: `The ingestion cursor is ${ingestion.lagBlocks} finalized block(s) behind.`,
+      });
+    }
+
+    if (
+      ingestion.projections.staleJobs > 0 ||
+      ingestion.projections.degradedJobs > 0
+    ) {
+      issues.push({
+        code: 'projection_backlog',
+        severity: ingestion.projections.degradedJobs > 0 ? 'critical' : 'warning',
+        summary:
+          'Escrow chain projections are stale or degraded for one or more jobs.',
+        detail: `${ingestion.projections.staleJobs} stale and ${ingestion.projections.degradedJobs} degraded projection(s) detected.`,
       });
     }
 
