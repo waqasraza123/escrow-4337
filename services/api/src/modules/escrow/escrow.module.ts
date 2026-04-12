@@ -11,5 +11,6 @@ import { EscrowContractModule } from './onchain/escrow-contract.module';
   imports: [PersistenceModule, EscrowContractModule, UsersModule, AuthModule],
   controllers: [EscrowController],
   providers: [EscrowService, EscrowActorService],
+  exports: [EscrowService, EscrowActorService],
 })
 export class EscrowModule {}

@@ -29,6 +29,7 @@ const webMessages = {
       operatorConsole: 'Operator Console',
       currentLanguage: 'Language',
       home: 'Home',
+      marketplace: 'Marketplace',
       trust: 'Trust',
       signIn: 'Sign in',
       startEscrow: 'Start a milestone escrow',
@@ -104,8 +105,8 @@ const webMessages = {
           body: 'One client, one contractor, one operator, one chain, one milestone-based service contract model.',
         },
         {
-          title: 'It is not a marketplace or embedded platform.',
-          body: 'No talent discovery, no white-label API layer, no multi-chain sprawl, and no generalized escrow platform pitch.',
+          title: 'It is an escrow-first marketplace, not an embedded platform.',
+          body: 'Curated talent discovery and brief hiring now exist, but the close still routes into one client-to-one contractor escrow flow on one chain.',
         },
         {
           title: 'Trust claims stay narrow.',
@@ -613,6 +614,7 @@ const webMessages = {
       operatorConsole: 'لوحة المشغّل',
       currentLanguage: 'اللغة',
       home: 'الرئيسية',
+      marketplace: 'السوق',
       trust: 'الثقة',
       signIn: 'تسجيل الدخول',
       startEscrow: 'ابدأ ضمان المراحل',
@@ -688,8 +690,8 @@ const webMessages = {
           body: 'عميل واحد، مقاول واحد، مشغّل واحد، سلسلة واحدة، ونموذج عقد خدمات قائم على المراحل.',
         },
         {
-          title: 'وليس سوقاً أو منصة مدمجة.',
-          body: 'لا يوجد اكتشاف مواهب، ولا طبقة API بيضاء العلامة، ولا تشتت متعدد السلاسل، ولا طرح عام لمنصة ضمان.',
+          title: 'هو سوق يبدأ بالضمان وليس منصة مدمجة.',
+          body: 'يوجد الآن اكتشاف مواهب وعروض موجزة منسقة، لكن الإغلاق ما زال ينتقل إلى مسار ضمان بعقد عميل واحد مع مقاول واحد وعلى سلسلة واحدة.',
         },
         {
           title: 'ادعاءات الثقة تبقى محدودة ودقيقة.',

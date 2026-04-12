@@ -6,12 +6,15 @@ import { PersistenceConfigService } from '../persistence.config';
 
 function createInitialData(): PersistenceFileData {
   return {
-    version: 10,
+    version: 11,
     users: {},
     otpEntries: {},
     otpRequestThrottles: {},
     sessions: {},
     escrowJobs: {},
+    marketplaceProfiles: {},
+    marketplaceOpportunities: {},
+    marketplaceApplications: {},
     walletLinkChallenges: {},
   };
 }
@@ -63,12 +66,15 @@ export class FilePersistenceStore {
     const parsed = JSON.parse(raw) as Partial<PersistenceFileData>;
 
     return {
-      version: 10,
+      version: 11,
       users: parsed.users ?? {},
       otpEntries: parsed.otpEntries ?? {},
       otpRequestThrottles: parsed.otpRequestThrottles ?? {},
       sessions: parsed.sessions ?? {},
       escrowJobs: parsed.escrowJobs ?? {},
+      marketplaceProfiles: parsed.marketplaceProfiles ?? {},
+      marketplaceOpportunities: parsed.marketplaceOpportunities ?? {},
+      marketplaceApplications: parsed.marketplaceApplications ?? {},
       walletLinkChallenges: parsed.walletLinkChallenges ?? {},
     };
   }

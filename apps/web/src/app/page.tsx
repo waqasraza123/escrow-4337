@@ -14,6 +14,7 @@ export default function Home() {
         <nav className={styles.nav}>
           <strong className={styles.brand}>{messages.common.brand}</strong>
           <div className={styles.navLinks}>
+            <Link href="/marketplace">{messages.common.marketplace}</Link>
             <Link href="/trust">{messages.common.trust}</Link>
             <Link href="/app/sign-in">{messages.common.signIn}</Link>
             <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
@@ -32,6 +33,7 @@ export default function Home() {
             <h1>{messages.marketing.heroTitle}</h1>
             <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
+              <Link href="/marketplace">{messages.common.marketplace}</Link>
               <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
               <Link className={styles.secondaryLink} href="/trust">
                 {messages.marketing.trustCta}

@@ -4,6 +4,11 @@ import type {
   SessionRecord,
 } from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
+import type {
+  MarketplaceApplicationRecord,
+  MarketplaceOpportunityRecord,
+  MarketplaceProfileRecord,
+} from '../modules/marketplace/marketplace.types';
 import type { UserRecord } from '../modules/users/users.types';
 import type { WalletLinkChallengeRecord } from '../modules/wallet/wallet.types';
 
@@ -48,6 +53,23 @@ export interface EscrowRepository {
   save(job: EscrowJobRecord): Promise<void>;
 }
 
+export interface MarketplaceRepository {
+  getProfileByUserId(userId: string): Promise<MarketplaceProfileRecord | null>;
+  getProfileBySlug(slug: string): Promise<MarketplaceProfileRecord | null>;
+  listProfiles(): Promise<MarketplaceProfileRecord[]>;
+  saveProfile(profile: MarketplaceProfileRecord): Promise<void>;
+  getOpportunityById(
+    opportunityId: string,
+  ): Promise<MarketplaceOpportunityRecord | null>;
+  listOpportunities(): Promise<MarketplaceOpportunityRecord[]>;
+  saveOpportunity(opportunity: MarketplaceOpportunityRecord): Promise<void>;
+  getApplicationById(
+    applicationId: string,
+  ): Promise<MarketplaceApplicationRecord | null>;
+  listApplications(): Promise<MarketplaceApplicationRecord[]>;
+  saveApplication(application: MarketplaceApplicationRecord): Promise<void>;
+}
+
 export interface WalletLinkChallengesRepository {
   create(challenge: WalletLinkChallengeRecord): Promise<void>;
   getById(challengeId: string): Promise<WalletLinkChallengeRecord | null>;
@@ -58,11 +80,14 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 10;
+  version: 11;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
   sessions: Record<string, SessionRecord>;
   escrowJobs: Record<string, EscrowJobRecord>;
+  marketplaceProfiles: Record<string, MarketplaceProfileRecord>;
+  marketplaceOpportunities: Record<string, MarketplaceOpportunityRecord>;
+  marketplaceApplications: Record<string, MarketplaceApplicationRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

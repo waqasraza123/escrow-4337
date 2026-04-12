@@ -16,9 +16,14 @@ describe('marketing homepage', () => {
       screen.getByRole('heading', { name: 'Milestone escrow for crypto service work' }),
     ).toBeInTheDocument();
     expect(
+      screen.getAllByRole('link', { name: 'Marketplace' })[0],
+    ).toHaveAttribute('href', '/marketplace');
+    expect(
       screen.getAllByRole('link', { name: 'Start a milestone escrow' })[0],
     ).toHaveAttribute('href', '/app/new-contract');
     expect(screen.getByText('Create and fund')).toBeInTheDocument();
-    expect(screen.getByText('It is a focused agency or client escrow flow.')).toBeInTheDocument();
+    expect(
+      screen.getByText('It is an escrow-first marketplace, not an embedded platform.'),
+    ).toBeInTheDocument();
   });
 });

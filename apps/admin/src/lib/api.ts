@@ -109,6 +109,84 @@ export type RuntimeProfile = {
   warnings: string[];
 };
 
+export type MarketplaceModerationStatus = 'visible' | 'hidden' | 'suspended';
+
+export type MarketplaceAdminProfile = {
+  userId: string;
+  slug: string;
+  displayName: string;
+  headline: string;
+  bio: string;
+  skills: string[];
+  rateMin: string | null;
+  rateMax: string | null;
+  timezone: string;
+  availability: 'open' | 'limited' | 'unavailable';
+  portfolioUrls: string[];
+  verifiedWalletAddress: string | null;
+  completedEscrowCount: number;
+  isComplete: boolean;
+  moderationStatus: MarketplaceModerationStatus;
+};
+
+export type MarketplaceAdminOpportunity = {
+  id: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  currencyAddress: string;
+  requiredSkills: string[];
+  visibility: 'public' | 'private';
+  status: 'draft' | 'published' | 'paused' | 'closed' | 'hired' | 'archived';
+  budgetMin: string | null;
+  budgetMax: string | null;
+  timeline: string;
+  publishedAt: number | null;
+  hiredApplicationId: string | null;
+  hiredJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  owner: {
+    userId: string;
+    displayName: string;
+    profileSlug: string | null;
+  };
+  escrowReadiness: 'ready' | 'wallet_required' | 'smart_account_required';
+  applicationCount: number;
+  moderationStatus: MarketplaceModerationStatus;
+};
+
+export type MarketplaceModerationDashboard = {
+  generatedAt: string;
+  summary: {
+    totalProfiles: number;
+    visibleProfiles: number;
+    hiddenProfiles: number;
+    suspendedProfiles: number;
+    totalOpportunities: number;
+    publishedOpportunities: number;
+    hiredOpportunities: number;
+    visibleOpportunities: number;
+    hiddenOpportunities: number;
+    suspendedOpportunities: number;
+    totalApplications: number;
+    submittedApplications: number;
+    shortlistedApplications: number;
+    hiredApplications: number;
+    hireConversionPercent: number;
+    agingOpportunityCount: number;
+  };
+  agingOpportunities: Array<{
+    opportunityId: string;
+    title: string;
+    ownerDisplayName: string;
+    ageDays: number;
+    status: MarketplaceAdminOpportunity['status'];
+    visibility: MarketplaceAdminOpportunity['visibility'];
+  }>;
+};
+
 export type CaseExportArtifact = 'job-history' | 'dispute-case';
 
 export type CaseExportFormat = 'json' | 'csv';
@@ -867,6 +945,60 @@ export const adminApi = {
       {
         method: 'POST',
         body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceModerationDashboard(accessToken: string) {
+    return requestJson<MarketplaceModerationDashboard>(
+      apiBaseUrl,
+      '/marketplace/moderation/dashboard',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listMarketplaceModerationProfiles(accessToken: string) {
+    return requestJson<{ profiles: MarketplaceAdminProfile[] }>(
+      apiBaseUrl,
+      '/marketplace/moderation/profiles',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listMarketplaceModerationOpportunities(accessToken: string) {
+    return requestJson<{ opportunities: MarketplaceAdminOpportunity[] }>(
+      apiBaseUrl,
+      '/marketplace/moderation/opportunities',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  moderateMarketplaceProfile(
+    userId: string,
+    moderationStatus: MarketplaceModerationStatus,
+    accessToken: string,
+  ) {
+    return requestJson<{ profile: MarketplaceAdminProfile }>(
+      apiBaseUrl,
+      `/marketplace/moderation/profiles/${encodeURIComponent(userId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ moderationStatus }),
+      },
+      accessToken,
+    );
+  },
+  moderateMarketplaceOpportunity(
+    opportunityId: string,
+    moderationStatus: MarketplaceModerationStatus,
+    accessToken: string,
+  ) {
+    return requestJson<{ opportunity: MarketplaceAdminOpportunity }>(
+      apiBaseUrl,
+      `/marketplace/moderation/opportunities/${encodeURIComponent(opportunityId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ moderationStatus }),
       },
       accessToken,
     );

@@ -248,6 +248,105 @@ export type RuntimeProfile = {
   warnings: string[];
 };
 
+export type MarketplaceAvailability = 'open' | 'limited' | 'unavailable';
+export type OpportunityVisibility = 'public' | 'private';
+export type OpportunityStatus =
+  | 'draft'
+  | 'published'
+  | 'paused'
+  | 'closed'
+  | 'hired'
+  | 'archived';
+export type ApplicationStatus =
+  | 'submitted'
+  | 'shortlisted'
+  | 'rejected'
+  | 'withdrawn'
+  | 'hired';
+export type ModerationStatus = 'visible' | 'hidden' | 'suspended';
+
+export type MarketplaceProfile = {
+  userId: string;
+  slug: string;
+  displayName: string;
+  headline: string;
+  bio: string;
+  skills: string[];
+  rateMin: string | null;
+  rateMax: string | null;
+  timezone: string;
+  availability: MarketplaceAvailability;
+  portfolioUrls: string[];
+  verifiedWalletAddress: string | null;
+  completedEscrowCount: number;
+  isComplete: boolean;
+};
+
+export type MarketplaceOpportunity = {
+  id: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  currencyAddress: string;
+  requiredSkills: string[];
+  visibility: OpportunityVisibility;
+  status: OpportunityStatus;
+  budgetMin: string | null;
+  budgetMax: string | null;
+  timeline: string;
+  publishedAt: number | null;
+  hiredApplicationId: string | null;
+  hiredJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  owner: {
+    userId: string;
+    displayName: string;
+    profileSlug: string | null;
+  };
+  escrowReadiness: 'ready' | 'wallet_required' | 'smart_account_required';
+  applicationCount: number;
+};
+
+export type MarketplaceApplication = {
+  id: string;
+  opportunityId: string;
+  coverNote: string;
+  proposedRate: string | null;
+  selectedWalletAddress: string;
+  portfolioUrls: string[];
+  status: ApplicationStatus;
+  hiredJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  applicant: {
+    userId: string;
+    displayName: string;
+    profileSlug: string | null;
+    headline: string;
+    verifiedWalletAddress: string | null;
+    completedEscrowCount: number;
+  };
+  opportunity: {
+    id: string;
+    title: string;
+    visibility: OpportunityVisibility;
+    status: OpportunityStatus;
+    ownerDisplayName: string;
+  };
+};
+
+export type MarketplaceOpportunityDetail = MarketplaceOpportunity & {
+  applications?: MarketplaceApplication[];
+};
+
+export type HireApplicationResponse = {
+  applicationId: string;
+  opportunityId: string;
+  jobId: string;
+};
+
 const apiBaseUrl = resolveApiBaseUrl(
   process.env.NEXT_PUBLIC_API_BASE_URL,
   resolveLocalApiBaseUrl(process.env.NEXT_PUBLIC_API_PORT),
@@ -572,5 +671,223 @@ export const webApi = {
     return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
       method: 'GET',
     });
+  },
+  listMarketplaceProfiles(query?: {
+    q?: string;
+    skill?: string;
+    availability?: MarketplaceAvailability;
+    limit?: number;
+  }) {
+    const search = new URLSearchParams();
+    if (query?.q) search.set('q', query.q);
+    if (query?.skill) search.set('skill', query.skill);
+    if (query?.availability) search.set('availability', query.availability);
+    if (query?.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ profiles: MarketplaceProfile[] }>(
+      apiBaseUrl,
+      `/marketplace/profiles${suffix}`,
+      { method: 'GET' },
+    );
+  },
+  getMarketplaceProfile(slug: string) {
+    return requestJson<{ profile: MarketplaceProfile }>(
+      apiBaseUrl,
+      `/marketplace/profiles/${encodeURIComponent(slug)}`,
+      { method: 'GET' },
+    );
+  },
+  getMyMarketplaceProfile(accessToken: string) {
+    return requestJson<{ profile: MarketplaceProfile }>(
+      apiBaseUrl,
+      '/marketplace/profiles/me',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  upsertMarketplaceProfile(
+    input: {
+      slug: string;
+      displayName: string;
+      headline: string;
+      bio: string;
+      skills: string[];
+      rateMin: string | null;
+      rateMax: string | null;
+      timezone: string;
+      availability: MarketplaceAvailability;
+      portfolioUrls: string[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ profile: MarketplaceProfile }>(
+      apiBaseUrl,
+      '/marketplace/profiles',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMarketplaceOpportunities(query?: {
+    q?: string;
+    skill?: string;
+    category?: string;
+    limit?: number;
+  }) {
+    const search = new URLSearchParams();
+    if (query?.q) search.set('q', query.q);
+    if (query?.skill) search.set('skill', query.skill);
+    if (query?.category) search.set('category', query.category);
+    if (query?.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ opportunities: MarketplaceOpportunity[] }>(
+      apiBaseUrl,
+      `/marketplace/opportunities${suffix}`,
+      { method: 'GET' },
+    );
+  },
+  getMarketplaceOpportunity(id: string) {
+    return requestJson<{ opportunity: MarketplaceOpportunityDetail }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}`,
+      { method: 'GET' },
+    );
+  },
+  listMyMarketplaceOpportunities(accessToken: string) {
+    return requestJson<{ opportunities: MarketplaceOpportunity[] }>(
+      apiBaseUrl,
+      '/marketplace/opportunities/mine',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createMarketplaceOpportunity(
+    input: {
+      title: string;
+      summary: string;
+      description: string;
+      category: string;
+      currencyAddress: string;
+      requiredSkills: string[];
+      visibility: OpportunityVisibility;
+      budgetMin: string | null;
+      budgetMax: string | null;
+      timeline: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ opportunity: MarketplaceOpportunity }>(
+      apiBaseUrl,
+      '/marketplace/opportunities',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  publishMarketplaceOpportunity(id: string, accessToken: string) {
+    return requestJson<{ opportunity: MarketplaceOpportunity }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/publish`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  pauseMarketplaceOpportunity(id: string, accessToken: string) {
+    return requestJson<{ opportunity: MarketplaceOpportunity }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/pause`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  listOpportunityApplications(id: string, accessToken: string) {
+    return requestJson<{ applications: MarketplaceApplication[] }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/applications`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  applyToMarketplaceOpportunity(
+    id: string,
+    input: {
+      coverNote: string;
+      proposedRate: string | null;
+      selectedWalletAddress: string;
+      portfolioUrls: string[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ opportunity: MarketplaceOpportunityDetail }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/applications`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMyMarketplaceApplications(accessToken: string) {
+    return requestJson<{ applications: MarketplaceApplication[] }>(
+      apiBaseUrl,
+      '/marketplace/applications/mine',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  withdrawMarketplaceApplication(id: string, accessToken: string) {
+    return requestJson<{ applications: MarketplaceApplication[] }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/withdraw`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  shortlistMarketplaceApplication(id: string, accessToken: string) {
+    return requestJson<{ applications: MarketplaceApplication[] }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/shortlist`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  rejectMarketplaceApplication(id: string, accessToken: string) {
+    return requestJson<{ applications: MarketplaceApplication[] }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  hireMarketplaceApplication(id: string, accessToken: string) {
+    return requestJson<HireApplicationResponse>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/hire`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
   },
 };

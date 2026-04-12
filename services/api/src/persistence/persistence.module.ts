@@ -7,10 +7,12 @@ import {
   FileUsersRepository,
   FileWalletLinkChallengesRepository,
 } from './file/file.repositories';
+import { FileMarketplaceRepository } from './file/file.marketplace.repositories';
 import { FilePersistenceStore } from './file/file-persistence.store';
 import { PersistenceConfigService } from './persistence.config';
 import {
   ESCROW_REPOSITORY,
+  MARKETPLACE_REPOSITORY,
   OTP_REPOSITORY,
   OTP_REQUEST_THROTTLES_REPOSITORY,
   SESSIONS_REPOSITORY,
@@ -26,6 +28,7 @@ import {
   PostgresUsersRepository,
   PostgresWalletLinkChallengesRepository,
 } from './postgres/postgres.repositories';
+import { PostgresMarketplaceRepository } from './postgres/postgres.marketplace.repositories';
 
 @Global()
 @Module({
@@ -114,6 +117,22 @@ import {
           : new PostgresEscrowRepository(db),
     },
     {
+      provide: MARKETPLACE_REPOSITORY,
+      inject: [
+        PersistenceConfigService,
+        FilePersistenceStore,
+        PostgresDatabaseService,
+      ],
+      useFactory: (
+        config: PersistenceConfigService,
+        fileStore: FilePersistenceStore,
+        db: PostgresDatabaseService,
+      ) =>
+        config.driver === 'file'
+          ? new FileMarketplaceRepository(fileStore)
+          : new PostgresMarketplaceRepository(db),
+    },
+    {
       provide: WALLET_LINK_CHALLENGES_REPOSITORY,
       inject: [
         PersistenceConfigService,
@@ -138,6 +157,7 @@ import {
     OTP_REQUEST_THROTTLES_REPOSITORY,
     SESSIONS_REPOSITORY,
     ESCROW_REPOSITORY,
+    MARKETPLACE_REPOSITORY,
     WALLET_LINK_CHALLENGES_REPOSITORY,
   ],
 })
