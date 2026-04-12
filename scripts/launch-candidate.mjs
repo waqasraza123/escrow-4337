@@ -131,10 +131,21 @@ async function main() {
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
     },
   );
+  const walkthroughCanaryReport = await runJsonCommand(
+    'deployed-walkthrough',
+    ['pnpm', 'e2e:walkthrough:deployed'],
+    resolve(artifactsDir, 'deployed-walkthrough.raw.log'),
+    resolve(artifactsDir, 'deployed-walkthrough.json'),
+    {
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
 
   const smokeSummary = summarizePlaywrightReport(smokeReport);
   const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
   const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
+  const walkthroughCanarySummary = summarizePlaywrightReport(walkthroughCanaryReport);
 
   const blockers = collectBlockers({
     deploymentValidation,
@@ -144,6 +155,7 @@ async function main() {
     smokeSummary,
     seededCanarySummary,
     exactCanarySummary,
+    walkthroughCanarySummary,
   });
   const summary = {
     generatedAt: new Date().toISOString(),
@@ -181,6 +193,7 @@ async function main() {
     smoke: smokeSummary,
     seededCanary: seededCanarySummary,
     exactCanary: exactCanarySummary,
+    walkthroughCanary: walkthroughCanarySummary,
     blockers,
   };
 
@@ -387,6 +400,7 @@ function collectBlockers({
   smokeSummary,
   seededCanarySummary,
   exactCanarySummary,
+  walkthroughCanarySummary,
 }) {
   const blockers = [];
 
@@ -418,6 +432,12 @@ function collectBlockers({
   }
   if (exactCanarySummary.skipped > 0 || exactCanarySummary.total === 0) {
     blockers.push('Exact deployed canary did not execute its required staged launch path.');
+  }
+  if (walkthroughCanarySummary.failed > 0) {
+    blockers.push('Deployed walkthrough canary reported failures.');
+  }
+  if (walkthroughCanarySummary.skipped > 0 || walkthroughCanarySummary.total === 0) {
+    blockers.push('Deployed walkthrough canary did not execute its required guided launch path.');
   }
 
   return blockers;
@@ -453,6 +473,7 @@ function buildSummaryMarkdown(summary) {
 - Smoke failures: ${summary.smoke.failed}
 - Seeded canary failures: ${summary.seededCanary.failed}
 - Exact canary failures: ${summary.exactCanary.failed}
+- Walkthrough canary failures: ${summary.walkthroughCanary.failed}
 
 ## Blockers
 

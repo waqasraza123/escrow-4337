@@ -39,6 +39,8 @@ The Playwright harness now also includes two focused deployed canary lanes behin
 
 Use the seeded deployed canary as the default staged mutation proof because it is faster and less brittle. The `Deployed Smoke` workflow now runs that seeded lane after read-only smoke. The exact deployed flow stays reserved for `pnpm launch:candidate` and the manual `Launch Candidate` workflow, where it serves as explicit release-candidate evidence rather than the default post-deploy gate.
 
+The exact browser contract now also includes a dedicated walkthrough canary that validates the first-time guided path and the real copied contractor invite-link handoff through staged client, contractor, and operator actors. `pnpm launch:candidate` now captures that walkthrough report separately, and the repo also includes a standalone `Walkthrough Acceptance` workflow for local built-app regression against Docker-backed Postgres.
+
 For the exact staging rollout order that combines deployment, smoke, launch readiness, evidence capture, and rollback checkpoints, use [docs/STAGING_EXECUTION_SEQUENCE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/STAGING_EXECUTION_SEQUENCE.md).
 
 ## Launch Readiness Endpoint

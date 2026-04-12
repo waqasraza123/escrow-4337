@@ -1,0 +1,62 @@
+name: Walkthrough Acceptance
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  local-walkthrough:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start local Postgres
+        run: pnpm db:up
+
+      - name: Wait for local Postgres
+        run: timeout 60 sh -c 'until [ "$(docker inspect -f "{{.State.Health.Status}}" escrow4337-postgres 2>/dev/null)" = "healthy" ]; do sleep 1; done'
+
+      - name: Run local walkthrough acceptance
+        run: PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:walkthrough:local
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/playwright
+          if-no-files-found: warn

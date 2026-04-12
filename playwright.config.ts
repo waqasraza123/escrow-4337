@@ -91,7 +91,18 @@ const localProjects = [
   {
     name: 'local-journeys',
     testMatch: /journeys\/local\/.*\.spec\.ts$/,
+    testIgnore: /journeys\/local\/launch-walkthrough-flow\.spec\.ts$/,
     ...localProjectBase,
+  },
+  {
+    name: 'local-walkthrough',
+    testMatch: /journeys\/local\/.*walkthrough.*\.spec\.ts$/,
+    ...localProjectBase,
+    use: {
+      ...localProjectBase.use,
+      trace: 'retain-on-failure',
+      video: 'retain-on-failure',
+    },
   },
 ];
 
@@ -109,7 +120,18 @@ const deployedProjects = [
   {
     name: 'deployed-exact',
     testMatch: /journeys\/deployed\/.*exact.*\.spec\.ts$/,
+    testIgnore: /journeys\/deployed\/.*walkthrough.*\.spec\.ts$/,
     ...deployedProjectBase,
+  },
+  {
+    name: 'deployed-walkthrough',
+    testMatch: /journeys\/deployed\/.*walkthrough.*\.spec\.ts$/,
+    ...deployedProjectBase,
+    use: {
+      ...deployedProjectBase.use,
+      trace: 'retain-on-failure',
+      video: 'retain-on-failure',
+    },
   },
 ];
 
