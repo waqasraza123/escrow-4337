@@ -52,6 +52,10 @@ jobs:
             const fs = require('fs');
             const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
+            core.setOutput('git_ref', manifest.gitRef || '');
+            core.setOutput('run_url', manifest.runUrl || '');
+            core.setOutput('image_digest', manifest.image.digest);
+            core.setOutput('image_reference', manifest.image.canonicalReference || '');
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -220,6 +224,28 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
 
+      - name: Generate deployed smoke review artifact
+        run: node ./scripts/promotion-review.mjs smoke-record --output-dir artifacts/deployed-smoke-review
+        env:
+          DEPLOYED_SMOKE_ENVIRONMENT: staging
+          DEPLOYED_SMOKE_REPOSITORY: ${{ github.repository }}
+          DEPLOYED_SMOKE_WORKFLOW: ${{ github.workflow }}
+          DEPLOYED_SMOKE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOYED_SMOKE_ACTOR: ${{ github.actor }}
+          DEPLOYED_SMOKE_CANDIDATE_RUN_ID: ${{ github.event.workflow_run.id }}
+          DEPLOYED_SMOKE_CANDIDATE_RUN_URL: ${{ steps.candidate_manifest.outputs.run_url }}
+          DEPLOYED_SMOKE_COMMIT_SHA: ${{ steps.candidate_manifest.outputs.commit_sha }}
+          DEPLOYED_SMOKE_GIT_REF: ${{ steps.candidate_manifest.outputs.git_ref }}
+          DEPLOYED_SMOKE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
+          DEPLOYED_SMOKE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
+
+      - name: Upload deployed smoke review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-smoke-review
+          path: artifacts/deployed-smoke-review
+          if-no-files-found: error
+
   manual-smoke:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -247,6 +273,10 @@ jobs:
             const fs = require('fs');
             const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
+            core.setOutput('git_ref', manifest.gitRef || '');
+            core.setOutput('run_url', manifest.runUrl || '');
+            core.setOutput('image_digest', manifest.image.digest);
+            core.setOutput('image_reference', manifest.image.canonicalReference || '');
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -414,3 +444,25 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL }}
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
+
+      - name: Generate deployed smoke review artifact
+        run: node ./scripts/promotion-review.mjs smoke-record --output-dir artifacts/deployed-smoke-review
+        env:
+          DEPLOYED_SMOKE_ENVIRONMENT: ${{ inputs.environment }}
+          DEPLOYED_SMOKE_REPOSITORY: ${{ github.repository }}
+          DEPLOYED_SMOKE_WORKFLOW: ${{ github.workflow }}
+          DEPLOYED_SMOKE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOYED_SMOKE_ACTOR: ${{ github.actor }}
+          DEPLOYED_SMOKE_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          DEPLOYED_SMOKE_CANDIDATE_RUN_URL: ${{ steps.candidate_manifest.outputs.run_url }}
+          DEPLOYED_SMOKE_COMMIT_SHA: ${{ steps.candidate_manifest.outputs.commit_sha }}
+          DEPLOYED_SMOKE_GIT_REF: ${{ steps.candidate_manifest.outputs.git_ref }}
+          DEPLOYED_SMOKE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
+          DEPLOYED_SMOKE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
+
+      - name: Upload deployed smoke review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-smoke-review
+          path: artifacts/deployed-smoke-review
+          if-no-files-found: error

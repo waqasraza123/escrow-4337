@@ -29,7 +29,8 @@ Run the same image with different commands:
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
 7. Before final sign-off, run the manual `Launch Candidate` workflow or `pnpm launch:candidate` against the same environment.
 8. Preserve the generated launch-candidate artifact bundle for rollout evidence and any rollback review.
-9. Review `promotion-record.json` or `promotion-record.md` from that bundle before any production promotion decision; production candidates should include a designated rollback image SHA.
+9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id plus the selected `Deployed Smoke` and `Launch Candidate` run ids.
+10. Review `promotion-review.json` or `promotion-review.md` before any production promotion decision; it reconciles the CI image manifest, deployed-smoke review artifact, and launch-candidate review artifact into one machine-readable decision record. Production candidates should still include a designated rollback image SHA inside the underlying launch-candidate record.
 
 ## Frontend Contract
 
@@ -52,13 +53,14 @@ Required launch-candidate evidence for the narrowed launch flow:
 - use the CI-published `api-image-manifest` artifact for the exact candidate run instead of manually retyping the image SHA
 - run `pnpm launch:candidate`
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
-- review the generated promotion record plus daemon alert dry-run artifact alongside the evidence manifest before promotion
+- run `Promotion Review` with the matching `Deployed Smoke` and `Launch Candidate` run ids so the release dossier machine-checks candidate run, commit, digest, and evidence completeness before promotion
+- review the generated promotion review plus daemon alert dry-run artifact alongside the underlying evidence manifest before promotion
 
 `pnpm smoke:deployed` remains read-only. The seeded canary is the default staged mutation proof, and the exact flow stays confined to explicit launch-candidate evidence runs.
 
 ## Production Promotion
 
-- Promotion to `production` is manual through `Deployed Smoke`.
+- Promotion to `production` is manual and should conclude with a green `Promotion Review` run.
 - Use the same image contract that passed staging.
 - Run production smoke only after the new API image, migration posture, and worker rollout are complete.
 

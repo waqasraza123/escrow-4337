@@ -1,0 +1,105 @@
+name: Promotion Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment whose staged evidence is being reviewed
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      candidate_run_id:
+        description: CI workflow run id that published the candidate API image manifest
+        required: true
+        type: string
+      deployed_smoke_run_id:
+        description: Deployed Smoke workflow run id to reconcile for this candidate
+        required: true
+        type: string
+      launch_candidate_run_id:
+        description: Launch Candidate workflow run id to reconcile for this candidate
+        required: true
+        type: string
+
+jobs:
+  promotion-review:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download API image manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: api-image-manifest
+          path: artifacts/api-image-manifest
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Download deployed smoke review artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployed-smoke-review
+          path: artifacts/deployed-smoke-review
+          run-id: ${{ inputs.deployed_smoke_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Download launch candidate review artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: launch-candidate-review
+          path: artifacts/launch-candidate-review
+          run-id: ${{ inputs.launch_candidate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Read candidate image manifest
+        id: candidate_manifest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            core.setOutput('commit_sha', manifest.commitSha);
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate_manifest.outputs.commit_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Resolve API image manifest
+        run: |
+          node ./scripts/api-image-manifest.mjs resolve \
+            --manifest artifacts/api-image-manifest/manifest.json \
+            --expected-repository "${{ github.repository }}" \
+            --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
+            --expected-run-id "${{ inputs.candidate_run_id }}"
+
+      - name: Run promotion review
+        run: |
+          node ./scripts/promotion-review.mjs review \
+            --image-manifest artifacts/api-image-manifest/manifest.json \
+            --deployed-smoke-record artifacts/deployed-smoke-review/deployed-smoke-record.json \
+            --launch-promotion-record artifacts/launch-candidate-review/promotion-record.json \
+            --launch-evidence-manifest artifacts/launch-candidate-review/evidence-manifest.json \
+            --output-dir artifacts/promotion-review \
+            --expected-environment "${{ inputs.environment }}" \
+            --expected-repository "${{ github.repository }}" \
+            --expected-candidate-run-id "${{ inputs.candidate_run_id }}" \
+            --expected-smoke-run-id "${{ inputs.deployed_smoke_run_id }}" \
+            --expected-launch-run-id "${{ inputs.launch_candidate_run_id }}"
+
+      - name: Upload promotion review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-review-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/promotion-review
+          if-no-files-found: error

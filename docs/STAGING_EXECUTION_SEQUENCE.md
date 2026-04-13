@@ -64,12 +64,16 @@ Required environment contract:
    The same gate now also runs `pnpm verify:authority:deployed`, which creates a staged escrow job through the deployed API, runs protected reconciliation, and captures public audit/export proof that the staged environment reads from `chain_projection`.
    When using the manual GitHub workflow, pass the CI candidate run id for the staged candidate and the rollback image SHA if one is already designated so the workflow resolves the exact candidate commit and digest from the published image manifest.
 
-10. Preserve the evidence bundle and workflow links.
-    Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
-    Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
-    The launch-candidate artifact bundle now captures that metadata directly and includes `evidence-manifest.json`, `promotion-record.json`, and a daemon alert dry-run artifact. `evidence-manifest.json` should show zero missing artifacts before promotion discussion.
+10. Run promotion review against the staged evidence set.
+    Canonical GitHub path: run workflow `Promotion Review` with inputs `environment=staging`, the CI candidate run id, the successful `Deployed Smoke` run id, and the successful `Launch Candidate` run id.
+    Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
 
-11. Decide whether deeper staged proof is required.
+11. Preserve the evidence bundle and workflow links.
+    Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
+    Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, `Promotion Review` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
+    The release review set now includes `deployed-smoke-record.json`, `evidence-manifest.json`, `promotion-record.json`, and `promotion-review.json`. `evidence-manifest.json` should show zero missing artifacts and `promotion-review.json` should report `ready` before promotion discussion.
+
+12. Decide whether deeper staged proof is required.
     The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.
     If you need to run the exact browser-auth and browser-setup flow directly outside the launch-candidate wrapper, use `pnpm e2e:canary:deployed:exact`.
 
@@ -82,6 +86,7 @@ Treat staging as proven only when all of the following are true:
 - `pnpm --filter escrow4334-api deployment:validate` passes
 - `pnpm smoke:deployed` passes against live staging URLs
 - `pnpm launch:candidate` passes with launch readiness enforced
+- `promotion-review.json` reports `ready` for staged promotion review and reconciles the intended candidate run, commit SHA, and image digest across smoke and launch evidence
 - `promotion-record.json` reports `ready` for staging review and has no unresolved blockers
 - the artifact bundle and workflow evidence are preserved for review
 

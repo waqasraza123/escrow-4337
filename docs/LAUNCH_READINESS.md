@@ -35,6 +35,8 @@ The launch-candidate runner now writes an explicit evidence bundle under `artifa
 
 The `Launch Candidate` workflow now consumes the CI-published `api-image-manifest` artifact for a specific candidate run, checks out the exact candidate commit from that manifest, and records promotion metadata inside the bundle, including the target environment, launch workflow run URL, candidate CI run URL, commit SHA, deployed image digest, and rollback image SHA when designated. GitHub-triggered launch candidates fail fast if that metadata is missing or mismatched, and production promotion review is now blocked when a rollback image SHA is absent.
 
+`Deployed Smoke` now also publishes a stable machine-readable review artifact with the target environment, smoke workflow run URL, candidate CI run metadata, commit SHA, and deployed image digest for the validated candidate. The manual `Promotion Review` workflow consumes that deployed-smoke review artifact together with the CI `api-image-manifest` and the launch-candidate review artifact, then blocks promotion if candidate run ids, commit SHAs, image digests, environment labels, or required launch evidence diverge.
+
 The Playwright harness now also includes two focused deployed canary lanes behind explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials:
 
 - seeded deployed canary: API-authenticated actors plus API-seeded join-ready job state, then browser coverage for contractor join, delivery, dispute, and operator resolution
