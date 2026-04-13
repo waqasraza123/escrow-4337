@@ -40,7 +40,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: api-image-manifest
-          path: artifacts/api-image-manifest
+          path: ${{ runner.temp }}/api-image-manifest
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
@@ -50,7 +50,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            const manifest = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/api-image-manifest/manifest.json`, 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
             core.setOutput('git_ref', manifest.gitRef || '');
             core.setOutput('run_url', manifest.runUrl || '');
@@ -82,7 +82,7 @@ jobs:
       - name: Resolve API image manifest
         run: |
           node ./scripts/api-image-manifest.mjs resolve \
-            --manifest artifacts/api-image-manifest/manifest.json \
+            --manifest "${{ runner.temp }}/api-image-manifest/manifest.json" \
             --expected-repository "${{ github.repository }}" \
             --expected-commit-sha "${{ github.event.workflow_run.head_sha }}" \
             --expected-run-id "${{ github.event.workflow_run.id }}"
@@ -242,7 +242,7 @@ jobs:
       - name: Upload deployed smoke review artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deployed-smoke-review
+          name: deployed-smoke-review-staging-candidate-${{ github.event.workflow_run.id }}
           path: artifacts/deployed-smoke-review
           if-no-files-found: error
 
@@ -261,7 +261,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: api-image-manifest
-          path: artifacts/api-image-manifest
+          path: ${{ runner.temp }}/api-image-manifest
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
 
@@ -271,7 +271,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            const manifest = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/api-image-manifest/manifest.json`, 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
             core.setOutput('git_ref', manifest.gitRef || '');
             core.setOutput('run_url', manifest.runUrl || '');
@@ -303,7 +303,7 @@ jobs:
       - name: Resolve API image manifest
         run: |
           node ./scripts/api-image-manifest.mjs resolve \
-            --manifest artifacts/api-image-manifest/manifest.json \
+            --manifest "${{ runner.temp }}/api-image-manifest/manifest.json" \
             --expected-repository "${{ github.repository }}" \
             --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
             --expected-run-id "${{ inputs.candidate_run_id }}"
@@ -463,6 +463,6 @@ jobs:
       - name: Upload deployed smoke review artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deployed-smoke-review
+          name: deployed-smoke-review-${{ inputs.environment }}-candidate-${{ inputs.candidate_run_id }}
           path: artifacts/deployed-smoke-review
           if-no-files-found: error

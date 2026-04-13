@@ -100,7 +100,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: api-image-manifest
-          path: artifacts/api-image-manifest
+          path: ${{ runner.temp }}/api-image-manifest
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
 
@@ -110,7 +110,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            const manifest = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/api-image-manifest/manifest.json`, 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
             core.setOutput('git_ref', manifest.gitRef || '');
             core.setOutput('run_url', manifest.runUrl || '');
@@ -145,7 +145,7 @@ jobs:
       - name: Resolve API image manifest
         run: |
           node ./scripts/api-image-manifest.mjs resolve \
-            --manifest artifacts/api-image-manifest/manifest.json \
+            --manifest "${{ runner.temp }}/api-image-manifest/manifest.json" \
             --expected-repository "${{ github.repository }}" \
             --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
             --expected-run-id "${{ inputs.candidate_run_id }}"
@@ -171,7 +171,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: launch-candidate-review
+          name: launch-candidate-review-${{ inputs.environment }}-candidate-${{ inputs.candidate_run_id }}
           path: |
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/evidence-manifest.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/promotion-record.json

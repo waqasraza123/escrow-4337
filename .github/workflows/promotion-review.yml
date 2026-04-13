@@ -15,12 +15,12 @@ on:
         required: true
         type: string
       deployed_smoke_run_id:
-        description: Deployed Smoke workflow run id to reconcile for this candidate
-        required: true
+        description: Optional override for the Deployed Smoke workflow run id; omit to auto-discover the newest matching review artifact
+        required: false
         type: string
       launch_candidate_run_id:
-        description: Launch Candidate workflow run id to reconcile for this candidate
-        required: true
+        description: Optional override for the Launch Candidate workflow run id; omit to auto-discover the newest matching review artifact
+        required: false
         type: string
 
 jobs:
@@ -31,28 +31,51 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Checkout workflow repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Resolve review artifact selections
+        id: review_artifacts
+        run: |
+          node ./scripts/release-review-selection.mjs resolve \
+            --environment "${{ inputs.environment }}" \
+            --candidate-run-id "${{ inputs.candidate_run_id }}" \
+            ${DEPLOYED_SMOKE_RUN_ID:+--deployed-smoke-run-id "$DEPLOYED_SMOKE_RUN_ID"} \
+            ${LAUNCH_CANDIDATE_RUN_ID:+--launch-candidate-run-id "$LAUNCH_CANDIDATE_RUN_ID"} \
+            --write-env "$RUNNER_TEMP/promotion-review-selection.env"
+          cat "$RUNNER_TEMP/promotion-review-selection.env" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOYED_SMOKE_RUN_ID: ${{ inputs.deployed_smoke_run_id }}
+          LAUNCH_CANDIDATE_RUN_ID: ${{ inputs.launch_candidate_run_id }}
+
       - name: Download API image manifest
         uses: actions/download-artifact@v4
         with:
           name: api-image-manifest
-          path: artifacts/api-image-manifest
+          path: ${{ runner.temp }}/api-image-manifest
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
 
       - name: Download deployed smoke review artifact
         uses: actions/download-artifact@v4
         with:
-          name: deployed-smoke-review
-          path: artifacts/deployed-smoke-review
-          run-id: ${{ inputs.deployed_smoke_run_id }}
+          name: ${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/deployed-smoke-review
+          run-id: ${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_RUN_ID }}
           github-token: ${{ github.token }}
 
       - name: Download launch candidate review artifact
         uses: actions/download-artifact@v4
         with:
-          name: launch-candidate-review
-          path: artifacts/launch-candidate-review
-          run-id: ${{ inputs.launch_candidate_run_id }}
+          name: ${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/launch-candidate-review
+          run-id: ${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_RUN_ID }}
           github-token: ${{ github.token }}
 
       - name: Read candidate image manifest
@@ -61,23 +84,18 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            const manifest = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/api-image-manifest/manifest.json`, 'utf8'));
             core.setOutput('commit_sha', manifest.commitSha);
 
-      - name: Checkout
+      - name: Checkout candidate commit
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.candidate_manifest.outputs.commit_sha }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Resolve API image manifest
         run: |
           node ./scripts/api-image-manifest.mjs resolve \
-            --manifest artifacts/api-image-manifest/manifest.json \
+            --manifest "${{ runner.temp }}/api-image-manifest/manifest.json" \
             --expected-repository "${{ github.repository }}" \
             --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
             --expected-run-id "${{ inputs.candidate_run_id }}"
@@ -85,24 +103,24 @@ jobs:
       - name: Run promotion review
         run: |
           node ./scripts/promotion-review.mjs review \
-            --image-manifest artifacts/api-image-manifest/manifest.json \
-            --deployed-smoke-record artifacts/deployed-smoke-review/deployed-smoke-record.json \
-            --launch-promotion-record artifacts/launch-candidate-review/promotion-record.json \
-            --launch-evidence-manifest artifacts/launch-candidate-review/evidence-manifest.json \
+            --image-manifest "${{ runner.temp }}/api-image-manifest/manifest.json" \
+            --deployed-smoke-record "${{ runner.temp }}/deployed-smoke-review/deployed-smoke-record.json" \
+            --launch-promotion-record "${{ runner.temp }}/launch-candidate-review/promotion-record.json" \
+            --launch-evidence-manifest "${{ runner.temp }}/launch-candidate-review/evidence-manifest.json" \
             --output-dir artifacts/promotion-review \
             --expected-environment "${{ inputs.environment }}" \
             --expected-repository "${{ github.repository }}" \
             --expected-candidate-run-id "${{ inputs.candidate_run_id }}" \
-            --expected-smoke-run-id "${{ inputs.deployed_smoke_run_id }}" \
-            --expected-launch-run-id "${{ inputs.launch_candidate_run_id }}"
+            --expected-smoke-run-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_RUN_ID }}" \
+            --expected-launch-run-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_RUN_ID }}"
 
       - name: Generate release dossier
         if: always()
         run: |
           node ./scripts/release-dossier.mjs \
-            --image-manifest-dir artifacts/api-image-manifest \
-            --deployed-smoke-dir artifacts/deployed-smoke-review \
-            --launch-review-dir artifacts/launch-candidate-review \
+            --image-manifest-dir "${{ runner.temp }}/api-image-manifest" \
+            --deployed-smoke-dir "${{ runner.temp }}/deployed-smoke-review" \
+            --launch-review-dir "${{ runner.temp }}/launch-candidate-review" \
             --promotion-review-dir artifacts/promotion-review \
             --output-dir artifacts/release-dossier
         env:

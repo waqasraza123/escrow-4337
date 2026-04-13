@@ -65,7 +65,9 @@ Required environment contract:
    When using the manual GitHub workflow, pass the CI candidate run id for the staged candidate and the rollback image SHA if one is already designated so the workflow resolves the exact candidate commit and digest from the published image manifest.
 
 10. Run promotion review against the staged evidence set.
-    Canonical GitHub path: run workflow `Promotion Review` with inputs `environment=staging`, the CI candidate run id, the successful `Deployed Smoke` run id, and the successful `Launch Candidate` run id.
+    Canonical GitHub path: run workflow `Promotion Review` with inputs `environment=staging` and the CI candidate run id.
+    It now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that candidate and environment.
+    Provide explicit smoke or launch run ids only when you need to override the auto-selected review artifacts.
     Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
     Preserve the uploaded `release-dossier` artifact from that workflow; it now copies the source evidence into one canonical folder and includes `release-dossier-checksums.txt`.
 

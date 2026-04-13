@@ -29,7 +29,9 @@ Run the same image with different commands:
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
 7. Before final sign-off, run the manual `Launch Candidate` workflow or `pnpm launch:candidate` against the same environment.
 8. Preserve the generated launch-candidate artifact bundle for rollout evidence and any rollback review.
-9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id plus the selected `Deployed Smoke` and `Launch Candidate` run ids.
+9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id.
+   By default it now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that environment and candidate.
+   Supply explicit smoke or launch run ids only when you need to override that auto-selection.
 10. Review the uploaded `release-dossier` artifact before any production promotion decision.
 11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`. Production candidates should still include a designated rollback image SHA inside the underlying launch-candidate record.
 
@@ -54,7 +56,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - use the CI-published `api-image-manifest` artifact for the exact candidate run instead of manually retyping the image SHA
 - run `pnpm launch:candidate`
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
-- run `Promotion Review` with the matching `Deployed Smoke` and `Launch Candidate` run ids so the release dossier machine-checks candidate run, commit, digest, and evidence completeness before promotion
+- run `Promotion Review` for the staged candidate; let it auto-discover the newest matching smoke and launch review artifacts unless you need explicit override run ids
 - preserve the uploaded `release-dossier` artifact, which now includes copied evidence under `evidence/` plus `release-dossier-checksums.txt`
 - review the generated release dossier plus daemon alert dry-run artifact alongside the underlying evidence manifest before promotion
 
