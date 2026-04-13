@@ -4,62 +4,71 @@
 - 2026-04-13
 
 ## Current Objective
-- Ship the next production-grade release-governance phase after release dossiers: publish a stable approved-release pointer and let production launch candidates auto-resolve rollback image SHA from reviewed evidence instead of manual entry.
+- Restore the repository verification baseline so new product slices ship on a green branch again.
 
 ## Last Completed Step
-- Added a ready-only `release-pointer` contract plus workflow wiring so `Promotion Review` publishes `release-pointer-<environment>` artifacts and `Launch Candidate` can auto-resolve `rollback_image_sha` for production from the latest approved release pointer when no explicit override is supplied.
+- Recovered the repo baseline by clearing the `services/api` lint backlog, hardening the local chain-ingestion verification runner types, fixing deployment-validation test doubles for the current Postgres migration query flow, and preserving explicit refreshed-session success states in web/admin consoles so local Playwright smoke passes again.
 
 ## Current Step
-- Task complete. Targeted launch-script verification passed; root `pnpm verify:ci` is still blocked by a pre-existing `services/api` lint backlog unrelated to this change.
+- Task complete. `pnpm verify:ci` and `pnpm verify:chain:local` now pass.
 
 ## Why This Step Exists
-- The repo could already preserve a reviewed release dossier, but production launch candidates still depended on a human manually retyping the rollback image SHA. This phase turns the last approved release into a stable machine-readable pointer so rollback provenance can be auto-resolved from reviewed evidence instead of operator memory.
+- The branch could not ship safely while root verification was red. Recent API formatting drift, one stale deployment-validation mock, and browser smoke refresh-state regressions had to be corrected before starting the next feature slice.
 
 ## Changed Files
-- `.github/workflows/launch-candidate.yml`
-- `.github/workflows/promotion-review.yml`
-- `docs/DEPLOYMENT_RUNBOOK.md`
-- `docs/INCIDENT_PLAYBOOK.md`
-- `docs/LAUNCH_READINESS.md`
-- `docs/STAGING_EXECUTION_SEQUENCE.md`
-- `docs/project-state.md`
-- `docs/_local/current-session.md`
-- `scripts/release-pointer-lib.mjs`
-- `scripts/release-pointer-lib.test.mjs`
-- `scripts/release-pointer.mjs`
+- `apps/admin/src/app/operator-console.tsx`
+- `apps/web/src/app/web-console.tsx`
+- `services/api/src/modules/operations/escrow-chain-sync-local-verification-runner.ts`
+- `services/api/test/deployment-validation.service.spec.ts`
+- `services/api/src/modules/escrow/escrow.service.ts`
+- `services/api/src/persistence/file/file.repositories.ts`
+- formatted via `eslint --fix`:
+  `services/api/src/common/http/port.ts`
+  `services/api/src/main.ts`
+  `services/api/src/modules/auth/email/email-template.service.ts`
+  `services/api/src/modules/escrow/escrow.dto.ts`
+  `services/api/src/modules/marketplace/marketplace.controller.ts`
+  `services/api/src/modules/marketplace/marketplace.dto.ts`
+  `services/api/src/modules/marketplace/marketplace.service.ts`
+  `services/api/src/modules/operations/escrow-chain-ingestion-status.service.ts`
+  `services/api/src/modules/operations/escrow-chain-sync-daemon-monitoring.service.ts`
+  `services/api/src/modules/operations/escrow-chain-sync.service.ts`
+  `services/api/src/modules/operations/escrow-health.service.ts`
+  `services/api/src/modules/operations/escrow-onchain-authority.service.ts`
+  `services/api/src/modules/operations/launch-readiness.service.ts`
+  `services/api/src/modules/operations/runtime-profile.service.ts`
+  `services/api/src/persistence/file/file.marketplace.repositories.ts`
+  `services/api/src/persistence/persistence.types.ts`
+  `services/api/src/persistence/postgres/postgres.marketplace.repositories.ts`
+  `services/api/test/escrow.controller.integration.spec.ts`
+  `services/api/test/escrow.service.spec.ts`
+  `services/api/test/launch-readiness.service.spec.ts`
+  `services/api/test/marketplace.controller.integration.spec.ts`
+  `services/api/test/marketplace.service.spec.ts`
+  `services/api/test/runtime-profile.service.spec.ts`
 
 ## Key Constraints
-- Keep the phase grounded in the existing GitHub Actions deployment flow; do not invent a second rollback review process outside CI, Deployed Smoke, Launch Candidate, Promotion Review, the release dossier artifact, and the new approved-release pointer artifact.
-- Preserve the current staged smoke and launch flows, but remove manual production rollback SHA bookkeeping by deriving rollback provenance from the latest reviewed release pointer when no explicit override is supplied.
-- The pointer must only be published from a ready promotion-review result and must carry the exact candidate run, commit SHA, and image digest that were reviewed.
-- Treat unrelated `services/api` lint failures as existing repo debt unless this phase directly caused them.
+- Keep behavior aligned with the existing product and operator flows; do not “fix” smoke failures by weakening tests.
+- Preserve the current single-contractor escrow and operator authorization model.
+- Treat the local chain-ingestion verifier as a typed production support harness, not a loose script.
 
 ## Verification Commands
-- `node --check scripts/release-pointer.mjs`
-- `node --check scripts/release-pointer-lib.mjs`
-- `pnpm test:scripts`
-- `node ./scripts/release-pointer.mjs --help`
-- local fixture runs:
-  `node ./scripts/release-pointer.mjs generate --release-dossier artifacts/test-release-dossier/dossier/release-dossier.json --output-dir artifacts/test-release-pointer`
-  `node ./scripts/release-pointer.mjs validate --pointer artifacts/test-release-pointer/release-pointer.json --expected-environment staging --write-env artifacts/test-release-pointer/release-pointer.env`
+- `pnpm --filter escrow4334-api lint`
+- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts marketplace.controller.integration.spec.ts escrow.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runInBand deployment-validation.service.spec.ts`
+- `pnpm --filter web test -- src/app/page.spec.tsx`
+- `pnpm --filter admin test -- src/app/page.spec.tsx`
+- `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/smoke/local/auth-smoke.spec.ts --project=local-smoke`
 - `git diff --check`
 - `pnpm verify:ci`
+- `pnpm verify:chain:local`
 
 ## Verification Status
 - Passed:
-  - `node --check scripts/release-pointer.mjs`
-  - `node --check scripts/release-pointer-lib.mjs`
-  - `pnpm test:scripts`
-  - `node ./scripts/release-pointer.mjs --help`
-  - local release-pointer fixture run writing `artifacts/test-release-pointer/release-pointer.json`
-  - local release-pointer validation writing `artifacts/test-release-pointer/release-pointer.env`
-  - `git diff --check`
-- Failed due to unrelated existing repo state:
-  - `pnpm verify:ci`
-  - blocker: `services/api` lint reports a large pre-existing Prettier and lint backlog in files outside this change
+  - all commands above
 
 ## Expected Result
-- `Promotion Review` now publishes a stable ready-only `release-pointer-<environment>` artifact, and `Launch Candidate` can derive production rollback image SHA from the latest approved production pointer when no explicit rollback override is supplied.
+- Root verification is green again, deployment-validation tests reflect the current migration contract, the local chain-ingestion verifier is type-safe under lint, and both consoles keep a visible success state after manual session refresh.
 
 ## Next Likely Step
-- Run a real staging `Promotion Review` to publish `release-pointer-staging`, then run a real production `Launch Candidate` without `rollback_image_sha` once `release-pointer-production` exists and confirm the auto-resolved rollback SHA matches the reviewed prior production release.
+- Pick the next product slice from the remaining core backlog now that the branch is green; prioritize a broken or incomplete operator/integrity flow over more release-tooling work.

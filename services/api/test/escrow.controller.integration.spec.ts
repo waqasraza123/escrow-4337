@@ -279,7 +279,9 @@ describe('EscrowController integration', () => {
       auditResponse.bundle.executions.map((execution) => execution.action),
     ).toEqual(['create_job', 'fund_job']);
     expect(auditResponse.bundle.authority.source).toBe('local_fallback');
-    expect(auditResponse.bundle.authority.reason).toBe('authority_reads_disabled');
+    expect(auditResponse.bundle.authority.reason).toBe(
+      'authority_reads_disabled',
+    );
   });
 
   it('lists authenticated jobs for the current participant only', async () => {

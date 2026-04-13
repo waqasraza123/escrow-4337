@@ -4,7 +4,9 @@ function parseConfiguredPort(value: string, envName: 'NEST_API_PORT' | 'PORT') {
   const parsed = Number.parseInt(value.trim(), 10);
 
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > maxTcpPort) {
-    throw new Error(`${envName} must be a valid TCP port between 1 and ${maxTcpPort}`);
+    throw new Error(
+      `${envName} must be a valid TCP port between 1 and ${maxTcpPort}`,
+    );
   }
 
   return parsed;

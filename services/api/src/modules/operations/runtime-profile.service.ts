@@ -113,7 +113,8 @@ export class RuntimeProfileService {
           lagBlocks: chainIngestion.lagBlocks,
           cursor: {
             nextFromBlock: chainIngestion.cursor?.nextFromBlock ?? null,
-            lastFinalizedBlock: chainIngestion.cursor?.lastFinalizedBlock ?? null,
+            lastFinalizedBlock:
+              chainIngestion.cursor?.lastFinalizedBlock ?? null,
             lastScannedBlock: chainIngestion.cursor?.lastScannedBlock ?? null,
             updatedAt: chainIngestion.cursor?.updatedAt ?? null,
           },

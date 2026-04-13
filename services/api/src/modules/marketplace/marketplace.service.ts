@@ -8,19 +8,24 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { normalizeEvmAddress } from '../../common/evm-address';
-import { ESCROW_REPOSITORY, MARKETPLACE_REPOSITORY } from '../../persistence/persistence.tokens';
+import {
+  ESCROW_REPOSITORY,
+  MARKETPLACE_REPOSITORY,
+} from '../../persistence/persistence.tokens';
 import type {
   EscrowRepository,
   MarketplaceRepository,
 } from '../../persistence/persistence.types';
-import type {
-  EscrowMilestoneRecord,
-} from '../escrow/escrow.types';
+import type { EscrowMilestoneRecord } from '../escrow/escrow.types';
 import { EscrowActorService } from '../escrow/escrow-actor.service';
 import { EscrowService } from '../escrow/escrow.service';
 import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
 import { UsersService } from '../users/users.service';
-import { isEoaWallet, isSmartAccountWallet, type UserRecord } from '../users/users.types';
+import {
+  isEoaWallet,
+  isSmartAccountWallet,
+  type UserRecord,
+} from '../users/users.types';
 import type {
   ApplyToOpportunityDto,
   CreateMarketplaceOpportunityDto,
@@ -66,19 +71,16 @@ import type {
 
 function normalizeTextArray(values: string[]) {
   return Array.from(
-    new Set(
-      values
-        .map((value) => value.trim())
-        .filter(Boolean),
-    ),
+    new Set(values.map((value) => value.trim()).filter(Boolean)),
   );
 }
 
 function normalizeProofArtifacts(
   values: Array<
-    MarketplaceTalentProofArtifact | (Omit<MarketplaceTalentProofArtifact, 'jobId'> & {
-      jobId?: string | null;
-    })
+    | MarketplaceTalentProofArtifact
+    | (Omit<MarketplaceTalentProofArtifact, 'jobId'> & {
+        jobId?: string | null;
+      })
   >,
 ): MarketplaceTalentProofArtifact[] {
   return values.map((artifact) => ({
@@ -114,7 +116,10 @@ function containsQuery(haystack: string, query?: string) {
   return haystack.toLowerCase().includes(query.trim().toLowerCase());
 }
 
-function compareModerationStatus(left: ModerationStatus, right: ModerationStatus) {
+function compareModerationStatus(
+  left: ModerationStatus,
+  right: ModerationStatus,
+) {
   const order = {
     visible: 0,
     hidden: 1,
@@ -189,13 +194,16 @@ export class MarketplaceService {
     dto: UpsertMarketplaceProfileDto,
   ): Promise<MarketplaceProfileResponse> {
     const now = Date.now();
-    const existingBySlug = await this.marketplaceRepository.getProfileBySlug(dto.slug);
+    const existingBySlug = await this.marketplaceRepository.getProfileBySlug(
+      dto.slug,
+    );
 
     if (existingBySlug && existingBySlug.userId !== userId) {
       throw new ConflictException('Marketplace slug is already in use');
     }
 
-    const existing = await this.marketplaceRepository.getProfileByUserId(userId);
+    const existing =
+      await this.marketplaceRepository.getProfileByUserId(userId);
     const profile: MarketplaceProfileRecord = {
       userId,
       slug: dto.slug,
@@ -222,7 +230,9 @@ export class MarketplaceService {
       profile.rateMax &&
       Number(profile.rateMin) > Number(profile.rateMax)
     ) {
-      throw new BadRequestException('Profile minimum rate cannot exceed maximum rate');
+      throw new BadRequestException(
+        'Profile minimum rate cannot exceed maximum rate',
+      );
     }
 
     const nextPortfolioArtifacts = normalizeProofArtifacts(
@@ -234,9 +244,10 @@ export class MarketplaceService {
         jobId: null,
       })),
     );
-    const nonPortfolioProofs = existing?.proofArtifacts.filter(
-      (artifact) => artifact.kind !== 'portfolio',
-    ) ?? [];
+    const nonPortfolioProofs =
+      existing?.proofArtifacts.filter(
+        (artifact) => artifact.kind !== 'portfolio',
+      ) ?? [];
     profile.proofArtifacts = [...nextPortfolioArtifacts, ...nonPortfolioProofs];
 
     await this.marketplaceRepository.saveProfile(profile);
@@ -256,7 +267,9 @@ export class MarketplaceService {
     );
     profile.proofArtifacts = [
       ...portfolioProofs,
-      ...normalizeProofArtifacts(dto.proofArtifacts.filter((artifact) => artifact.kind !== 'portfolio')),
+      ...normalizeProofArtifacts(
+        dto.proofArtifacts.filter((artifact) => artifact.kind !== 'portfolio'),
+      ),
     ];
     profile.updatedAt = Date.now();
     await this.marketplaceRepository.saveProfile(profile);
@@ -290,7 +303,8 @@ export class MarketplaceService {
         if (
           query.skill &&
           ![...profile.skills, ...profile.specialties].some(
-            (skill) => skill.toLowerCase() === query.skill?.trim().toLowerCase(),
+            (skill) =>
+              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
           )
         ) {
           return false;
@@ -308,15 +322,20 @@ export class MarketplaceService {
       })
       .sort((left, right) => {
         if (
-          right.view.escrowStats.completionCount !== left.view.escrowStats.completionCount
+          right.view.escrowStats.completionCount !==
+          left.view.escrowStats.completionCount
         ) {
           return (
             right.view.escrowStats.completionCount -
             left.view.escrowStats.completionCount
           );
         }
-        if (right.view.completedEscrowCount !== left.view.completedEscrowCount) {
-          return right.view.completedEscrowCount - left.view.completedEscrowCount;
+        if (
+          right.view.completedEscrowCount !== left.view.completedEscrowCount
+        ) {
+          return (
+            right.view.completedEscrowCount - left.view.completedEscrowCount
+          );
         }
         return right.profile.updatedAt - left.profile.updatedAt;
       })
@@ -399,7 +418,9 @@ export class MarketplaceService {
     this.assertOpportunityOwner(userId, opportunity);
 
     if (opportunity.status === 'hired' || opportunity.status === 'archived') {
-      throw new ConflictException('Closed marketplace opportunities cannot be edited');
+      throw new ConflictException(
+        'Closed marketplace opportunities cannot be edited',
+      );
     }
 
     const next: MarketplaceOpportunityRecord = {
@@ -415,7 +436,9 @@ export class MarketplaceService {
       mustHaveSkills: dto.mustHaveSkills
         ? normalizeTextArray(dto.mustHaveSkills)
         : opportunity.mustHaveSkills,
-      outcomes: dto.outcomes ? normalizeTextArray(dto.outcomes) : opportunity.outcomes,
+      outcomes: dto.outcomes
+        ? normalizeTextArray(dto.outcomes)
+        : opportunity.outcomes,
       acceptanceCriteria: dto.acceptanceCriteria
         ? normalizeTextArray(dto.acceptanceCriteria)
         : opportunity.acceptanceCriteria,
@@ -424,17 +447,21 @@ export class MarketplaceService {
         : opportunity.screeningQuestions,
       visibility: dto.visibility ?? opportunity.visibility,
       budgetMin:
-        dto.budgetMin !== undefined ? dto.budgetMin ?? null : opportunity.budgetMin,
+        dto.budgetMin !== undefined
+          ? (dto.budgetMin ?? null)
+          : opportunity.budgetMin,
       budgetMax:
-        dto.budgetMax !== undefined ? dto.budgetMax ?? null : opportunity.budgetMax,
+        dto.budgetMax !== undefined
+          ? (dto.budgetMax ?? null)
+          : opportunity.budgetMax,
       timeline: dto.timeline ?? opportunity.timeline,
       desiredStartAt:
         dto.desiredStartAt !== undefined
-          ? dto.desiredStartAt ?? null
+          ? (dto.desiredStartAt ?? null)
           : opportunity.desiredStartAt,
       timezoneOverlapHours:
         dto.timezoneOverlapHours !== undefined
-          ? dto.timezoneOverlapHours ?? null
+          ? (dto.timezoneOverlapHours ?? null)
           : opportunity.timezoneOverlapHours,
       engagementType: dto.engagementType ?? opportunity.engagementType,
       cryptoReadinessRequired:
@@ -464,12 +491,15 @@ export class MarketplaceService {
       dto.screeningQuestions,
     );
     opportunity.desiredStartAt =
-      dto.desiredStartAt !== undefined ? dto.desiredStartAt ?? null : opportunity.desiredStartAt;
+      dto.desiredStartAt !== undefined
+        ? (dto.desiredStartAt ?? null)
+        : opportunity.desiredStartAt;
     opportunity.timezoneOverlapHours =
       dto.timezoneOverlapHours !== undefined
-        ? dto.timezoneOverlapHours ?? null
+        ? (dto.timezoneOverlapHours ?? null)
         : opportunity.timezoneOverlapHours;
-    opportunity.engagementType = dto.engagementType ?? opportunity.engagementType;
+    opportunity.engagementType =
+      dto.engagementType ?? opportunity.engagementType;
     opportunity.cryptoReadinessRequired =
       dto.cryptoReadinessRequired ?? opportunity.cryptoReadinessRequired;
     opportunity.updatedAt = Date.now();
@@ -486,12 +516,16 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(opportunityId);
     this.assertOpportunityOwner(userId, opportunity);
     if (opportunity.moderationStatus === 'suspended') {
-      throw new ForbiddenException('Suspended marketplace opportunities cannot be published');
+      throw new ForbiddenException(
+        'Suspended marketplace opportunities cannot be published',
+      );
     }
 
     const profile = await this.requireProfileByUserId(userId);
     if (!this.isProfileComplete(profile)) {
-      throw new ForbiddenException('Complete your marketplace profile before publishing briefs');
+      throw new ForbiddenException(
+        'Complete your marketplace profile before publishing briefs',
+      );
     }
 
     const readiness = await this.getEscrowReadiness(userId);
@@ -565,7 +599,8 @@ export class MarketplaceService {
         if (
           query.skill &&
           ![...opportunity.requiredSkills, ...opportunity.mustHaveSkills].some(
-            (skill) => skill.toLowerCase() === query.skill?.trim().toLowerCase(),
+            (skill) =>
+              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
           )
         ) {
           return false;
@@ -639,11 +674,13 @@ export class MarketplaceService {
   ): Promise<MarketplaceMatchesResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
     this.assertOpportunityOwner(userId, opportunity);
-    const applications = (await this.marketplaceRepository.listApplications()).filter(
-      (application) => application.opportunityId === opportunityId,
-    );
+    const applications = (
+      await this.marketplaceRepository.listApplications()
+    ).filter((application) => application.opportunityId === opportunityId);
     const dossiers = await Promise.all(
-      applications.map((application) => this.buildApplicationDossier(application)),
+      applications.map((application) =>
+        this.buildApplicationDossier(application),
+      ),
     );
     return {
       matches: dossiers.sort(
@@ -659,12 +696,16 @@ export class MarketplaceService {
     applicationId: string,
   ): Promise<MarketplaceApplicationDossierResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     if (
       application.applicantUserId !== userId &&
       opportunity.ownerUserId !== userId
     ) {
-      throw new ForbiddenException('You do not have access to this application dossier');
+      throw new ForbiddenException(
+        'You do not have access to this application dossier',
+      );
     }
     return {
       dossier: await this.buildApplicationDossier(application),
@@ -680,10 +721,14 @@ export class MarketplaceService {
     const applicant = await this.usersService.getRequiredById(userId);
 
     if (opportunity.ownerUserId === userId) {
-      throw new ForbiddenException('Clients cannot apply to their own marketplace opportunities');
+      throw new ForbiddenException(
+        'Clients cannot apply to their own marketplace opportunities',
+      );
     }
     if (opportunity.status !== 'published') {
-      throw new ConflictException('Marketplace opportunity is not open for applications');
+      throw new ConflictException(
+        'Marketplace opportunity is not open for applications',
+      );
     }
     if (opportunity.moderationStatus !== 'visible') {
       throw new ForbiddenException('Marketplace opportunity is not available');
@@ -694,7 +739,9 @@ export class MarketplaceService {
       throw new ForbiddenException('Suspended marketplace talent cannot apply');
     }
     if (!this.isProfileComplete(profile)) {
-      throw new ForbiddenException('Complete your marketplace profile before applying');
+      throw new ForbiddenException(
+        'Complete your marketplace profile before applying',
+      );
     }
 
     const selectedWallet = this.usersService.findWallet(
@@ -706,10 +753,15 @@ export class MarketplaceService {
       !isEoaWallet(selectedWallet) ||
       selectedWallet.verificationMethod !== 'siwe'
     ) {
-      throw new ForbiddenException('Applications require a linked SIWE-verified wallet');
+      throw new ForbiddenException(
+        'Applications require a linked SIWE-verified wallet',
+      );
     }
 
-    this.validateScreeningAnswers(opportunity.screeningQuestions, dto.screeningAnswers);
+    this.validateScreeningAnswers(
+      opportunity.screeningQuestions,
+      dto.screeningAnswers,
+    );
 
     const applications = await this.marketplaceRepository.listApplications();
     const existing = applications.find(
@@ -723,7 +775,9 @@ export class MarketplaceService {
       existing.status !== 'withdrawn' &&
       existing.status !== 'rejected'
     ) {
-      throw new ConflictException('You already have an active application for this opportunity');
+      throw new ConflictException(
+        'You already have an active application for this opportunity',
+      );
     }
 
     const now = Date.now();
@@ -738,7 +792,9 @@ export class MarketplaceService {
       deliveryApproach: dto.deliveryApproach,
       milestonePlanSummary: dto.milestonePlanSummary,
       estimatedStartAt: dto.estimatedStartAt ?? null,
-      relevantProofArtifacts: normalizeProofArtifacts(dto.relevantProofArtifacts),
+      relevantProofArtifacts: normalizeProofArtifacts(
+        dto.relevantProofArtifacts,
+      ),
       portfolioUrls:
         dto.portfolioUrls.length > 0
           ? normalizeTextArray(dto.portfolioUrls)
@@ -788,10 +844,14 @@ export class MarketplaceService {
     const application = await this.requireApplication(applicationId);
 
     if (application.applicantUserId !== userId) {
-      throw new ForbiddenException('Only the applicant can withdraw this application');
+      throw new ForbiddenException(
+        'Only the applicant can withdraw this application',
+      );
     }
     if (application.status === 'hired') {
-      throw new ConflictException('Hired marketplace applications cannot be withdrawn');
+      throw new ConflictException(
+        'Hired marketplace applications cannot be withdrawn',
+      );
     }
 
     application.status = 'withdrawn';
@@ -805,7 +865,9 @@ export class MarketplaceService {
     applicationId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
@@ -820,7 +882,9 @@ export class MarketplaceService {
     applicationId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
@@ -835,7 +899,9 @@ export class MarketplaceService {
     applicationId: string,
   ): Promise<HireApplicationResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
@@ -910,7 +976,8 @@ export class MarketplaceService {
     const allApplications = await this.marketplaceRepository.listApplications();
     const siblingApplications = allApplications.filter(
       (candidate) =>
-        candidate.opportunityId === opportunity.id && candidate.id !== application.id,
+        candidate.opportunityId === opportunity.id &&
+        candidate.id !== application.id,
     );
 
     for (const sibling of siblingApplications) {
@@ -938,7 +1005,9 @@ export class MarketplaceService {
     const profiles = await this.marketplaceRepository.listProfiles();
     const opportunities = await this.marketplaceRepository.listOpportunities();
     const applications = await this.marketplaceRepository.listApplications();
-    const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
+    const profileMap = new Map(
+      profiles.map((profile) => [profile.userId, profile]),
+    );
     const agingNow = Date.now();
     const hiredApplications = applications.filter(
       (application) => application.status === 'hired',
@@ -978,12 +1047,15 @@ export class MarketplaceService {
       generatedAt: new Date().toISOString(),
       summary: {
         totalProfiles: profiles.length,
-        visibleProfiles: profiles.filter((profile) => profile.moderationStatus === 'visible')
-          .length,
-        hiddenProfiles: profiles.filter((profile) => profile.moderationStatus === 'hidden')
-          .length,
-        suspendedProfiles: profiles.filter((profile) => profile.moderationStatus === 'suspended')
-          .length,
+        visibleProfiles: profiles.filter(
+          (profile) => profile.moderationStatus === 'visible',
+        ).length,
+        hiddenProfiles: profiles.filter(
+          (profile) => profile.moderationStatus === 'hidden',
+        ).length,
+        suspendedProfiles: profiles.filter(
+          (profile) => profile.moderationStatus === 'suspended',
+        ).length,
         totalOpportunities: opportunities.length,
         publishedOpportunities: opportunities.filter(
           (opportunity) => opportunity.status === 'published',
@@ -1105,9 +1177,8 @@ export class MarketplaceService {
   }
 
   private async requireOpportunity(opportunityId: string) {
-    const opportunity = await this.marketplaceRepository.getOpportunityById(
-      opportunityId,
-    );
+    const opportunity =
+      await this.marketplaceRepository.getOpportunityById(opportunityId);
     if (!opportunity) {
       throw new NotFoundException('Marketplace opportunity not found');
     }
@@ -1115,9 +1186,8 @@ export class MarketplaceService {
   }
 
   private async requireApplication(applicationId: string) {
-    const application = await this.marketplaceRepository.getApplicationById(
-      applicationId,
-    );
+    const application =
+      await this.marketplaceRepository.getApplicationById(applicationId);
     if (!application) {
       throw new NotFoundException('Marketplace application not found');
     }
@@ -1146,7 +1216,9 @@ export class MarketplaceService {
   private async toOpportunityView(
     opportunity: MarketplaceOpportunityRecord,
   ): Promise<MarketplaceOpportunityView> {
-    const owner = await this.usersService.getRequiredById(opportunity.ownerUserId);
+    const owner = await this.usersService.getRequiredById(
+      opportunity.ownerUserId,
+    );
     const applications = await this.marketplaceRepository.listApplications();
 
     return {
@@ -1201,8 +1273,12 @@ export class MarketplaceService {
     const applicantUser = await this.usersService.getRequiredById(
       application.applicantUserId,
     );
-    const opportunity = await this.requireOpportunity(application.opportunityId);
-    const owner = await this.usersService.getRequiredById(opportunity.ownerUserId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
+    const owner = await this.usersService.getRequiredById(
+      opportunity.ownerUserId,
+    );
     const applicantSummary = await this.toTalentSummary(applicantUser);
     const dossier = await this.buildApplicationDossier(
       application,
@@ -1231,8 +1307,12 @@ export class MarketplaceService {
     };
   }
 
-  private async toClientSummary(user: UserRecord): Promise<MarketplaceClientSummary> {
-    const profile = await this.marketplaceRepository.getProfileByUserId(user.id);
+  private async toClientSummary(
+    user: UserRecord,
+  ): Promise<MarketplaceClientSummary> {
+    const profile = await this.marketplaceRepository.getProfileByUserId(
+      user.id,
+    );
 
     return {
       userId: user.id,
@@ -1241,8 +1321,12 @@ export class MarketplaceService {
     };
   }
 
-  private async toTalentSummary(user: UserRecord): Promise<MarketplaceTalentSummary> {
-    const profile = await this.marketplaceRepository.getProfileByUserId(user.id);
+  private async toTalentSummary(
+    user: UserRecord,
+  ): Promise<MarketplaceTalentSummary> {
+    const profile = await this.marketplaceRepository.getProfileByUserId(
+      user.id,
+    );
     const escrowStats = await this.getEscrowStats(user);
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
 
@@ -1253,8 +1337,12 @@ export class MarketplaceService {
       headline: profile?.headline ?? 'Marketplace applicant',
       specialties: profile?.specialties ?? [],
       verifiedWalletAddress,
-      verificationLevel: this.computeVerificationLevel(verifiedWalletAddress, escrowStats),
-      cryptoReadiness: profile?.cryptoReadiness ?? this.deriveCryptoReadiness(user),
+      verificationLevel: this.computeVerificationLevel(
+        verifiedWalletAddress,
+        escrowStats,
+      ),
+      cryptoReadiness:
+        profile?.cryptoReadiness ?? this.deriveCryptoReadiness(user),
       escrowStats,
       completedEscrowCount: escrowStats.completionCount,
     };
@@ -1266,17 +1354,25 @@ export class MarketplaceService {
     applicantSummaryOverride?: MarketplaceTalentSummary,
   ): Promise<MarketplaceApplicationDossier> {
     const opportunity =
-      opportunityOverride ?? (await this.requireOpportunity(application.opportunityId));
+      opportunityOverride ??
+      (await this.requireOpportunity(application.opportunityId));
     const applicantUser = await this.usersService.getRequiredById(
       application.applicantUserId,
     );
     const applicantSummary =
       applicantSummaryOverride ?? (await this.toTalentSummary(applicantUser));
     const screeningMap = new Map(
-      application.screeningAnswers.map((answer) => [answer.questionId, answer.answer]),
+      application.screeningAnswers.map((answer) => [
+        answer.questionId,
+        answer.answer,
+      ]),
     );
-    const applicantSkills = await this.getApplicantSkills(application.applicantUserId);
-    const normalizedApplicantSkills = applicantSkills.map((skill) => skill.toLowerCase());
+    const applicantSkills = await this.getApplicantSkills(
+      application.applicantUserId,
+    );
+    const normalizedApplicantSkills = applicantSkills.map((skill) =>
+      skill.toLowerCase(),
+    );
     const normalizedRequiredSkills = opportunity.requiredSkills.map((skill) =>
       skill.toLowerCase(),
     );
@@ -1296,9 +1392,10 @@ export class MarketplaceService {
     const requiredMissingQuestions = opportunity.screeningQuestions
       .filter((question) => question.required && !screeningMap.get(question.id))
       .map((question) => `Missing answer: ${question.prompt}`);
-    const categoryExperience = applicantSummary.escrowStats.completedByCategory.find(
-      (entry) => entry.category === opportunity.category,
-    )?.count ?? 0;
+    const categoryExperience =
+      applicantSummary.escrowStats.completedByCategory.find(
+        (entry) => entry.category === opportunity.category,
+      )?.count ?? 0;
     const readinessGap =
       this.cryptoReadinessRank(applicantSummary.cryptoReadiness) <
       this.cryptoReadinessRank(opportunity.cryptoReadinessRequired);
@@ -1318,7 +1415,8 @@ export class MarketplaceService {
       },
       {
         factor: 'category_overlap',
-        score: categoryExperience > 0 ? Math.min(100, categoryExperience * 25) : 25,
+        score:
+          categoryExperience > 0 ? Math.min(100, categoryExperience * 25) : 25,
         weight: 15,
         summary:
           categoryExperience > 0
@@ -1327,12 +1425,11 @@ export class MarketplaceService {
       },
       {
         factor: 'escrow_track_record',
-        score:
-          Math.max(
-            0,
-            applicantSummary.escrowStats.completionRate -
-              applicantSummary.escrowStats.disputeRate,
-          ),
+        score: Math.max(
+          0,
+          applicantSummary.escrowStats.completionRate -
+            applicantSummary.escrowStats.disputeRate,
+        ),
         weight: 25,
         summary: `${applicantSummary.escrowStats.completionCount} completed, ${applicantSummary.escrowStats.disputeRate}% dispute rate, ${applicantSummary.escrowStats.onTimeDeliveryRate}% on-time delivery.`,
       },
@@ -1373,7 +1470,9 @@ export class MarketplaceService {
     );
     const missingRequirements = [...requiredMissingQuestions];
     if (mustHaveSkillGaps.length > 0) {
-      missingRequirements.push(`Missing skills: ${mustHaveSkillGaps.join(', ')}`);
+      missingRequirements.push(
+        `Missing skills: ${mustHaveSkillGaps.join(', ')}`,
+      );
     }
     if (readinessGap) {
       missingRequirements.push(
@@ -1448,7 +1547,9 @@ export class MarketplaceService {
     questions: MarketplaceScreeningQuestion[],
     answers: MarketplaceScreeningAnswer[],
   ) {
-    const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.answer]));
+    const answerMap = new Map(
+      answers.map((answer) => [answer.questionId, answer.answer]),
+    );
     for (const question of questions) {
       if (question.required && !answerMap.get(question.id)?.trim()) {
         throw new BadRequestException(
@@ -1458,7 +1559,9 @@ export class MarketplaceService {
     }
   }
 
-  private async getEscrowStats(user: UserRecord): Promise<MarketplaceEscrowStats> {
+  private async getEscrowStats(
+    user: UserRecord,
+  ): Promise<MarketplaceEscrowStats> {
     const addresses = user.wallets.map((wallet) =>
       normalizeEvmAddress(wallet.address),
     );
@@ -1477,8 +1580,12 @@ export class MarketplaceService {
 
     const jobs = await Promise.all(
       (await this.escrowRepository.listByParticipantAddresses(addresses))
-        .filter((job) => addresses.includes(normalizeEvmAddress(job.onchain.workerAddress)))
-        .map(async (job) => (await this.escrowOnchainAuthority.mergeJob(job)).job),
+        .filter((job) =>
+          addresses.includes(normalizeEvmAddress(job.onchain.workerAddress)),
+        )
+        .map(
+          async (job) => (await this.escrowOnchainAuthority.mergeJob(job)).job,
+        ),
     );
     const completedJobs = jobs.filter(
       (job) => job.status === 'completed' || job.status === 'resolved',
@@ -1492,11 +1599,16 @@ export class MarketplaceService {
       ),
     );
     const milestoneDeliverySignals = jobs
-      .flatMap((job) => job.milestones.map((milestone) => milestoneDeliveredOnTime(milestone)))
+      .flatMap((job) =>
+        job.milestones.map((milestone) => milestoneDeliveredOnTime(milestone)),
+      )
       .filter((value): value is boolean => value !== null);
     const categoryCounts = new Map<string, number>();
     for (const job of completedJobs) {
-      categoryCounts.set(job.category, (categoryCounts.get(job.category) ?? 0) + 1);
+      categoryCounts.set(
+        job.category,
+        (categoryCounts.get(job.category) ?? 0) + 1,
+      );
     }
     const fundedAmounts = jobs
       .map((job) => toNumberAmount(job.fundedAmount))
@@ -1543,7 +1655,9 @@ export class MarketplaceService {
         user.defaultExecutionWalletAddress,
       );
       if (executionWallet && isSmartAccountWallet(executionWallet)) {
-        const eoaCount = user.wallets.filter((wallet) => isEoaWallet(wallet)).length;
+        const eoaCount = user.wallets.filter((wallet) =>
+          isEoaWallet(wallet),
+        ).length;
         return eoaCount > 0 ? 'escrow_power_user' : 'smart_account_ready';
       }
     }
@@ -1581,7 +1695,9 @@ export class MarketplaceService {
     );
   }
 
-  private async getEscrowReadiness(userId: string): Promise<EscrowReadinessStatus> {
+  private async getEscrowReadiness(
+    userId: string,
+  ): Promise<EscrowReadinessStatus> {
     const user = await this.usersService.getRequiredById(userId);
 
     if (user.wallets.length === 0) {
@@ -1606,22 +1722,32 @@ export class MarketplaceService {
     opportunity: MarketplaceOpportunityRecord,
   ) {
     if (opportunity.ownerUserId !== userId) {
-      throw new ForbiddenException('Only the client who owns the opportunity can do that');
+      throw new ForbiddenException(
+        'Only the client who owns the opportunity can do that',
+      );
     }
   }
 
-  private assertOpportunityOpenForDecision(opportunity: MarketplaceOpportunityRecord) {
+  private assertOpportunityOpenForDecision(
+    opportunity: MarketplaceOpportunityRecord,
+  ) {
     if (opportunity.status !== 'published') {
-      throw new ConflictException('Marketplace opportunity is not accepting hiring decisions');
+      throw new ConflictException(
+        'Marketplace opportunity is not accepting hiring decisions',
+      );
     }
     if (opportunity.hiredJobId) {
-      throw new ConflictException('Marketplace opportunity has already been hired');
+      throw new ConflictException(
+        'Marketplace opportunity has already been hired',
+      );
     }
   }
 
   private validateBudgetRange(min: string | null, max: string | null) {
     if (min && max && Number(min) > Number(max)) {
-      throw new BadRequestException('Budget minimum cannot exceed budget maximum');
+      throw new BadRequestException(
+        'Budget minimum cannot exceed budget maximum',
+      );
     }
   }
 }

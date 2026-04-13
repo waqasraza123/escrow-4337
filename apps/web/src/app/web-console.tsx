@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createErrorState,
   createIdleState,
@@ -474,6 +474,7 @@ export function EscrowConsole({
   const [contractorEmailDraft, setContractorEmailDraft] = useState('');
   const [pendingLifecycleAction, setPendingLifecycleAction] =
     useState<PendingLifecycleAction | null>(null);
+  const nextSessionSuccessMessageRef = useRef<string | null>(null);
 
   const selectedJob = useMemo(
     () => jobsResponse.jobs.find((entry) => entry.job.id === selectedJobId) ?? null,
@@ -873,7 +874,10 @@ export function EscrowConsole({
       return;
     }
 
-    void refreshConsole(accessToken);
+    const successMessage =
+      nextSessionSuccessMessageRef.current ?? 'Console state is current.';
+    nextSessionSuccessMessageRef.current = null;
+    void refreshConsole(accessToken, successMessage);
   }, [accessToken]);
 
   useEffect(() => {
@@ -968,7 +972,10 @@ export function EscrowConsole({
     selectedJobView,
   ]);
 
-  async function refreshConsole(token = accessToken) {
+  async function refreshConsole(
+    token = accessToken,
+    successMessage = 'Console state is current.',
+  ) {
     if (!token) {
       return;
     }
@@ -991,7 +998,7 @@ export function EscrowConsole({
         '',
       );
       setSelectedJobId((current) => current || jobs.jobs[0]?.job.id || null);
-      setSessionState(createSuccessState('Console state is current.'));
+      setSessionState(createSuccessState(successMessage));
     } catch (error) {
       setSessionState(createErrorState(error, 'Failed to load session'));
     }
@@ -1105,10 +1112,10 @@ export function EscrowConsole({
 
     try {
       const tokens = await webApi.refresh(refreshToken);
+      nextSessionSuccessMessageRef.current = 'Session refreshed.';
       setAccessToken(tokens.accessToken);
       setRefreshToken(tokens.refreshToken);
       writeSession(tokens);
-      setSessionState(createSuccessState('Session refreshed.'));
     } catch (error) {
       setSessionState(createErrorState(error, 'Session refresh failed'));
       clearSession();

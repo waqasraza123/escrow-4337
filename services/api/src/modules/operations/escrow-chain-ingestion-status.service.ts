@@ -78,12 +78,17 @@ export class EscrowChainIngestionStatusService {
     if (!this.operationsConfig.escrowIngestionEnabled) {
       warnings.push('Escrow chain ingestion is disabled.');
     } else if (!contractAddress) {
-      issues.push('Escrow chain ingestion requires a configured contract address.');
+      issues.push(
+        'Escrow chain ingestion requires a configured contract address.',
+      );
     } else if (!cursor) {
       warnings.push('Escrow chain ingestion has not published a cursor yet.');
     }
 
-    if ((lagBlocks ?? 0) > this.operationsConfig.escrowIngestionBatchBlocks * 2) {
+    if (
+      (lagBlocks ?? 0) >
+      this.operationsConfig.escrowIngestionBatchBlocks * 2
+    ) {
       warnings.push(
         `Escrow chain ingestion is ${lagBlocks} block(s) behind the finalized head.`,
       );
@@ -100,11 +105,7 @@ export class EscrowChainIngestionStatusService {
     }
 
     const status =
-      issues.length > 0
-        ? 'failed'
-        : warnings.length > 0
-          ? 'warning'
-          : 'ok';
+      issues.length > 0 ? 'failed' : warnings.length > 0 ? 'warning' : 'ok';
 
     return {
       generatedAt: new Date(now).toISOString(),
@@ -130,7 +131,9 @@ export class EscrowChainIngestionStatusService {
       summary:
         status === 'ok'
           ? 'Escrow chain ingestion is healthy.'
-          : issues[0] ?? warnings[0] ?? 'Escrow chain ingestion requires review.',
+          : (issues[0] ??
+            warnings[0] ??
+            'Escrow chain ingestion requires review.'),
       issues,
       warnings,
     };

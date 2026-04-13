@@ -37,8 +37,10 @@ function mergeAuditEvents(
   localAudit: EscrowAuditEvent[],
   chainAudit: EscrowOnchainProjectionRecord['chainAudit'],
 ) {
-  return [...localAudit.filter((event) => !onchainAuditEventTypes.has(event.type)), ...chainAudit]
-    .sort(compareAuditEvents);
+  return [
+    ...localAudit.filter((event) => !onchainAuditEventTypes.has(event.type)),
+    ...chainAudit,
+  ].sort(compareAuditEvents);
 }
 
 function mergeMilestones(
@@ -96,7 +98,12 @@ function latestLocalOnchainActivityAt(job: EscrowJobRecord) {
           .filter((event) => event.type === 'job.funded')
           .map((event) => event.at)
       : [];
-  const times = [...onchainAuditTimes, ...milestoneTimes, ...executionTimes, ...fundedAt];
+  const times = [
+    ...onchainAuditTimes,
+    ...milestoneTimes,
+    ...executionTimes,
+    ...fundedAt,
+  ];
 
   return times.length > 0 ? Math.max(...times) : job.updatedAt;
 }
@@ -153,14 +160,13 @@ export class EscrowOnchainAuthorityService {
       projectedAt: projection?.projectedAt ?? null,
       lastProjectedBlock: projection?.lastProjectedBlock ?? null,
       lastEventCount: projection?.lastEventCount ?? null,
-      reason:
-        !authorityReadsEnabled
-          ? 'authority_reads_disabled'
-          : !projection
-            ? 'projection_missing'
-            : !projectionHealthy
-              ? projection.degradedReason ?? 'projection_degraded'
-              : 'projection_stale',
+      reason: !authorityReadsEnabled
+        ? 'authority_reads_disabled'
+        : !projection
+          ? 'projection_missing'
+          : !projectionHealthy
+            ? (projection.degradedReason ?? 'projection_degraded')
+            : 'projection_stale',
     };
   }
 
@@ -172,12 +178,19 @@ export class EscrowOnchainAuthorityService {
     authority: EscrowAuthorityStatus;
     projection: EscrowOnchainProjectionRecord | null;
   }> {
-    const projection = await this.escrowRepository.getOnchainProjection(localJob.id);
+    const projection = await this.escrowRepository.getOnchainProjection(
+      localJob.id,
+    );
     const authority = this.getAuthorityStatus(projection, now);
     const projectionBehindLocal =
-      !!projection && projection.projectedAt < latestLocalOnchainActivityAt(localJob);
+      !!projection &&
+      projection.projectedAt < latestLocalOnchainActivityAt(localJob);
 
-    if (!projection || authority.source === 'local_fallback' || projectionBehindLocal) {
+    if (
+      !projection ||
+      authority.source === 'local_fallback' ||
+      projectionBehindLocal
+    ) {
       return {
         job: cloneValue(localJob),
         authority: projectionBehindLocal

@@ -37,7 +37,6 @@ import type {
   CreateJobResponse,
   EscrowAuditBundle,
   EscrowAuditEvent,
-  EscrowContractorInviteDeliveryMode,
   EscrowContractorParticipationPublicView,
   EscrowContractorParticipationView,
   EscrowExecutionRecord,
@@ -280,12 +279,16 @@ export class EscrowService {
     await this.escrowActorService.resolveClientForJob(userId, job);
     const participation = this.requirePendingContractorParticipation(job);
     const user = await this.usersService.getRequiredById(userId);
-    const regenerated =
-      dto.regenerate === true || !participation.invite.token;
+    const regenerated = dto.regenerate === true || !participation.invite.token;
     const token = regenerated
       ? this.rotateInviteToken(participation, Date.now())
-      : participation.invite.token ?? this.rotateInviteToken(participation, Date.now());
-    const joinUrl = this.buildContractorJoinUrl(job.id, token, dto.frontendOrigin);
+      : (participation.invite.token ??
+        this.rotateInviteToken(participation, Date.now()));
+    const joinUrl = this.buildContractorJoinUrl(
+      job.id,
+      token,
+      dto.frontendOrigin,
+    );
     const sentAt = Date.now();
 
     participation.invite.lastSentAt = sentAt;
@@ -382,7 +385,9 @@ export class EscrowService {
       return {
         jobId: job.id,
         status:
-          participation.joinedUserId === user.id ? 'joined' : 'claimed_by_other',
+          participation.joinedUserId === user.id
+            ? 'joined'
+            : 'claimed_by_other',
         contractorEmailHint: this.maskEmail(participation.contractorEmail),
         workerAddress: job.onchain.workerAddress,
         linkedWalletAddresses,
@@ -1100,7 +1105,9 @@ export class EscrowService {
     const participation = this.requireContractorParticipation(job);
 
     if (participation.status === 'joined') {
-      throw new ConflictException('Contractor identity has already been locked');
+      throw new ConflictException(
+        'Contractor identity has already been locked',
+      );
     }
 
     return participation;
@@ -1155,10 +1162,14 @@ export class EscrowService {
     try {
       origin = new URL(frontendOrigin).origin;
     } catch {
-      throw new BadRequestException('frontendOrigin must be an absolute origin');
+      throw new BadRequestException(
+        'frontendOrigin must be an absolute origin',
+      );
     }
 
-    const configuredOrigins = readCorsOrigins(process.env.NEST_API_CORS_ORIGINS);
+    const configuredOrigins = readCorsOrigins(
+      process.env.NEST_API_CORS_ORIGINS,
+    );
 
     if (
       configuredOrigins.length > 0 &&

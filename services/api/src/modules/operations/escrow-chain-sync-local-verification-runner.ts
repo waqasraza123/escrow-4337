@@ -7,10 +7,16 @@ import net from 'net';
 import { spawn, type ChildProcess } from 'child_process';
 import { Client } from 'pg';
 import {
+  BigNumber,
+  Contract,
   ContractFactory,
   providers,
   utils,
+  type BigNumberish,
+  type ContractReceipt,
+  type ContractTransaction,
   type ContractInterface,
+  type Signer,
 } from 'ethers';
 import { NestFactory } from '@nestjs/core';
 import { loadApiEnvironment } from '../../common/env/load-env';
@@ -155,6 +161,123 @@ type PostgresIsolation = {
   schemaName: string | null;
   cleanup: () => Promise<void>;
 };
+
+type LocalContracts = {
+  provider: providers.JsonRpcProvider;
+  owner: providers.JsonRpcSigner;
+  arbitrator: providers.JsonRpcSigner;
+  client: providers.JsonRpcSigner;
+  worker: providers.JsonRpcSigner;
+  ownerAddress: string;
+  arbitratorAddress: string;
+  clientAddress: string;
+  workerAddress: string;
+  usdcAddress: string;
+  escrowAddress: string;
+  usdc: LocalUsdcContract;
+  escrow: LocalEscrowContract;
+};
+
+type LocalEscrowMilestoneInput = {
+  amount: BigNumberish;
+  deliverableHash: string;
+  delivered: boolean;
+  released: boolean;
+  disputed: boolean;
+};
+
+type LocalUsdcContract = Contract & {
+  connect(signer: Signer): LocalUsdcContract;
+  deployed(): Promise<LocalUsdcContract>;
+  mint(to: string, amount: BigNumberish): Promise<ContractTransaction>;
+  approve(spender: string, amount: BigNumberish): Promise<ContractTransaction>;
+};
+
+type LocalEscrowContract = Contract & {
+  connect(signer: Signer): LocalEscrowContract;
+  deployed(): Promise<LocalEscrowContract>;
+  createJob(
+    workerAddress: string,
+    currencyAddress: string,
+    jobHash: string,
+  ): Promise<ContractTransaction>;
+  setMilestones(
+    escrowId: string,
+    milestones: LocalEscrowMilestoneInput[],
+  ): Promise<ContractTransaction>;
+  fund(escrowId: string, amount: BigNumberish): Promise<ContractTransaction>;
+  deliver(
+    escrowId: string,
+    milestoneIndex: number,
+    deliverableHash: string,
+  ): Promise<ContractTransaction>;
+  release(
+    escrowId: string,
+    milestoneIndex: number,
+  ): Promise<ContractTransaction>;
+  openDispute(
+    escrowId: string,
+    milestoneIndex: number,
+    reasonHash: string,
+  ): Promise<ContractTransaction>;
+  resolve(
+    escrowId: string,
+    milestoneIndex: number,
+    workerShareBps: number,
+  ): Promise<ContractTransaction>;
+};
+
+function asLocalUsdcContract(contract: Contract): LocalUsdcContract {
+  return contract as LocalUsdcContract;
+}
+
+function asLocalEscrowContract(contract: Contract): LocalEscrowContract {
+  return contract as LocalEscrowContract;
+}
+
+function connectLocalUsdc(
+  contract: LocalUsdcContract,
+  signer: Signer,
+): LocalUsdcContract {
+  return asLocalUsdcContract(contract.connect(signer));
+}
+
+function connectLocalEscrow(
+  contract: LocalEscrowContract,
+  signer: Signer,
+): LocalEscrowContract {
+  return asLocalEscrowContract(contract.connect(signer));
+}
+
+async function waitForContractReceipt(
+  transaction: Promise<ContractTransaction> | ContractTransaction,
+): Promise<ContractReceipt> {
+  return (await transaction).wait();
+}
+
+function readJobCreatedEscrowId(receipt: ContractReceipt): string | null {
+  for (const event of receipt.events ?? []) {
+    if (event.event !== 'JobCreated') {
+      continue;
+    }
+
+    const args = event.args as Record<string, unknown> | undefined;
+    const escrowId = args?.escrowId;
+    if (escrowId === undefined || escrowId === null) {
+      continue;
+    }
+
+    if (typeof escrowId === 'string') {
+      return escrowId;
+    }
+
+    if (BigNumber.isBigNumber(escrowId)) {
+      return escrowId.toString();
+    }
+  }
+
+  return null;
+}
 
 function printHelp() {
   // eslint-disable-next-line no-console
@@ -495,17 +618,19 @@ async function startAnvil(requestedPort: number | null): Promise<{
   });
 
   let stderrBuffer = '';
-  child.stderr.on('data', (chunk) => {
-    stderrBuffer += chunk.toString();
+  child.stderr.on('data', (chunk: Buffer | string) => {
+    const nextChunk =
+      typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+    stderrBuffer = `${stderrBuffer}${nextChunk}`;
   });
 
   const provider = new providers.JsonRpcProvider(`http://127.0.0.1:${port}`);
   try {
     await waitForRpc(provider);
     if (spawnError) {
-      throw spawnError;
+      throw new Error('Anvil child process emitted an error before RPC ready');
     }
-  } catch (error) {
+  } catch {
     await stopChildProcess(child).catch(() => undefined);
     throw new Error(
       `Failed to start Anvil on port ${port}.${stderrBuffer ? ` stderr: ${stderrBuffer.trim()}` : ''}`,
@@ -519,7 +644,10 @@ async function startAnvil(requestedPort: number | null): Promise<{
   };
 }
 
-async function deployLocalContracts(repoRoot: string, rpcUrl: string) {
+async function deployLocalContracts(
+  repoRoot: string,
+  rpcUrl: string,
+): Promise<LocalContracts> {
   const provider = new providers.JsonRpcProvider(rpcUrl);
   const owner = provider.getSigner(0);
   const arbitrator = provider.getSigner(1);
@@ -547,7 +675,7 @@ async function deployLocalContracts(repoRoot: string, rpcUrl: string) {
     usdcArtifact.bytecode.object,
     owner,
   );
-  const usdc = await usdcFactory.deploy();
+  const usdc = asLocalUsdcContract(await usdcFactory.deploy());
   await usdc.deployed();
 
   const escrowFactory = new ContractFactory(
@@ -555,7 +683,9 @@ async function deployLocalContracts(repoRoot: string, rpcUrl: string) {
     escrowArtifact.bytecode.object,
     owner,
   );
-  const escrow = await escrowFactory.deploy(ownerAddress, arbitratorAddress);
+  const escrow = asLocalEscrowContract(
+    await escrowFactory.deploy(ownerAddress, arbitratorAddress),
+  );
   await escrow.deployed();
 
   return {
@@ -751,22 +881,30 @@ async function runVerification(
     });
 
     const mintAmount = 1_000n * ONE_USDC;
-    await (
-      await contracts.usdc.mint(contracts.clientAddress, mintAmount)
-    ).wait();
+    await waitForContractReceipt(
+      contracts.usdc.mint(contracts.clientAddress, mintAmount),
+    );
 
     const jobHash = utils.keccak256(
       utils.toUtf8Bytes('escrow4337-local-chain-verification'),
     );
 
-    const createTx = await contracts.escrow
-      .connect(contracts.client)
-      .createJob(contracts.workerAddress, contracts.usdcAddress, jobHash);
-    const createReceipt = await createTx.wait();
-    const jobCreatedEvent = createReceipt.events?.find(
-      (event: { event?: string }) => event.event === 'JobCreated',
+    const clientEscrow = connectLocalEscrow(contracts.escrow, contracts.client);
+    const workerEscrow = connectLocalEscrow(contracts.escrow, contracts.worker);
+    const arbitratorEscrow = connectLocalEscrow(
+      contracts.escrow,
+      contracts.arbitrator,
     );
-    const escrowId = jobCreatedEvent?.args?.escrowId?.toString();
+    const clientUsdc = connectLocalUsdc(contracts.usdc, contracts.client);
+
+    const createReceipt = await waitForContractReceipt(
+      clientEscrow.createJob(
+        contracts.workerAddress,
+        contracts.usdcAddress,
+        jobHash,
+      ),
+    );
+    const escrowId = readJobCreatedEscrowId(createReceipt);
     requireCondition(
       escrowId,
       'Failed to read escrow id from the JobCreated receipt',
@@ -803,7 +941,7 @@ async function runVerification(
       label: 'Local arbitrator',
     });
 
-    const milestones = [
+    const milestones: LocalEscrowMilestoneInput[] = [
       {
         amount: 300n * ONE_USDC,
         deliverableHash: utils.hexZeroPad('0x0', 32),
@@ -820,50 +958,49 @@ async function runVerification(
       },
     ];
 
-    const setMilestonesTx = await contracts.escrow
-      .connect(contracts.client)
-      .setMilestones(escrowId, milestones);
-    const setMilestonesReceipt = await setMilestonesTx.wait();
+    const setMilestonesReceipt = await waitForContractReceipt(
+      clientEscrow.setMilestones(escrowId, milestones),
+    );
 
     const fundAmount = 500n * ONE_USDC;
-    await (
-      await contracts.usdc
-        .connect(contracts.client)
-        .approve(contracts.escrowAddress, fundAmount)
-    ).wait();
-    const fundTx = await contracts.escrow
-      .connect(contracts.client)
-      .fund(escrowId, fundAmount);
-    const fundReceipt = await fundTx.wait();
+    await waitForContractReceipt(
+      clientUsdc.approve(contracts.escrowAddress, fundAmount),
+    );
+    const fundReceipt = await waitForContractReceipt(
+      clientEscrow.fund(escrowId, fundAmount),
+    );
 
-    const deliverFirstTx = await contracts.escrow
-      .connect(contracts.worker)
-      .deliver(escrowId, 0, utils.keccak256(utils.toUtf8Bytes('delivery-1')));
-    const deliverFirstReceipt = await deliverFirstTx.wait();
+    const deliverFirstReceipt = await waitForContractReceipt(
+      workerEscrow.deliver(
+        escrowId,
+        0,
+        utils.keccak256(utils.toUtf8Bytes('delivery-1')),
+      ),
+    );
 
-    const releaseFirstTx = await contracts.escrow
-      .connect(contracts.client)
-      .release(escrowId, 0);
-    const releaseFirstReceipt = await releaseFirstTx.wait();
+    const releaseFirstReceipt = await waitForContractReceipt(
+      clientEscrow.release(escrowId, 0),
+    );
 
-    const deliverSecondTx = await contracts.escrow
-      .connect(contracts.worker)
-      .deliver(escrowId, 1, utils.keccak256(utils.toUtf8Bytes('delivery-2')));
-    const deliverSecondReceipt = await deliverSecondTx.wait();
+    const deliverSecondReceipt = await waitForContractReceipt(
+      workerEscrow.deliver(
+        escrowId,
+        1,
+        utils.keccak256(utils.toUtf8Bytes('delivery-2')),
+      ),
+    );
 
-    const openDisputeSecondTx = await contracts.escrow
-      .connect(contracts.client)
-      .openDispute(
+    const openDisputeSecondReceipt = await waitForContractReceipt(
+      clientEscrow.openDispute(
         escrowId,
         1,
         utils.keccak256(utils.toUtf8Bytes('needs-fix')),
-      );
-    const openDisputeSecondReceipt = await openDisputeSecondTx.wait();
+      ),
+    );
 
-    const resolveSecondTx = await contracts.escrow
-      .connect(contracts.arbitrator)
-      .resolve(escrowId, 1, 10_000);
-    const resolveSecondReceipt = await resolveSecondTx.wait();
+    const resolveSecondReceipt = await waitForContractReceipt(
+      arbitratorEscrow.resolve(escrowId, 1, 10_000),
+    );
 
     await contracts.provider.send('evm_mine', []);
 

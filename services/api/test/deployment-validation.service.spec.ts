@@ -248,13 +248,17 @@ describe('DeploymentValidationService', () => {
 
   function allMigrationsAppliedQuery() {
     return (text: string) => {
+      if (text.includes('SET search_path TO public')) {
+        return Promise.resolve({ rows: [] });
+      }
+
       if (text.includes('current_database()')) {
         return Promise.resolve({
           rows: [{ currentDatabase: 'escrow' }],
         });
       }
 
-      if (text.includes("to_regclass('public.schema_migrations')")) {
+      if (text.includes('SELECT to_regclass($1) AS "relationName"')) {
         return Promise.resolve({
           rows: [{ relationName: 'schema_migrations' }],
         });
@@ -272,13 +276,17 @@ describe('DeploymentValidationService', () => {
 
   function pendingMigrationQuery() {
     return (text: string) => {
+      if (text.includes('SET search_path TO public')) {
+        return Promise.resolve({ rows: [] });
+      }
+
       if (text.includes('current_database()')) {
         return Promise.resolve({
           rows: [{ currentDatabase: 'escrow' }],
         });
       }
 
-      if (text.includes("to_regclass('public.schema_migrations')")) {
+      if (text.includes('SELECT to_regclass($1) AS "relationName"')) {
         return Promise.resolve({
           rows: [{ relationName: 'schema_migrations' }],
         });

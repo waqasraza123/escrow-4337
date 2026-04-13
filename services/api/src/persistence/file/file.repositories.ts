@@ -4,7 +4,6 @@ import type {
   SessionRecord,
 } from '../../modules/auth/auth.types';
 import type {
-  EscrowAuthoritySource,
   EscrowChainCursorRecord,
   EscrowChainEventRecord,
   EscrowChainSyncRecord,
@@ -518,7 +517,10 @@ export class FileEscrowRepository implements EscrowRepository {
           if (event.contractAddress.toLowerCase() !== contractAddress) {
             return false;
           }
-          if (input.escrowId !== undefined && event.escrowId !== input.escrowId) {
+          if (
+            input.escrowId !== undefined &&
+            event.escrowId !== input.escrowId
+          ) {
             return false;
           }
           if (
@@ -527,7 +529,10 @@ export class FileEscrowRepository implements EscrowRepository {
           ) {
             return false;
           }
-          if (input.toBlock !== undefined && event.blockNumber > input.toBlock) {
+          if (
+            input.toBlock !== undefined &&
+            event.blockNumber > input.toBlock
+          ) {
             return false;
           }
           return true;

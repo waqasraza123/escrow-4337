@@ -149,7 +149,9 @@ export class EscrowChainSyncDaemonMonitoringService {
   }
 
   private evaluateIngestion(
-    ingestion: Awaited<ReturnType<EscrowChainIngestionStatusService['getStatus']>>,
+    ingestion: Awaited<
+      ReturnType<EscrowChainIngestionStatusService['getStatus']>
+    >,
   ): EscrowChainSyncDaemonHealthIssue[] {
     const issues: EscrowChainSyncDaemonHealthIssue[] = [];
 
@@ -168,13 +170,13 @@ export class EscrowChainSyncDaemonMonitoringService {
     if (
       ingestion.enabled &&
       typeof ingestion.lagBlocks === 'number' &&
-      ingestion.lagBlocks >
-        this.operationsConfig.escrowIngestionBatchBlocks * 2
+      ingestion.lagBlocks > this.operationsConfig.escrowIngestionBatchBlocks * 2
     ) {
       issues.push({
         code: 'ingestion_lagging',
         severity: 'warning',
-        summary: 'Escrow chain ingestion is lagging behind finalized chain head.',
+        summary:
+          'Escrow chain ingestion is lagging behind finalized chain head.',
         detail: `The ingestion cursor is ${ingestion.lagBlocks} finalized block(s) behind.`,
       });
     }
@@ -185,7 +187,8 @@ export class EscrowChainSyncDaemonMonitoringService {
     ) {
       issues.push({
         code: 'projection_backlog',
-        severity: ingestion.projections.degradedJobs > 0 ? 'critical' : 'warning',
+        severity:
+          ingestion.projections.degradedJobs > 0 ? 'critical' : 'warning',
         summary:
           'Escrow chain projections are stale or degraded for one or more jobs.',
         detail: `${ingestion.projections.staleJobs} stale and ${ingestion.projections.degradedJobs} degraded projection(s) detected.`,

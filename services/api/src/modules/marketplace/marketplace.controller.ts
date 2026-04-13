@@ -20,9 +20,7 @@ export class MarketplaceController {
 
   @Get('profiles')
   listProfiles(
-    @Query(
-      new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema),
-    )
+    @Query(new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema))
     query: marketplaceDto.MarketplaceProfilesQueryDto,
   ) {
     return this.marketplaceService.listProfiles(query);
@@ -121,7 +119,11 @@ export class MarketplaceController {
     )
     body: marketplaceDto.UpdateMarketplaceScreeningDto,
   ) {
-    return this.marketplaceService.updateOpportunityScreening(user.id, id, body);
+    return this.marketplaceService.updateOpportunityScreening(
+      user.id,
+      id,
+      body,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -132,10 +134,7 @@ export class MarketplaceController {
 
   @UseGuards(AuthGuard)
   @Get('opportunities/:id/applications')
-  getOpportunityApplications(
-    @User() user: ReqUser,
-    @Param('id') id: string,
-  ) {
+  getOpportunityApplications(@User() user: ReqUser, @Param('id') id: string) {
     return this.marketplaceService.getOpportunityApplications(user.id, id);
   }
 

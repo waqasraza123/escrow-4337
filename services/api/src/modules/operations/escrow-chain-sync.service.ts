@@ -405,7 +405,7 @@ function ensureProjectedMilestone(
     milestones.push(createProjectedMilestone());
   }
 
-  return milestones[index]!;
+  return milestones[index];
 }
 
 function deriveExpectedJobStatus(
@@ -451,7 +451,12 @@ function mergeProjectedMilestones(
   projection: EscrowOnchainProjectionRecord,
 ) {
   return Array.from(
-    { length: Math.max(localJob.milestones.length, projection.milestones.length) },
+    {
+      length: Math.max(
+        localJob.milestones.length,
+        projection.milestones.length,
+      ),
+    },
     (_, index) => {
       const local =
         localJob.milestones[index] ??
@@ -488,7 +493,10 @@ function mergeProjectionIntoJob(
   mergedJob.fundedAmount = projection.fundedAmount;
   mergedJob.status = projection.status;
   mergedJob.updatedAt = Math.max(localJob.updatedAt, projection.projectedAt);
-  mergedJob.audit = mergeLocalAndChainAudit(localJob.audit, projection.chainAudit);
+  mergedJob.audit = mergeLocalAndChainAudit(
+    localJob.audit,
+    projection.chainAudit,
+  );
   mergedJob.milestones = mergeProjectedMilestones(localJob, projection);
   return mergedJob;
 }
@@ -609,7 +617,10 @@ export class EscrowChainSyncService {
   ): Promise<EscrowChainSyncBatchReport> {
     await this.requireOperatorAccess(userId);
 
-    if (input.persist === true && this.operationsConfig.escrowIngestionEnabled) {
+    if (
+      input.persist === true &&
+      this.operationsConfig.escrowIngestionEnabled
+    ) {
       await this.ingestFinalizedRange(now);
     }
 
@@ -977,7 +988,8 @@ export class EscrowChainSyncService {
           );
           const jobHash = event.payload.jobHash.toLowerCase();
           if (
-            clientAddress !== normalizeEvmAddress(localJob.onchain.clientAddress)
+            clientAddress !==
+            normalizeEvmAddress(localJob.onchain.clientAddress)
           ) {
             issues.push({
               code: 'job_created_client_mismatch',
@@ -1214,8 +1226,14 @@ export class EscrowChainSyncService {
       });
     }
 
-    const chainAudit = applyStableAuditTimestamps(parsedAuditEvents, localJob.audit);
-    const projectedStatus = deriveExpectedJobStatus(projectedMilestones, fundedAmount);
+    const chainAudit = applyStableAuditTimestamps(
+      parsedAuditEvents,
+      localJob.audit,
+    );
+    const projectedStatus = deriveExpectedJobStatus(
+      projectedMilestones,
+      fundedAmount,
+    );
     const lastProjectedBlock =
       sortedEvents[sortedEvents.length - 1]?.blockNumber ?? null;
     const lastEventBlock = lastProjectedBlock;
@@ -1297,17 +1315,16 @@ export class EscrowChainSyncService {
       contractAddress,
       streamName,
     });
-    const cursor: EscrowChainCursorRecord =
-      existingCursor ?? {
-        chainId,
-        contractAddress,
-        streamName,
-        nextFromBlock: 0,
-        lastFinalizedBlock: null,
-        lastScannedBlock: null,
-        lastError: null,
-        updatedAt: now,
-      };
+    const cursor: EscrowChainCursorRecord = existingCursor ?? {
+      chainId,
+      contractAddress,
+      streamName,
+      nextFromBlock: 0,
+      lastFinalizedBlock: null,
+      lastScannedBlock: null,
+      lastError: null,
+      updatedAt: now,
+    };
 
     if (finalizedBlock < cursor.nextFromBlock) {
       await this.escrowRepository.saveChainCursor({
@@ -1320,7 +1337,9 @@ export class EscrowChainSyncService {
 
     const toBlock = Math.min(
       finalizedBlock,
-      cursor.nextFromBlock + this.operationsConfig.escrowIngestionBatchBlocks - 1,
+      cursor.nextFromBlock +
+        this.operationsConfig.escrowIngestionBatchBlocks -
+        1,
     );
     const fromBlock = Math.max(
       0,
@@ -1328,7 +1347,11 @@ export class EscrowChainSyncService {
     );
 
     try {
-      const logs = await this.readContractLogs(contractAddress, fromBlock, toBlock);
+      const logs = await this.readContractLogs(
+        contractAddress,
+        fromBlock,
+        toBlock,
+      );
       const deduped = dedupeLogs(logs);
       const events = await this.toChainEventRecords(
         {
@@ -1393,7 +1416,8 @@ export class EscrowChainSyncService {
           duplicateLogs: 0,
           latestBlock,
           fromBlock: sortedEvents[0]?.blockNumber ?? fromBlock,
-          toBlock: sortedEvents[sortedEvents.length - 1]?.blockNumber ?? toBlock,
+          toBlock:
+            sortedEvents[sortedEvents.length - 1]?.blockNumber ?? toBlock,
           persistProjection: true,
           now,
         });
@@ -1403,7 +1427,8 @@ export class EscrowChainSyncService {
         ...cursor,
         lastFinalizedBlock: finalizedBlock,
         lastScannedBlock: cursor.lastScannedBlock,
-        lastError: error instanceof Error ? error.message : 'Chain ingestion failed',
+        lastError:
+          error instanceof Error ? error.message : 'Chain ingestion failed',
         updatedAt: now,
       });
       throw error;

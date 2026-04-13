@@ -385,10 +385,10 @@ describe('EscrowService', () => {
       },
     );
     const wrongWalletInviteToken =
-      new URL(wrongWalletInvite.invite.joinUrl).searchParams.get('invite') ?? '';
-    const wrongWalletUser = await usersService.getOrCreateByEmail(
-      wrongWalletEmail,
-    );
+      new URL(wrongWalletInvite.invite.joinUrl).searchParams.get('invite') ??
+      '';
+    const wrongWalletUser =
+      await usersService.getOrCreateByEmail(wrongWalletEmail);
     await usersService.linkWallet(wrongWalletUser.id, {
       address: '0x9999999999999999999999999999999999999999',
       walletKind: 'eoa',

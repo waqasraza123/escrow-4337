@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './page.module.css';
 import {
   createErrorState,
@@ -470,6 +470,7 @@ export function OperatorConsole({
   const [resolutionAction, setResolutionAction] = useState<'release' | 'refund'>('release');
   const [resolutionNote, setResolutionNote] = useState('');
   const [state, setState] = useState<AsyncState>(createIdleState());
+  const nextSessionSuccessMessageRef = useRef<string | null>(null);
   const formatDate = (value?: number | null, fallback?: string) =>
     formatTimestamp(value, {
       fallback,
@@ -511,7 +512,10 @@ export function OperatorConsole({
       return;
     }
 
-    void refreshOperatorSession(accessToken);
+    const successMessage =
+      nextSessionSuccessMessageRef.current ?? 'Operator session is current.';
+    nextSessionSuccessMessageRef.current = null;
+    void refreshOperatorSession(accessToken, successMessage);
   }, [accessToken]);
 
   async function loadRuntimeProfile() {
@@ -526,7 +530,10 @@ export function OperatorConsole({
     }
   }
 
-  async function refreshOperatorSession(token = accessToken) {
+  async function refreshOperatorSession(
+    token = accessToken,
+    successMessage = 'Operator session is current.',
+  ) {
     if (!token) {
       return;
     }
@@ -542,7 +549,7 @@ export function OperatorConsole({
           nextProfile.wallets.find((wallet) => wallet.walletKind === 'eoa')?.address ||
           '',
       );
-      setSessionState(createSuccessState('Operator session is current.'));
+      setSessionState(createSuccessState(successMessage));
     } catch (error) {
       setSessionState(createErrorState(error, 'Failed to load operator session'));
       clearSession();
@@ -620,10 +627,10 @@ export function OperatorConsole({
 
     try {
       const tokens = await adminApi.refresh(refreshToken);
+      nextSessionSuccessMessageRef.current = 'Operator session refreshed.';
       setAccessToken(tokens.accessToken);
       setRefreshToken(tokens.refreshToken);
       writeSession(tokens);
-      setSessionState(createSuccessState('Operator session refreshed.'));
     } catch (error) {
       setSessionState(createErrorState(error, 'Operator session refresh failed'));
       clearSession();

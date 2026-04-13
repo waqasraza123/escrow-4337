@@ -58,9 +58,7 @@ describe('RuntimeProfileService', () => {
     };
   }
 
-  function createService(
-    ingestionStatus = createIngestionStatus(),
-  ) {
+  function createService(ingestionStatus = createIngestionStatus()) {
     return new RuntimeProfileService(
       new EmailConfigService(),
       new EscrowContractConfigService(),

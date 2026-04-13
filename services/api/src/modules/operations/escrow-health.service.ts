@@ -850,22 +850,26 @@ export class EscrowHealthService {
       },
       chainSync,
       executionFailureWorkflow:
-        effectiveJob.operations.executionFailureWorkflow && failedExecutionDiagnostics
+        effectiveJob.operations.executionFailureWorkflow &&
+        failedExecutionDiagnostics
           ? {
               claimedByUserId:
-                effectiveJob.operations.executionFailureWorkflow.claimedByUserId,
+                effectiveJob.operations.executionFailureWorkflow
+                  .claimedByUserId,
               claimedByEmail:
                 effectiveJob.operations.executionFailureWorkflow.claimedByEmail,
-              claimedAt: effectiveJob.operations.executionFailureWorkflow.claimedAt,
+              claimedAt:
+                effectiveJob.operations.executionFailureWorkflow.claimedAt,
               status: normalizeFailureWorkflowStatus(
                 effectiveJob.operations.executionFailureWorkflow.status,
               ),
               acknowledgedFailureAt:
                 effectiveJob.operations.executionFailureWorkflow
-                  .acknowledgedFailureAt ??
-                null,
-              note: effectiveJob.operations.executionFailureWorkflow.note ?? null,
-              updatedAt: effectiveJob.operations.executionFailureWorkflow.updatedAt,
+                  .acknowledgedFailureAt ?? null,
+              note:
+                effectiveJob.operations.executionFailureWorkflow.note ?? null,
+              updatedAt:
+                effectiveJob.operations.executionFailureWorkflow.updatedAt,
               latestFailureNeedsAcknowledgement:
                 (effectiveJob.operations.executionFailureWorkflow
                   .acknowledgedFailureAt ?? 0) <
@@ -874,8 +878,10 @@ export class EscrowHealthService {
           : null,
       staleWorkflow: effectiveJob.operations.staleWorkflow
         ? {
-            claimedByUserId: effectiveJob.operations.staleWorkflow.claimedByUserId,
-            claimedByEmail: effectiveJob.operations.staleWorkflow.claimedByEmail,
+            claimedByUserId:
+              effectiveJob.operations.staleWorkflow.claimedByUserId,
+            claimedByEmail:
+              effectiveJob.operations.staleWorkflow.claimedByEmail,
             claimedAt: effectiveJob.operations.staleWorkflow.claimedAt,
             note: effectiveJob.operations.staleWorkflow.note ?? null,
             updatedAt: effectiveJob.operations.staleWorkflow.updatedAt,

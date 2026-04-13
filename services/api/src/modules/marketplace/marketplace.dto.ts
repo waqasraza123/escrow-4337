@@ -105,12 +105,14 @@ export const createMarketplaceOpportunitySchema = z
     budgetMax: z.string().regex(amountPattern).optional().nullable(),
     timeline: z.string().trim().min(1).max(240),
     desiredStartAt: timestampSchema.nullable().optional(),
-    timezoneOverlapHours: z.coerce.number().int().min(0).max(24).nullable().optional(),
-    engagementType: z.enum([
-      'fixed_scope',
-      'milestone_retainer',
-      'advisory',
-    ]),
+    timezoneOverlapHours: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(24)
+      .nullable()
+      .optional(),
+    engagementType: z.enum(['fixed_scope', 'milestone_retainer', 'advisory']),
     cryptoReadinessRequired: z.enum([
       'wallet_only',
       'smart_account_ready',
@@ -129,7 +131,13 @@ export const updateMarketplaceScreeningSchema = z
     mustHaveSkills: stringArraySchema.default([]),
     screeningQuestions: z.array(screeningQuestionSchema).max(8).default([]),
     desiredStartAt: timestampSchema.nullable().optional(),
-    timezoneOverlapHours: z.coerce.number().int().min(0).max(24).nullable().optional(),
+    timezoneOverlapHours: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(24)
+      .nullable()
+      .optional(),
     engagementType: z
       .enum(['fixed_scope', 'milestone_retainer', 'advisory'])
       .optional(),

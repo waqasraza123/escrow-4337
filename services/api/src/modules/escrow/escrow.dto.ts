@@ -115,7 +115,9 @@ export type ReleaseMilestoneDto = z.infer<typeof releaseMilestoneSchema>;
 export type DisputeMilestoneDto = z.infer<typeof disputeMilestoneSchema>;
 export type ResolveMilestoneDto = z.infer<typeof resolveMilestoneSchema>;
 export type ContractorInviteDto = z.infer<typeof contractorInviteSchema>;
-export type UpdateContractorEmailDto = z.infer<typeof updateContractorEmailSchema>;
+export type UpdateContractorEmailDto = z.infer<
+  typeof updateContractorEmailSchema
+>;
 export type ContractorJoinReadinessQueryDto = z.infer<
   typeof contractorJoinReadinessQuerySchema
 >;

@@ -268,7 +268,9 @@ describe('LaunchReadinessService', () => {
     const ingestionStatus = createIngestionStatus({
       status: 'warning',
       summary: 'Escrow chain ingestion is lagging behind finalized chain head.',
-      warnings: ['Escrow chain ingestion is 120 block(s) behind the finalized head.'],
+      warnings: [
+        'Escrow chain ingestion is 120 block(s) behind the finalized head.',
+      ],
       lagBlocks: 120,
     });
 

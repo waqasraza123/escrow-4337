@@ -44,7 +44,10 @@ async function bootstrap() {
 }
 
 void bootstrap().catch((error) => {
-  if (error instanceof Error && error.message.startsWith('API startup failed:')) {
+  if (
+    error instanceof Error &&
+    error.message.startsWith('API startup failed:')
+  ) {
     console.error(error.message);
     process.exit(1);
     return;

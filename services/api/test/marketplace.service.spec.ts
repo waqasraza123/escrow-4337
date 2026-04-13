@@ -106,12 +106,17 @@ describe('MarketplaceService', () => {
       buildOpportunityInput({
         title: 'Founding product engineer',
         summary: 'Ship the first client portal.',
-        description: 'We need a contractor to build the first milestone-based portal.',
+        description:
+          'We need a contractor to build the first milestone-based portal.',
         mustHaveSkills: ['typescript', 'react'],
         outcomes: ['Ship a client portal', 'Integrate escrow dashboards'],
         acceptanceCriteria: ['Responsive UI', 'Wallet-aware onboarding'],
         screeningQuestions: [
-          { id: 'q1', prompt: 'Describe a similar escrow-adjacent build.', required: true },
+          {
+            id: 'q1',
+            prompt: 'Describe a similar escrow-adjacent build.',
+            required: true,
+          },
         ],
         cryptoReadinessRequired: 'wallet_only',
       }),
@@ -132,7 +137,8 @@ describe('MarketplaceService', () => {
         screeningAnswers: [
           {
             questionId: 'q1',
-            answer: 'Built milestone-based contractor onboarding with wallet verification.',
+            answer:
+              'Built milestone-based contractor onboarding with wallet verification.',
           },
         ],
       }),
@@ -144,7 +150,9 @@ describe('MarketplaceService', () => {
     );
     expect(applications.applications).toHaveLength(1);
     expect(applications.applications[0]?.status).toBe('submitted');
-    expect(applications.applications[0]?.applicant.profileSlug).toBe('great-builder');
+    expect(applications.applications[0]?.applicant.profileSlug).toBe(
+      'great-builder',
+    );
     expect(applications.applications[0]?.fitScore).toBeGreaterThan(0);
     expect(applications.applications[0]?.riskFlags).toContain(
       'no_completed_escrow_history',
@@ -152,20 +160,20 @@ describe('MarketplaceService', () => {
 
     const dossier = await marketplaceService.getApplicationDossier(
       clientUserId,
-      applications.applications[0]!.id,
+      applications.applications[0].id,
     );
     expect(dossier.dossier.matchSummary.missingRequirements).toHaveLength(0);
     expect(dossier.dossier.recommendation).toBe('review');
 
     const shortlisted = await marketplaceService.shortlistApplication(
       clientUserId,
-      applications.applications[0]!.id,
+      applications.applications[0].id,
     );
     expect(shortlisted.applications[0]?.status).toBe('shortlisted');
 
     const hired = await marketplaceService.hireApplication(
       clientUserId,
-      applications.applications[0]!.id,
+      applications.applications[0].id,
     );
     expect(hired.opportunityId).toBe(created.opportunity.id);
     expect(hired.jobId).toBeTruthy();
@@ -173,13 +181,16 @@ describe('MarketplaceService', () => {
     const auditBundle = await escrowService.getAuditBundle(hired.jobId);
     expect(auditBundle.bundle.job.title).toBe('Founding product engineer');
     expect(auditBundle.bundle.job.onchain.workerAddress).toBe(applicantAddress);
-    expect(auditBundle.bundle.job.contractorParticipation?.status).toBe('pending');
+    expect(auditBundle.bundle.job.contractorParticipation?.status).toBe(
+      'pending',
+    );
     expect(auditBundle.bundle.job.termsJSON.marketplace).toMatchObject({
       opportunityId: created.opportunity.id,
-      applicationId: applications.applications[0]!.id,
+      applicationId: applications.applications[0].id,
     });
 
-    const myApplications = await marketplaceService.listMyApplications(applicantUserId);
+    const myApplications =
+      await marketplaceService.listMyApplications(applicantUserId);
     expect(myApplications.applications[0]?.status).toBe('hired');
     expect(myApplications.applications[0]?.opportunity.title).toBe(
       'Founding product engineer',
@@ -238,12 +249,19 @@ describe('MarketplaceService', () => {
         description: 'Needs exact fit for a crypto-native workflow.',
         mustHaveSkills: ['typescript', 'react'],
         screeningQuestions: [
-          { id: 'q1', prompt: 'How would you structure milestone delivery?', required: true },
+          {
+            id: 'q1',
+            prompt: 'How would you structure milestone delivery?',
+            required: true,
+          },
         ],
         cryptoReadinessRequired: 'smart_account_ready',
       }),
     );
-    await marketplaceService.publishOpportunity(clientUserId, created.opportunity.id);
+    await marketplaceService.publishOpportunity(
+      clientUserId,
+      created.opportunity.id,
+    );
 
     await marketplaceService.applyToOpportunity(
       applicantUserId,
@@ -253,7 +271,8 @@ describe('MarketplaceService', () => {
         screeningAnswers: [
           {
             questionId: 'q1',
-            answer: 'I define milestone acceptance upfront and validate against delivery artifacts.',
+            answer:
+              'I define milestone acceptance upfront and validate against delivery artifacts.',
           },
         ],
       }),
@@ -263,7 +282,9 @@ describe('MarketplaceService', () => {
       created.opportunity.id,
       buildApplicationInput({
         selectedWalletAddress: weakerApplicantAddress,
-        screeningAnswers: [{ questionId: 'q1', answer: 'I usually figure it out later.' }],
+        screeningAnswers: [
+          { questionId: 'q1', answer: 'I usually figure it out later.' },
+        ],
         deliveryApproach: 'I will adapt as I go.',
         milestonePlanSummary: 'One vague phase.',
       }),
@@ -281,9 +302,9 @@ describe('MarketplaceService', () => {
     expect(matches.matches[1]?.matchSummary.riskFlags).toContain(
       'must_have_skill_gap',
     );
-    expect(matches.matches[1]?.matchSummary.missingRequirements.length).toBeGreaterThan(
-      0,
-    );
+    expect(
+      matches.matches[1]?.matchSummary.missingRequirements.length,
+    ).toBeGreaterThan(0);
   });
 
   it('requires arbitrator control for moderation actions', async () => {
@@ -365,11 +386,15 @@ describe('MarketplaceService', () => {
         description: 'Published long enough to show in aging.',
       }),
     );
-    await marketplaceService.publishOpportunity(clientUserId, agedOpportunity.opportunity.id);
-
-    const storedAgedOpportunity = await marketplaceRepository.getOpportunityById(
+    await marketplaceService.publishOpportunity(
+      clientUserId,
       agedOpportunity.opportunity.id,
     );
+
+    const storedAgedOpportunity =
+      await marketplaceRepository.getOpportunityById(
+        agedOpportunity.opportunity.id,
+      );
     expect(storedAgedOpportunity).not.toBeNull();
     await marketplaceRepository.saveOpportunity({
       ...storedAgedOpportunity!,
@@ -385,7 +410,10 @@ describe('MarketplaceService', () => {
         description: 'This brief should count toward hire conversion.',
       }),
     );
-    await marketplaceService.publishOpportunity(clientUserId, hiredOpportunity.opportunity.id);
+    await marketplaceService.publishOpportunity(
+      clientUserId,
+      hiredOpportunity.opportunity.id,
+    );
     await marketplaceService.applyToOpportunity(
       applicantUserId,
       hiredOpportunity.opportunity.id,
@@ -393,15 +421,18 @@ describe('MarketplaceService', () => {
         selectedWalletAddress: applicantAddress,
       }),
     );
-    const hiredApplications = await marketplaceService.getOpportunityApplications(
+    const hiredApplications =
+      await marketplaceService.getOpportunityApplications(
+        clientUserId,
+        hiredOpportunity.opportunity.id,
+      );
+    await marketplaceService.hireApplication(
       clientUserId,
-      hiredOpportunity.opportunity.id,
+      hiredApplications.applications[0].id,
     );
-    await marketplaceService.hireApplication(clientUserId, hiredApplications.applications[0]!.id);
 
-    const dashboard = await marketplaceService.getModerationDashboard(
-      arbitratorUserId,
-    );
+    const dashboard =
+      await marketplaceService.getModerationDashboard(arbitratorUserId);
     expect(dashboard.summary.totalProfiles).toBe(2);
     expect(dashboard.summary.totalOpportunities).toBe(2);
     expect(dashboard.summary.publishedOpportunities).toBe(1);
@@ -426,8 +457,13 @@ function buildProfileInput(
     rateMax: string | null;
     timezone: string;
     availability: 'open' | 'limited' | 'unavailable';
-    preferredEngagements: Array<'fixed_scope' | 'milestone_retainer' | 'advisory'>;
-    cryptoReadiness: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+    preferredEngagements: Array<
+      'fixed_scope' | 'milestone_retainer' | 'advisory'
+    >;
+    cryptoReadiness:
+      | 'wallet_only'
+      | 'smart_account_ready'
+      | 'escrow_power_user';
     portfolioUrls: string[];
   }>,
 ) {
@@ -462,7 +498,11 @@ function buildOpportunityInput(
     mustHaveSkills: string[];
     outcomes: string[];
     acceptanceCriteria: string[];
-    screeningQuestions: Array<{ id: string; prompt: string; required: boolean }>;
+    screeningQuestions: Array<{
+      id: string;
+      prompt: string;
+      required: boolean;
+    }>;
     visibility: 'public' | 'private';
     budgetMin: string | null;
     budgetMax: string | null;
@@ -470,7 +510,10 @@ function buildOpportunityInput(
     desiredStartAt: number | null;
     timezoneOverlapHours: number | null;
     engagementType: 'fixed_scope' | 'milestone_retainer' | 'advisory';
-    cryptoReadinessRequired: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+    cryptoReadinessRequired:
+      | 'wallet_only'
+      | 'smart_account_ready'
+      | 'escrow_power_user';
   }>,
 ) {
   return {
@@ -509,14 +552,19 @@ function buildApplicationInput(
       id: string;
       label: string;
       url: string;
-      kind: 'portfolio' | 'escrow_delivery' | 'escrow_case' | 'external_case_study';
+      kind:
+        | 'portfolio'
+        | 'escrow_delivery'
+        | 'escrow_case'
+        | 'external_case_study';
       jobId: string | null;
     }>;
     portfolioUrls: string[];
   }>,
 ) {
   return {
-    coverNote: 'I can deliver this in two milestones with clear acceptance criteria.',
+    coverNote:
+      'I can deliver this in two milestones with clear acceptance criteria.',
     proposedRate: '125',
     selectedWalletAddress: applicantAddress,
     screeningAnswers: [],

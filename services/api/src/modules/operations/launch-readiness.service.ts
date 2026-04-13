@@ -54,7 +54,9 @@ export class LaunchReadinessService {
   private buildChecks(
     profile: Awaited<ReturnType<RuntimeProfileService['getProfile']>>,
     daemonHealth: LaunchReadinessChainSyncHealthSnapshot,
-    chainIngestion: Awaited<ReturnType<EscrowChainIngestionStatusService['getStatus']>>,
+    chainIngestion: Awaited<
+      ReturnType<EscrowChainIngestionStatusService['getStatus']>
+    >,
   ): LaunchReadinessCheck[] {
     const daemonPosture = profile.operations.chainSyncDaemon;
     const checks: LaunchReadinessCheck[] = [
@@ -159,10 +161,9 @@ export class LaunchReadinessService {
         summary: chainIngestion.enabled
           ? 'Escrow chain ingestion is enabled.'
           : 'Escrow chain ingestion is disabled.',
-        details:
-          chainIngestion.enabled
-            ? undefined
-            : 'Launch scope now expects finalized chain ingestion to be enabled.',
+        details: chainIngestion.enabled
+          ? undefined
+          : 'Launch scope now expects finalized chain ingestion to be enabled.',
         blocker: !chainIngestion.enabled,
       },
       {

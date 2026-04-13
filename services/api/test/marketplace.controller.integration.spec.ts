@@ -111,7 +111,8 @@ describe('MarketplaceController integration', () => {
       buildOpportunityInput({
         title: 'Marketplace portal',
         summary: 'Ship the first portal',
-        description: 'Need a contractor who can build the first portal quickly.',
+        description:
+          'Need a contractor who can build the first portal quickly.',
         requiredSkills: ['react', 'typescript'],
         mustHaveSkills: ['react'],
         outcomes: ['Deliver the portal'],
@@ -141,7 +142,8 @@ describe('MarketplaceController integration', () => {
         screeningAnswers: [
           {
             questionId: 'q1',
-            answer: 'I align acceptance criteria up front and deliver milestone evidence.',
+            answer:
+              'I align acceptance criteria up front and deliver milestone evidence.',
           },
         ],
       }),
@@ -163,13 +165,13 @@ describe('MarketplaceController integration', () => {
 
     const dossier = await controller.getApplicationDossier(
       clientUser,
-      applications.applications[0]!.id,
+      applications.applications[0].id,
     );
     expect(dossier.dossier.matchSummary.missingRequirements).toHaveLength(0);
 
     const hired = await controller.hireApplication(
       clientUser,
-      applications.applications[0]!.id,
+      applications.applications[0].id,
     );
     expect(hired.opportunityId).toBe(created.opportunity.id);
     expect(hired.jobId).toBeTruthy();
@@ -226,8 +228,13 @@ function buildProfileInput(
     rateMax: string | null;
     timezone: string;
     availability: 'open' | 'limited' | 'unavailable';
-    preferredEngagements: Array<'fixed_scope' | 'milestone_retainer' | 'advisory'>;
-    cryptoReadiness: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+    preferredEngagements: Array<
+      'fixed_scope' | 'milestone_retainer' | 'advisory'
+    >;
+    cryptoReadiness:
+      | 'wallet_only'
+      | 'smart_account_ready'
+      | 'escrow_power_user';
     portfolioUrls: string[];
   }>,
 ) {
@@ -262,7 +269,11 @@ function buildOpportunityInput(
     mustHaveSkills: string[];
     outcomes: string[];
     acceptanceCriteria: string[];
-    screeningQuestions: Array<{ id: string; prompt: string; required: boolean }>;
+    screeningQuestions: Array<{
+      id: string;
+      prompt: string;
+      required: boolean;
+    }>;
     visibility: 'public' | 'private';
     budgetMin: string | null;
     budgetMax: string | null;
@@ -270,7 +281,10 @@ function buildOpportunityInput(
     desiredStartAt: number | null;
     timezoneOverlapHours: number | null;
     engagementType: 'fixed_scope' | 'milestone_retainer' | 'advisory';
-    cryptoReadinessRequired: 'wallet_only' | 'smart_account_ready' | 'escrow_power_user';
+    cryptoReadinessRequired:
+      | 'wallet_only'
+      | 'smart_account_ready'
+      | 'escrow_power_user';
   }>,
 ) {
   return {
@@ -309,7 +323,11 @@ function buildApplicationInput(
       id: string;
       label: string;
       url: string;
-      kind: 'portfolio' | 'escrow_delivery' | 'escrow_case' | 'external_case_study';
+      kind:
+        | 'portfolio'
+        | 'escrow_delivery'
+        | 'escrow_case'
+        | 'external_case_study';
       jobId: string | null;
     }>;
     portfolioUrls: string[];

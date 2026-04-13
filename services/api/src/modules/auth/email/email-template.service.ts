@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EmailConfigService } from './email.config';
-import type {
-  ContractorInviteEmailInput,
-  EmailMessage,
-} from './email.types';
+import type { ContractorInviteEmailInput, EmailMessage } from './email.types';
 
 @Injectable()
 export class EmailTemplateService {

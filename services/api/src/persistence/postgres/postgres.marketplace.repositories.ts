@@ -132,7 +132,8 @@ function mapOpportunity(
     engagementType: row.engagement_type,
     cryptoReadinessRequired: row.crypto_readiness_required,
     moderationStatus: row.moderation_status,
-    publishedAt: row.published_at_ms === null ? null : Number(row.published_at_ms),
+    publishedAt:
+      row.published_at_ms === null ? null : Number(row.published_at_ms),
     hiredApplicationId: row.hired_application_id,
     hiredJobId: row.hired_job_id,
     createdAt: Number(row.created_at_ms),
@@ -154,7 +155,9 @@ function mapApplication(
     deliveryApproach: row.delivery_approach,
     milestonePlanSummary: row.milestone_plan_summary,
     estimatedStartAt:
-      row.estimated_start_at_ms === null ? null : Number(row.estimated_start_at_ms),
+      row.estimated_start_at_ms === null
+        ? null
+        : Number(row.estimated_start_at_ms),
     relevantProofArtifacts: row.relevant_proof_artifacts_json ?? [],
     portfolioUrls: row.portfolio_urls_json ?? [],
     status: row.status,
@@ -383,12 +386,16 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         opportunity.budgetMin,
         opportunity.budgetMax,
         opportunity.timeline,
-        opportunity.desiredStartAt === null ? null : String(opportunity.desiredStartAt),
+        opportunity.desiredStartAt === null
+          ? null
+          : String(opportunity.desiredStartAt),
         opportunity.timezoneOverlapHours,
         opportunity.engagementType,
         opportunity.cryptoReadinessRequired,
         opportunity.moderationStatus,
-        opportunity.publishedAt === null ? null : String(opportunity.publishedAt),
+        opportunity.publishedAt === null
+          ? null
+          : String(opportunity.publishedAt),
         opportunity.hiredApplicationId,
         opportunity.hiredJobId,
         String(opportunity.createdAt),
@@ -473,7 +480,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         JSON.stringify(application.screeningAnswers),
         application.deliveryApproach,
         application.milestonePlanSummary,
-        application.estimatedStartAt === null ? null : String(application.estimatedStartAt),
+        application.estimatedStartAt === null
+          ? null
+          : String(application.estimatedStartAt),
         JSON.stringify(application.relevantProofArtifacts),
         JSON.stringify(application.portfolioUrls),
         application.status,

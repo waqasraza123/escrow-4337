@@ -14,7 +14,9 @@ function cloneValue<T>(value: T): T {
 }
 
 function normalizeTextList(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()))).filter(Boolean);
+  return Array.from(new Set(values.map((value) => value.trim()))).filter(
+    Boolean,
+  );
 }
 
 function normalizeProofArtifacts(values: MarketplaceTalentProofArtifact[]) {
@@ -67,7 +69,9 @@ function normalizeOpportunity(
     mustHaveSkills: normalizeTextList(opportunity.mustHaveSkills),
     outcomes: normalizeTextList(opportunity.outcomes),
     acceptanceCriteria: normalizeTextList(opportunity.acceptanceCriteria),
-    screeningQuestions: normalizeScreeningQuestions(opportunity.screeningQuestions),
+    screeningQuestions: normalizeScreeningQuestions(
+      opportunity.screeningQuestions,
+    ),
   };
 }
 
@@ -77,7 +81,9 @@ function normalizeApplication(
   return {
     ...application,
     screeningAnswers: normalizeScreeningAnswers(application.screeningAnswers),
-    relevantProofArtifacts: normalizeProofArtifacts(application.relevantProofArtifacts),
+    relevantProofArtifacts: normalizeProofArtifacts(
+      application.relevantProofArtifacts,
+    ),
     portfolioUrls: normalizeTextList(application.portfolioUrls),
     deliveryApproach: application.deliveryApproach.trim(),
     milestonePlanSummary: application.milestonePlanSummary.trim(),

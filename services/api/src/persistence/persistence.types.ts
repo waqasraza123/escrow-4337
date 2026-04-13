@@ -83,7 +83,9 @@ export interface EscrowRepository {
   listOnchainProjections(
     jobIds?: string[],
   ): Promise<EscrowOnchainProjectionRecord[]>;
-  saveOnchainProjection(projection: EscrowOnchainProjectionRecord): Promise<void>;
+  saveOnchainProjection(
+    projection: EscrowOnchainProjectionRecord,
+  ): Promise<void>;
 }
 
 export interface MarketplaceRepository {
