@@ -4,6 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { config as loadDotenv } from 'dotenv';
 import { assertRequiredDeployedFlowEnv } from './deployed-flow-env.mjs';
+import {
+  buildEvidenceManifest,
+  buildLaunchMetadata,
+  buildSummaryMarkdown,
+  validateIncidentPlaybook,
+  validateLaunchMetadata,
+  writeGitHubStepSummary,
+} from './launch-candidate-lib.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -24,6 +32,7 @@ loadOptionalEnv('.env.e2e.deployed');
 const apiBaseUrl = readRequiredEnv('PLAYWRIGHT_DEPLOYED_API_BASE_URL');
 const expectLaunchReady =
   process.env.PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY?.trim().toLowerCase() !== 'false';
+const launchMetadata = buildLaunchMetadata(process.env);
 
 mkdirSync(artifactsDir, {
   recursive: true,
@@ -38,6 +47,16 @@ async function main() {
       ...incidentOwnershipIssues.map((issue) => `- ${issue}`),
     ].join('\n');
     writeFileSync(resolve(artifactsDir, 'incident-playbook-validation.txt'), `${error}\n`, 'utf8');
+    throw new Error(error);
+  }
+
+  const metadataIssues = validateLaunchMetadata(launchMetadata, process.env);
+  if (metadataIssues.length > 0) {
+    const error = [
+      'Launch candidate is blocked because the promotion metadata is incomplete.',
+      ...metadataIssues.map((issue) => `- ${issue}`),
+    ].join('\n');
+    writeFileSync(resolve(artifactsDir, 'launch-metadata-validation.txt'), `${error}\n`, 'utf8');
     throw new Error(error);
   }
 
@@ -157,6 +176,17 @@ async function main() {
   const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
   const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
   const walkthroughCanarySummary = summarizePlaywrightReport(walkthroughCanaryReport);
+  const evidenceManifest = buildEvidenceManifest({
+    artifactsDir,
+    playbook: incidentPlaybook,
+    metadata: launchMetadata,
+    repoRoot,
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'evidence-manifest.json'),
+    `${JSON.stringify(evidenceManifest, null, 2)}\n`,
+    'utf8',
+  );
 
   const blockers = collectBlockers({
     deploymentValidation,
@@ -168,11 +198,13 @@ async function main() {
     exactCanarySummary,
     walkthroughCanarySummary,
     authorityEvidence,
+    evidenceManifest,
   });
   const summary = {
     generatedAt: new Date().toISOString(),
     artifactsDir,
     expectLaunchReady,
+    launchMetadata,
     incidentPlaybook: {
       file: 'docs/incident-playbook.json',
       incidentCount: incidentPlaybook.incidents.length,
@@ -217,6 +249,13 @@ async function main() {
         disputeCase: authorityEvidence.exports.disputeCaseAuthoritySource,
       },
     },
+    evidenceContract: {
+      requiredArtifactCount: evidenceManifest.requiredArtifacts.total,
+      presentArtifactCount: evidenceManifest.requiredArtifacts.present.length,
+      producedArtifactCount: evidenceManifest.producedArtifacts.length,
+      missingArtifacts: evidenceManifest.requiredArtifacts.missing,
+      incidents: evidenceManifest.incidents,
+    },
     blockers,
   };
 
@@ -225,7 +264,9 @@ async function main() {
     `${JSON.stringify(summary, null, 2)}\n`,
     'utf8',
   );
-  writeFileSync(resolve(artifactsDir, 'summary.md'), buildSummaryMarkdown(summary), 'utf8');
+  const summaryMarkdown = buildSummaryMarkdown(summary);
+  writeFileSync(resolve(artifactsDir, 'summary.md'), summaryMarkdown, 'utf8');
+  writeGitHubStepSummary(summaryMarkdown, process.env);
 
   if (blockers.length > 0) {
     throw new Error(
@@ -283,37 +324,6 @@ function readRequiredEnv(key) {
 function readIncidentPlaybook() {
   const filePath = resolve(repoRoot, 'docs', 'incident-playbook.json');
   return JSON.parse(readFileSync(filePath, 'utf8'));
-}
-
-function validateIncidentPlaybook(playbook) {
-  const issues = [];
-
-  if (!Array.isArray(playbook.incidents) || playbook.incidents.length === 0) {
-    issues.push('docs/incident-playbook.json must define at least one incident.');
-    return issues;
-  }
-
-  for (const incident of playbook.incidents) {
-    if (!incident.id) {
-      issues.push('Every incident must have an id.');
-    }
-    if (!incident.summary) {
-      issues.push(`Incident ${incident.id || '<missing id>'} is missing a summary.`);
-    }
-    if (!incident.owner) {
-      issues.push(`Incident ${incident.id || '<missing id>'} is missing an owner.`);
-    }
-    if (!incident.rollback) {
-      issues.push(`Incident ${incident.id || '<missing id>'} is missing rollback guidance.`);
-    }
-    if (!Array.isArray(incident.evidence) || incident.evidence.length === 0) {
-      issues.push(
-        `Incident ${incident.id || '<missing id>'} must list at least one evidence artifact.`,
-      );
-    }
-  }
-
-  return issues;
 }
 
 async function runLoggedCommand(stepName, command, logPath, extraEnv = {}) {
@@ -425,6 +435,7 @@ function collectBlockers({
   exactCanarySummary,
   walkthroughCanarySummary,
   authorityEvidence,
+  evidenceManifest,
 }) {
   const blockers = [];
 
@@ -472,6 +483,18 @@ function collectBlockers({
   if (authorityEvidence.ingestion?.status !== 'ok') {
     blockers.push('Deployed authority evidence reported unhealthy ingestion posture.');
   }
+  if (evidenceManifest.requiredArtifacts.missing.length > 0) {
+    blockers.push(
+      `Evidence contract is incomplete. Missing artifacts: ${evidenceManifest.requiredArtifacts.missing.join(', ')}`,
+    );
+  }
+  for (const incident of evidenceManifest.incidents) {
+    if (incident.missingEvidence.length > 0) {
+      blockers.push(
+        `Incident ${incident.id} is missing required evidence artifacts: ${incident.missingEvidence.join(', ')}`,
+      );
+    }
+  }
 
   return blockers;
 }
@@ -491,37 +514,6 @@ function summarizePlaywrightReport(report) {
     total: expected + unexpected + flaky + skipped,
     failed: unexpected + flaky,
   };
-}
-
-function buildSummaryMarkdown(summary) {
-  return `# Launch Candidate Summary
-
-- Generated at: ${summary.generatedAt}
-- Artifact directory: ${summary.artifactsDir}
-- Expect launch ready: ${summary.expectLaunchReady ? 'true' : 'false'}
-- Deployment validation: ${summary.deploymentValidation.ok ? 'ok' : 'failed'}
-- Daemon health: ${summary.daemonHealth.status}
-- Runtime profile: ${summary.runtimeProfile.profile}
-- Launch readiness: ${summary.launchReadiness.ready ? 'ready' : 'blocked'}
-- Smoke failures: ${summary.smoke.failed}
-- Seeded canary failures: ${summary.seededCanary.failed}
-- Exact canary failures: ${summary.exactCanary.failed}
-- Walkthrough canary failures: ${summary.walkthroughCanary.failed}
-- Authority evidence: ${summary.authorityEvidence.auditSource} after ${summary.authorityEvidence.syncAttempts} sync attempt(s)
-
-## Blockers
-
-${summary.blockers.length === 0 ? '- none' : summary.blockers.map((blocker) => `- ${blocker}`).join('\n')}
-
-## Launch Readiness Warnings
-
-${summary.launchReadiness.warnings.length === 0 ? '- none' : summary.launchReadiness.warnings.map((warning) => `- ${warning}`).join('\n')}
-
-## Incident Ownership
-
-- Incident definitions: ${summary.incidentPlaybook.incidentCount}
-- Distinct owners: ${summary.incidentPlaybook.ownerCount}
-`;
 }
 
 function renderCommand(stepName, command) {

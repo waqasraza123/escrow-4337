@@ -11,6 +11,7 @@
     "verify:ci": "./scripts/verify-ci.sh",
     "verify:chain:local": "pnpm --filter escrow4334-api build && node ./services/api/scripts/run-built-cli.mjs dist/modules/operations/escrow-chain-sync-local-verification-runner.js",
     "verify:push": "./scripts/verify-push.sh",
+    "test:scripts": "node --test scripts/*.test.mjs",
     "setup:githooks": "sh -c 'chmod +x .githooks/pre-push scripts/verify-push.sh scripts/safe-push.sh scripts/verify-ci.sh scripts/contracts-check.sh && if git rev-parse --git-dir >/dev/null 2>&1; then git config --local core.hooksPath .githooks; fi'",
     "safe-push": "./scripts/safe-push.sh",
     "e2e": "playwright test",

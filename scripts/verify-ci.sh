@@ -13,6 +13,7 @@ run() {
 run pnpm typecheck
 run pnpm lint
 run pnpm test
+run pnpm test:scripts
 run pnpm build
 run env PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:smoke:local
 run pnpm contracts:check

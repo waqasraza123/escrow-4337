@@ -32,7 +32,7 @@
       "owner": "operator",
       "summary": "The configured arbitrator wallet or launch-scoped operator capability is unavailable.",
       "rollback": "Block promotion until the configured arbitrator wallet, export support, and operator workflow posture are restored or the launch scope is redefined.",
-      "evidence": ["launch-readiness.json", "runtime-profile.json"]
+      "evidence": ["launch-readiness.json", "runtime-profile.json", "authority-evidence/summary.json"]
     },
     {
       "id": "frontend_runtime_mismatch",

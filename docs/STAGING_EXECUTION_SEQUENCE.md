@@ -61,10 +61,12 @@ Required environment contract:
    Local equivalent when you have the staging secret set loaded: `pnpm launch:candidate`
    This must keep `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`.
    The same gate now also runs `pnpm verify:authority:deployed`, which creates a staged escrow job through the deployed API, runs protected reconciliation, and captures public audit/export proof that the staged environment reads from `chain_projection`.
+   When using the manual GitHub workflow, pass the exact deployed image SHA for the staged candidate and the rollback image SHA if one is already designated so the artifact bundle preserves promotion metadata.
 
 10. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
     Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
+    The launch-candidate artifact bundle now captures that metadata directly and includes `evidence-manifest.json`, which should show zero missing artifacts before promotion discussion.
 
 11. Decide whether deeper staged proof is required.
     The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.

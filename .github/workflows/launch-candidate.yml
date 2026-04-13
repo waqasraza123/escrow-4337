@@ -10,6 +10,14 @@ on:
         options:
           - staging
           - production
+      deployed_image_sha:
+        description: Deployed image SHA for the candidate being validated
+        required: true
+        type: string
+      rollback_image_sha:
+        description: Rollback image SHA if one is already designated
+        required: false
+        type: string
 
 jobs:
   launch-candidate:
@@ -78,6 +86,15 @@ jobs:
       PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
       PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
       LAUNCH_CANDIDATE_ARTIFACT_DIR: artifacts/launch-candidate/${{ github.run_id }}-${{ github.run_attempt }}
+      LAUNCH_CANDIDATE_ENVIRONMENT: ${{ inputs.environment }}
+      LAUNCH_CANDIDATE_REPOSITORY: ${{ github.repository }}
+      LAUNCH_CANDIDATE_WORKFLOW: ${{ github.workflow }}
+      LAUNCH_CANDIDATE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      LAUNCH_CANDIDATE_COMMIT_SHA: ${{ github.sha }}
+      LAUNCH_CANDIDATE_GIT_REF: ${{ github.ref_name }}
+      LAUNCH_CANDIDATE_ACTOR: ${{ github.actor }}
+      LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: ${{ inputs.deployed_image_sha }}
+      LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: ${{ inputs.rollback_image_sha }}
 
     steps:
       - name: Checkout
