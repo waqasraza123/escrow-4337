@@ -67,11 +67,12 @@ Required environment contract:
 10. Run promotion review against the staged evidence set.
     Canonical GitHub path: run workflow `Promotion Review` with inputs `environment=staging`, the CI candidate run id, the successful `Deployed Smoke` run id, and the successful `Launch Candidate` run id.
     Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
+    Preserve the uploaded `release-dossier` artifact from that workflow; it now copies the source evidence into one canonical folder and includes `release-dossier-checksums.txt`.
 
 11. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
     Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, `Promotion Review` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
-    The release review set now includes `deployed-smoke-record.json`, `evidence-manifest.json`, `promotion-record.json`, and `promotion-review.json`. `evidence-manifest.json` should show zero missing artifacts and `promotion-review.json` should report `ready` before promotion discussion.
+    The release review set now includes `deployed-smoke-record.json`, `evidence-manifest.json`, `promotion-record.json`, `promotion-review.json`, and the assembled `release-dossier.json`. `evidence-manifest.json` should show zero missing artifacts and `promotion-review.json` should report `ready` before promotion discussion.
 
 12. Decide whether deeper staged proof is required.
     The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.
@@ -87,6 +88,7 @@ Treat staging as proven only when all of the following are true:
 - `pnpm smoke:deployed` passes against live staging URLs
 - `pnpm launch:candidate` passes with launch readiness enforced
 - `promotion-review.json` reports `ready` for staged promotion review and reconciles the intended candidate run, commit SHA, and image digest across smoke and launch evidence
+- the `release-dossier` artifact exists, includes copied evidence files, and has a checksum manifest for the preserved review packet
 - `promotion-record.json` reports `ready` for staging review and has no unresolved blockers
 - the artifact bundle and workflow evidence are preserved for review
 

@@ -57,6 +57,8 @@ For a launch candidate, keep the artifact bundle from `pnpm launch:candidate` or
 
 - the generated `summary.json` and `summary.md`
 - the generated `promotion-record.json` and `promotion-record.md`
+- the generated `promotion-review.json` and `promotion-review.md`
+- the generated `release-dossier.json`, `release-dossier.md`, and `release-dossier-checksums.txt`
 - deployment validation output
 - daemon health output
 - daemon alert dry-run output

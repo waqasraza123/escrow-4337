@@ -96,10 +96,34 @@ jobs:
             --expected-smoke-run-id "${{ inputs.deployed_smoke_run_id }}" \
             --expected-launch-run-id "${{ inputs.launch_candidate_run_id }}"
 
+      - name: Generate release dossier
+        if: always()
+        run: |
+          node ./scripts/release-dossier.mjs \
+            --image-manifest-dir artifacts/api-image-manifest \
+            --deployed-smoke-dir artifacts/deployed-smoke-review \
+            --launch-review-dir artifacts/launch-candidate-review \
+            --promotion-review-dir artifacts/promotion-review \
+            --output-dir artifacts/release-dossier
+        env:
+          RELEASE_DOSSIER_ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_DOSSIER_REPOSITORY: ${{ github.repository }}
+          RELEASE_DOSSIER_WORKFLOW: ${{ github.workflow }}
+          RELEASE_DOSSIER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RELEASE_DOSSIER_ACTOR: ${{ github.actor }}
+
       - name: Upload promotion review artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: promotion-review-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/promotion-review
+          if-no-files-found: error
+
+      - name: Upload release dossier artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dossier-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release-dossier
           if-no-files-found: error
