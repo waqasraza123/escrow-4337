@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   buildEvidenceManifest,
+  buildPromotionRecord,
   buildLaunchMetadata,
+  evaluatePromotionReadiness,
   validateIncidentPlaybook,
   validateLaunchMetadata,
 } from './launch-candidate-lib.mjs';
@@ -81,6 +83,8 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
 
   try {
     writeFileSync(resolve(root, 'deployment-validation.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'chain-sync-daemon-health.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'chain-sync-daemon-alert-dry-run.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'runtime-profile.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'launch-readiness.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'smoke-deployed.json'), '{}\n', 'utf8');
@@ -92,6 +96,8 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       recursive: true,
     });
     writeFileSync(resolve(root, 'authority-evidence', 'summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'promotion-record.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'promotion-record.md'), '# promotion\n', 'utf8');
 
     const manifest = buildEvidenceManifest({
       artifactsDir: root,
@@ -111,8 +117,8 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     });
 
-    assert.equal(manifest.requiredArtifacts.total, 10);
-    assert.ok(manifest.requiredArtifacts.missing.includes('chain-sync-daemon-health.json'));
+    assert.equal(manifest.requiredArtifacts.total, 13);
+    assert.deepEqual(manifest.requiredArtifacts.missing, []);
     assert.deepEqual(manifest.incidents, [
       {
         id: 'operator_authority_gap',
@@ -129,4 +135,122 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       force: true,
     });
   }
+});
+
+test('evaluatePromotionReadiness requires rollback metadata for production and alert posture for required daemon', () => {
+  const readiness = evaluatePromotionReadiness({
+    metadata: {
+      environment: 'production',
+      rollbackImageSha: null,
+    },
+    runtimeProfile: {
+      operations: {
+        chainSyncDaemon: {
+          required: true,
+        },
+      },
+    },
+    daemonHealth: {
+      status: 'ok',
+    },
+    daemonAlertDrill: {
+      notification: {
+        configured: false,
+        dryRun: true,
+        reason: 'webhook_unconfigured',
+      },
+    },
+    evidenceManifest: {
+      requiredArtifacts: {
+        missing: [],
+      },
+    },
+    launchBlockers: [],
+  });
+
+  assert.equal(readiness.status, 'blocked');
+  assert.deepEqual(readiness.blockers, [
+    'Production promotion requires a designated rollback image SHA.',
+    'Daemon alert drill did not confirm configured alert delivery posture.',
+    'Daemon alert drill reports webhook delivery is unconfigured.',
+  ]);
+});
+
+test('buildPromotionRecord summarizes launch, rollback, and observability posture', () => {
+  const record = buildPromotionRecord({
+    metadata: {
+      environment: 'staging',
+      deployedImageSha: 'sha256:new',
+      rollbackImageSha: null,
+    },
+    runtimeProfile: {
+      operations: {
+        chainSyncDaemon: {
+          required: true,
+          alertingConfigured: true,
+          alertMinSeverity: 'warning',
+          alertSendRecovery: true,
+          alertResendIntervalSeconds: 900,
+        },
+      },
+    },
+    daemonHealth: {
+      status: 'ok',
+      summary: 'healthy',
+    },
+    daemonAlertDrill: {
+      notification: {
+        configured: true,
+        attempted: false,
+        sent: false,
+        dryRun: true,
+        event: null,
+        severity: null,
+        reason: 'no_active_alert',
+        webhookResponseStatus: null,
+      },
+    },
+    evidenceManifest: {
+      requiredArtifacts: {
+        total: 13,
+        present: Array.from({ length: 13 }, (_, index) => `artifact-${index}`),
+        missing: [],
+      },
+      incidents: [],
+    },
+    summary: {
+      launchReadiness: {
+        ready: true,
+        warnings: [],
+      },
+      blockers: [],
+      smoke: {
+        failed: 0,
+      },
+      seededCanary: {
+        failed: 0,
+      },
+      exactCanary: {
+        failed: 0,
+      },
+      walkthroughCanary: {
+        failed: 0,
+      },
+      authorityEvidence: {
+        ok: true,
+        auditSource: 'chain_projection',
+      },
+    },
+    promotionReadiness: {
+      status: 'ready',
+      blockers: [],
+      warnings: ['Rollback image SHA is not yet recorded for this candidate.'],
+    },
+  });
+
+  assert.equal(record.status, 'ready');
+  assert.equal(record.rollback.ready, true);
+  assert.equal(record.observability.alertDrill.configured, true);
+  assert.equal(record.evidence.presentArtifactCount, 13);
+  assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

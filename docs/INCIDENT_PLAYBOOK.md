@@ -56,8 +56,10 @@ The machine-readable source of truth is `docs/incident-playbook.json`. `pnpm lau
 For a launch candidate, keep the artifact bundle from `pnpm launch:candidate` or the `Launch Candidate` workflow. Promotion evidence should include:
 
 - the generated `summary.json` and `summary.md`
+- the generated `promotion-record.json` and `promotion-record.md`
 - deployment validation output
 - daemon health output
+- daemon alert dry-run output
 - runtime-profile output
 - launch-readiness output
 - deployed smoke JSON report

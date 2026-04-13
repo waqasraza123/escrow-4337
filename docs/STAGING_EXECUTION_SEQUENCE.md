@@ -66,7 +66,7 @@ Required environment contract:
 10. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
     Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
-    The launch-candidate artifact bundle now captures that metadata directly and includes `evidence-manifest.json`, which should show zero missing artifacts before promotion discussion.
+    The launch-candidate artifact bundle now captures that metadata directly and includes `evidence-manifest.json`, `promotion-record.json`, and a daemon alert dry-run artifact. `evidence-manifest.json` should show zero missing artifacts before promotion discussion.
 
 11. Decide whether deeper staged proof is required.
     The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.
@@ -81,6 +81,7 @@ Treat staging as proven only when all of the following are true:
 - `pnpm --filter escrow4334-api deployment:validate` passes
 - `pnpm smoke:deployed` passes against live staging URLs
 - `pnpm launch:candidate` passes with launch readiness enforced
+- `promotion-record.json` reports `ready` for staging review and has no unresolved blockers
 - the artifact bundle and workflow evidence are preserved for review
 
 ## Stop Conditions

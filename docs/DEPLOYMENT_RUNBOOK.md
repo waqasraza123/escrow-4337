@@ -29,6 +29,7 @@ Run the same image with different commands:
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
 7. Before final sign-off, run the manual `Launch Candidate` workflow or `pnpm launch:candidate` against the same environment.
 8. Preserve the generated launch-candidate artifact bundle for rollout evidence and any rollback review.
+9. Review `promotion-record.json` or `promotion-record.md` from that bundle before any production promotion decision; production candidates should include a designated rollback image SHA.
 
 ## Frontend Contract
 
@@ -50,6 +51,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - populate `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials and OTP codes in the target GitHub environment
 - run `pnpm launch:candidate`
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
+- review the generated promotion record plus daemon alert dry-run artifact alongside the evidence manifest before promotion
 
 `pnpm smoke:deployed` remains read-only. The seeded canary is the default staged mutation proof, and the exact flow stays confined to explicit launch-candidate evidence runs.
 

@@ -4,33 +4,31 @@
 - 2026-04-13
 
 ## Current Objective
-- Ship the next production-grade launch-hardening phase after deployed authority proof: make the launch-candidate artifact bundle enforce a machine-readable evidence contract and preserve promotion metadata for staging review.
+- Ship the next production-grade launch-hardening phase after evidence-contract enforcement: add promotion-review and alert-drill artifacts so the launch-candidate bundle captures rollback posture and observability proof alongside staged flow evidence.
 
 ## Last Completed Step
-- Added launch evidence-contract validation, GitHub promotion metadata capture, and script-level tests for the launch-candidate runner and workflow.
+- Added promotion-record generation plus daemon alert dry-run capture to the launch-candidate runner and updated the launch docs to require reviewing those artifacts before promotion.
 
 ## Current Step
 - Task complete. Targeted launch-script verification passed; root `pnpm verify:ci` is still blocked by a pre-existing `services/api` lint backlog unrelated to this change.
 
 ## Why This Step Exists
-- The repo already had incident ownership and deploy-side authority proof, but promotion evidence was still too loose: the workflow did not require deployed image metadata and the artifact bundle did not machine-check that every required incident artifact was actually present.
+- The repo already had incident ownership, deploy-side authority proof, and evidence-manifest validation, but promotion review still lacked repo-side proof that alert delivery posture was configured and that rollback metadata plus review status were preserved in one machine-readable artifact.
 
 ## Changed Files
-- `.github/workflows/launch-candidate.yml`
+- `docs/DEPLOYMENT_RUNBOOK.md`
 - `docs/LAUNCH_READINESS.md`
 - `docs/STAGING_EXECUTION_SEQUENCE.md`
-- `docs/incident-playbook.json`
+- `docs/INCIDENT_PLAYBOOK.md`
 - `docs/project-state.md`
 - `docs/_local/current-session.md`
-- `package.json`
 - `scripts/launch-candidate.mjs`
 - `scripts/launch-candidate-lib.mjs`
 - `scripts/launch-candidate-lib.test.mjs`
-- `scripts/verify-ci.sh`
 
 ## Key Constraints
 - Keep the phase grounded in the existing launch-candidate flow and artifact directory; do not invent a second release process.
-- Preserve local usability for `pnpm launch:candidate`, but fail fast in GitHub when promotion metadata is incomplete.
+- Preserve local usability for `pnpm launch:candidate`, but raise the launch gate when required daemon alert posture or production rollback metadata is incomplete.
 - Treat unrelated `services/api` lint failures as existing repo debt unless this phase directly caused them.
 
 ## Verification Commands
@@ -53,7 +51,7 @@
   - blocker: `services/api` lint reports a large pre-existing Prettier and lint backlog in files outside this change
 
 ## Expected Result
-- `pnpm launch:candidate` now emits `evidence-manifest.json`, validates required incident artifacts before promotion, writes a richer summary, and the GitHub `Launch Candidate` workflow records environment, run URL, commit SHA, deployed image SHA, and optional rollback image SHA inside the artifact bundle.
+- `pnpm launch:candidate` now emits a daemon alert dry-run artifact plus `promotion-record.json` or `.md`, validates required incident artifacts before promotion, and blocks production review when rollback metadata or required daemon alert posture is incomplete.
 
 ## Next Likely Step
-- Run the updated `Launch Candidate` workflow against staging with the real deployed image SHA, then review the uploaded `evidence-manifest.json`, summary, and authority artifacts before any production promotion discussion.
+- Run the updated `Launch Candidate` workflow against staging with the real deployed image SHA and the designated rollback image SHA, then review `promotion-record.json`, `evidence-manifest.json`, and the alert or authority artifacts before any production promotion discussion.

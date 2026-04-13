@@ -4,6 +4,7 @@ import { relative, resolve } from 'node:path';
 export const launchCandidateRequiredArtifacts = [
   'deployment-validation.json',
   'chain-sync-daemon-health.json',
+  'chain-sync-daemon-alert-dry-run.json',
   'runtime-profile.json',
   'launch-readiness.json',
   'smoke-deployed.json',
@@ -12,6 +13,8 @@ export const launchCandidateRequiredArtifacts = [
   'deployed-walkthrough.json',
   'deployed-authority-evidence.json',
   'authority-evidence/summary.json',
+  'promotion-record.json',
+  'promotion-record.md',
 ];
 
 export function validateIncidentPlaybook(playbook) {
@@ -197,6 +200,153 @@ export function buildEvidenceManifest({
   };
 }
 
+export function evaluatePromotionReadiness({
+  metadata,
+  runtimeProfile,
+  daemonHealth,
+  daemonAlertDrill,
+  evidenceManifest,
+  launchBlockers = [],
+}) {
+  const blockers = [];
+  const warnings = [];
+  const daemonRequired = runtimeProfile?.operations?.chainSyncDaemon?.required === true;
+  const notification = daemonAlertDrill?.notification ?? null;
+
+  if (launchBlockers.length > 0) {
+    blockers.push('Launch candidate still has unresolved blockers.');
+  }
+
+  if (evidenceManifest.requiredArtifacts.missing.length > 0) {
+    blockers.push('Launch artifact bundle is incomplete.');
+  }
+
+  if (metadata.environment === 'production' && !metadata.rollbackImageSha) {
+    blockers.push('Production promotion requires a designated rollback image SHA.');
+  } else if (!metadata.rollbackImageSha) {
+    warnings.push('Rollback image SHA is not yet recorded for this candidate.');
+  }
+
+  if (daemonRequired) {
+    if (daemonHealth.status === 'failed') {
+      blockers.push('Required recurring chain-sync daemon is unhealthy.');
+    }
+    if (notification?.dryRun !== true) {
+      blockers.push('Daemon alert drill did not run in dry-run mode.');
+    }
+    if (notification?.configured !== true) {
+      blockers.push('Daemon alert drill did not confirm configured alert delivery posture.');
+    }
+    if (notification?.reason === 'webhook_unconfigured') {
+      blockers.push('Daemon alert drill reports webhook delivery is unconfigured.');
+    }
+  } else if (notification?.configured !== true) {
+    warnings.push('Daemon alert webhook is not configured because recurring chain sync is optional.');
+  }
+
+  return {
+    status: blockers.length === 0 ? 'ready' : 'blocked',
+    blockers,
+    warnings,
+  };
+}
+
+export function buildPromotionRecord({
+  generatedAt = new Date().toISOString(),
+  metadata,
+  runtimeProfile,
+  daemonHealth,
+  daemonAlertDrill,
+  evidenceManifest,
+  summary,
+  promotionReadiness,
+}) {
+  return {
+    generatedAt,
+    status: promotionReadiness.status,
+    metadata,
+    launchCandidate: {
+      launchReady: summary.launchReadiness.ready,
+      blockers: summary.blockers,
+      warnings: summary.launchReadiness.warnings,
+      smokeFailures: summary.smoke.failed,
+      seededCanaryFailures: summary.seededCanary.failed,
+      exactCanaryFailures: summary.exactCanary.failed,
+      walkthroughCanaryFailures: summary.walkthroughCanary.failed,
+      authorityEvidenceOk: summary.authorityEvidence.ok,
+      authorityAuditSource: summary.authorityEvidence.auditSource,
+    },
+    rollback: {
+      deployedImageSha: metadata.deployedImageSha,
+      rollbackImageSha: metadata.rollbackImageSha,
+      required: metadata.environment === 'production',
+      ready:
+        metadata.environment === 'production'
+          ? Boolean(metadata.rollbackImageSha)
+          : true,
+    },
+    observability: {
+      daemonRequired: runtimeProfile.operations.chainSyncDaemon.required,
+      daemonHealthStatus: daemonHealth.status,
+      daemonHealthSummary: daemonHealth.summary,
+      alertingConfigured: runtimeProfile.operations.chainSyncDaemon.alertingConfigured,
+      alertMinSeverity: runtimeProfile.operations.chainSyncDaemon.alertMinSeverity,
+      alertSendRecovery: runtimeProfile.operations.chainSyncDaemon.alertSendRecovery,
+      alertResendIntervalSeconds:
+        runtimeProfile.operations.chainSyncDaemon.alertResendIntervalSeconds,
+      alertDrill: summarizeNotification(daemonAlertDrill),
+    },
+    evidence: {
+      requiredArtifactCount: evidenceManifest.requiredArtifacts.total,
+      presentArtifactCount: evidenceManifest.requiredArtifacts.present.length,
+      missingArtifacts: evidenceManifest.requiredArtifacts.missing,
+      incidentCoverage: evidenceManifest.incidents,
+    },
+    blockers: promotionReadiness.blockers,
+    warnings: promotionReadiness.warnings,
+  };
+}
+
+export function buildPromotionMarkdown(record) {
+  return `# Promotion Record
+
+- Generated at: ${record.generatedAt}
+- Status: ${record.status}
+- Environment: ${record.metadata.environment ?? 'local'}
+- Commit SHA: ${record.metadata.commitSha ?? 'n/a'}
+- Deployed image SHA: ${record.metadata.deployedImageSha ?? 'n/a'}
+- Rollback image SHA: ${record.metadata.rollbackImageSha ?? 'n/a'}
+- Launch readiness: ${record.launchCandidate.launchReady ? 'ready' : 'blocked'}
+- Authority audit source: ${record.launchCandidate.authorityAuditSource}
+- Daemon health: ${record.observability.daemonHealthStatus}
+- Alert drill configured: ${record.observability.alertDrill.configured ? 'true' : 'false'}
+- Alert drill reason: ${record.observability.alertDrill.reason ?? 'n/a'}
+- Required artifacts present: ${record.evidence.presentArtifactCount}/${record.evidence.requiredArtifactCount}
+
+## Blockers
+
+${record.blockers.length === 0 ? '- none' : record.blockers.map((blocker) => `- ${blocker}`).join('\n')}
+
+## Warnings
+
+${record.warnings.length === 0 ? '- none' : record.warnings.map((warning) => `- ${warning}`).join('\n')}
+
+## Incident Coverage
+
+${record.evidence.incidentCoverage.length === 0
+    ? '- none'
+    : record.evidence.incidentCoverage
+        .map((incident) =>
+          `- ${incident.id}: ${
+            incident.missingEvidence.length === 0
+              ? 'ok'
+              : `missing ${incident.missingEvidence.join(', ')}`
+          }`,
+        )
+        .join('\n')}
+`;
+}
+
 export function buildSummaryMarkdown(summary) {
   const metadata = summary.launchMetadata ?? {};
   const evidenceContract = summary.evidenceContract ?? {
@@ -204,6 +354,13 @@ export function buildSummaryMarkdown(summary) {
     requiredArtifactCount: 0,
     missingArtifacts: [],
     incidents: [],
+  };
+  const promotion = summary.promotion ?? {
+    status: 'blocked',
+    alertDrillConfigured: false,
+    alertDrillReason: null,
+    rollbackReady: false,
+    warnings: [],
   };
 
   return `# Launch Candidate Summary
@@ -229,12 +386,20 @@ export function buildSummaryMarkdown(summary) {
 - Exact canary failures: ${summary.exactCanary.failed}
 - Walkthrough canary failures: ${summary.walkthroughCanary.failed}
 - Authority evidence: ${summary.authorityEvidence.auditSource} after ${summary.authorityEvidence.syncAttempts} sync attempt(s)
+- Promotion review: ${promotion.status}
+- Alert drill configured: ${promotion.alertDrillConfigured ? 'true' : 'false'}
+- Alert drill reason: ${promotion.alertDrillReason ?? 'n/a'}
+- Rollback ready: ${promotion.rollbackReady ? 'true' : 'false'}
 
 ## Evidence Contract
 
 - Required artifacts present: ${evidenceContract.presentArtifactCount}/${evidenceContract.requiredArtifactCount}
 - Produced artifacts: ${evidenceContract.producedArtifactCount}
 - Missing artifacts: ${evidenceContract.missingArtifacts.length === 0 ? 'none' : evidenceContract.missingArtifacts.join(', ')}
+
+## Promotion Warnings
+
+${promotion.warnings.length === 0 ? '- none' : promotion.warnings.map((warning) => `- ${warning}`).join('\n')}
 
 ## Blockers
 
@@ -321,4 +486,18 @@ function trimToNull(value) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function summarizeNotification(daemonAlertDrill) {
+  const notification = daemonAlertDrill?.notification ?? {};
+  return {
+    configured: notification.configured === true,
+    attempted: notification.attempted === true,
+    sent: notification.sent === true,
+    dryRun: notification.dryRun === true,
+    event: notification.event ?? null,
+    severity: notification.severity ?? null,
+    reason: notification.reason ?? null,
+    webhookResponseStatus: notification.webhookResponseStatus ?? null,
+  };
 }

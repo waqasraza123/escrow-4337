@@ -31,9 +31,9 @@ Use `pnpm launch:candidate` as the canonical launch-candidate suite. It runs:
 
 The GitHub-native equivalent is the manual `Launch Candidate` workflow against `staging` or `production`.
 
-The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, runtime-profile output, launch-readiness output, deployed smoke results, separate seeded and exact canary reports, deployed authority-evidence artifacts, a generated summary, and an `evidence-manifest.json` file that machine-checks the required artifact contract against `docs/incident-playbook.json`.
+The launch-candidate runner now writes an explicit evidence bundle under `artifacts/launch-candidate/...` containing deployment validation output, daemon health output, a daemon alert dry-run artifact, runtime-profile output, launch-readiness output, deployed smoke results, separate seeded and exact canary reports, deployed authority-evidence artifacts, a generated summary, an `evidence-manifest.json` file that machine-checks the required artifact contract against `docs/incident-playbook.json`, and a machine-generated promotion record for review.
 
-The `Launch Candidate` workflow also now records promotion metadata inside that bundle, including the target environment, workflow run URL, commit SHA, deployed image SHA, and optional rollback image SHA. GitHub-triggered launch candidates fail fast if that metadata is missing.
+The `Launch Candidate` workflow also now records promotion metadata inside that bundle, including the target environment, workflow run URL, commit SHA, deployed image SHA, and rollback image SHA when designated. GitHub-triggered launch candidates fail fast if that metadata is missing, and production promotion review is now blocked when a rollback image SHA is absent.
 
 The Playwright harness now also includes two focused deployed canary lanes behind explicit `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials:
 

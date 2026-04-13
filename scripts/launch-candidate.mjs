@@ -6,8 +6,11 @@ import { config as loadDotenv } from 'dotenv';
 import { assertRequiredDeployedFlowEnv } from './deployed-flow-env.mjs';
 import {
   buildEvidenceManifest,
+  buildPromotionMarkdown,
+  buildPromotionRecord,
   buildLaunchMetadata,
   buildSummaryMarkdown,
+  evaluatePromotionReadiness,
   validateIncidentPlaybook,
   validateLaunchMetadata,
   writeGitHubStepSummary,
@@ -109,6 +112,23 @@ async function main() {
     resolve(artifactsDir, 'chain-sync-daemon-health.raw.log'),
     resolve(artifactsDir, 'chain-sync-daemon-health.json'),
   );
+  const daemonAlertDryRun = await runJsonCommand(
+    'chain-sync-daemon-alert-dry-run',
+    [
+      'pnpm',
+      '--filter',
+      'escrow4334-api',
+      'exec',
+      'node',
+      './scripts/run-built-cli.mjs',
+      'dist/modules/operations/escrow-chain-sync-daemon-health-runner.js',
+      '--dry-run',
+      '--fail-on',
+      'never',
+    ],
+    resolve(artifactsDir, 'chain-sync-daemon-alert-dry-run.raw.log'),
+    resolve(artifactsDir, 'chain-sync-daemon-alert-dry-run.json'),
+  );
 
   const runtimeProfile = await fetchJsonArtifact(
     new URL('/operations/runtime-profile', apiBaseUrl).toString(),
@@ -176,21 +196,23 @@ async function main() {
   const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
   const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
   const walkthroughCanarySummary = summarizePlaywrightReport(walkthroughCanaryReport);
-  const evidenceManifest = buildEvidenceManifest({
+  writeFileSync(
+    resolve(artifactsDir, 'promotion-record.json'),
+    `${JSON.stringify({ status: 'pending' }, null, 2)}\n`,
+    'utf8',
+  );
+  writeFileSync(resolve(artifactsDir, 'promotion-record.md'), '# Promotion Record\n\nPending.\n', 'utf8');
+  let evidenceManifest = buildEvidenceManifest({
     artifactsDir,
     playbook: incidentPlaybook,
     metadata: launchMetadata,
     repoRoot,
   });
-  writeFileSync(
-    resolve(artifactsDir, 'evidence-manifest.json'),
-    `${JSON.stringify(evidenceManifest, null, 2)}\n`,
-    'utf8',
-  );
-
-  const blockers = collectBlockers({
+  let blockers = collectBlockers({
     deploymentValidation,
     daemonHealth,
+    daemonAlertDryRun,
+    runtimeProfile,
     launchReadiness,
     expectLaunchReady,
     smokeSummary,
@@ -200,7 +222,7 @@ async function main() {
     authorityEvidence,
     evidenceManifest,
   });
-  const summary = {
+  let summary = {
     generatedAt: new Date().toISOString(),
     artifactsDir,
     expectLaunchReady,
@@ -223,6 +245,14 @@ async function main() {
       status: daemonHealth.status,
       summary: daemonHealth.summary,
       issueCodes: daemonHealth.issues.map((issue) => issue.code),
+    },
+    daemonAlertDrill: {
+      configured: daemonAlertDryRun.notification?.configured === true,
+      attempted: daemonAlertDryRun.notification?.attempted === true,
+      sent: daemonAlertDryRun.notification?.sent === true,
+      dryRun: daemonAlertDryRun.notification?.dryRun === true,
+      event: daemonAlertDryRun.notification?.event ?? null,
+      reason: daemonAlertDryRun.notification?.reason ?? null,
     },
     runtimeProfile: {
       profile: runtimeProfile.profile,
@@ -255,6 +285,89 @@ async function main() {
       producedArtifactCount: evidenceManifest.producedArtifacts.length,
       missingArtifacts: evidenceManifest.requiredArtifacts.missing,
       incidents: evidenceManifest.incidents,
+    },
+    blockers,
+  };
+  let promotionReadiness = evaluatePromotionReadiness({
+    metadata: launchMetadata,
+    runtimeProfile,
+    daemonHealth,
+    daemonAlertDrill,
+    evidenceManifest,
+    launchBlockers: blockers,
+  });
+  const promotionRecord = buildPromotionRecord({
+    metadata: launchMetadata,
+    runtimeProfile,
+    daemonHealth,
+    daemonAlertDrill,
+    evidenceManifest,
+    summary,
+    promotionReadiness,
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'promotion-record.json'),
+    `${JSON.stringify(promotionRecord, null, 2)}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    resolve(artifactsDir, 'promotion-record.md'),
+    buildPromotionMarkdown(promotionRecord),
+    'utf8',
+  );
+  evidenceManifest = buildEvidenceManifest({
+    artifactsDir,
+    playbook: incidentPlaybook,
+    metadata: launchMetadata,
+    repoRoot,
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'evidence-manifest.json'),
+    `${JSON.stringify(evidenceManifest, null, 2)}\n`,
+    'utf8',
+  );
+  promotionReadiness = evaluatePromotionReadiness({
+    metadata: launchMetadata,
+    runtimeProfile,
+    daemonHealth,
+    daemonAlertDrill,
+    evidenceManifest,
+    launchBlockers: blockers,
+  });
+  blockers = collectBlockers({
+    deploymentValidation,
+    daemonHealth,
+    daemonAlertDryRun,
+    runtimeProfile,
+    launchReadiness,
+    expectLaunchReady,
+    smokeSummary,
+    seededCanarySummary,
+    exactCanarySummary,
+    walkthroughCanarySummary,
+    authorityEvidence,
+    evidenceManifest,
+    promotionReadiness,
+  });
+  summary = {
+    ...summary,
+    evidenceContract: {
+      requiredArtifactCount: evidenceManifest.requiredArtifacts.total,
+      presentArtifactCount: evidenceManifest.requiredArtifacts.present.length,
+      producedArtifactCount: evidenceManifest.producedArtifacts.length,
+      missingArtifacts: evidenceManifest.requiredArtifacts.missing,
+      incidents: evidenceManifest.incidents,
+    },
+    promotion: {
+      status: promotionReadiness.status,
+      alertDrillConfigured: daemonAlertDryRun.notification?.configured === true,
+      alertDrillReason: daemonAlertDryRun.notification?.reason ?? null,
+      rollbackReady:
+        launchMetadata.environment === 'production'
+          ? Boolean(launchMetadata.rollbackImageSha)
+          : true,
+      warnings: promotionReadiness.warnings,
+      blockers: promotionReadiness.blockers,
     },
     blockers,
   };
@@ -428,6 +541,8 @@ async function fetchJsonArtifact(url, outputPath) {
 function collectBlockers({
   deploymentValidation,
   daemonHealth,
+  daemonAlertDryRun,
+  runtimeProfile,
   launchReadiness,
   expectLaunchReady,
   smokeSummary,
@@ -436,6 +551,7 @@ function collectBlockers({
   walkthroughCanarySummary,
   authorityEvidence,
   evidenceManifest,
+  promotionReadiness = { blockers: [] },
 }) {
   const blockers = [];
 
@@ -445,6 +561,20 @@ function collectBlockers({
 
   if (daemonHealth.status === 'failed') {
     blockers.push('Daemon health reported failed posture.');
+  }
+  if (
+    runtimeProfile.operations?.chainSyncDaemon?.required === true &&
+    daemonAlertDryRun.notification?.configured !== true
+  ) {
+    blockers.push(
+      'Daemon alert dry-run did not confirm configured alert delivery posture for the required worker.',
+    );
+  }
+  if (
+    runtimeProfile.operations?.chainSyncDaemon?.required === true &&
+    daemonAlertDryRun.notification?.dryRun !== true
+  ) {
+    blockers.push('Daemon alert dry-run did not execute in dry-run mode.');
   }
 
   if (expectLaunchReady && launchReadiness.ready !== true) {
@@ -495,6 +625,7 @@ function collectBlockers({
       );
     }
   }
+  blockers.push(...promotionReadiness.blockers);
 
   return blockers;
 }
