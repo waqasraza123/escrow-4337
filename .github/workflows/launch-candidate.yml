@@ -93,8 +93,6 @@ jobs:
       LAUNCH_CANDIDATE_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       LAUNCH_CANDIDATE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       LAUNCH_CANDIDATE_ACTOR: ${{ github.actor }}
-      LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: ${{ inputs.rollback_image_sha }}
-
     steps:
       - name: Download API image manifest
         uses: actions/download-artifact@v4
@@ -150,6 +148,59 @@ jobs:
             --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
             --expected-run-id "${{ inputs.candidate_run_id }}"
 
+      - name: Resolve rollback release pointer selection
+        if: inputs.environment == 'production' && inputs.rollback_image_sha == ''
+        id: rollback_release_pointer_selection
+        run: |
+          node ./scripts/release-pointer.mjs resolve \
+            --environment "${{ inputs.environment }}" \
+            --write-env "$RUNNER_TEMP/release-pointer-selection.env"
+          cat "$RUNNER_TEMP/release-pointer-selection.env" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Download rollback release pointer artifact
+        if: inputs.environment == 'production' && inputs.rollback_image_sha == ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/release-pointer
+          run-id: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Validate rollback release pointer
+        if: inputs.environment == 'production' && inputs.rollback_image_sha == ''
+        id: rollback_release_pointer
+        run: |
+          node ./scripts/release-pointer.mjs validate \
+            --pointer "${{ runner.temp }}/release-pointer/release-pointer.json" \
+            --expected-environment "${{ inputs.environment }}" \
+            --write-env "$RUNNER_TEMP/release-pointer.env"
+          cat "$RUNNER_TEMP/release-pointer.env" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve rollback image SHA
+        id: rollback_image
+        shell: bash
+        run: |
+          rollback_image_sha="$ROLLBACK_IMAGE_INPUT"
+          rollback_source="input"
+          if [ -z "$rollback_image_sha" ]; then
+            rollback_image_sha="$ROLLBACK_IMAGE_RESOLVED"
+            rollback_source="release-pointer"
+          fi
+
+          if [ -z "$rollback_image_sha" ] && [ "$ROLLBACK_REQUIRED" = "true" ]; then
+            echo "Rollback image SHA is required for production launch candidates." >&2
+            exit 1
+          fi
+
+          echo "rollback_image_sha=$rollback_image_sha" >> "$GITHUB_OUTPUT"
+          echo "rollback_source=$rollback_source" >> "$GITHUB_OUTPUT"
+        env:
+          ROLLBACK_IMAGE_INPUT: ${{ inputs.rollback_image_sha }}
+          ROLLBACK_IMAGE_RESOLVED: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_IMAGE_DIGEST }}
+          ROLLBACK_REQUIRED: ${{ inputs.environment == 'production' }}
+
       - name: Run launch candidate suite
         run: pnpm launch:candidate
         env:
@@ -158,6 +209,7 @@ jobs:
           LAUNCH_CANDIDATE_CANDIDATE_RUN_URL: ${{ steps.candidate_manifest.outputs.run_url }}
           LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
           LAUNCH_CANDIDATE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
+          LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: ${{ steps.rollback_image.outputs.rollback_image_sha }}
 
       - name: Upload launch candidate artifacts
         if: always()

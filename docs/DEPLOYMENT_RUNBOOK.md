@@ -33,7 +33,9 @@ Run the same image with different commands:
    By default it now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that environment and candidate.
    Supply explicit smoke or launch run ids only when you need to override that auto-selection.
 10. Review the uploaded `release-dossier` artifact before any production promotion decision.
-11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`. Production candidates should still include a designated rollback image SHA inside the underlying launch-candidate record.
+11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`.
+12. Treat the uploaded `release-pointer-<environment>` artifact as the latest approved release pointer for that environment.
+    The next `production` launch-candidate run can now auto-resolve its rollback image SHA from the newest non-expired `release-pointer-production` artifact when no explicit rollback SHA is supplied.
 
 ## Frontend Contract
 
@@ -58,6 +60,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
 - run `Promotion Review` for the staged candidate; let it auto-discover the newest matching smoke and launch review artifacts unless you need explicit override run ids
 - preserve the uploaded `release-dossier` artifact, which now includes copied evidence under `evidence/` plus `release-dossier-checksums.txt`
+- preserve the uploaded `release-pointer-staging` artifact so the reviewed candidate can be referenced without reopening the full dossier
 - review the generated release dossier plus daemon alert dry-run artifact alongside the underlying evidence manifest before promotion
 
 `pnpm smoke:deployed` remains read-only. The seeded canary is the default staged mutation proof, and the exact flow stays confined to explicit launch-candidate evidence runs.
@@ -66,6 +69,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 
 - Promotion to `production` is manual and should conclude with a green `Promotion Review` run.
 - Use the same image contract that passed staging.
+- If the previous production release already has a green `Promotion Review`, let the next `Launch Candidate` run auto-resolve `rollback_image_sha` from the latest `release-pointer-production` artifact instead of retyping it.
 - Run production smoke only after the new API image, migration posture, and worker rollout are complete.
 
 ## Rollback
