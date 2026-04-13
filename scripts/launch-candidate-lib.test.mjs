@@ -66,6 +66,9 @@ test('validateLaunchMetadata requires promotion metadata for GitHub runs', () =>
     GITHUB_SHA: 'abc123',
     GITHUB_REF_NAME: 'main',
     GITHUB_ACTOR: 'mc',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_ID: '44',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_URL:
+      'https://github.com/mc/escrow4337/actions/runs/44',
     LAUNCH_CANDIDATE_ENVIRONMENT: 'staging',
   });
   const issues = validateLaunchMetadata(metadata, {

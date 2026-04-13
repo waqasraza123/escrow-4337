@@ -10,8 +10,8 @@ on:
         options:
           - staging
           - production
-      deployed_image_sha:
-        description: Deployed image SHA for the candidate being validated
+      candidate_run_id:
+        description: CI workflow run id that published the candidate API image manifest
         required: true
         type: string
       rollback_image_sha:
@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
+      actions: read
       contents: read
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -89,16 +90,37 @@ jobs:
       LAUNCH_CANDIDATE_ENVIRONMENT: ${{ inputs.environment }}
       LAUNCH_CANDIDATE_REPOSITORY: ${{ github.repository }}
       LAUNCH_CANDIDATE_WORKFLOW: ${{ github.workflow }}
+      LAUNCH_CANDIDATE_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       LAUNCH_CANDIDATE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      LAUNCH_CANDIDATE_COMMIT_SHA: ${{ github.sha }}
-      LAUNCH_CANDIDATE_GIT_REF: ${{ github.ref_name }}
       LAUNCH_CANDIDATE_ACTOR: ${{ github.actor }}
-      LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: ${{ inputs.deployed_image_sha }}
       LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: ${{ inputs.rollback_image_sha }}
 
     steps:
+      - name: Download API image manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: api-image-manifest
+          path: artifacts/api-image-manifest
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Read candidate image manifest
+        id: candidate_manifest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            core.setOutput('commit_sha', manifest.commitSha);
+            core.setOutput('git_ref', manifest.gitRef || '');
+            core.setOutput('run_url', manifest.runUrl || '');
+            core.setOutput('image_digest', manifest.image.digest);
+            core.setOutput('image_reference', manifest.image.canonicalReference || '');
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate_manifest.outputs.commit_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -120,8 +142,22 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Resolve API image manifest
+        run: |
+          node ./scripts/api-image-manifest.mjs resolve \
+            --manifest artifacts/api-image-manifest/manifest.json \
+            --expected-repository "${{ github.repository }}" \
+            --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
+            --expected-run-id "${{ inputs.candidate_run_id }}"
+
       - name: Run launch candidate suite
         run: pnpm launch:candidate
+        env:
+          LAUNCH_CANDIDATE_COMMIT_SHA: ${{ steps.candidate_manifest.outputs.commit_sha }}
+          LAUNCH_CANDIDATE_GIT_REF: ${{ steps.candidate_manifest.outputs.git_ref }}
+          LAUNCH_CANDIDATE_CANDIDATE_RUN_URL: ${{ steps.candidate_manifest.outputs.run_url }}
+          LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
+          LAUNCH_CANDIDATE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
 
       - name: Upload launch candidate artifacts
         if: always()

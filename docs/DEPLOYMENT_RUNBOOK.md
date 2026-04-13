@@ -5,7 +5,7 @@ This runbook covers the Phase 7 deployment contract for the API and recurring wo
 ## Build And Publish
 
 - CI workflow `CI` is the source of truth for build, test, and image publication.
-- On pushes to `main`, GitHub Actions builds `services/api/Dockerfile` and publishes `ghcr.io/<owner>/escrow-4337-api`.
+- On pushes to `main`, GitHub Actions builds `services/api/Dockerfile`, publishes `ghcr.io/<owner>/escrow-4337-api`, and uploads an `api-image-manifest` artifact that records the exact candidate commit, tags, digest, and workflow run URL.
 - Published tags:
   - immutable SHA tag for the pushed commit
   - `main` tag for the latest default-branch build
@@ -49,6 +49,7 @@ Staging is the first required live-environment checkpoint:
 Required launch-candidate evidence for the narrowed launch flow:
 
 - populate `PLAYWRIGHT_DEPLOYED_FLOW_*` credentials and OTP codes in the target GitHub environment
+- use the CI-published `api-image-manifest` artifact for the exact candidate run instead of manually retyping the image SHA
 - run `pnpm launch:candidate`
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
 - review the generated promotion record plus daemon alert dry-run artifact alongside the evidence manifest before promotion

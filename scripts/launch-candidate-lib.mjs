@@ -98,6 +98,8 @@ export function buildLaunchMetadata(env = process.env) {
     repository:
       trimToNull(env.LAUNCH_CANDIDATE_REPOSITORY) ?? trimToNull(env.GITHUB_REPOSITORY),
     workflow: trimToNull(env.LAUNCH_CANDIDATE_WORKFLOW) ?? trimToNull(env.GITHUB_WORKFLOW),
+    candidateRunId: trimToNull(env.LAUNCH_CANDIDATE_CANDIDATE_RUN_ID),
+    candidateRunUrl: trimToNull(env.LAUNCH_CANDIDATE_CANDIDATE_RUN_URL),
     runId: trimToNull(env.GITHUB_RUN_ID),
     runAttempt: trimToNull(env.GITHUB_RUN_ATTEMPT),
     runUrl: trimToNull(env.LAUNCH_CANDIDATE_RUN_URL),
@@ -108,6 +110,7 @@ export function buildLaunchMetadata(env = process.env) {
       trimToNull(env.GITHUB_REF),
     actor: trimToNull(env.LAUNCH_CANDIDATE_ACTOR) ?? trimToNull(env.GITHUB_ACTOR),
     deployedImageSha: trimToNull(env.LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA),
+    deployedImageReference: trimToNull(env.LAUNCH_CANDIDATE_DEPLOYED_IMAGE_REFERENCE),
     rollbackImageSha: trimToNull(env.LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA),
   };
 }
@@ -128,6 +131,8 @@ export function validateLaunchMetadata(metadata, env = process.env) {
     ['environment', 'environment'],
     ['repository', 'repository'],
     ['workflow', 'workflow'],
+    ['candidateRunId', 'candidate run id'],
+    ['candidateRunUrl', 'candidate run URL'],
     ['runUrl', 'run URL'],
     ['commitSha', 'commit SHA'],
     ['gitRef', 'git ref'],
@@ -370,11 +375,14 @@ export function buildSummaryMarkdown(summary) {
 - Environment: ${metadata.environment ?? 'local'}
 - Repository: ${metadata.repository ?? 'n/a'}
 - Workflow: ${metadata.workflow ?? 'n/a'}
+- Candidate Run ID: ${metadata.candidateRunId ?? 'n/a'}
+- Candidate Run URL: ${metadata.candidateRunUrl ?? 'n/a'}
 - Run URL: ${metadata.runUrl ?? 'n/a'}
 - Commit SHA: ${metadata.commitSha ?? 'n/a'}
 - Git ref: ${metadata.gitRef ?? 'n/a'}
 - Actor: ${metadata.actor ?? 'n/a'}
 - Deployed image SHA: ${metadata.deployedImageSha ?? 'n/a'}
+- Deployed image reference: ${metadata.deployedImageReference ?? 'n/a'}
 - Rollback image SHA: ${metadata.rollbackImageSha ?? 'n/a'}
 - Expect launch ready: ${summary.expectLaunchReady ? 'true' : 'false'}
 - Deployment validation: ${summary.deploymentValidation.ok ? 'ok' : 'failed'}

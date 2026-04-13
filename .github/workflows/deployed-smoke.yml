@@ -16,6 +16,10 @@ on:
         options:
           - staging
           - production
+      candidate_run_id:
+        description: CI workflow run id that published the candidate API image manifest
+        required: true
+        type: string
 
 jobs:
   staging-smoke:
@@ -29,12 +33,30 @@ jobs:
       group: deployed-smoke-staging
       cancel-in-progress: false
     permissions:
+      actions: read
       contents: read
     steps:
+      - name: Download API image manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: api-image-manifest
+          path: artifacts/api-image-manifest
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Read candidate image manifest
+        id: candidate_manifest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            core.setOutput('commit_sha', manifest.commitSha);
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ steps.candidate_manifest.outputs.commit_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -52,6 +74,14 @@ jobs:
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Resolve API image manifest
+        run: |
+          node ./scripts/api-image-manifest.mjs resolve \
+            --manifest artifacts/api-image-manifest/manifest.json \
+            --expected-repository "${{ github.repository }}" \
+            --expected-commit-sha "${{ github.event.workflow_run.head_sha }}" \
+            --expected-run-id "${{ github.event.workflow_run.id }}"
 
       - name: Build API artifacts
         run: pnpm --filter escrow4334-api build
@@ -198,10 +228,30 @@ jobs:
       group: deployed-smoke-${{ inputs.environment }}
       cancel-in-progress: false
     permissions:
+      actions: read
       contents: read
     steps:
+      - name: Download API image manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: api-image-manifest
+          path: artifacts/api-image-manifest
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Read candidate image manifest
+        id: candidate_manifest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('artifacts/api-image-manifest/manifest.json', 'utf8'));
+            core.setOutput('commit_sha', manifest.commitSha);
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate_manifest.outputs.commit_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -219,6 +269,14 @@ jobs:
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Resolve API image manifest
+        run: |
+          node ./scripts/api-image-manifest.mjs resolve \
+            --manifest artifacts/api-image-manifest/manifest.json \
+            --expected-repository "${{ github.repository }}" \
+            --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
+            --expected-run-id "${{ inputs.candidate_run_id }}"
 
       - name: Build API artifacts
         run: pnpm --filter escrow4334-api build

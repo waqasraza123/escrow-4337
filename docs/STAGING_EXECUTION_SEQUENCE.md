@@ -55,13 +55,14 @@ Required environment contract:
    Manual GitHub fallback: run workflow `Deployed Smoke` with input `environment=staging`.
    Local equivalent when you have the staging secret set loaded: `pnpm smoke:deployed`
    The same workflow now runs `pnpm e2e:canary:deployed` immediately after smoke, so staged post-deploy proof includes one seeded mutation canary by default.
+   Both GitHub paths now resolve the exact candidate commit and image digest from the CI `api-image-manifest` artifact instead of relying on the current branch head at dispatch time.
 
 9. Run the launch-candidate gate against the same staging target.
    Canonical GitHub path: run workflow `Launch Candidate` with input `environment=staging`.
    Local equivalent when you have the staging secret set loaded: `pnpm launch:candidate`
    This must keep `PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY=true`.
    The same gate now also runs `pnpm verify:authority:deployed`, which creates a staged escrow job through the deployed API, runs protected reconciliation, and captures public audit/export proof that the staged environment reads from `chain_projection`.
-   When using the manual GitHub workflow, pass the exact deployed image SHA for the staged candidate and the rollback image SHA if one is already designated so the artifact bundle preserves promotion metadata.
+   When using the manual GitHub workflow, pass the CI candidate run id for the staged candidate and the rollback image SHA if one is already designated so the workflow resolves the exact candidate commit and digest from the published image manifest.
 
 10. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
