@@ -4,6 +4,7 @@ import {
   seedJsonStorage,
 } from '@escrow4334/frontend-core/testing';
 import { describe, expect, it, vi } from 'vitest';
+import { WebI18nProvider } from '../../lib/i18n';
 
 const sessionStorageKey = 'escrow4337.web.session';
 
@@ -260,7 +261,11 @@ describe('marketplace workspace', () => {
       ],
     });
 
-    renderApp(<MarketplaceWorkspacePage />);
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Marketplace pipeline')).toBeInTheDocument();
@@ -279,5 +284,52 @@ describe('marketplace workspace', () => {
     expect(
       screen.getAllByRole('link', { name: 'View contract' })[0],
     ).toHaveAttribute('href', '/app/contracts/job-123');
+  });
+
+  it('renders Arabic workspace headings and action labels through the shared marketplace messages', async () => {
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="ar">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('مسار السوق')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('heading', { name: 'ملف الموثوقية' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'إنشاء مواصفات التوظيف' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'السوق العام' })).toHaveAttribute(
+      'href',
+      '/marketplace',
+    );
+    expect(screen.getByRole('button', { name: 'تسجيل الخروج' })).toBeInTheDocument();
+    expect(screen.getByLabelText('المهارات الأساسية')).toBeInTheDocument();
+    expect(screen.getByLabelText('روابط الإثبات الخارجية')).toBeInTheDocument();
   });
 });
