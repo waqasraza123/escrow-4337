@@ -197,6 +197,20 @@ describe('marketplace moderation page', () => {
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('Abuse queue')).toBeInTheDocument();
     expect(screen.getByText('Suspicious copied portfolio.')).toBeInTheDocument();
+    expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+      { limit: 50 },
+      'access-token-123',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Suspend subject' }));
+
+    await waitFor(() => {
+      expect(mockedAdminApi.moderateMarketplaceProfile).toHaveBeenCalledWith(
+        'user-1',
+        'suspended',
+        'access-token-123',
+      );
+    });
 
     await user.type(
       screen.getByRole('textbox', { name: 'Resolution note' }),
@@ -211,6 +225,18 @@ describe('marketplace moderation page', () => {
           status: 'resolved',
           resolutionNote: 'Hidden after review.',
         },
+        'access-token-123',
+      );
+    });
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Subject filter' }),
+      'opportunity',
+    );
+
+    await waitFor(() => {
+      expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+        { limit: 50, subjectType: 'opportunity' },
         'access-token-123',
       );
     });

@@ -59,10 +59,17 @@ export function MarketplaceModerationConsole() {
   );
   const [reports, setReports] = useState<MarketplaceAbuseReport[]>([]);
   const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
+  const [reportFilters, setReportFilters] = useState<{
+    status?: MarketplaceAbuseReportStatus;
+    subjectType?: 'profile' | 'opportunity';
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function load(nextTokens: SessionTokens | null = tokens) {
+  async function load(
+    nextTokens: SessionTokens | null = tokens,
+    nextReportFilters = reportFilters,
+  ) {
     setError(null);
 
     if (!nextTokens) {
@@ -88,7 +95,7 @@ export function MarketplaceModerationConsole() {
           adminApi.listMarketplaceModerationProfiles(nextTokens.accessToken),
           adminApi.listMarketplaceModerationOpportunities(nextTokens.accessToken),
           adminApi.listMarketplaceModerationReports(
-            { limit: 50 },
+            { ...nextReportFilters, limit: 50 },
             nextTokens.accessToken,
           ),
         ]);
@@ -106,8 +113,11 @@ export function MarketplaceModerationConsole() {
   useEffect(() => {
     const stored = readSession();
     setTokens(stored);
-    void load(stored);
   }, []);
+
+  useEffect(() => {
+    void load(tokens, reportFilters);
+  }, [tokens, reportFilters]);
 
   async function handleSignOut() {
     if (tokens) {
@@ -150,6 +160,34 @@ export function MarketplaceModerationConsole() {
       tokens.accessToken,
     );
     setMessage(`Opportunity moderation updated to ${moderationStatus}.`);
+    await load(tokens);
+  }
+
+  async function handleModerateReportSubject(
+    report: MarketplaceAbuseReport,
+    moderationStatus: MarketplaceModerationStatus,
+  ) {
+    if (!tokens) {
+      return;
+    }
+
+    if (report.subject.type === 'profile') {
+      await adminApi.moderateMarketplaceProfile(
+        report.subject.id,
+        moderationStatus,
+        tokens.accessToken,
+      );
+    } else {
+      await adminApi.moderateMarketplaceOpportunity(
+        report.subject.id,
+        moderationStatus,
+        tokens.accessToken,
+      );
+    }
+
+    setMessage(
+      `${report.subject.type === 'profile' ? 'Profile' : 'Opportunity'} moderation updated to ${moderationStatus}.`,
+    );
     await load(tokens);
   }
 
@@ -371,6 +409,49 @@ export function MarketplaceModerationConsole() {
                   <h2>Abuse queue</h2>
                 </div>
               </div>
+              <div className={styles.fieldGrid}>
+                <label className={styles.field}>
+                  <span>Status filter</span>
+                  <select
+                    value={reportFilters.status ?? ''}
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        status:
+                          event.target.value === ''
+                            ? undefined
+                            : (event.target.value as MarketplaceAbuseReportStatus),
+                      }))
+                    }
+                  >
+                    <option value="">All statuses</option>
+                    <option value="open">Open</option>
+                    <option value="reviewing">Reviewing</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
+                </label>
+
+                <label className={styles.field}>
+                  <span>Subject filter</span>
+                  <select
+                    value={reportFilters.subjectType ?? ''}
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        subjectType:
+                          event.target.value === ''
+                            ? undefined
+                            : (event.target.value as 'profile' | 'opportunity'),
+                      }))
+                    }
+                  >
+                    <option value="">All subjects</option>
+                    <option value="profile">Profiles</option>
+                    <option value="opportunity">Opportunities</option>
+                  </select>
+                </label>
+              </div>
               <div className={styles.stack}>
                 {reports.length === 0 ? (
                   <p className={styles.stateText}>No abuse reports submitted yet.</p>
@@ -435,6 +516,30 @@ export function MarketplaceModerationConsole() {
                           }
                         >
                           Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleModerateReportSubject(report, 'visible')
+                          }
+                        >
+                          Restore subject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleModerateReportSubject(report, 'hidden')
+                          }
+                        >
+                          Hide subject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleModerateReportSubject(report, 'suspended')
+                          }
+                        >
+                          Suspend subject
                         </button>
                       </div>
                     </article>

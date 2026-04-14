@@ -4,55 +4,31 @@
 - 2026-04-14
 
 ## Current Objective
-- Ship the next marketplace trust-and-safety slice on top of the restored green baseline.
+- Keep shipping marketplace trust-and-safety and operator moderation slices on top of the restored green baseline.
 
 ## Last Completed Step
-- Added marketplace abuse reporting end to end: authenticated report intake for profiles and opportunities, persisted abuse reports in file/Postgres repositories, arbitrator-only moderation queue and report status updates, dashboard abuse-report counts, admin moderation console visibility, and public web report forms.
+- Hardened operator triage for marketplace abuse reports: the admin queue now supports server-backed report filters and direct subject moderation actions from each report card, so operators can review and hide/suspend/restore the underlying profile or opportunity without switching panels.
 
 ## Current Step
-- Task complete. Abuse-reporting is shipped and verification is green.
+- Task complete. Report triage workflow hardening is shipped and targeted verification is green.
 
 ## Why This Step Exists
-- Marketplace discovery and moderation had public visibility controls but no user-submitted trust-and-safety intake. That gap blocked a basic production path for spam/scam reporting and operator review.
+- The new abuse queue existed, but operators still had to jump back to separate profile/opportunity panels to take action. That slowed moderation and weakened the queue as an operational tool.
 
 ## Changed Files
-- API:
-  `services/api/src/modules/marketplace/marketplace.controller.ts`
-  `services/api/src/modules/marketplace/marketplace.dto.ts`
-  `services/api/src/modules/marketplace/marketplace.service.ts`
-  `services/api/src/modules/marketplace/marketplace.types.ts`
-  `services/api/src/persistence/persistence.types.ts`
-  `services/api/src/persistence/file/file-persistence.store.ts`
-  `services/api/src/persistence/file/file.marketplace.repositories.ts`
-  `services/api/src/persistence/postgres/postgres.marketplace.repositories.ts`
-  `services/api/src/persistence/postgres/migrations/011_marketplace_abuse_reports.sql`
-  `services/api/test/marketplace.service.spec.ts`
-  `services/api/test/marketplace.controller.integration.spec.ts`
-- Web:
-  `apps/web/src/lib/api.ts`
-  `apps/web/src/app/marketplace/abuse-report-panel.tsx`
-  `apps/web/src/app/marketplace/abuse-report-panel.spec.tsx`
-  `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
-  `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
 - Admin:
-  `apps/admin/src/lib/api.ts`
   `apps/admin/src/app/marketplace/moderation-console.tsx`
   `apps/admin/src/app/marketplace/marketplace-moderation.spec.tsx`
 - Docs:
-  `docs/project-state.md`
   `docs/_local/current-session.md`
 
 ## Key Constraints
-- Keep the existing single-contractor escrow bridge and arbitrator authorization model unchanged.
-- Report intake must preserve data integrity: no self-reporting, no duplicate active reports per reporter/subject, resolution note required for closed states.
-- Public reporting should follow existing public-detail visibility semantics instead of inventing a new access model.
+- Keep the new report queue aligned with existing API moderation contracts; do not fork new one-off mutation paths.
+- Preserve the existing arbitrator authorization model and existing profile/opportunity moderation endpoints.
+- Keep the queue actionable without turning it into a noisy operator surface.
 
 ## Verification Commands
-- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts marketplace.controller.integration.spec.ts`
-- `pnpm --filter web test -- src/app/marketplace/abuse-report-panel.spec.tsx`
 - `pnpm --filter admin test -- src/app/marketplace/marketplace-moderation.spec.tsx`
-- `pnpm --filter escrow4334-api lint`
-- `pnpm --filter web lint`
 - `pnpm --filter admin lint`
 - `git diff --check`
 - `pnpm verify:ci`
@@ -63,7 +39,7 @@
   - all commands above
 
 ## Expected Result
-- Marketplace users can submit abuse reports from public detail pages, operators can review and resolve them from the admin moderation surface, and the repo stays green under the full verification baseline.
+- Operators can filter the abuse queue by status/subject type and directly moderate the underlying subject from the queue itself, while the admin surface remains green under targeted verification.
 
 ## Next Likely Step
-- Continue marketplace integrity hardening with the next operator-focused slice: add search/ranking controls or stronger moderation workflow tooling, whichever has the clearest core-flow impact after abuse intake is in place.
+- Continue marketplace integrity hardening with the next operator-facing slice after queue triage: likely richer moderation workflow state, search/ranking controls, or stronger trust-safety evidence handling.
