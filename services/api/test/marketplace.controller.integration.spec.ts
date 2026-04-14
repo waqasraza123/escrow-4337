@@ -182,6 +182,11 @@ describe('MarketplaceController integration', () => {
     );
     expect(hired.opportunityId).toBe(created.opportunity.id);
     expect(hired.jobId).toBeTruthy();
+
+    const myApplications = await controller.listMyApplications(applicantUser);
+    expect(myApplications.applications[0]?.contractPath).toMatch(
+      new RegExp(`^/app/contracts/${hired.jobId}\\?invite=`),
+    );
   });
 
   it('keeps private briefs out of the public feed while allowing direct detail access', async () => {

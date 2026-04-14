@@ -902,7 +902,9 @@ export class MarketplaceService {
 
     return {
       applications: await Promise.all(
-        applications.map((application) => this.toApplicationView(application)),
+        applications.map((application) =>
+          this.toApplicationView(application, userId),
+        ),
       ),
     };
   }
@@ -1591,6 +1593,7 @@ export class MarketplaceService {
 
   private async toApplicationView(
     application: MarketplaceApplicationRecord,
+    viewerUserId?: string,
   ): Promise<MarketplaceApplicationView> {
     const applicantUser = await this.usersService.getRequiredById(
       application.applicantUserId,
@@ -1610,6 +1613,11 @@ export class MarketplaceService {
 
     return {
       ...application,
+      contractPath: await this.resolveApplicationContractPath(
+        application,
+        applicantUser,
+        viewerUserId,
+      ),
       applicant: applicantSummary,
       opportunity: {
         id: opportunity.id,
@@ -1627,6 +1635,37 @@ export class MarketplaceService {
       riskFlags: dossier.matchSummary.riskFlags,
       dossier,
     };
+  }
+
+  private async resolveApplicationContractPath(
+    application: MarketplaceApplicationRecord,
+    applicantUser: UserRecord,
+    viewerUserId?: string,
+  ): Promise<string | null> {
+    if (!application.hiredJobId) {
+      return null;
+    }
+
+    const defaultPath = `/app/contracts/${application.hiredJobId}`;
+    if (viewerUserId !== application.applicantUserId) {
+      return defaultPath;
+    }
+
+    const job = await this.escrowRepository.getById(application.hiredJobId);
+    const participation = job?.contractorParticipation;
+    const inviteToken = participation?.invite.token;
+
+    if (
+      !job ||
+      !participation ||
+      participation.status === 'joined' ||
+      !inviteToken ||
+      participation.contractorEmail !== applicantUser.email
+    ) {
+      return defaultPath;
+    }
+
+    return `${defaultPath}?invite=${encodeURIComponent(inviteToken)}`;
   }
 
   private async toAbuseReportView(

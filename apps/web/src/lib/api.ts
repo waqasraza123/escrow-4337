@@ -446,6 +446,7 @@ export type MarketplaceApplication = {
   portfolioUrls: string[];
   status: ApplicationStatus;
   hiredJobId: string | null;
+  contractPath: string | null;
   createdAt: number;
   updatedAt: number;
   applicant: {

@@ -183,6 +183,13 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
   });
   await expect(clientContractLink).toBeVisible();
   await expect(clientContractLink).toHaveAttribute('href', /\/app\/contracts\//);
+  const clientContractHref = await clientContractLink.getAttribute('href');
+  if (!clientContractHref) {
+    throw new Error('Client hired opportunity did not expose a contract href');
+  }
+
+  await clientPage.goto(`${webBaseUrl}${clientContractHref}`);
+  await expect(clientPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
 
   await talentPage.goto(`${webBaseUrl}/app/marketplace`);
   const hiredApplicationCard = myApplicationsPanel
@@ -190,9 +197,37 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
     .filter({ hasText: opportunityTitle })
     .first();
   await expect(hiredApplicationCard.getByText('Hired')).toBeVisible();
+  const talentContractLink = hiredApplicationCard.getByRole('link', {
+    name: 'View contract',
+  });
+  await expect(talentContractLink).toHaveAttribute('href', /\/app\/contracts\//);
+  const talentContractHref = await talentContractLink.getAttribute('href');
+  if (!talentContractHref) {
+    throw new Error('Hired application did not expose a contract href');
+  }
+  expect(new URL(talentContractHref, webBaseUrl).pathname).toBe(
+    new URL(clientContractHref, webBaseUrl).pathname,
+  );
+  expect(talentContractHref).toContain('invite=');
+
+  await talentPage.goto(`${webBaseUrl}${talentContractHref}`);
+  await expect(talentPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await talentPage.getByRole('button', { name: 'Join contract' }).click();
   await expect(
-    hiredApplicationCard.getByRole('link', { name: 'View contract' }),
-  ).toHaveAttribute('href', /\/app\/contracts\//);
+    talentPage.getByText(
+      'Contract joined. Worker delivery is now enabled for this session.',
+    ),
+  ).toBeVisible();
+  await expect(
+    talentPage.getByText(
+      'This contract has already been joined by the bound contractor identity.',
+    ),
+  ).toBeVisible();
+
+  await talentPage.goto(`${webBaseUrl}${talentContractHref}/deliver`);
+  await expect(
+    talentPage.getByRole('button', { name: 'Deliver selected milestone' }),
+  ).toBeVisible();
 
   await Promise.all([clientContext.close(), talentContext.close()]);
 });

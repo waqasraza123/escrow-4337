@@ -275,6 +275,7 @@ export type MarketplaceApplicationView = Omit<
   MarketplaceApplicationRecord,
   'applicantUserId'
 > & {
+  contractPath: string | null;
   applicant: MarketplaceTalentSummary;
   opportunity: MarketplaceApplicationOpportunitySummary;
   fitScore: number;

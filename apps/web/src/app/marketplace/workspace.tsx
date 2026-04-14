@@ -1359,7 +1359,10 @@ export function MarketplaceWorkspace() {
                   {application.hiredJobId ? (
                     <Link
                       className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                      href={`/app/contracts/${application.hiredJobId}`}
+                      href={
+                        application.contractPath ??
+                        `/app/contracts/${application.hiredJobId}`
+                      }
                     >
                       {workspaceMessages.viewContract}
                     </Link>

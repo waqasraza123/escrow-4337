@@ -195,6 +195,9 @@ describe('MarketplaceService', () => {
     expect(myApplications.applications[0]?.opportunity.title).toBe(
       'Founding product engineer',
     );
+    expect(myApplications.applications[0]?.contractPath).toMatch(
+      new RegExp(`^/app/contracts/${hired.jobId}\\?invite=`),
+    );
   });
 
   it('ranks stronger applicants ahead of weaker ones using deterministic dossier scoring', async () => {

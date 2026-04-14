@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import {
   renderApp,
   seedJsonStorage,
@@ -174,6 +174,7 @@ describe('marketplace workspace', () => {
           portfolioUrls: ['https://example.com/work'],
           status: 'hired',
           hiredJobId: 'job-123',
+          contractPath: '/app/contracts/job-123?invite=invite-token-123',
           createdAt: 20,
           updatedAt: 20,
           applicant: {
@@ -282,8 +283,10 @@ describe('marketplace workspace', () => {
     expect(screen.getByLabelText('Screening questions')).toBeInTheDocument();
     expect(screen.getByLabelText('External proof URLs')).toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: 'View contract' })[0],
-    ).toHaveAttribute('href', '/app/contracts/job-123');
+      within(screen.getByTestId('marketplace-my-application-app-1')).getByRole('link', {
+        name: 'View contract',
+      }),
+    ).toHaveAttribute('href', '/app/contracts/job-123?invite=invite-token-123');
   });
 
   it('renders Arabic workspace headings and action labels through the shared marketplace messages', async () => {
