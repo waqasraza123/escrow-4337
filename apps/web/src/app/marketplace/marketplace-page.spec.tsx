@@ -17,6 +17,37 @@ vi.mock('../../lib/api', () => ({
 import MarketplacePage from './page';
 
 describe('marketplace page', () => {
+  it('renders Arabic marketplace copy through the shared public marketplace messages', async () => {
+    mockedWebApi.listMarketplaceProfiles.mockResolvedValue({
+      profiles: [],
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="ar">
+        <MarketplacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'وظّف عبر عروض موجزة منسقة ثم حوّل الاختيار الفائز إلى الضمان.',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('link', { name: 'افتح مساحة العمل' })).toHaveAttribute(
+      'href',
+      '/app/marketplace',
+    );
+    expect(screen.getByText('مواهب مميزة')).toBeInTheDocument();
+    expect(screen.getByText('لا توجد ملفات مواهب عامة بعد')).toBeInTheDocument();
+    expect(screen.getByText('الفرص المفتوحة')).toBeInTheDocument();
+  });
+
   it('renders visible talent and opportunity cards from the marketplace feed', async () => {
     mockedWebApi.listMarketplaceProfiles.mockResolvedValue({
       profiles: [
@@ -119,5 +150,13 @@ describe('marketplace page', () => {
     expect(
       screen.getByRole('link', { name: 'Open workspace' }),
     ).toHaveAttribute('href', '/app/marketplace');
+    expect(screen.getByRole('link', { name: 'View profile' })).toHaveAttribute(
+      'href',
+      '/marketplace/profiles/builder-one',
+    );
+    expect(screen.getByRole('link', { name: 'View brief' })).toHaveAttribute(
+      'href',
+      '/marketplace/opportunities/opp-1',
+    );
   });
 });

@@ -13,6 +13,7 @@ import { useWebI18n } from '../../lib/i18n';
 
 export function MarketplaceBrowser() {
   const { messages } = useWebI18n();
+  const marketplaceMessages = messages.publicMarketplace;
   const [profiles, setProfiles] = useState<MarketplaceProfile[]>([]);
   const [opportunities, setOpportunities] = useState<MarketplaceOpportunity[]>(
     [],
@@ -39,13 +40,17 @@ export function MarketplaceBrowser() {
           return;
         }
 
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load marketplace');
+        setError(
+          loadError instanceof Error && loadError.message.trim().length > 0
+            ? marketplaceMessages.loadFailure
+            : marketplaceMessages.loadFailure,
+        );
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [marketplaceMessages.loadFailure]);
 
   return (
     <main className={styles.page}>
@@ -55,7 +60,7 @@ export function MarketplaceBrowser() {
           <div className={styles.navLinks}>
             <Link href="/">{messages.common.home}</Link>
             <Link href="/trust">{messages.common.trust}</Link>
-            <Link href="/app/marketplace">Marketplace workspace</Link>
+            <Link href="/app/marketplace">{marketplaceMessages.navWorkspace}</Link>
           </div>
           <LanguageSwitcher
             className={styles.languageSwitcher}
@@ -67,49 +72,58 @@ export function MarketplaceBrowser() {
 
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>Escrow-first marketplace</p>
-            <h1>Hire through curated briefs and convert the winner into escrow.</h1>
-            <p className={styles.lead}>
-              Browse verified talent, publish private or public briefs, and move the
-              selected application straight into the existing milestone escrow flow.
-            </p>
+            <p className={styles.eyebrow}>{marketplaceMessages.heroEyebrow}</p>
+            <h1>{marketplaceMessages.heroTitle}</h1>
+            <p className={styles.lead}>{marketplaceMessages.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Link href="/app/marketplace">Open workspace</Link>
-              <Link className={styles.secondaryLink} href="/app/new-contract">
-                Direct contract path
+              <Link
+                className={`${styles.ctaLink} ${styles.ctaPrimary}`}
+                href="/app/marketplace"
+              >
+                {marketplaceMessages.openWorkspace}
+              </Link>
+              <Link
+                className={`${styles.ctaLink} ${styles.ctaSecondary}`}
+                href="/app/new-contract"
+              >
+                {marketplaceMessages.directContractPath}
               </Link>
             </div>
           </div>
           <div className={styles.cardStack}>
             <article className={styles.statCard}>
-              <strong>{profiles.length} visible talent profiles</strong>
-              <p>Profiles only appear after they are complete and moderation-visible.</p>
+              <strong>
+                {marketplaceMessages.stats.visibleTalentTitle(profiles.length)}
+              </strong>
+              <p>{marketplaceMessages.stats.visibleTalentBody}</p>
             </article>
             <article className={styles.statCard}>
-              <strong>{opportunities.length} open briefs</strong>
-              <p>Public briefs are browseable; private briefs are still direct-linkable.</p>
+              <strong>
+                {marketplaceMessages.stats.openBriefsTitle(opportunities.length)}
+              </strong>
+              <p>{marketplaceMessages.stats.openBriefsBody}</p>
             </article>
             <article className={styles.statCard}>
-              <strong>One hire closes into one escrow contract</strong>
-              <p>The marketplace is a sourcing layer, not a separate settlement path.</p>
+              <strong>{marketplaceMessages.stats.escrowCloseTitle}</strong>
+              <p>{marketplaceMessages.stats.escrowCloseBody}</p>
             </article>
           </div>
         </section>
 
         {error ? (
           <section className={styles.section}>
-            <h2>Marketplace feed unavailable</h2>
+            <h2>{marketplaceMessages.loadFailure}</h2>
             <p>{error}</p>
           </section>
         ) : null}
 
         <section className={styles.section}>
-          <h2>Featured talent</h2>
+          <h2>{marketplaceMessages.featuredTalentTitle}</h2>
           <div className={styles.steps}>
             {profiles.length === 0 ? (
               <article className={styles.stepCard}>
-                <strong>No public talent profiles yet</strong>
-                <p>Profiles appear here after contractors complete them in the marketplace workspace.</p>
+                <strong>{marketplaceMessages.noProfilesTitle}</strong>
+                <p>{marketplaceMessages.noProfilesBody}</p>
               </article>
             ) : (
               profiles.map((profile) => (
@@ -122,10 +136,12 @@ export function MarketplaceBrowser() {
                   </p>
                   <p>
                     Completed escrow jobs: {profile.completedEscrowCount}
-                    {profile.verifiedWalletAddress ? ' • verified wallet' : ''}
+                    {profile.verifiedWalletAddress
+                      ? ` • ${marketplaceMessages.labels.verifiedWallet}`
+                      : ''}
                   </p>
                   <Link className={styles.cardLink} href={`/marketplace/profiles/${profile.slug}`}>
-                    View profile
+                    {marketplaceMessages.actions.viewProfile}
                   </Link>
                 </article>
               ))
@@ -134,12 +150,12 @@ export function MarketplaceBrowser() {
         </section>
 
         <section className={styles.section}>
-          <h2>Open opportunities</h2>
+          <h2>{marketplaceMessages.openOpportunitiesTitle}</h2>
           <div className={styles.steps}>
             {opportunities.length === 0 ? (
               <article className={styles.stepCard}>
-                <strong>No public briefs yet</strong>
-                <p>Clients can publish briefs from the authenticated marketplace workspace.</p>
+                <strong>{marketplaceMessages.noOpportunitiesTitle}</strong>
+                <p>{marketplaceMessages.noOpportunitiesBody}</p>
               </article>
             ) : (
               opportunities.map((opportunity) => (
@@ -156,7 +172,7 @@ export function MarketplaceBrowser() {
                     className={styles.cardLink}
                     href={`/marketplace/opportunities/${opportunity.id}`}
                   >
-                    View brief
+                    {marketplaceMessages.actions.viewBrief}
                   </Link>
                 </article>
               ))
@@ -165,20 +181,14 @@ export function MarketplaceBrowser() {
         </section>
 
         <section className={styles.section}>
-          <h2>How this expands the product</h2>
+          <h2>{marketplaceMessages.expansionTitle}</h2>
           <div className={styles.objectionGrid}>
-            <article className={styles.objectionCard}>
-              <strong>Discovery before contract creation</strong>
-              <p>Clients can now source talent through profiles, public briefs, and applications before they create escrow.</p>
-            </article>
-            <article className={styles.objectionCard}>
-              <strong>Still escrow-first</strong>
-              <p>The selected application closes into the same milestone escrow workflow, dispute flow, and operator review path.</p>
-            </article>
-            <article className={styles.objectionCard}>
-              <strong>Useful without becoming spammy</strong>
-              <p>This is curated-brief matching, not an open bid wall, so it stays closer to startup hiring and closer to the current trust model.</p>
-            </article>
+            {marketplaceMessages.expansionCards.map((card) => (
+              <article key={card.title} className={styles.objectionCard}>
+                <strong>{card.title}</strong>
+                <p>{card.body}</p>
+              </article>
+            ))}
           </div>
         </section>
       </div>

@@ -189,6 +189,56 @@
   align-items: center;
 }
 
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(92, 67, 46, 0.12);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.actionLink:hover {
+  transform: translateY(-1px);
+}
+
+.actionLink:active {
+  transform: translateY(0);
+}
+
+.actionLinkPrimary {
+  background: linear-gradient(135deg, #2d1a11, #5d3620);
+  border-color: transparent;
+  color: #fffaf6;
+  box-shadow: 0 16px 28px rgba(48, 29, 17, 0.16);
+}
+
+.actionLinkPrimary:hover {
+  background: linear-gradient(135deg, #27170f, #4c2d1d);
+  box-shadow: 0 18px 30px rgba(48, 29, 17, 0.2);
+}
+
+.actionLinkSecondary {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--foreground);
+  box-shadow: 0 10px 18px rgba(47, 31, 18, 0.06);
+}
+
+.actionLinkSecondary:hover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(92, 67, 46, 0.18);
+  box-shadow: 0 12px 22px rgba(47, 31, 18, 0.09);
+}
+
 .stateText,
 .muted {
   color: var(--foreground-soft);
@@ -686,6 +736,11 @@
 
   .topBarMeta {
     font-size: 0.95rem;
+  }
+
+  .actionLink {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .summaryGrid article,

@@ -33,9 +33,19 @@ export default function Home() {
             <h1>{messages.marketing.heroTitle}</h1>
             <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Link href="/marketplace">{messages.common.marketplace}</Link>
-              <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
-              <Link className={styles.secondaryLink} href="/trust">
+              <Link
+                className={`${styles.ctaLink} ${styles.ctaSecondary}`}
+                href="/marketplace"
+              >
+                {messages.common.marketplace}
+              </Link>
+              <Link
+                className={`${styles.ctaLink} ${styles.ctaPrimary}`}
+                href="/app/new-contract"
+              >
+                {messages.common.startEscrow}
+              </Link>
+              <Link className={`${styles.ctaLink} ${styles.ctaTertiary}`} href="/trust">
                 {messages.marketing.trustCta}
               </Link>
             </div>

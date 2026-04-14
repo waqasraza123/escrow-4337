@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import styles from '../page.module.css';
 import type { MarketplaceAbuseReportReason, SessionTokens } from '../../lib/api';
+import { useWebI18n } from '../../lib/i18n';
 
 const sessionStorageKey = 'escrow4337.web.session';
 
@@ -50,6 +51,8 @@ export function AbuseReportPanel({
   subjectLabel,
   onSubmit,
 }: AbuseReportPanelProps) {
+  const { messages } = useWebI18n();
+  const reportingMessages = messages.publicMarketplace.reporting;
   const [reason, setReason] = useState<MarketplaceAbuseReportReason>('spam');
   const [details, setDetails] = useState('');
   const [evidenceInput, setEvidenceInput] = useState('');
@@ -64,12 +67,12 @@ export function AbuseReportPanel({
 
     const session = readSession();
     if (!session?.accessToken) {
-      setError('Sign in from the app workspace before submitting a report.');
+      setError(reportingMessages.signInRequired);
       return;
     }
 
     if (reason === 'other' && details.trim().length === 0) {
-      setError('Additional details are required for the "other" report reason.');
+      setError(reportingMessages.otherReasonRequired);
       return;
     }
 
@@ -83,7 +86,7 @@ export function AbuseReportPanel({
         },
         session.accessToken,
       );
-      setMessage(`Report submitted for ${subjectLabel}.`);
+      setMessage(reportingMessages.submitted(subjectLabel));
       setReason('spam');
       setDetails('');
       setEvidenceInput('');
@@ -91,7 +94,7 @@ export function AbuseReportPanel({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Failed to submit report',
+          : reportingMessages.failedSubmit,
       );
     } finally {
       setSubmitting(false);
@@ -102,48 +105,50 @@ export function AbuseReportPanel({
     <article className={styles.panel}>
       <div className={styles.panelHeader}>
         <div>
-          <span className={styles.panelEyebrow}>Trust and safety</span>
-          <h2>Report this listing</h2>
+          <span className={styles.panelEyebrow}>{reportingMessages.eyebrow}</span>
+          <h2>{reportingMessages.title}</h2>
         </div>
       </div>
-      <p className={styles.stateText}>
-        Flag spam, scams, impersonation, or policy abuse for operator review.
-      </p>
+      <p className={styles.stateText}>{reportingMessages.intro}</p>
       <form className={styles.stack} onSubmit={(event) => void handleSubmit(event)}>
         <label className={styles.field}>
-          <span>Reason</span>
+          <span>{reportingMessages.reason}</span>
           <select value={reason} onChange={(event) => setReason(event.target.value as MarketplaceAbuseReportReason)}>
-            <option value="spam">Spam</option>
-            <option value="scam">Scam</option>
-            <option value="impersonation">Impersonation</option>
-            <option value="harassment">Harassment</option>
-            <option value="off_platform_payment">Off-platform payment</option>
-            <option value="policy_violation">Policy violation</option>
-            <option value="other">Other</option>
+            <option value="spam">{reportingMessages.reasons.spam}</option>
+            <option value="scam">{reportingMessages.reasons.scam}</option>
+            <option value="impersonation">{reportingMessages.reasons.impersonation}</option>
+            <option value="harassment">{reportingMessages.reasons.harassment}</option>
+            <option value="off_platform_payment">
+              {reportingMessages.reasons.off_platform_payment}
+            </option>
+            <option value="policy_violation">
+              {reportingMessages.reasons.policy_violation}
+            </option>
+            <option value="other">{reportingMessages.reasons.other}</option>
           </select>
         </label>
 
         <label className={styles.field}>
-          <span>Details</span>
+          <span>{reportingMessages.details}</span>
           <textarea
             value={details}
             onChange={(event) => setDetails(event.target.value)}
-            placeholder="Describe what happened and why it should be reviewed."
+            placeholder={reportingMessages.detailsPlaceholder}
           />
         </label>
 
         <label className={styles.field}>
-          <span>Evidence URLs</span>
+          <span>{reportingMessages.evidenceUrls}</span>
           <textarea
             value={evidenceInput}
             onChange={(event) => setEvidenceInput(event.target.value)}
-            placeholder="Paste supporting URLs, one per line."
+            placeholder={reportingMessages.evidencePlaceholder}
           />
         </label>
 
         <div className={styles.inlineActions}>
           <button type="submit" disabled={submitting}>
-            {submitting ? 'Submitting…' : 'Submit report'}
+            {submitting ? reportingMessages.submitting : reportingMessages.submit}
           </button>
         </div>
       </form>

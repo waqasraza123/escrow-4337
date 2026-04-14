@@ -2,30 +2,32 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { formatTimestamp } from '@escrow4334/frontend-core';
 import styles from '../../../page.module.css';
 import { AbuseReportPanel } from '../../abuse-report-panel';
 import {
   webApi,
   type MarketplaceOpportunityDetail,
 } from '../../../../lib/api';
+import { useWebI18n } from '../../../../lib/i18n';
 
 type OpportunityDetailProps = {
   id: string;
 };
 
-function formatDateTime(value: number | null) {
-  if (!value) {
-    return 'Not specified';
-  }
-
-  return new Date(value).toLocaleString();
-}
-
 export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
+  const { definition, messages } = useWebI18n();
+  const marketplaceMessages = messages.publicMarketplace;
   const [opportunity, setOpportunity] = useState<MarketplaceOpportunityDetail | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
+
+  const formatDateTime = (value: number | null) =>
+    formatTimestamp(value, {
+      fallback: marketplaceMessages.opportunityDetail.notSpecified,
+      locale: definition.langTag,
+    });
 
   useEffect(() => {
     let active = true;
@@ -40,7 +42,9 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
       .catch((loadError: unknown) => {
         if (active) {
           setError(
-            loadError instanceof Error ? loadError.message : 'Failed to load opportunity',
+            loadError instanceof Error && loadError.message.trim().length > 0
+              ? marketplaceMessages.opportunityDetail.unavailableBody
+              : marketplaceMessages.opportunityDetail.unavailableBody,
           );
         }
       });
@@ -48,34 +52,46 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, marketplaceMessages.opportunityDetail.unavailableBody]);
 
   return (
     <main className={styles.page}>
       <div className={styles.console}>
         <div className={styles.topBar}>
           <div className={styles.topBarContent}>
-            <span className={styles.topBarLabel}>Marketplace opportunity</span>
+            <span className={styles.topBarLabel}>
+              {marketplaceMessages.opportunityDetail.topBarLabel}
+            </span>
             <p className={styles.topBarMeta}>
-              Decision-ready brief detail before escrow conversion.
+              {marketplaceMessages.opportunityDetail.topBarMeta}
             </p>
           </div>
           <div className={styles.inlineActions}>
-            <Link href="/marketplace">Back to marketplace</Link>
-            <Link href="/app/marketplace">Open workspace</Link>
+            <Link
+              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+              href="/marketplace"
+            >
+              {marketplaceMessages.actions.backToMarketplace}
+            </Link>
+            <Link
+              className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
+              href="/app/marketplace"
+            >
+              {marketplaceMessages.openWorkspace}
+            </Link>
           </div>
         </div>
 
         {error ? (
           <section className={styles.panel}>
-            <h2>Opportunity unavailable</h2>
+            <h2>{marketplaceMessages.opportunityDetail.unavailableTitle}</h2>
             <p className={styles.stateText}>{error}</p>
           </section>
         ) : null}
 
         {!opportunity && !error ? (
           <section className={styles.panel}>
-            <h2>Loading brief…</h2>
+            <h2>{marketplaceMessages.opportunityDetail.loadingTitle}</h2>
           </section>
         ) : null}
 
@@ -83,22 +99,36 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
           <>
             <section className={styles.hero}>
               <div>
-                <p className={styles.eyebrow}>{opportunity.visibility} brief</p>
+                <p className={styles.eyebrow}>
+                  {marketplaceMessages.opportunityDetail.briefEyebrow(
+                    marketplaceMessages.labels.visibility[opportunity.visibility],
+                  )}
+                </p>
                 <h1>{opportunity.title}</h1>
                 <p className={styles.heroCopy}>{opportunity.summary}</p>
               </div>
               <div className={styles.heroCard}>
                 <div>
-                  <span className={styles.metaLabel}>Client</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.client}
+                  </span>
                   <strong>{opportunity.owner.displayName}</strong>
                 </div>
                 <div>
-                  <span className={styles.metaLabel}>Applications</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.applications}
+                  </span>
                   <strong>{opportunity.applicationCount}</strong>
                 </div>
                 <div>
-                  <span className={styles.metaLabel}>Escrow readiness</span>
-                  <strong>{opportunity.escrowReadiness}</strong>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.escrowReadiness}
+                  </span>
+                  <strong>
+                    {marketplaceMessages.labels.escrowReadiness[
+                      opportunity.escrowReadiness
+                    ]}
+                  </strong>
                 </div>
               </div>
             </section>
@@ -107,42 +137,60 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>Brief</span>
-                    <h2>Scope and outcomes</h2>
+                    <span className={styles.panelEyebrow}>
+                      {marketplaceMessages.opportunityDetail.scopeEyebrow}
+                    </span>
+                    <h2>{marketplaceMessages.opportunityDetail.scopeTitle}</h2>
                   </div>
                 </div>
                 <p className={styles.stateText}>{opportunity.description}</p>
                 <div className={styles.summaryGrid}>
                   <article>
-                    <span className={styles.metaLabel}>Category</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.category}
+                    </span>
                     <strong>{opportunity.category}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Timeline</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.timeline}
+                    </span>
                     <strong>{opportunity.timeline}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Budget</span>
-                    <strong>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.budget}
+                    </span>
+                    <strong className={styles.ltrValue} data-ltr="true">
                       {opportunity.budgetMin || opportunity.budgetMax
                         ? `${opportunity.budgetMin ?? '—'} to ${opportunity.budgetMax ?? '—'}`
-                        : 'Not specified'}
+                        : marketplaceMessages.opportunityDetail.notSpecified}
                     </strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Settlement token</span>
-                    <strong>{opportunity.currencyAddress}</strong>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.settlementToken}
+                    </span>
+                    <strong className={styles.ltrValue} data-ltr="true">
+                      {opportunity.currencyAddress}
+                    </strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Desired start</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.desiredStart}
+                    </span>
                     <strong>{formatDateTime(opportunity.desiredStartAt)}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Timezone overlap</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.opportunityDetail.timezoneOverlap}
+                    </span>
                     <strong>
                       {opportunity.timezoneOverlapHours === null
-                        ? 'Not specified'
-                        : `${opportunity.timezoneOverlapHours} hours`}
+                        ? marketplaceMessages.opportunityDetail.notSpecified
+                        : marketplaceMessages.opportunityDetail.hours(
+                            opportunity.timezoneOverlapHours,
+                          )}
                     </strong>
                   </article>
                 </div>
@@ -151,38 +199,61 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>Hiring spec</span>
-                    <h2>Fit requirements</h2>
+                    <span className={styles.panelEyebrow}>
+                      {marketplaceMessages.opportunityDetail.hiringSpecEyebrow}
+                    </span>
+                    <h2>{marketplaceMessages.opportunityDetail.fitRequirementsTitle}</h2>
                   </div>
                 </div>
                 <div className={styles.stack}>
                   <p className={styles.stateText}>
-                    Required skills: {opportunity.requiredSkills.join(' • ')}
+                    {marketplaceMessages.opportunityDetail.requiredSkills}:{' '}
+                    {opportunity.requiredSkills.join(' • ')}
                   </p>
                   <p className={styles.stateText}>
-                    Must-have skills: {opportunity.mustHaveSkills.join(' • ') || 'None listed'}
+                    {marketplaceMessages.opportunityDetail.mustHaveSkills}:{' '}
+                    {opportunity.mustHaveSkills.join(' • ') ||
+                      messages.publicMarketplace.profileDetail.noneListed}
                   </p>
                   <p className={styles.stateText}>
-                    Engagement type: {opportunity.engagementType}
+                    {marketplaceMessages.opportunityDetail.engagementType}:{' '}
+                    {
+                      marketplaceMessages.labels.engagementType[
+                        opportunity.engagementType
+                      ]
+                    }
                   </p>
                   <p className={styles.stateText}>
-                    Crypto readiness required: {opportunity.cryptoReadinessRequired}
+                    {marketplaceMessages.opportunityDetail.cryptoReadinessRequired}:{' '}
+                    {
+                      marketplaceMessages.labels.cryptoReadiness[
+                        opportunity.cryptoReadinessRequired
+                      ]
+                    }
                   </p>
-                  <span className={styles.metaLabel}>Outcomes</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.outcomes}
+                  </span>
                   {opportunity.outcomes.map((item) => (
                     <p key={item} className={styles.stateText}>
                       {item}
                     </p>
                   ))}
-                  <span className={styles.metaLabel}>Acceptance criteria</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.acceptanceCriteria}
+                  </span>
                   {opportunity.acceptanceCriteria.map((item) => (
                     <p key={item} className={styles.stateText}>
                       {item}
                     </p>
                   ))}
-                  <span className={styles.metaLabel}>Screening questions</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.opportunityDetail.screeningQuestions}
+                  </span>
                   {opportunity.screeningQuestions.length === 0 ? (
-                    <p className={styles.stateText}>No screening questions specified.</p>
+                    <p className={styles.stateText}>
+                      {marketplaceMessages.opportunityDetail.noScreeningQuestions}
+                    </p>
                   ) : (
                     opportunity.screeningQuestions.map((question) => (
                       <p key={question.id} className={styles.stateText}>
@@ -190,7 +261,12 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                       </p>
                     ))
                   )}
-                  <Link href="/app/marketplace">Apply from workspace</Link>
+                  <Link
+                    className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
+                    href="/app/marketplace"
+                  >
+                    {marketplaceMessages.actions.applyFromWorkspace}
+                  </Link>
                 </div>
               </article>
 

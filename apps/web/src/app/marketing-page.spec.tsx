@@ -26,4 +26,28 @@ describe('marketing homepage', () => {
       screen.getByText('It is an escrow-first marketplace, not an embedded platform.'),
     ).toBeInTheDocument();
   });
+
+  it('renders Arabic CTA labels from the shared marketing messages', () => {
+    renderApp(
+      <WebI18nProvider initialLocale="ar">
+        <Home />
+      </WebI18nProvider>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'ضمان مراحل احترافي لأعمال الخدمات الرقمية' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'ابدأ ضمان المراحل' })[0]).toHaveAttribute(
+      'href',
+      '/app/new-contract',
+    );
+    expect(screen.getAllByRole('link', { name: 'السوق' })[0]).toHaveAttribute(
+      'href',
+      '/marketplace',
+    );
+    expect(screen.getByRole('link', { name: 'اطّلع على نموذج الثقة' })).toHaveAttribute(
+      'href',
+      '/trust',
+    );
+  });
 });

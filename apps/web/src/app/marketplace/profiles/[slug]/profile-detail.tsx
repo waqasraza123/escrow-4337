@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import styles from '../../../page.module.css';
 import { AbuseReportPanel } from '../../abuse-report-panel';
 import { webApi, type MarketplaceProfile } from '../../../../lib/api';
+import { useWebI18n } from '../../../../lib/i18n';
 
 type ProfileDetailProps = {
   slug: string;
@@ -15,6 +16,8 @@ function formatPercent(value: number) {
 }
 
 export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
+  const { messages } = useWebI18n();
+  const marketplaceMessages = messages.publicMarketplace;
   const [profile, setProfile] = useState<MarketplaceProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +34,9 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
       .catch((loadError: unknown) => {
         if (active) {
           setError(
-            loadError instanceof Error ? loadError.message : 'Failed to load profile',
+            loadError instanceof Error && loadError.message.trim().length > 0
+              ? marketplaceMessages.profileDetail.unavailableBody
+              : marketplaceMessages.profileDetail.unavailableBody,
           );
         }
       });
@@ -39,34 +44,44 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, marketplaceMessages.profileDetail.unavailableBody]);
 
   return (
     <main className={styles.page}>
       <div className={styles.console}>
         <div className={styles.topBar}>
           <div className={styles.topBarContent}>
-            <span className={styles.topBarLabel}>Marketplace profile</span>
-            <p className={styles.topBarMeta}>
-              Public contractor detail with escrow-derived trust signals.
-            </p>
+            <span className={styles.topBarLabel}>
+              {marketplaceMessages.profileDetail.topBarLabel}
+            </span>
+            <p className={styles.topBarMeta}>{marketplaceMessages.profileDetail.topBarMeta}</p>
           </div>
           <div className={styles.inlineActions}>
-            <Link href="/marketplace">Back to marketplace</Link>
-            <Link href="/app/marketplace">Open workspace</Link>
+            <Link
+              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+              href="/marketplace"
+            >
+              {marketplaceMessages.actions.backToMarketplace}
+            </Link>
+            <Link
+              className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
+              href="/app/marketplace"
+            >
+              {marketplaceMessages.openWorkspace}
+            </Link>
           </div>
         </div>
 
         {error ? (
           <section className={styles.panel}>
-            <h2>Profile unavailable</h2>
+            <h2>{marketplaceMessages.profileDetail.unavailableTitle}</h2>
             <p className={styles.stateText}>{error}</p>
           </section>
         ) : null}
 
         {!profile && !error ? (
           <section className={styles.panel}>
-            <h2>Loading profile…</h2>
+            <h2>{marketplaceMessages.profileDetail.loadingTitle}</h2>
           </section>
         ) : null}
 
@@ -74,21 +89,35 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
           <>
             <section className={styles.hero}>
               <div>
-                <p className={styles.eyebrow}>Talent profile</p>
+                <p className={styles.eyebrow}>
+                  {marketplaceMessages.profileDetail.heroEyebrow}
+                </p>
                 <h1>{profile.displayName}</h1>
                 <p className={styles.heroCopy}>{profile.headline}</p>
               </div>
               <div className={styles.heroCard}>
                 <div>
-                  <span className={styles.metaLabel}>Verification</span>
-                  <strong>{profile.verificationLevel}</strong>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.profileDetail.verification}
+                  </span>
+                  <strong>
+                    {marketplaceMessages.labels.verificationLevel[
+                      profile.verificationLevel
+                    ]}
+                  </strong>
                 </div>
                 <div>
-                  <span className={styles.metaLabel}>Crypto readiness</span>
-                  <strong>{profile.cryptoReadiness}</strong>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.profileDetail.cryptoReadiness}
+                  </span>
+                  <strong>
+                    {marketplaceMessages.labels.cryptoReadiness[profile.cryptoReadiness]}
+                  </strong>
                 </div>
                 <div>
-                  <span className={styles.metaLabel}>Completed escrow jobs</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.profileDetail.completedEscrowJobs}
+                  </span>
                   <strong>{profile.completedEscrowCount}</strong>
                 </div>
               </div>
@@ -98,32 +127,52 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>About</span>
-                    <h2>Credibility summary</h2>
+                    <span className={styles.panelEyebrow}>
+                      {marketplaceMessages.profileDetail.aboutEyebrow}
+                    </span>
+                    <h2>{marketplaceMessages.profileDetail.credibilityTitle}</h2>
                   </div>
                 </div>
                 <p className={styles.stateText}>{profile.bio}</p>
                 <div className={styles.summaryGrid}>
                   <article>
-                    <span className={styles.metaLabel}>Skills</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.skills}
+                    </span>
                     <strong>{profile.skills.join(' • ')}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Specialties</span>
-                    <strong>{profile.specialties.join(' • ') || 'None listed'}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>Preferred engagements</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.specialties}
+                    </span>
                     <strong>
-                      {profile.preferredEngagements.join(' • ') || 'None listed'}
+                      {profile.specialties.join(' • ') ||
+                        marketplaceMessages.profileDetail.noneListed}
                     </strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Rate range</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.preferredEngagements}
+                    </span>
                     <strong>
+                      {profile.preferredEngagements.length > 0
+                        ? profile.preferredEngagements
+                            .map(
+                              (engagement) =>
+                                marketplaceMessages.labels.engagementType[engagement],
+                            )
+                            .join(' • ')
+                        : marketplaceMessages.profileDetail.noneListed}
+                    </strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.rateRange}
+                    </span>
+                    <strong className={styles.ltrValue} data-ltr="true">
                       {profile.rateMin || profile.rateMax
                         ? `${profile.rateMin ?? '—'} to ${profile.rateMax ?? '—'}`
-                        : 'Not listed'}
+                        : marketplaceMessages.profileDetail.notListed}
                     </strong>
                   </article>
                 </div>
@@ -132,32 +181,52 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>Escrow signal</span>
-                    <h2>Verified execution history</h2>
+                    <span className={styles.panelEyebrow}>
+                      {marketplaceMessages.profileDetail.escrowSignalEyebrow}
+                    </span>
+                    <h2>{marketplaceMessages.profileDetail.executionTitle}</h2>
                   </div>
                 </div>
                 <div className={styles.summaryGrid}>
                   <article>
-                    <span className={styles.metaLabel}>Completion rate</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.completionRate}
+                    </span>
                     <strong>{formatPercent(profile.escrowStats.completionRate)}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Dispute rate</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.disputeRate}
+                    </span>
                     <strong>{formatPercent(profile.escrowStats.disputeRate)}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>On-time delivery</span>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.onTimeDelivery}
+                    </span>
                     <strong>{formatPercent(profile.escrowStats.onTimeDeliveryRate)}</strong>
                   </article>
                   <article>
-                    <span className={styles.metaLabel}>Average contract band</span>
-                    <strong>{profile.escrowStats.averageContractValueBand}</strong>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.averageContractBand}
+                    </span>
+                    <strong>
+                      {
+                        marketplaceMessages.labels.averageContractValueBand[
+                          profile.escrowStats.averageContractValueBand
+                        ]
+                      }
+                    </strong>
                   </article>
                 </div>
                 <div className={styles.stack}>
-                  <span className={styles.metaLabel}>Completed by category</span>
+                  <span className={styles.metaLabel}>
+                    {marketplaceMessages.profileDetail.completedByCategory}
+                  </span>
                   {profile.escrowStats.completedByCategory.length === 0 ? (
-                    <p className={styles.stateText}>No completed escrow history yet.</p>
+                    <p className={styles.stateText}>
+                      {marketplaceMessages.profileDetail.noEscrowHistory}
+                    </p>
                   ) : (
                     profile.escrowStats.completedByCategory.map((entry) => (
                       <p key={entry.category} className={styles.stateText}>
@@ -173,20 +242,30 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <article className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <span className={styles.panelEyebrow}>Proof</span>
-                    <h2>Wallet and proof artifacts</h2>
+                    <span className={styles.panelEyebrow}>
+                      {marketplaceMessages.profileDetail.proofEyebrow}
+                    </span>
+                    <h2>{marketplaceMessages.profileDetail.walletAndProofTitle}</h2>
                   </div>
                 </div>
                 <div className={styles.stack}>
                   <div>
-                    <span className={styles.metaLabel}>Verified wallet</span>
-                    <strong>{profile.verifiedWalletAddress ?? 'No verified wallet published'}</strong>
+                    <span className={styles.metaLabel}>
+                      {marketplaceMessages.profileDetail.verifiedWallet}
+                    </span>
+                    <strong className={styles.ltrValue} data-ltr="true">
+                      {profile.verifiedWalletAddress ??
+                        marketplaceMessages.profileDetail.noVerifiedWallet}
+                    </strong>
                   </div>
-                  {profile.proofArtifacts.map((artifact) => (
-                    <a key={artifact.id} href={artifact.url} target="_blank" rel="noreferrer">
-                      {artifact.label} • {artifact.kind}
-                    </a>
-                  ))}
+                  <div className={styles.linkList}>
+                    {profile.proofArtifacts.map((artifact) => (
+                      <a key={artifact.id} href={artifact.url} target="_blank" rel="noreferrer">
+                        {artifact.label} •{' '}
+                        {marketplaceMessages.labels.proofArtifactKind[artifact.kind]}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               </article>
 
