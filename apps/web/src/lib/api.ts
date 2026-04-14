@@ -477,6 +477,58 @@ export type MarketplaceOpportunityDetail = MarketplaceOpportunity & {
   applications?: MarketplaceApplication[];
 };
 
+export type MarketplaceAbuseReportReason =
+  | 'spam'
+  | 'scam'
+  | 'impersonation'
+  | 'harassment'
+  | 'off_platform_payment'
+  | 'policy_violation'
+  | 'other';
+
+export type MarketplaceAbuseReportStatus =
+  | 'open'
+  | 'reviewing'
+  | 'resolved'
+  | 'dismissed';
+
+export type MarketplaceAbuseReportSubjectSummary =
+  | {
+      type: 'profile';
+      id: string;
+      label: string;
+      slug: string;
+      moderationStatus: ModerationStatus;
+    }
+  | {
+      type: 'opportunity';
+      id: string;
+      label: string;
+      visibility: OpportunityVisibility;
+      moderationStatus: ModerationStatus;
+      status: OpportunityStatus;
+    };
+
+export type MarketplaceAbuseReport = {
+  id: string;
+  subject: MarketplaceAbuseReportSubjectSummary;
+  reporter: {
+    userId: string;
+    email: string;
+  };
+  reason: MarketplaceAbuseReportReason;
+  details: string | null;
+  evidenceUrls: string[];
+  status: MarketplaceAbuseReportStatus;
+  resolutionNote: string | null;
+  resolvedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type HireApplicationResponse = {
   applicationId: string;
   opportunityId: string;
@@ -1031,6 +1083,44 @@ export const webApi = {
     return requestJson<{ opportunity: MarketplaceOpportunityDetail }>(
       apiBaseUrl,
       `/marketplace/opportunities/${id}/applications`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  reportMarketplaceProfile(
+    slug: string,
+    input: {
+      reason: MarketplaceAbuseReportReason;
+      details?: string | null;
+      evidenceUrls: string[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ report: MarketplaceAbuseReport }>(
+      apiBaseUrl,
+      `/marketplace/profiles/${encodeURIComponent(slug)}/report`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  reportMarketplaceOpportunity(
+    id: string,
+    input: {
+      reason: MarketplaceAbuseReportReason;
+      details?: string | null;
+      evidenceUrls: string[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ report: MarketplaceAbuseReport }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${encodeURIComponent(id)}/report`,
       {
         method: 'POST',
         body: JSON.stringify(input),

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import styles from '../../../page.module.css';
+import { AbuseReportPanel } from '../../abuse-report-panel';
 import { webApi, type MarketplaceProfile } from '../../../../lib/api';
 
 type ProfileDetailProps = {
@@ -188,6 +189,15 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                   ))}
                 </div>
               </article>
+
+              <AbuseReportPanel
+                subjectLabel={profile.displayName}
+                onSubmit={(input, accessToken) =>
+                  webApi.reportMarketplaceProfile(slug, input, accessToken).then(
+                    () => undefined,
+                  )
+                }
+              />
             </section>
           </>
         ) : null}

@@ -250,6 +250,9 @@ export type MarketplaceModerationDashboard = {
     hiredApplications: number;
     hireConversionPercent: number;
     agingOpportunityCount: number;
+    totalAbuseReports: number;
+    openAbuseReports: number;
+    reviewingAbuseReports: number;
   };
   agingOpportunities: Array<{
     opportunityId: string;
@@ -259,6 +262,59 @@ export type MarketplaceModerationDashboard = {
     status: MarketplaceAdminOpportunity['status'];
     visibility: MarketplaceAdminOpportunity['visibility'];
   }>;
+  recentAbuseReports: MarketplaceAbuseReport[];
+};
+
+export type MarketplaceAbuseReportReason =
+  | 'spam'
+  | 'scam'
+  | 'impersonation'
+  | 'harassment'
+  | 'off_platform_payment'
+  | 'policy_violation'
+  | 'other';
+
+export type MarketplaceAbuseReportStatus =
+  | 'open'
+  | 'reviewing'
+  | 'resolved'
+  | 'dismissed';
+
+export type MarketplaceAbuseReportSubjectSummary =
+  | {
+      type: 'profile';
+      id: string;
+      label: string;
+      slug: string;
+      moderationStatus: MarketplaceModerationStatus;
+    }
+  | {
+      type: 'opportunity';
+      id: string;
+      label: string;
+      visibility: MarketplaceAdminOpportunity['visibility'];
+      moderationStatus: MarketplaceModerationStatus;
+      status: MarketplaceAdminOpportunity['status'];
+    };
+
+export type MarketplaceAbuseReport = {
+  id: string;
+  subject: MarketplaceAbuseReportSubjectSummary;
+  reporter: {
+    userId: string;
+    email: string;
+  };
+  reason: MarketplaceAbuseReportReason;
+  details: string | null;
+  evidenceUrls: string[];
+  status: MarketplaceAbuseReportStatus;
+  resolutionNote: string | null;
+  resolvedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type CaseExportArtifact = 'job-history' | 'dispute-case';
@@ -1061,6 +1117,26 @@ export const adminApi = {
       accessToken,
     );
   },
+  listMarketplaceModerationReports(
+    input: {
+      status?: MarketplaceAbuseReportStatus;
+      subjectType?: 'profile' | 'opportunity';
+      limit?: number;
+    },
+    accessToken: string,
+  ) {
+    const search = new URLSearchParams();
+    if (input.status) search.set('status', input.status);
+    if (input.subjectType) search.set('subjectType', input.subjectType);
+    if (input.limit) search.set('limit', String(input.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ reports: MarketplaceAbuseReport[] }>(
+      apiBaseUrl,
+      `/marketplace/moderation/reports${suffix}`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
   moderateMarketplaceProfile(
     userId: string,
     moderationStatus: MarketplaceModerationStatus,
@@ -1087,6 +1163,24 @@ export const adminApi = {
       {
         method: 'POST',
         body: JSON.stringify({ moderationStatus }),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceModerationReport(
+    reportId: string,
+    input: {
+      status: MarketplaceAbuseReportStatus;
+      resolutionNote?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ report: MarketplaceAbuseReport }>(
+      apiBaseUrl,
+      `/marketplace/moderation/reports/${encodeURIComponent(reportId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
       },
       accessToken,
     );

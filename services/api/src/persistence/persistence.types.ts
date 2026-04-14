@@ -11,6 +11,7 @@ import type {
 } from '../modules/escrow/escrow.types';
 import type {
   MarketplaceApplicationRecord,
+  MarketplaceAbuseReportRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
 } from '../modules/marketplace/marketplace.types';
@@ -103,6 +104,11 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceApplicationRecord | null>;
   listApplications(): Promise<MarketplaceApplicationRecord[]>;
   saveApplication(application: MarketplaceApplicationRecord): Promise<void>;
+  getAbuseReportById(
+    reportId: string,
+  ): Promise<MarketplaceAbuseReportRecord | null>;
+  listAbuseReports(): Promise<MarketplaceAbuseReportRecord[]>;
+  saveAbuseReport(report: MarketplaceAbuseReportRecord): Promise<void>;
 }
 
 export interface WalletLinkChallengesRepository {
@@ -115,7 +121,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 13;
+  version: 14;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
@@ -127,5 +133,6 @@ export type PersistenceFileData = {
   marketplaceProfiles: Record<string, MarketplaceProfileRecord>;
   marketplaceOpportunities: Record<string, MarketplaceOpportunityRecord>;
   marketplaceApplications: Record<string, MarketplaceApplicationRecord>;
+  marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

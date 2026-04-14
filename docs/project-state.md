@@ -39,6 +39,7 @@
 
 - API and frontend now include an escrow-first marketplace layer: talent profiles, opportunities, applications, deterministic public browse surfaces, authenticated CRUD, shortlist or reject or withdraw or hire transitions, a first admin moderation dashboard with funnel metrics and aging no-hire briefs, richer marketplace workspace pipeline summaries, contract deep-links after hire, and a hire bridge that turns a selected application into the existing single-contractor escrow job model without changing the onchain contract shape.
 - Marketplace now also includes a crypto-native hiring quality layer: structured hiring specs, structured proposals, proof-artifact management, escrow-derived execution reputation, deterministic fit scoring with explicit breakdowns and risk flags, public reputation-rich profile and opportunity detail views, and dossier endpoints that let clients review applicants before hire.
+- Marketplace trust-and-safety now also includes authenticated abuse-report intake for public profile or opportunity detail pages, persisted abuse-report records in file-backed and Postgres adapters, arbitrator-only moderation queue reads and report status updates, and dashboard abuse-report counts plus recent-report visibility in the admin console.
 - `WorkstreamEscrow` contract supports job creation, funding, milestone delivery/release, disputes, resolution, and remainder refunds.
 - Contract tests cover happy-path release/dispute and refund behavior.
 - API auth prototype supports OTP start/verify, refresh, logout, `me`, and Shariah preference toggling.
@@ -160,7 +161,7 @@
 
 ## Deferred / Not Yet Implemented
 
-- Marketplace still lacks report-abuse flows, advanced ranking, search indexing, chat or off-platform communication controls, ratings or reviews, agencies, open bidding, and multi-contractor escrow composition.
+- Marketplace still lacks advanced ranking, search indexing, chat or off-platform communication controls, ratings or reviews, agencies, open bidding, and multi-contractor escrow composition.
 - Marketplace fit scoring is deterministic and explainable, but it is still rules-based; there is no richer ranking UI in admin, no saved search or recommendation loop, and no live browser canary yet covering dossier review end to end.
 - Live end-to-end validation of the configured email relay against real environments.
 - Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.
@@ -180,7 +181,7 @@
 
 ## Risks / Watchouts
 
-- Marketplace moderation is intentionally minimal. Public discovery now exists, but there is no mature trust-and-safety pipeline, abuse reporting flow, or human-review queue beyond operator visibility toggles and suspension posture.
+- Marketplace moderation is still intentionally minimal. Abuse reports and an operator queue now exist, but there is still no richer policy engine, investigation workflow, search abuse detection, or broader trust-and-safety automation.
 - Marketplace ranking is still deterministic and shallow, driven by explicit dossier factors such as must-have coverage, category overlap, screening completeness, crypto readiness, and escrow history rather than a dedicated search index, recommendation system, or fraud model.
 - The new hire bridge keeps the one-client or one-contractor escrow shape deliberately unchanged. Marketplace hires still terminate in the existing invite or join escrow workflow, so there is not yet multi-award, agency, or pooled talent support.
 - Frontend apps now expose real console workflows, but they still depend on the prototype API surface and manual environment configuration rather than hardened production deployment.

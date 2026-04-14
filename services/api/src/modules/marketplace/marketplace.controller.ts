@@ -156,6 +156,32 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('profiles/:slug/report')
+  reportProfile(
+    @User() user: ReqUser,
+    @Param('slug') slug: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.createMarketplaceAbuseReportSchema),
+    )
+    body: marketplaceDto.CreateMarketplaceAbuseReportDto,
+  ) {
+    return this.marketplaceService.reportProfile(user.id, slug, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('opportunities/:id/report')
+  reportOpportunity(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.createMarketplaceAbuseReportSchema),
+    )
+    body: marketplaceDto.CreateMarketplaceAbuseReportDto,
+  ) {
+    return this.marketplaceService.reportOpportunity(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('applications/mine')
   listMyApplications(@User() user: ReqUser) {
     return this.marketplaceService.listMyApplications(user.id);
@@ -210,6 +236,20 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('moderation/reports')
+  listModerationReports(
+    @User() user: ReqUser,
+    @Query(
+      new ZodValidationPipe(
+        marketplaceDto.marketplaceModerationReportsQuerySchema,
+      ),
+    )
+    query: marketplaceDto.MarketplaceModerationReportsQueryDto,
+  ) {
+    return this.marketplaceService.listModerationReports(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('moderation/profiles/:userId')
   moderateProfile(
     @User() user: ReqUser,
@@ -229,5 +269,18 @@ export class MarketplaceController {
     body: marketplaceDto.UpdateModerationDto,
   ) {
     return this.marketplaceService.moderateOpportunity(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('moderation/reports/:id')
+  updateModerationReport(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.updateMarketplaceAbuseReportSchema),
+    )
+    body: marketplaceDto.UpdateMarketplaceAbuseReportDto,
+  ) {
+    return this.marketplaceService.updateModerationReport(user.id, id, body);
   }
 }

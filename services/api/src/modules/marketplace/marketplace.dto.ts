@@ -47,6 +47,7 @@ const screeningAnswerSchema = z
   })
   .strict();
 const timestampSchema = z.coerce.number().int().positive();
+const abuseEvidenceUrlsSchema = z.array(z.string().url().max(2048)).max(5);
 
 export const upsertMarketplaceProfileSchema = z
   .object({
@@ -176,6 +177,37 @@ export const updateModerationSchema = z
   })
   .strict();
 
+export const createMarketplaceAbuseReportSchema = z
+  .object({
+    reason: z.enum([
+      'spam',
+      'scam',
+      'impersonation',
+      'harassment',
+      'off_platform_payment',
+      'policy_violation',
+      'other',
+    ]),
+    details: z.string().trim().min(1).max(2000).nullable().optional(),
+    evidenceUrls: abuseEvidenceUrlsSchema.default([]),
+  })
+  .strict();
+
+export const marketplaceModerationReportsQuerySchema = z
+  .object({
+    status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']).optional(),
+    subjectType: z.enum(['profile', 'opportunity']).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict();
+
+export const updateMarketplaceAbuseReportSchema = z
+  .object({
+    status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
+    resolutionNote: z.string().trim().min(1).max(2000).nullable().optional(),
+  })
+  .strict();
+
 export type UpsertMarketplaceProfileDto = z.infer<
   typeof upsertMarketplaceProfileSchema
 >;
@@ -199,3 +231,12 @@ export type MarketplaceOpportunitiesQueryDto = z.infer<
 >;
 export type ApplyToOpportunityDto = z.infer<typeof applyToOpportunitySchema>;
 export type UpdateModerationDto = z.infer<typeof updateModerationSchema>;
+export type CreateMarketplaceAbuseReportDto = z.infer<
+  typeof createMarketplaceAbuseReportSchema
+>;
+export type MarketplaceModerationReportsQueryDto = z.infer<
+  typeof marketplaceModerationReportsQuerySchema
+>;
+export type UpdateMarketplaceAbuseReportDto = z.infer<
+  typeof updateMarketplaceAbuseReportSchema
+>;

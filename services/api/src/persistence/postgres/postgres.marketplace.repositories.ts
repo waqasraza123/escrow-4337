@@ -1,5 +1,8 @@
 import type { QueryResultRow } from 'pg';
 import type {
+  MarketplaceAbuseReportRecord,
+  MarketplaceAbuseReportStatus,
+  MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceCryptoReadiness,
   MarketplaceEngagementType,
@@ -78,6 +81,21 @@ type MarketplaceApplicationRow = QueryResultRow & {
   portfolio_urls_json: string[];
   status: MarketplaceApplicationRecord['status'];
   hired_job_id: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceAbuseReportRow = QueryResultRow & {
+  id: string;
+  subject_type: MarketplaceAbuseReportSubjectType;
+  subject_id: string;
+  reporter_user_id: string;
+  reason: MarketplaceAbuseReportRecord['reason'];
+  details: string | null;
+  evidence_urls_json: string[];
+  status: MarketplaceAbuseReportStatus;
+  resolution_note: string | null;
+  resolved_by_user_id: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -162,6 +180,25 @@ function mapApplication(
     portfolioUrls: row.portfolio_urls_json ?? [],
     status: row.status,
     hiredJobId: row.hired_job_id,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapAbuseReport(
+  row: MarketplaceAbuseReportRow,
+): MarketplaceAbuseReportRecord {
+  return {
+    id: row.id,
+    subjectType: row.subject_type,
+    subjectId: row.subject_id,
+    reporterUserId: row.reporter_user_id,
+    reason: row.reason,
+    details: row.details,
+    evidenceUrls: row.evidence_urls_json ?? [],
+    status: row.status,
+    resolutionNote: row.resolution_note,
+    resolvedByUserId: row.resolved_by_user_id,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -489,6 +526,82 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         application.hiredJobId,
         String(application.createdAt),
         String(application.updatedAt),
+      ],
+    );
+  }
+
+  async getAbuseReportById(reportId: string) {
+    const result = await this.db.query<MarketplaceAbuseReportRow>(
+      `
+        SELECT *
+        FROM marketplace_abuse_reports
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [reportId],
+    );
+
+    return result.rows[0] ? mapAbuseReport(result.rows[0]) : null;
+  }
+
+  async listAbuseReports() {
+    const result = await this.db.query<MarketplaceAbuseReportRow>(
+      `
+        SELECT *
+        FROM marketplace_abuse_reports
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapAbuseReport);
+  }
+
+  async saveAbuseReport(report: MarketplaceAbuseReportRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_abuse_reports (
+          id,
+          subject_type,
+          subject_id,
+          reporter_user_id,
+          reason,
+          details,
+          evidence_urls_json,
+          status,
+          resolution_note,
+          resolved_by_user_id,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10::uuid, $11, $12
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          subject_type = EXCLUDED.subject_type,
+          subject_id = EXCLUDED.subject_id,
+          reporter_user_id = EXCLUDED.reporter_user_id,
+          reason = EXCLUDED.reason,
+          details = EXCLUDED.details,
+          evidence_urls_json = EXCLUDED.evidence_urls_json,
+          status = EXCLUDED.status,
+          resolution_note = EXCLUDED.resolution_note,
+          resolved_by_user_id = EXCLUDED.resolved_by_user_id,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        report.id,
+        report.subjectType,
+        report.subjectId,
+        report.reporterUserId,
+        report.reason,
+        report.details,
+        JSON.stringify(report.evidenceUrls),
+        report.status,
+        report.resolutionNote,
+        report.resolvedByUserId,
+        String(report.createdAt),
+        String(report.updatedAt),
       ],
     );
   }

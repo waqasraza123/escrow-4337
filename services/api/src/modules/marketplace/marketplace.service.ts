@@ -28,9 +28,12 @@ import {
 } from '../users/users.types';
 import type {
   ApplyToOpportunityDto,
+  CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
+  MarketplaceModerationReportsQueryDto,
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
+  UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceOpportunityDto,
   UpdateMarketplaceProofsDto,
   UpdateMarketplaceScreeningDto,
@@ -40,6 +43,12 @@ import type {
 import type {
   EscrowReadinessStatus,
   HireApplicationResponse,
+  MarketplaceAbuseReportRecord,
+  MarketplaceAbuseReportResponse,
+  MarketplaceAbuseReportsListResponse,
+  MarketplaceAbuseReportStatus,
+  MarketplaceAbuseReportSubjectSummary,
+  MarketplaceAbuseReportView,
   MarketplaceApplicationDossier,
   MarketplaceApplicationDossierResponse,
   MarketplaceApplicationRecord,
@@ -823,6 +832,61 @@ export class MarketplaceService {
     };
   }
 
+  async reportProfile(
+    userId: string,
+    slug: string,
+    dto: CreateMarketplaceAbuseReportDto,
+  ): Promise<MarketplaceAbuseReportResponse> {
+    const profile = await this.marketplaceRepository.getProfileBySlug(
+      slug.trim().toLowerCase(),
+    );
+
+    if (
+      !profile ||
+      profile.moderationStatus !== 'visible' ||
+      !this.isProfileComplete(profile)
+    ) {
+      throw new NotFoundException('Marketplace profile not found');
+    }
+    if (profile.userId === userId) {
+      throw new ForbiddenException(
+        'You cannot report your own marketplace profile',
+      );
+    }
+
+    return this.createAbuseReport(userId, {
+      subjectType: 'profile',
+      subjectId: profile.userId,
+      dto,
+    });
+  }
+
+  async reportOpportunity(
+    userId: string,
+    opportunityId: string,
+    dto: CreateMarketplaceAbuseReportDto,
+  ): Promise<MarketplaceAbuseReportResponse> {
+    const opportunity = await this.requireOpportunity(opportunityId);
+
+    if (
+      opportunity.moderationStatus !== 'visible' ||
+      opportunity.status !== 'published'
+    ) {
+      throw new NotFoundException('Marketplace opportunity not found');
+    }
+    if (opportunity.ownerUserId === userId) {
+      throw new ForbiddenException(
+        'You cannot report your own marketplace opportunity',
+      );
+    }
+
+    return this.createAbuseReport(userId, {
+      subjectType: 'opportunity',
+      subjectId: opportunity.id,
+      dto,
+    });
+  }
+
   async listMyApplications(
     userId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
@@ -1001,10 +1065,11 @@ export class MarketplaceService {
   async getModerationDashboard(
     userId: string,
   ): Promise<MarketplaceModerationDashboard> {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.requireModerationAccess(userId);
     const profiles = await this.marketplaceRepository.listProfiles();
     const opportunities = await this.marketplaceRepository.listOpportunities();
     const applications = await this.marketplaceRepository.listApplications();
+    const reports = await this.marketplaceRepository.listAbuseReports();
     const profileMap = new Map(
       profiles.map((profile) => [profile.userId, profile]),
     );
@@ -1085,13 +1150,29 @@ export class MarketplaceService {
             ? 0
             : Math.round((hiredApplications / activeOpportunities) * 100),
         agingOpportunityCount: agingOpportunities.length,
+        totalAbuseReports: reports.length,
+        openAbuseReports: reports.filter((report) => report.status === 'open')
+          .length,
+        reviewingAbuseReports: reports.filter(
+          (report) => report.status === 'reviewing',
+        ).length,
       },
       agingOpportunities,
+      recentAbuseReports: await Promise.all(
+        reports
+          .sort(
+            (left, right) =>
+              this.compareAbuseReportPriority(left.status, right.status) ||
+              right.updatedAt - left.updatedAt,
+          )
+          .slice(0, 5)
+          .map((report) => this.toAbuseReportView(report)),
+      ),
     };
   }
 
   async listModerationProfiles(userId: string) {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.requireModerationAccess(userId);
     const profiles = await this.marketplaceRepository.listProfiles();
     return {
       profiles: await Promise.all(
@@ -1115,7 +1196,7 @@ export class MarketplaceService {
   }
 
   async listModerationOpportunities(userId: string) {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.requireModerationAccess(userId);
     const opportunities = await this.marketplaceRepository.listOpportunities();
     return {
       opportunities: await Promise.all(
@@ -1138,12 +1219,42 @@ export class MarketplaceService {
     };
   }
 
+  async listModerationReports(
+    userId: string,
+    query: MarketplaceModerationReportsQueryDto,
+  ): Promise<MarketplaceAbuseReportsListResponse> {
+    await this.requireModerationAccess(userId);
+    const reports = await this.marketplaceRepository.listAbuseReports();
+
+    return {
+      reports: await Promise.all(
+        reports
+          .filter((report) => {
+            if (query.status && report.status !== query.status) {
+              return false;
+            }
+            if (query.subjectType && report.subjectType !== query.subjectType) {
+              return false;
+            }
+            return true;
+          })
+          .sort(
+            (left, right) =>
+              this.compareAbuseReportPriority(left.status, right.status) ||
+              right.updatedAt - left.updatedAt,
+          )
+          .slice(0, query.limit)
+          .map((report) => this.toAbuseReportView(report)),
+      ),
+    };
+  }
+
   async moderateProfile(
     userId: string,
     targetUserId: string,
     dto: UpdateModerationDto,
   ): Promise<MarketplaceProfileResponse> {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.requireModerationAccess(userId);
     const profile = await this.requireProfileByUserId(targetUserId);
     profile.moderationStatus = dto.moderationStatus;
     profile.updatedAt = Date.now();
@@ -1158,13 +1269,48 @@ export class MarketplaceService {
     opportunityId: string,
     dto: UpdateModerationDto,
   ): Promise<MarketplaceOpportunityResponse> {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.requireModerationAccess(userId);
     const opportunity = await this.requireOpportunity(opportunityId);
     opportunity.moderationStatus = dto.moderationStatus;
     opportunity.updatedAt = Date.now();
     await this.marketplaceRepository.saveOpportunity(opportunity);
     return {
       opportunity: await this.toOpportunityView(opportunity),
+    };
+  }
+
+  async updateModerationReport(
+    userId: string,
+    reportId: string,
+    dto: UpdateMarketplaceAbuseReportDto,
+  ): Promise<MarketplaceAbuseReportResponse> {
+    await this.requireModerationAccess(userId);
+    const report = await this.requireAbuseReport(reportId);
+
+    if (
+      (dto.status === 'resolved' || dto.status === 'dismissed') &&
+      !dto.resolutionNote?.trim()
+    ) {
+      throw new BadRequestException(
+        'Resolution note is required when closing an abuse report',
+      );
+    }
+
+    report.status = dto.status;
+    report.updatedAt = Date.now();
+
+    if (dto.status === 'resolved' || dto.status === 'dismissed') {
+      report.resolutionNote = dto.resolutionNote?.trim() ?? null;
+      report.resolvedByUserId = userId;
+    } else {
+      report.resolutionNote = null;
+      report.resolvedByUserId = null;
+    }
+
+    await this.marketplaceRepository.saveAbuseReport(report);
+
+    return {
+      report: await this.toAbuseReportView(report),
     };
   }
 
@@ -1192,6 +1338,15 @@ export class MarketplaceService {
       throw new NotFoundException('Marketplace application not found');
     }
     return application;
+  }
+
+  private async requireAbuseReport(reportId: string) {
+    const report =
+      await this.marketplaceRepository.getAbuseReportById(reportId);
+    if (!report) {
+      throw new NotFoundException('Marketplace abuse report not found');
+    }
+    return report;
   }
 
   private async toProfileView(
@@ -1304,6 +1459,70 @@ export class MarketplaceService {
       fitBreakdown: dossier.matchSummary.fitBreakdown,
       riskFlags: dossier.matchSummary.riskFlags,
       dossier,
+    };
+  }
+
+  private async toAbuseReportView(
+    report: MarketplaceAbuseReportRecord,
+  ): Promise<MarketplaceAbuseReportView> {
+    const reporter = await this.usersService.getRequiredById(
+      report.reporterUserId,
+    );
+    const resolvedBy = report.resolvedByUserId
+      ? await this.usersService.getRequiredById(report.resolvedByUserId)
+      : null;
+
+    return {
+      id: report.id,
+      subject: await this.buildAbuseReportSubjectSummary(report),
+      reporter: {
+        userId: reporter.id,
+        email: reporter.email,
+      },
+      reason: report.reason,
+      details: report.details,
+      evidenceUrls: report.evidenceUrls,
+      status: report.status,
+      resolutionNote: report.resolutionNote,
+      resolvedBy: resolvedBy
+        ? {
+            userId: resolvedBy.id,
+            email: resolvedBy.email,
+          }
+        : null,
+      createdAt: report.createdAt,
+      updatedAt: report.updatedAt,
+    };
+  }
+
+  private async buildAbuseReportSubjectSummary(
+    report: MarketplaceAbuseReportRecord,
+  ): Promise<MarketplaceAbuseReportSubjectSummary> {
+    if (report.subjectType === 'profile') {
+      const profile = await this.marketplaceRepository.getProfileByUserId(
+        report.subjectId,
+      );
+
+      return {
+        type: 'profile',
+        id: report.subjectId,
+        label: profile?.displayName ?? 'Removed profile',
+        slug: profile?.slug ?? report.subjectId,
+        moderationStatus: profile?.moderationStatus ?? 'hidden',
+      };
+    }
+
+    const opportunity = await this.marketplaceRepository.getOpportunityById(
+      report.subjectId,
+    );
+
+    return {
+      type: 'opportunity',
+      id: report.subjectId,
+      label: opportunity?.title ?? 'Removed opportunity',
+      visibility: opportunity?.visibility ?? 'private',
+      moderationStatus: opportunity?.moderationStatus ?? 'hidden',
+      status: opportunity?.status ?? 'closed',
     };
   }
 
@@ -1749,5 +1968,74 @@ export class MarketplaceService {
         'Budget minimum cannot exceed budget maximum',
       );
     }
+  }
+
+  private async createAbuseReport(
+    reporterUserId: string,
+    input: {
+      subjectType: MarketplaceAbuseReportRecord['subjectType'];
+      subjectId: string;
+      dto: CreateMarketplaceAbuseReportDto;
+    },
+  ): Promise<MarketplaceAbuseReportResponse> {
+    if (input.dto.reason === 'other' && !input.dto.details?.trim()) {
+      throw new BadRequestException(
+        'Additional details are required when using the "other" abuse reason',
+      );
+    }
+
+    const existingReports = await this.marketplaceRepository.listAbuseReports();
+    const duplicate = existingReports.find(
+      (report) =>
+        report.subjectType === input.subjectType &&
+        report.subjectId === input.subjectId &&
+        report.reporterUserId === reporterUserId &&
+        (report.status === 'open' || report.status === 'reviewing'),
+    );
+
+    if (duplicate) {
+      throw new ConflictException(
+        'You already have an active abuse report for this marketplace item',
+      );
+    }
+
+    const now = Date.now();
+    const report: MarketplaceAbuseReportRecord = {
+      id: randomUUID(),
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      reporterUserId,
+      reason: input.dto.reason,
+      details: input.dto.details?.trim() || null,
+      evidenceUrls: normalizeTextArray(input.dto.evidenceUrls),
+      status: 'open',
+      resolutionNote: null,
+      resolvedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveAbuseReport(report);
+
+    return {
+      report: await this.toAbuseReportView(report),
+    };
+  }
+
+  private async requireModerationAccess(userId: string) {
+    await this.escrowActorService.resolveArbitrator(userId);
+  }
+
+  private compareAbuseReportPriority(
+    left: MarketplaceAbuseReportStatus,
+    right: MarketplaceAbuseReportStatus,
+  ) {
+    const order: Record<MarketplaceAbuseReportStatus, number> = {
+      open: 0,
+      reviewing: 1,
+      resolved: 2,
+      dismissed: 3,
+    };
+
+    return order[left] - order[right];
   }
 }

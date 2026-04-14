@@ -346,6 +346,108 @@ describe('MarketplaceService', () => {
     expect(profiles.profiles).toHaveLength(0);
   });
 
+  it('captures abuse reports, blocks duplicate active reports, and lets arbitrators close them', async () => {
+    await marketplaceService.upsertProfile(
+      clientUserId,
+      buildProfileInput({
+        slug: 'reporting-client',
+        displayName: 'Reporting Client',
+        headline: 'Reviews marketplace trust signals',
+        bio: 'Needs safe marketplace intake.',
+        skills: ['product'],
+        specialties: ['hiring'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'escrow_power_user',
+        portfolioUrls: ['https://example.com/client-reporting'],
+      }),
+    );
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'reported-builder',
+        displayName: 'Reported Builder',
+        headline: 'Public builder profile',
+        bio: 'Visible profile for trust-and-safety review.',
+        skills: ['typescript'],
+        specialties: ['marketplaces'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/reported-builder'],
+      }),
+    );
+
+    const opportunity = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Reported brief',
+        summary: 'Needs moderation visibility',
+        description: 'This brief is used to verify abuse report intake.',
+      }),
+    );
+    await marketplaceService.publishOpportunity(
+      clientUserId,
+      opportunity.opportunity.id,
+    );
+
+    const profileReport = await marketplaceService.reportProfile(
+      clientUserId,
+      'reported-builder',
+      {
+        reason: 'impersonation',
+        details: 'This profile copied another contractor portfolio.',
+        evidenceUrls: ['https://example.com/evidence/profile'],
+      },
+    );
+    expect(profileReport.report.status).toBe('open');
+
+    await expect(
+      marketplaceService.reportProfile(clientUserId, 'reported-builder', {
+        reason: 'spam',
+        details: 'Duplicate active report should be blocked.',
+        evidenceUrls: [],
+      }),
+    ).rejects.toThrow(
+      'You already have an active abuse report for this marketplace item',
+    );
+
+    const opportunityReport = await marketplaceService.reportOpportunity(
+      applicantUserId,
+      opportunity.opportunity.id,
+      {
+        reason: 'off_platform_payment',
+        details: 'The brief requested direct settlement outside escrow.',
+        evidenceUrls: ['https://example.com/evidence/opportunity'],
+      },
+    );
+    expect(opportunityReport.report.subject.type).toBe('opportunity');
+
+    const openReports = await marketplaceService.listModerationReports(
+      arbitratorUserId,
+      { limit: 50, status: 'open' },
+    );
+    expect(openReports.reports).toHaveLength(2);
+
+    const closedReport = await marketplaceService.updateModerationReport(
+      arbitratorUserId,
+      profileReport.report.id,
+      {
+        status: 'resolved',
+        resolutionNote: 'Profile hidden pending owner response.',
+      },
+    );
+    expect(closedReport.report.status).toBe('resolved');
+    expect(closedReport.report.resolvedBy?.email).toBe(
+      'arbitrator@example.com',
+    );
+
+    const dashboard =
+      await marketplaceService.getModerationDashboard(arbitratorUserId);
+    expect(dashboard.summary.totalAbuseReports).toBe(2);
+    expect(dashboard.summary.openAbuseReports).toBe(1);
+    expect(dashboard.summary.reviewingAbuseReports).toBe(0);
+    expect(dashboard.recentAbuseReports).toHaveLength(2);
+  });
+
   it('reports moderation dashboard metrics for aging briefs and hire conversion', async () => {
     await marketplaceService.upsertProfile(
       clientUserId,
@@ -441,7 +543,11 @@ describe('MarketplaceService', () => {
     expect(dashboard.summary.hiredApplications).toBe(1);
     expect(dashboard.summary.hireConversionPercent).toBe(50);
     expect(dashboard.summary.agingOpportunityCount).toBe(1);
+    expect(dashboard.summary.totalAbuseReports).toBe(0);
+    expect(dashboard.summary.openAbuseReports).toBe(0);
+    expect(dashboard.summary.reviewingAbuseReports).toBe(0);
     expect(dashboard.agingOpportunities[0]?.title).toBe('Aged brief');
+    expect(dashboard.recentAbuseReports).toHaveLength(0);
   });
 });
 

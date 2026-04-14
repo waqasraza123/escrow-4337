@@ -35,6 +35,20 @@ export type MarketplaceProofArtifactKind =
   | 'escrow_delivery'
   | 'escrow_case'
   | 'external_case_study';
+export type MarketplaceAbuseReportSubjectType = 'profile' | 'opportunity';
+export type MarketplaceAbuseReportReason =
+  | 'spam'
+  | 'scam'
+  | 'impersonation'
+  | 'harassment'
+  | 'off_platform_payment'
+  | 'policy_violation'
+  | 'other';
+export type MarketplaceAbuseReportStatus =
+  | 'open'
+  | 'reviewing'
+  | 'resolved'
+  | 'dismissed';
 
 export type MarketplaceTalentProofArtifact = {
   id: string;
@@ -172,6 +186,21 @@ export type MarketplaceApplicationRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceAbuseReportRecord = {
+  id: string;
+  subjectType: MarketplaceAbuseReportSubjectType;
+  subjectId: string;
+  reporterUserId: string;
+  reason: MarketplaceAbuseReportReason;
+  details: string | null;
+  evidenceUrls: string[];
+  status: MarketplaceAbuseReportStatus;
+  resolutionNote: string | null;
+  resolvedByUserId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MarketplaceProfileView = Omit<
   MarketplaceProfileRecord,
   'moderationStatus'
@@ -243,6 +272,43 @@ export type MarketplaceOpportunityDetailView = MarketplaceOpportunityView & {
   applications?: MarketplaceApplicationView[];
 };
 
+export type MarketplaceAbuseReportSubjectSummary =
+  | {
+      type: 'profile';
+      id: string;
+      label: string;
+      slug: string;
+      moderationStatus: ModerationStatus;
+    }
+  | {
+      type: 'opportunity';
+      id: string;
+      label: string;
+      visibility: OpportunityVisibility;
+      moderationStatus: ModerationStatus;
+      status: OpportunityStatus;
+    };
+
+export type MarketplaceAbuseReportView = {
+  id: string;
+  subject: MarketplaceAbuseReportSubjectSummary;
+  reporter: {
+    userId: string;
+    email: string;
+  };
+  reason: MarketplaceAbuseReportReason;
+  details: string | null;
+  evidenceUrls: string[];
+  status: MarketplaceAbuseReportStatus;
+  resolutionNote: string | null;
+  resolvedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MarketplaceModerationDashboard = {
   generatedAt: string;
   summary: {
@@ -262,6 +328,9 @@ export type MarketplaceModerationDashboard = {
     hiredApplications: number;
     hireConversionPercent: number;
     agingOpportunityCount: number;
+    totalAbuseReports: number;
+    openAbuseReports: number;
+    reviewingAbuseReports: number;
   };
   agingOpportunities: Array<{
     opportunityId: string;
@@ -271,6 +340,7 @@ export type MarketplaceModerationDashboard = {
     status: OpportunityStatus;
     visibility: OpportunityVisibility;
   }>;
+  recentAbuseReports: MarketplaceAbuseReportView[];
 };
 
 export type MarketplaceProfilesListResponse = {
@@ -307,6 +377,14 @@ export type MarketplaceMatchesResponse = {
 
 export type MarketplaceApplicationDossierResponse = {
   dossier: MarketplaceApplicationDossier;
+};
+
+export type MarketplaceAbuseReportResponse = {
+  report: MarketplaceAbuseReportView;
+};
+
+export type MarketplaceAbuseReportsListResponse = {
+  reports: MarketplaceAbuseReportView[];
 };
 
 export type HireApplicationResponse = {

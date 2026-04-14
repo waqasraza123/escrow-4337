@@ -3,6 +3,7 @@ import {
   renderApp,
   seedJsonStorage,
 } from '@escrow4334/frontend-core/testing';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 const sessionStorageKey = 'escrow4337.admin.session';
@@ -14,8 +15,10 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     getMarketplaceModerationDashboard: vi.fn(),
     listMarketplaceModerationProfiles: vi.fn(),
     listMarketplaceModerationOpportunities: vi.fn(),
+    listMarketplaceModerationReports: vi.fn(),
     moderateMarketplaceProfile: vi.fn(),
     moderateMarketplaceOpportunity: vi.fn(),
+    updateMarketplaceModerationReport: vi.fn(),
   },
 }));
 
@@ -27,6 +30,7 @@ import MarketplaceModerationPage from './page';
 
 describe('marketplace moderation page', () => {
   it('renders moderation summaries and rows from the operator session', async () => {
+    const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, {
       accessToken: 'access-token-123',
       refreshToken: 'refresh-token-123',
@@ -57,6 +61,9 @@ describe('marketplace moderation page', () => {
         hiredApplications: 1,
         hireConversionPercent: 50,
         agingOpportunityCount: 1,
+        totalAbuseReports: 1,
+        openAbuseReports: 1,
+        reviewingAbuseReports: 0,
       },
       agingOpportunities: [
         {
@@ -66,6 +73,30 @@ describe('marketplace moderation page', () => {
           ageDays: 9,
           status: 'published',
           visibility: 'public',
+        },
+      ],
+      recentAbuseReports: [
+        {
+          id: 'report-1',
+          subject: {
+            type: 'profile',
+            id: 'user-1',
+            label: 'Builder One',
+            slug: 'builder-one',
+            moderationStatus: 'visible',
+          },
+          reporter: {
+            userId: 'client-1',
+            email: 'client@example.com',
+          },
+          reason: 'spam',
+          details: 'Suspicious copied portfolio.',
+          evidenceUrls: ['https://example.com/evidence'],
+          status: 'open',
+          resolutionNote: null,
+          resolvedBy: null,
+          createdAt: 1,
+          updatedAt: 1,
         },
       ],
     });
@@ -121,6 +152,38 @@ describe('marketplace moderation page', () => {
         },
       ],
     });
+    mockedAdminApi.listMarketplaceModerationReports.mockResolvedValue({
+      reports: [
+        {
+          id: 'report-1',
+          subject: {
+            type: 'profile',
+            id: 'user-1',
+            label: 'Builder One',
+            slug: 'builder-one',
+            moderationStatus: 'visible',
+          },
+          reporter: {
+            userId: 'client-1',
+            email: 'client@example.com',
+          },
+          reason: 'spam',
+          details: 'Suspicious copied portfolio.',
+          evidenceUrls: ['https://example.com/evidence'],
+          status: 'open',
+          resolutionNote: null,
+          resolvedBy: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+    mockedAdminApi.updateMarketplaceModerationReport.mockResolvedValue({
+      report: {
+        id: 'report-1',
+        status: 'resolved',
+      },
+    });
 
     renderApp(<MarketplaceModerationPage />);
 
@@ -129,8 +192,27 @@ describe('marketplace moderation page', () => {
     });
 
     expect(screen.getByText('Talent moderation')).toBeInTheDocument();
-    expect(screen.getByText('Builder One')).toBeInTheDocument();
-    expect(screen.getByText('Old brief')).toBeInTheDocument();
+    expect(screen.getAllByText('Builder One').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Old brief').length).toBeGreaterThan(0);
     expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(screen.getByText('Abuse queue')).toBeInTheDocument();
+    expect(screen.getByText('Suspicious copied portfolio.')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Resolution note' }),
+      'Hidden after review.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Resolve' }));
+
+    await waitFor(() => {
+      expect(mockedAdminApi.updateMarketplaceModerationReport).toHaveBeenCalledWith(
+        'report-1',
+        {
+          status: 'resolved',
+          resolutionNote: 'Hidden after review.',
+        },
+        'access-token-123',
+      );
+    });
   });
 });

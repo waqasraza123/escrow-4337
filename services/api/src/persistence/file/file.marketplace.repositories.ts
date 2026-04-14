@@ -1,4 +1,5 @@
 import type {
+  MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
@@ -90,6 +91,18 @@ function normalizeApplication(
   };
 }
 
+function normalizeAbuseReport(
+  report: MarketplaceAbuseReportRecord,
+): MarketplaceAbuseReportRecord {
+  return {
+    ...report,
+    subjectId: report.subjectId.trim(),
+    details: report.details?.trim() || null,
+    evidenceUrls: normalizeTextList(report.evidenceUrls),
+    resolutionNote: report.resolutionNote?.trim() || null,
+  };
+}
+
 export class FileMarketplaceRepository implements MarketplaceRepository {
   constructor(private readonly store: FilePersistenceStore) {}
 
@@ -168,6 +181,29 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceApplications[application.id] = cloneValue(
         normalizeApplication(application),
+      );
+    });
+  }
+
+  async getAbuseReportById(reportId: string) {
+    return this.store.read((data) => {
+      const report = data.marketplaceAbuseReports[reportId];
+      return report ? cloneValue(normalizeAbuseReport(report)) : null;
+    });
+  }
+
+  async listAbuseReports() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceAbuseReports)
+        .map((report) => cloneValue(normalizeAbuseReport(report)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveAbuseReport(report: MarketplaceAbuseReportRecord) {
+    await this.store.write((data) => {
+      data.marketplaceAbuseReports[report.id] = cloneValue(
+        normalizeAbuseReport(report),
       );
     });
   }

@@ -1,64 +1,59 @@
 # Current Session
 
 ## Date
-- 2026-04-13
+- 2026-04-14
 
 ## Current Objective
-- Restore the repository verification baseline so new product slices ship on a green branch again.
+- Ship the next marketplace trust-and-safety slice on top of the restored green baseline.
 
 ## Last Completed Step
-- Recovered the repo baseline by clearing the `services/api` lint backlog, hardening the local chain-ingestion verification runner types, fixing deployment-validation test doubles for the current Postgres migration query flow, and preserving explicit refreshed-session success states in web/admin consoles so local Playwright smoke passes again.
+- Added marketplace abuse reporting end to end: authenticated report intake for profiles and opportunities, persisted abuse reports in file/Postgres repositories, arbitrator-only moderation queue and report status updates, dashboard abuse-report counts, admin moderation console visibility, and public web report forms.
 
 ## Current Step
-- Task complete. `pnpm verify:ci` and `pnpm verify:chain:local` now pass.
+- Task complete. Abuse-reporting is shipped and verification is green.
 
 ## Why This Step Exists
-- The branch could not ship safely while root verification was red. Recent API formatting drift, one stale deployment-validation mock, and browser smoke refresh-state regressions had to be corrected before starting the next feature slice.
+- Marketplace discovery and moderation had public visibility controls but no user-submitted trust-and-safety intake. That gap blocked a basic production path for spam/scam reporting and operator review.
 
 ## Changed Files
-- `apps/admin/src/app/operator-console.tsx`
-- `apps/web/src/app/web-console.tsx`
-- `services/api/src/modules/operations/escrow-chain-sync-local-verification-runner.ts`
-- `services/api/test/deployment-validation.service.spec.ts`
-- `services/api/src/modules/escrow/escrow.service.ts`
-- `services/api/src/persistence/file/file.repositories.ts`
-- formatted via `eslint --fix`:
-  `services/api/src/common/http/port.ts`
-  `services/api/src/main.ts`
-  `services/api/src/modules/auth/email/email-template.service.ts`
-  `services/api/src/modules/escrow/escrow.dto.ts`
+- API:
   `services/api/src/modules/marketplace/marketplace.controller.ts`
   `services/api/src/modules/marketplace/marketplace.dto.ts`
   `services/api/src/modules/marketplace/marketplace.service.ts`
-  `services/api/src/modules/operations/escrow-chain-ingestion-status.service.ts`
-  `services/api/src/modules/operations/escrow-chain-sync-daemon-monitoring.service.ts`
-  `services/api/src/modules/operations/escrow-chain-sync.service.ts`
-  `services/api/src/modules/operations/escrow-health.service.ts`
-  `services/api/src/modules/operations/escrow-onchain-authority.service.ts`
-  `services/api/src/modules/operations/launch-readiness.service.ts`
-  `services/api/src/modules/operations/runtime-profile.service.ts`
-  `services/api/src/persistence/file/file.marketplace.repositories.ts`
+  `services/api/src/modules/marketplace/marketplace.types.ts`
   `services/api/src/persistence/persistence.types.ts`
+  `services/api/src/persistence/file/file-persistence.store.ts`
+  `services/api/src/persistence/file/file.marketplace.repositories.ts`
   `services/api/src/persistence/postgres/postgres.marketplace.repositories.ts`
-  `services/api/test/escrow.controller.integration.spec.ts`
-  `services/api/test/escrow.service.spec.ts`
-  `services/api/test/launch-readiness.service.spec.ts`
-  `services/api/test/marketplace.controller.integration.spec.ts`
+  `services/api/src/persistence/postgres/migrations/011_marketplace_abuse_reports.sql`
   `services/api/test/marketplace.service.spec.ts`
-  `services/api/test/runtime-profile.service.spec.ts`
+  `services/api/test/marketplace.controller.integration.spec.ts`
+- Web:
+  `apps/web/src/lib/api.ts`
+  `apps/web/src/app/marketplace/abuse-report-panel.tsx`
+  `apps/web/src/app/marketplace/abuse-report-panel.spec.tsx`
+  `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
+  `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
+- Admin:
+  `apps/admin/src/lib/api.ts`
+  `apps/admin/src/app/marketplace/moderation-console.tsx`
+  `apps/admin/src/app/marketplace/marketplace-moderation.spec.tsx`
+- Docs:
+  `docs/project-state.md`
+  `docs/_local/current-session.md`
 
 ## Key Constraints
-- Keep behavior aligned with the existing product and operator flows; do not “fix” smoke failures by weakening tests.
-- Preserve the current single-contractor escrow and operator authorization model.
-- Treat the local chain-ingestion verifier as a typed production support harness, not a loose script.
+- Keep the existing single-contractor escrow bridge and arbitrator authorization model unchanged.
+- Report intake must preserve data integrity: no self-reporting, no duplicate active reports per reporter/subject, resolution note required for closed states.
+- Public reporting should follow existing public-detail visibility semantics instead of inventing a new access model.
 
 ## Verification Commands
+- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts marketplace.controller.integration.spec.ts`
+- `pnpm --filter web test -- src/app/marketplace/abuse-report-panel.spec.tsx`
+- `pnpm --filter admin test -- src/app/marketplace/marketplace-moderation.spec.tsx`
 - `pnpm --filter escrow4334-api lint`
-- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts marketplace.controller.integration.spec.ts escrow.service.spec.ts`
-- `pnpm --filter escrow4334-api test -- --runInBand deployment-validation.service.spec.ts`
-- `pnpm --filter web test -- src/app/page.spec.tsx`
-- `pnpm --filter admin test -- src/app/page.spec.tsx`
-- `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/smoke/local/auth-smoke.spec.ts --project=local-smoke`
+- `pnpm --filter web lint`
+- `pnpm --filter admin lint`
 - `git diff --check`
 - `pnpm verify:ci`
 - `pnpm verify:chain:local`
@@ -68,7 +63,7 @@
   - all commands above
 
 ## Expected Result
-- Root verification is green again, deployment-validation tests reflect the current migration contract, the local chain-ingestion verifier is type-safe under lint, and both consoles keep a visible success state after manual session refresh.
+- Marketplace users can submit abuse reports from public detail pages, operators can review and resolve them from the admin moderation surface, and the repo stays green under the full verification baseline.
 
 ## Next Likely Step
-- Pick the next product slice from the remaining core backlog now that the branch is green; prioritize a broken or incomplete operator/integrity flow over more release-tooling work.
+- Continue marketplace integrity hardening with the next operator-focused slice: add search/ranking controls or stronger moderation workflow tooling, whichever has the clearest core-flow impact after abuse intake is in place.

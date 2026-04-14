@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import styles from '../../../page.module.css';
+import { AbuseReportPanel } from '../../abuse-report-panel';
 import {
   webApi,
   type MarketplaceOpportunityDetail,
@@ -192,6 +193,15 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                   <Link href="/app/marketplace">Apply from workspace</Link>
                 </div>
               </article>
+
+              <AbuseReportPanel
+                subjectLabel={opportunity.title}
+                onSubmit={(input, accessToken) =>
+                  webApi.reportMarketplaceOpportunity(id, input, accessToken).then(
+                    () => undefined,
+                  )
+                }
+              />
             </section>
           </>
         ) : null}

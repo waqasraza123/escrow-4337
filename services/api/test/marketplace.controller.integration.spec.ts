@@ -11,6 +11,7 @@ import { configureFilePersistence } from './support/test-persistence';
 const clientAddress = '0x1111111111111111111111111111111111111111';
 const clientSmartAccountAddress = '0x5555555555555555555555555555555555555555';
 const applicantAddress = '0x3333333333333333333333333333333333333333';
+const arbitratorAddress = '0x2222222222222222222222222222222222222222';
 const currencyAddress = '0x4444444444444444444444444444444444444444';
 
 describe('MarketplaceController integration', () => {
@@ -20,6 +21,7 @@ describe('MarketplaceController integration', () => {
   let cleanupPersistence: (() => void) | undefined;
   let clientUser: ReqUser;
   let applicantUser: ReqUser;
+  let arbitratorUser: ReqUser;
 
   beforeEach(async () => {
     const persistence = configureFilePersistence();
@@ -41,6 +43,11 @@ describe('MarketplaceController integration', () => {
       usersService,
       'applicant@example.com',
       applicantAddress,
+    );
+    arbitratorUser = await createLinkedUser(
+      usersService,
+      'arbitrator@example.com',
+      arbitratorAddress,
     );
   });
 
@@ -213,6 +220,86 @@ describe('MarketplaceController integration', () => {
     const detail = await controller.getOpportunity(created.opportunity.id);
     expect(detail.opportunity.id).toBe(created.opportunity.id);
     expect(detail.opportunity.visibility).toBe('private');
+  });
+
+  it('accepts abuse reports through the controller and exposes them to arbitrator moderation', async () => {
+    await controller.upsertProfile(
+      clientUser,
+      buildProfileInput({
+        slug: 'client-report-subject',
+        displayName: 'Client Report Subject',
+        headline: 'Owns the brief',
+        bio: 'Used for abuse reporting integration.',
+        skills: ['product'],
+        specialties: ['hiring'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'escrow_power_user',
+        portfolioUrls: ['https://example.com/client-report-subject'],
+      }),
+    );
+    await controller.upsertProfile(
+      applicantUser,
+      buildProfileInput({
+        slug: 'builder-report-subject',
+        displayName: 'Builder Report Subject',
+        headline: 'Visible contractor profile',
+        bio: 'Public profile for reporting.',
+        skills: ['react', 'typescript'],
+        specialties: ['marketplaces'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/builder-report-subject'],
+      }),
+    );
+
+    const created = await controller.createOpportunity(
+      clientUser,
+      buildOpportunityInput({
+        title: 'Moderated brief',
+        summary: 'Used for operator queue validation',
+        description: 'Exercises abuse report intake.',
+      }),
+    );
+    await controller.publishOpportunity(clientUser, created.opportunity.id);
+
+    const profileReport = await controller.reportProfile(
+      clientUser,
+      'builder-report-subject',
+      {
+        reason: 'spam',
+        details: 'This profile is spamming copied replies.',
+        evidenceUrls: ['https://example.com/evidence/profile'],
+      },
+    );
+    expect(profileReport.report.subject.type).toBe('profile');
+
+    const opportunityReport = await controller.reportOpportunity(
+      applicantUser,
+      created.opportunity.id,
+      {
+        reason: 'policy_violation',
+        details: 'The brief requests an unsupported workflow.',
+        evidenceUrls: [],
+      },
+    );
+    expect(opportunityReport.report.subject.type).toBe('opportunity');
+
+    const reports = await controller.listModerationReports(arbitratorUser, {
+      limit: 50,
+    });
+    expect(reports.reports).toHaveLength(2);
+
+    const updated = await controller.updateModerationReport(
+      arbitratorUser,
+      profileReport.report.id,
+      {
+        status: 'dismissed',
+        resolutionNote: 'Insufficient evidence after review.',
+      },
+    );
+    expect(updated.report.status).toBe('dismissed');
+    expect(updated.report.resolutionNote).toContain('Insufficient evidence');
+    expect(opportunityReport.report.id).not.toBe(profileReport.report.id);
   });
 });
 
