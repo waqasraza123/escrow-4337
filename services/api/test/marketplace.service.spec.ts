@@ -346,7 +346,7 @@ describe('MarketplaceService', () => {
     expect(profiles.profiles).toHaveLength(0);
   });
 
-  it('captures abuse reports, blocks duplicate active reports, and lets arbitrators close them atomically with subject moderation', async () => {
+  it('captures abuse reports, enforces claim ownership, and closes them with escalation-safe investigation workflow', async () => {
     await marketplaceService.upsertProfile(
       clientUserId,
       buildProfileInput({
@@ -432,6 +432,84 @@ describe('MarketplaceService', () => {
         arbitratorUserId,
         profileReport.report.id,
         {
+          status: 'reviewing',
+          escalationReason: 'Needs policy confirmation first.',
+        },
+      ),
+    ).rejects.toThrow(
+      'Claim the abuse report before updating investigation state',
+    );
+
+    const claimedReport = await marketplaceService.updateModerationReport(
+      arbitratorUserId,
+      profileReport.report.id,
+      {
+        status: 'open',
+        claimAction: 'claim',
+      },
+    );
+    expect(claimedReport.report.claimedBy?.email).toBe(
+      'arbitrator@example.com',
+    );
+
+    const escalatedReport = await marketplaceService.updateModerationReport(
+      arbitratorUserId,
+      profileReport.report.id,
+      {
+        status: 'reviewing',
+        escalationReason: 'Needs policy confirmation first.',
+      },
+    );
+    expect(escalatedReport.report.status).toBe('reviewing');
+    expect(escalatedReport.report.escalationReason).toContain(
+      'policy confirmation',
+    );
+    expect(escalatedReport.report.escalatedBy?.email).toBe(
+      'arbitrator@example.com',
+    );
+
+    await expect(
+      marketplaceService.updateModerationReport(
+        arbitratorUserId,
+        profileReport.report.id,
+        {
+          status: 'resolved',
+          escalationReason: 'Still blocked on policy input.',
+          evidenceReviewStatus: 'supports_report',
+          investigationSummary: 'Escalated review cannot be closed yet.',
+          resolutionNote: 'Closing while escalated should fail.',
+        },
+      ),
+    ).rejects.toThrow('Clear escalation before closing an abuse report');
+
+    const clearedEscalation = await marketplaceService.updateModerationReport(
+      arbitratorUserId,
+      profileReport.report.id,
+      {
+        status: 'reviewing',
+        escalationReason: null,
+      },
+    );
+    expect(clearedEscalation.report.escalationReason).toBeNull();
+
+    await expect(
+      marketplaceService.updateModerationReport(
+        arbitratorUserId,
+        opportunityReport.report.id,
+        {
+          status: 'resolved',
+          resolutionNote: 'Closing without evidence review should fail.',
+        },
+      ),
+    ).rejects.toThrow(
+      'Claim the abuse report before updating investigation state',
+    );
+
+    await expect(
+      marketplaceService.updateModerationReport(
+        arbitratorUserId,
+        profileReport.report.id,
+        {
           status: 'resolved',
           resolutionNote: 'Closing without evidence review should fail.',
         },
@@ -460,6 +538,7 @@ describe('MarketplaceService', () => {
     expect(closedReport.report.evidenceReviewedBy?.email).toBe(
       'arbitrator@example.com',
     );
+    expect(closedReport.report.claimedBy?.email).toBe('arbitrator@example.com');
     expect(closedReport.report.resolvedBy?.email).toBe(
       'arbitrator@example.com',
     );
@@ -476,11 +555,21 @@ describe('MarketplaceService', () => {
       arbitratorUserId,
       {
         limit: 50,
+        claimState: 'claimed',
         evidenceReviewStatus: 'supports_report',
       },
     );
     expect(supportsReports.reports).toHaveLength(1);
     expect(supportsReports.reports[0]?.id).toBe(profileReport.report.id);
+
+    const escalatedReports = await marketplaceService.listModerationReports(
+      arbitratorUserId,
+      {
+        limit: 50,
+        escalated: true,
+      },
+    );
+    expect(escalatedReports.reports).toHaveLength(0);
 
     const dashboard =
       await marketplaceService.getModerationDashboard(arbitratorUserId);

@@ -54,6 +54,7 @@ export type MarketplaceAbuseReportEvidenceReviewStatus =
   | 'supports_report'
   | 'insufficient_evidence'
   | 'contradicts_report';
+export type MarketplaceAbuseReportClaimState = 'claimed' | 'unclaimed';
 
 export type MarketplaceTalentProofArtifact = {
   id: string;
@@ -200,6 +201,11 @@ export type MarketplaceAbuseReportRecord = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  claimedByUserId: string | null;
+  claimedAt: number | null;
+  escalationReason: string | null;
+  escalatedByUserId: string | null;
+  escalatedAt: number | null;
   evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
   investigationSummary: string | null;
   evidenceReviewedByUserId: string | null;
@@ -312,6 +318,17 @@ export type MarketplaceAbuseReportView = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  claimedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  claimedAt: number | null;
+  escalationReason: string | null;
+  escalatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  escalatedAt: number | null;
   evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
   investigationSummary: string | null;
   evidenceReviewedBy: {

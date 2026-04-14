@@ -222,7 +222,7 @@ describe('MarketplaceController integration', () => {
     expect(detail.opportunity.visibility).toBe('private');
   });
 
-  it('accepts abuse reports through the controller and exposes atomic arbitrator moderation updates', async () => {
+  it('accepts abuse reports through the controller and exposes claim plus escalation-aware moderation updates', async () => {
     await controller.upsertProfile(
       clientUser,
       buildProfileInput({
@@ -289,11 +289,42 @@ describe('MarketplaceController integration', () => {
     });
     expect(reports.reports).toHaveLength(2);
 
+    const claimed = await controller.updateModerationReport(
+      arbitratorUser,
+      profileReport.report.id,
+      {
+        status: 'open',
+        claimAction: 'claim',
+      },
+    );
+    expect(claimed.report.claimedBy?.email).toBe('arbitrator@example.com');
+
+    const escalated = await controller.updateModerationReport(
+      arbitratorUser,
+      profileReport.report.id,
+      {
+        status: 'reviewing',
+        escalationReason: 'Needs policy confirmation.',
+      },
+    );
+    expect(escalated.report.escalationReason).toContain('policy confirmation');
+
+    const escalatedOnly = await controller.listModerationReports(
+      arbitratorUser,
+      {
+        limit: 50,
+        escalated: true,
+      },
+    );
+    expect(escalatedOnly.reports).toHaveLength(1);
+    expect(escalatedOnly.reports[0]?.id).toBe(profileReport.report.id);
+
     const updated = await controller.updateModerationReport(
       arbitratorUser,
       profileReport.report.id,
       {
         status: 'dismissed',
+        escalationReason: null,
         evidenceReviewStatus: 'insufficient_evidence',
         investigationSummary:
           'The report includes screenshots, but they do not tie the account to the alleged behavior.',
@@ -308,9 +339,12 @@ describe('MarketplaceController integration', () => {
     );
     expect(updated.report.resolutionNote).toContain('Insufficient evidence');
     expect(updated.report.subjectModerationStatus).toBe('visible');
+    expect(updated.report.claimedBy?.email).toBe('arbitrator@example.com');
+    expect(updated.report.escalationReason).toBeNull();
 
     const filtered = await controller.listModerationReports(arbitratorUser, {
       limit: 50,
+      claimState: 'claimed',
       evidenceReviewStatus: 'insufficient_evidence',
     });
     expect(filtered.reports).toHaveLength(1);

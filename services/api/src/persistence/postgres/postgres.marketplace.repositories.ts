@@ -94,6 +94,11 @@ type MarketplaceAbuseReportRow = QueryResultRow & {
   details: string | null;
   evidence_urls_json: string[];
   status: MarketplaceAbuseReportStatus;
+  claimed_by_user_id: string | null;
+  claimed_at_ms: string | null;
+  escalation_reason: string | null;
+  escalated_by_user_id: string | null;
+  escalated_at_ms: string | null;
   evidence_review_status: MarketplaceAbuseReportRecord['evidenceReviewStatus'];
   investigation_summary: string | null;
   evidence_reviewed_by_user_id: string | null;
@@ -206,6 +211,12 @@ function mapAbuseReport(
     details: row.details,
     evidenceUrls: row.evidence_urls_json ?? [],
     status: row.status,
+    claimedByUserId: row.claimed_by_user_id,
+    claimedAt: row.claimed_at_ms === null ? null : Number(row.claimed_at_ms),
+    escalationReason: row.escalation_reason,
+    escalatedByUserId: row.escalated_by_user_id,
+    escalatedAt:
+      row.escalated_at_ms === null ? null : Number(row.escalated_at_ms),
     evidenceReviewStatus: row.evidence_review_status,
     investigationSummary: row.investigation_summary,
     evidenceReviewedByUserId: row.evidence_reviewed_by_user_id,
@@ -590,6 +601,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           details,
           evidence_urls_json,
           status,
+          claimed_by_user_id,
+          claimed_at_ms,
+          escalation_reason,
+          escalated_by_user_id,
+          escalated_at_ms,
           evidence_review_status,
           investigation_summary,
           evidence_reviewed_by_user_id,
@@ -603,7 +619,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10, $11::uuid, $12, $13, $14::uuid, $15, $16::uuid, $17, $18, $19
+          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9::uuid, $10, $11, $12::uuid, $13, $14, $15, $16::uuid, $17, $18, $19::uuid, $20, $21::uuid, $22, $23, $24
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -614,6 +630,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           details = EXCLUDED.details,
           evidence_urls_json = EXCLUDED.evidence_urls_json,
           status = EXCLUDED.status,
+          claimed_by_user_id = EXCLUDED.claimed_by_user_id,
+          claimed_at_ms = EXCLUDED.claimed_at_ms,
+          escalation_reason = EXCLUDED.escalation_reason,
+          escalated_by_user_id = EXCLUDED.escalated_by_user_id,
+          escalated_at_ms = EXCLUDED.escalated_at_ms,
           evidence_review_status = EXCLUDED.evidence_review_status,
           investigation_summary = EXCLUDED.investigation_summary,
           evidence_reviewed_by_user_id = EXCLUDED.evidence_reviewed_by_user_id,
@@ -634,6 +655,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         report.details,
         JSON.stringify(report.evidenceUrls),
         report.status,
+        report.claimedByUserId,
+        report.claimedAt === null ? null : String(report.claimedAt),
+        report.escalationReason,
+        report.escalatedByUserId,
+        report.escalatedAt === null ? null : String(report.escalatedAt),
         report.evidenceReviewStatus,
         report.investigationSummary,
         report.evidenceReviewedByUserId,

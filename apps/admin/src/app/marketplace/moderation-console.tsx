@@ -6,6 +6,7 @@ import styles from '../page.module.css';
 import {
   adminApi,
   type MarketplaceAbuseReport,
+  type MarketplaceAbuseReportClaimState,
   type MarketplaceAbuseReportEvidenceReviewStatus,
   type MarketplaceAbuseReportStatus,
   type MarketplaceAdminOpportunity,
@@ -69,6 +70,9 @@ export function MarketplaceModerationConsole() {
   );
   const [reports, setReports] = useState<MarketplaceAbuseReport[]>([]);
   const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
+  const [reportEscalationReasons, setReportEscalationReasons] = useState<
+    Record<string, string>
+  >({});
   const [reportInvestigationSummaries, setReportInvestigationSummaries] =
     useState<Record<string, string>>({});
   const [reportEvidenceReviews, setReportEvidenceReviews] = useState<
@@ -77,6 +81,8 @@ export function MarketplaceModerationConsole() {
   const [reportFilters, setReportFilters] = useState<{
     status?: MarketplaceAbuseReportStatus;
     subjectType?: 'profile' | 'opportunity';
+    claimState?: MarketplaceAbuseReportClaimState;
+    escalated?: boolean;
     evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
   }>({});
   const [error, setError] = useState<string | null>(null);
@@ -194,8 +200,27 @@ export function MarketplaceModerationConsole() {
       investigationSummaryDraft === undefined
         ? report.investigationSummary
         : investigationSummaryDraft.trim() || null;
+    const escalationReasonDraft = reportEscalationReasons[report.id];
+    const escalationReason =
+      escalationReasonDraft === undefined
+        ? report.escalationReason
+        : escalationReasonDraft.trim() || null;
     const evidenceReviewStatus =
       reportEvidenceReviews[report.id] ?? report.evidenceReviewStatus;
+    const isClaimedByOperator = report.claimedBy?.userId === operator?.id;
+
+    if (
+      !isClaimedByOperator &&
+      (status !== report.status ||
+        escalationReason !== report.escalationReason ||
+        evidenceReviewStatus !== report.evidenceReviewStatus ||
+        investigationSummary !== report.investigationSummary ||
+        resolutionNote !== report.resolutionNote ||
+        subjectModerationStatus !== undefined)
+    ) {
+      setError('Claim the abuse report before updating investigation state.');
+      return;
+    }
 
     if ((status === 'resolved' || status === 'dismissed') && !resolutionNote) {
       setError('Resolution note is required before closing a report.');
@@ -218,11 +243,20 @@ export function MarketplaceModerationConsole() {
       return;
     }
 
+    if (
+      (status === 'resolved' || status === 'dismissed') &&
+      escalationReason
+    ) {
+      setError('Clear escalation before closing a report.');
+      return;
+    }
+
     setError(null);
     await adminApi.updateMarketplaceModerationReport(
       report.id,
       {
         status,
+        escalationReason,
         evidenceReviewStatus,
         investigationSummary,
         resolutionNote,
@@ -234,6 +268,61 @@ export function MarketplaceModerationConsole() {
       subjectModerationStatus
         ? `Abuse report updated to ${status} and subject set to ${subjectModerationStatus}.`
         : `Abuse report updated to ${status}.`,
+    );
+    await load(tokens);
+  }
+
+  async function handleClaimAction(
+    report: MarketplaceAbuseReport,
+    claimAction: 'claim' | 'release',
+  ) {
+    if (!tokens) {
+      return;
+    }
+
+    setError(null);
+    await adminApi.updateMarketplaceModerationReport(
+      report.id,
+      {
+        status: report.status,
+        claimAction,
+      },
+      tokens.accessToken,
+    );
+    setMessage(
+      claimAction === 'claim'
+        ? 'Abuse report claimed for investigation.'
+        : 'Abuse report released back to the queue.',
+    );
+    await load(tokens);
+  }
+
+  async function handleEscalation(
+    report: MarketplaceAbuseReport,
+    escalationReason: string | null,
+  ) {
+    if (!tokens) {
+      return;
+    }
+
+    if (report.claimedBy?.userId !== operator?.id) {
+      setError('Claim the abuse report before changing escalation state.');
+      return;
+    }
+
+    setError(null);
+    await adminApi.updateMarketplaceModerationReport(
+      report.id,
+      {
+        status: report.status,
+        escalationReason,
+      },
+      tokens.accessToken,
+    );
+    setMessage(
+      escalationReason
+        ? 'Abuse report escalated for follow-up.'
+        : 'Abuse report escalation cleared.',
     );
     await load(tokens);
   }
@@ -473,6 +562,52 @@ export function MarketplaceModerationConsole() {
                 </label>
 
                 <label className={styles.field}>
+                  <span>Claim filter</span>
+                  <select
+                    value={reportFilters.claimState ?? ''}
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        claimState:
+                          event.target.value === ''
+                            ? undefined
+                            : (event.target.value as MarketplaceAbuseReportClaimState),
+                      }))
+                    }
+                  >
+                    <option value="">All claims</option>
+                    <option value="unclaimed">Unclaimed</option>
+                    <option value="claimed">Claimed</option>
+                  </select>
+                </label>
+
+                <label className={styles.field}>
+                  <span>Escalation filter</span>
+                  <select
+                    value={
+                      reportFilters.escalated === undefined
+                        ? ''
+                        : reportFilters.escalated
+                          ? 'true'
+                          : 'false'
+                    }
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        escalated:
+                          event.target.value === ''
+                            ? undefined
+                            : event.target.value === 'true',
+                      }))
+                    }
+                  >
+                    <option value="">All escalation states</option>
+                    <option value="true">Escalated</option>
+                    <option value="false">Not escalated</option>
+                  </select>
+                </label>
+
+                <label className={styles.field}>
                   <span>Evidence review filter</span>
                   <select
                     value={reportFilters.evidenceReviewStatus ?? ''}
@@ -511,6 +646,19 @@ export function MarketplaceModerationConsole() {
                         {report.details ?? 'No details supplied.'}
                       </p>
                       <p className={styles.stateText}>
+                        {report.claimedBy
+                          ? `Claimed by ${report.claimedBy.email}`
+                          : 'Unclaimed'}
+                      </p>
+                      {report.escalationReason ? (
+                        <p className={styles.stateText}>
+                          Escalated: {report.escalationReason}
+                          {report.escalatedBy
+                            ? ` by ${report.escalatedBy.email}`
+                            : ''}
+                        </p>
+                      ) : null}
+                      <p className={styles.stateText}>
                         Evidence review: {evidenceReviewLabels[report.evidenceReviewStatus]}
                         {report.evidenceReviewedBy
                           ? ` by ${report.evidenceReviewedBy.email}`
@@ -538,6 +686,66 @@ export function MarketplaceModerationConsole() {
                           ))}
                         </div>
                       ) : null}
+                      <div className={styles.inlineActions}>
+                        {report.claimedBy?.userId === operator?.id ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleClaimAction(report, 'release')}
+                          >
+                            Release claim
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={Boolean(report.claimedBy)}
+                            onClick={() => void handleClaimAction(report, 'claim')}
+                          >
+                            Claim report
+                          </button>
+                        )}
+                      </div>
+                      <label className={styles.field}>
+                        <span>Escalation note</span>
+                        <textarea
+                          value={
+                            reportEscalationReasons[report.id] ??
+                            report.escalationReason ??
+                            ''
+                          }
+                          onChange={(event) =>
+                            setReportEscalationReasons((current) => ({
+                              ...current,
+                              [report.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          disabled={report.claimedBy?.userId !== operator?.id}
+                          onClick={() =>
+                            void handleEscalation(
+                              report,
+                              (reportEscalationReasons[report.id]?.trim() ||
+                                report.escalationReason ||
+                                null),
+                            )
+                          }
+                        >
+                          Escalate
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            report.claimedBy?.userId !== operator?.id ||
+                            report.escalationReason === null
+                          }
+                          onClick={() => void handleEscalation(report, null)}
+                        >
+                          Clear escalation
+                        </button>
+                      </div>
                       <label className={styles.field}>
                         <span>Evidence review</span>
                         <select

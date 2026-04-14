@@ -197,6 +197,11 @@ export const marketplaceModerationReportsQuerySchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']).optional(),
     subjectType: z.enum(['profile', 'opportunity']).optional(),
+    claimState: z.enum(['claimed', 'unclaimed']).optional(),
+    escalated: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
     evidenceReviewStatus: z
       .enum([
         'pending',
@@ -212,6 +217,8 @@ export const marketplaceModerationReportsQuerySchema = z
 export const updateMarketplaceAbuseReportSchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
+    claimAction: z.enum(['claim', 'release']).optional(),
+    escalationReason: z.string().trim().min(1).max(2000).nullable().optional(),
     evidenceReviewStatus: z
       .enum([
         'pending',

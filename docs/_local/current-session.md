@@ -7,13 +7,13 @@
 - Keep shipping marketplace trust-and-safety and operator moderation slices on top of the restored green baseline.
 
 ## Last Completed Step
-- Added atomic abuse-report disposition workflow: arbitrator report updates can now persist the chosen subject moderation action on the same report, record who applied it and when, and drive combined resolve/dismiss actions from the admin queue.
+- Added abuse-report claim and escalation workflow: moderation reports now persist explicit ownership and escalation state, require a claim before investigation changes or closure, and expose queue filters for claimed/unclaimed and escalated posture.
 
 ## Current Step
-- Task complete. Atomic report disposition is shipped and targeted verification is green.
+- Task complete. Claim and escalation workflow is shipped and targeted verification is green.
 
 ## Why This Step Exists
-- The queue had become actionable, but report closure and subject moderation were still separate operations. That left room for operator drift where a report could be closed without a persisted subject action, or vice versa.
+- Structured evidence review improved moderation auditability, but the queue still lacked accountable ownership. Reports could be edited without an explicit claim, and escalations had no persisted state or filterable workflow posture.
 
 ## Changed Files
 - API:
@@ -24,7 +24,7 @@
   `services/api/src/persistence/file/file-persistence.store.ts`
   `services/api/src/persistence/file/file.marketplace.repositories.ts`
   `services/api/src/persistence/postgres/postgres.marketplace.repositories.ts`
-  `services/api/src/persistence/postgres/migrations/015_marketplace_abuse_report_workflow.sql`
+  `services/api/src/persistence/postgres/migrations/017_marketplace_abuse_report_claims.sql`
   `services/api/test/marketplace.service.spec.ts`
   `services/api/test/marketplace.controller.integration.spec.ts`
 - Admin:
@@ -37,7 +37,7 @@
 
 ## Key Constraints
 - Preserve the existing arbitrator authorization model and profile/opportunity moderation model.
-- Keep report resolution and subject moderation coherent: one operator decision should be able to persist both without requiring separate UI/API steps.
+- Keep moderation ownership honest to the current architecture: the backend only knows one configured arbitrator authority, so the workflow should support self-claim/release and escalation state without inventing a broader operator roster.
 - Avoid introducing broader RBAC or workflow engines before the repo has the required operator model.
 
 ## Verification Commands
@@ -52,7 +52,7 @@
   - all commands above
 
 ## Expected Result
-- Operators can close an abuse report and persist the resulting subject moderation action as one coherent moderation event, while the API and admin surfaces remain green under targeted verification.
+- Operators can claim a moderation report, persist escalation state, filter the queue by ownership/escalation posture, and only change investigation or close state once the report is explicitly owned, while the API and admin surfaces remain green under targeted verification.
 
 ## Next Likely Step
-- Continue marketplace integrity hardening with the next operator-facing slice after atomic disposition: likely richer evidence handling, investigation workflow, or marketplace ranking/search controls.
+- Continue marketplace integrity hardening with the next operator-facing slice after claim/escalation workflow: likely operator workload metrics and SLA-style queue health, richer admin dossier ranking controls, or broader marketplace search/ranking hardening.

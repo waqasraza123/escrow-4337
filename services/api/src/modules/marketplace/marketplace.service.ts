@@ -1237,6 +1237,24 @@ export class MarketplaceService {
               return false;
             }
             if (
+              query.claimState === 'claimed' &&
+              report.claimedByUserId === null
+            ) {
+              return false;
+            }
+            if (
+              query.claimState === 'unclaimed' &&
+              report.claimedByUserId !== null
+            ) {
+              return false;
+            }
+            if (
+              query.escalated !== undefined &&
+              query.escalated !== (report.escalationReason !== null)
+            ) {
+              return false;
+            }
+            if (
               query.evidenceReviewStatus &&
               report.evidenceReviewStatus !== query.evidenceReviewStatus
             ) {
@@ -1293,12 +1311,37 @@ export class MarketplaceService {
     await this.requireModerationAccess(userId);
     const report = await this.requireAbuseReport(reportId);
     const now = Date.now();
+    const hasWorkflowMutation =
+      dto.status !== report.status ||
+      dto.escalationReason !== undefined ||
+      dto.evidenceReviewStatus !== undefined ||
+      dto.investigationSummary !== undefined ||
+      dto.resolutionNote !== undefined ||
+      dto.subjectModerationStatus !== undefined;
     const nextEvidenceReviewStatus =
       dto.evidenceReviewStatus ?? report.evidenceReviewStatus;
+    const nextEscalationReason =
+      dto.escalationReason === undefined
+        ? report.escalationReason
+        : (dto.escalationReason?.trim() ?? null);
     const nextInvestigationSummary =
       dto.investigationSummary === undefined
         ? report.investigationSummary
         : (dto.investigationSummary?.trim() ?? null);
+
+    if (dto.claimAction === 'release' && hasWorkflowMutation) {
+      throw new BadRequestException(
+        'Claim release must be performed without other report workflow updates',
+      );
+    }
+
+    if (dto.claimAction) {
+      this.applyReportClaim(report, dto.claimAction, userId, now);
+    }
+
+    if (hasWorkflowMutation) {
+      this.assertReportClaimedByOperator(report, userId);
+    }
 
     if (
       (dto.status === 'resolved' || dto.status === 'dismissed') &&
@@ -1324,6 +1367,15 @@ export class MarketplaceService {
     ) {
       throw new BadRequestException(
         'Investigation summary is required when closing an abuse report',
+      );
+    }
+
+    if (
+      (dto.status === 'resolved' || dto.status === 'dismissed') &&
+      nextEscalationReason
+    ) {
+      throw new BadRequestException(
+        'Clear escalation before closing an abuse report',
       );
     }
 
@@ -1354,6 +1406,14 @@ export class MarketplaceService {
         investigationSummary: nextInvestigationSummary,
         userId,
         reviewedAt: now,
+      });
+    }
+
+    if (dto.escalationReason !== undefined) {
+      this.applyReportEscalation(report, {
+        escalationReason: nextEscalationReason,
+        userId,
+        escalatedAt: now,
       });
     }
 
@@ -1541,6 +1601,12 @@ export class MarketplaceService {
     const resolvedBy = report.resolvedByUserId
       ? await this.usersService.getRequiredById(report.resolvedByUserId)
       : null;
+    const claimedBy = report.claimedByUserId
+      ? await this.usersService.getRequiredById(report.claimedByUserId)
+      : null;
+    const escalatedBy = report.escalatedByUserId
+      ? await this.usersService.getRequiredById(report.escalatedByUserId)
+      : null;
     const evidenceReviewedBy = report.evidenceReviewedByUserId
       ? await this.usersService.getRequiredById(report.evidenceReviewedByUserId)
       : null;
@@ -1559,6 +1625,21 @@ export class MarketplaceService {
       details: report.details,
       evidenceUrls: report.evidenceUrls,
       status: report.status,
+      claimedBy: claimedBy
+        ? {
+            userId: claimedBy.id,
+            email: claimedBy.email,
+          }
+        : null,
+      claimedAt: report.claimedAt,
+      escalationReason: report.escalationReason,
+      escalatedBy: escalatedBy
+        ? {
+            userId: escalatedBy.id,
+            email: escalatedBy.email,
+          }
+        : null,
+      escalatedAt: report.escalatedAt,
       evidenceReviewStatus: report.evidenceReviewStatus,
       investigationSummary: report.investigationSummary,
       evidenceReviewedBy: evidenceReviewedBy
@@ -2102,6 +2183,11 @@ export class MarketplaceService {
       details: input.dto.details?.trim() || null,
       evidenceUrls: normalizeTextArray(input.dto.evidenceUrls),
       status: 'open',
+      claimedByUserId: null,
+      claimedAt: null,
+      escalationReason: null,
+      escalatedByUserId: null,
+      escalatedAt: null,
       evidenceReviewStatus: 'pending',
       investigationSummary: null,
       evidenceReviewedByUserId: null,
@@ -2123,6 +2209,57 @@ export class MarketplaceService {
 
   private async requireModerationAccess(userId: string) {
     await this.escrowActorService.resolveArbitrator(userId);
+  }
+
+  private assertReportClaimedByOperator(
+    report: MarketplaceAbuseReportRecord,
+    userId: string,
+  ) {
+    if (report.claimedByUserId === userId) {
+      return;
+    }
+
+    if (report.claimedByUserId === null) {
+      throw new ForbiddenException(
+        'Claim the abuse report before updating investigation state',
+      );
+    }
+
+    throw new ForbiddenException(
+      'This abuse report is already claimed by another operator',
+    );
+  }
+
+  private applyReportClaim(
+    report: MarketplaceAbuseReportRecord,
+    claimAction: 'claim' | 'release',
+    userId: string,
+    now: number,
+  ) {
+    if (claimAction === 'claim') {
+      if (report.claimedByUserId && report.claimedByUserId !== userId) {
+        throw new ConflictException(
+          'This abuse report is already claimed by another operator',
+        );
+      }
+
+      report.claimedByUserId = userId;
+      report.claimedAt = now;
+      return;
+    }
+
+    if (report.claimedByUserId === null) {
+      return;
+    }
+
+    if (report.claimedByUserId !== userId) {
+      throw new ForbiddenException(
+        'Only the operator who claimed this abuse report can release it',
+      );
+    }
+
+    report.claimedByUserId = null;
+    report.claimedAt = null;
   }
 
   private async applyReportSubjectModeration(
@@ -2153,6 +2290,26 @@ export class MarketplaceService {
     report.subjectModerationStatus = moderationStatus;
     report.subjectModeratedByUserId = userId;
     report.subjectModeratedAt = now;
+  }
+
+  private applyReportEscalation(
+    report: MarketplaceAbuseReportRecord,
+    input: {
+      escalationReason: string | null;
+      userId: string;
+      escalatedAt: number;
+    },
+  ) {
+    report.escalationReason = input.escalationReason;
+
+    if (input.escalationReason === null) {
+      report.escalatedByUserId = null;
+      report.escalatedAt = null;
+      return;
+    }
+
+    report.escalatedByUserId = input.userId;
+    report.escalatedAt = input.escalatedAt;
   }
 
   private applyReportEvidenceReview(

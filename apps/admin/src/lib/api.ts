@@ -284,6 +284,7 @@ export type MarketplaceAbuseReportEvidenceReviewStatus =
   | 'supports_report'
   | 'insufficient_evidence'
   | 'contradicts_report';
+export type MarketplaceAbuseReportClaimState = 'claimed' | 'unclaimed';
 
 export type MarketplaceAbuseReportSubjectSummary =
   | {
@@ -313,6 +314,17 @@ export type MarketplaceAbuseReport = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  claimedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  claimedAt: number | null;
+  escalationReason: string | null;
+  escalatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  escalatedAt: number | null;
   evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
   investigationSummary: string | null;
   evidenceReviewedBy: {
@@ -1139,6 +1151,8 @@ export const adminApi = {
     input: {
       status?: MarketplaceAbuseReportStatus;
       subjectType?: 'profile' | 'opportunity';
+      claimState?: MarketplaceAbuseReportClaimState;
+      escalated?: boolean;
       evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
       limit?: number;
     },
@@ -1147,6 +1161,10 @@ export const adminApi = {
     const search = new URLSearchParams();
     if (input.status) search.set('status', input.status);
     if (input.subjectType) search.set('subjectType', input.subjectType);
+    if (input.claimState) search.set('claimState', input.claimState);
+    if (input.escalated !== undefined) {
+      search.set('escalated', String(input.escalated));
+    }
     if (input.evidenceReviewStatus) {
       search.set('evidenceReviewStatus', input.evidenceReviewStatus);
     }
@@ -1193,6 +1211,8 @@ export const adminApi = {
     reportId: string,
     input: {
       status: MarketplaceAbuseReportStatus;
+      claimAction?: 'claim' | 'release';
+      escalationReason?: string | null;
       evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
       investigationSummary?: string | null;
       resolutionNote?: string | null;

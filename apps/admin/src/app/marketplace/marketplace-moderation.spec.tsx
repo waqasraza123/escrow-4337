@@ -61,9 +61,9 @@ describe('marketplace moderation page', () => {
         hiredApplications: 1,
         hireConversionPercent: 50,
         agingOpportunityCount: 1,
-        totalAbuseReports: 1,
+        totalAbuseReports: 2,
         openAbuseReports: 1,
-        reviewingAbuseReports: 0,
+        reviewingAbuseReports: 1,
       },
       agingOpportunities: [
         {
@@ -93,6 +93,14 @@ describe('marketplace moderation page', () => {
           details: 'Suspicious copied portfolio.',
           evidenceUrls: ['https://example.com/evidence'],
           status: 'open',
+          claimedBy: {
+            userId: 'operator-1',
+            email: 'operator@example.com',
+          },
+          claimedAt: 1,
+          escalationReason: null,
+          escalatedBy: null,
+          escalatedAt: null,
           evidenceReviewStatus: 'pending',
           investigationSummary: null,
           evidenceReviewedBy: null,
@@ -178,6 +186,14 @@ describe('marketplace moderation page', () => {
           details: 'Suspicious copied portfolio.',
           evidenceUrls: ['https://example.com/evidence'],
           status: 'open',
+          claimedBy: {
+            userId: 'operator-1',
+            email: 'operator@example.com',
+          },
+          claimedAt: 1,
+          escalationReason: null,
+          escalatedBy: null,
+          escalatedAt: null,
           evidenceReviewStatus: 'pending',
           investigationSummary: null,
           evidenceReviewedBy: null,
@@ -189,6 +205,47 @@ describe('marketplace moderation page', () => {
           subjectModeratedAt: null,
           createdAt: 1,
           updatedAt: 1,
+        },
+        {
+          id: 'report-2',
+          subject: {
+            type: 'opportunity',
+            id: 'opp-1',
+            label: 'Old brief',
+            visibility: 'public',
+            moderationStatus: 'visible',
+            status: 'published',
+          },
+          reporter: {
+            userId: 'client-2',
+            email: 'another@example.com',
+          },
+          reason: 'policy_violation',
+          details: 'Needs operator assignment.',
+          evidenceUrls: [],
+          status: 'reviewing',
+          claimedBy: null,
+          claimedAt: null,
+          escalationReason: 'Needs contract-policy confirmation.',
+          escalatedBy: {
+            userId: 'operator-1',
+            email: 'operator@example.com',
+          },
+          escalatedAt: 2,
+          evidenceReviewStatus: 'insufficient_evidence',
+          investigationSummary: 'Waiting for policy review.',
+          evidenceReviewedBy: {
+            userId: 'operator-1',
+            email: 'operator@example.com',
+          },
+          evidenceReviewedAt: 2,
+          resolutionNote: null,
+          resolvedBy: null,
+          subjectModerationStatus: null,
+          subjectModeratedBy: null,
+          subjectModeratedAt: null,
+          createdAt: 2,
+          updatedAt: 2,
         },
       ],
     });
@@ -211,30 +268,47 @@ describe('marketplace moderation page', () => {
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('Abuse queue')).toBeInTheDocument();
     expect(screen.getByText('Suspicious copied portfolio.')).toBeInTheDocument();
+    expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
     expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
       { limit: 50 },
       'access-token-123',
     );
 
+    await user.click(screen.getByRole('button', { name: 'Claim report' }));
+
+    await waitFor(() => {
+      expect(mockedAdminApi.updateMarketplaceModerationReport).toHaveBeenCalledWith(
+        'report-2',
+        {
+          status: 'reviewing',
+          claimAction: 'claim',
+        },
+        'access-token-123',
+      );
+    });
+
     await user.type(
-      screen.getByRole('textbox', { name: 'Investigation summary' }),
+      screen.getAllByRole('textbox', { name: 'Investigation summary' })[0]!,
       'Matched prior complaint artifacts.',
     );
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Evidence review' }),
+      screen.getAllByRole('combobox', { name: 'Evidence review' })[0]!,
       'supports_report',
     );
     await user.type(
-      screen.getByRole('textbox', { name: 'Resolution note' }),
+      screen.getAllByRole('textbox', { name: 'Resolution note' })[0]!,
       'Hidden after review.',
     );
-    await user.click(screen.getByRole('button', { name: 'Resolve + Suspend' }));
+    await user.click(
+      screen.getAllByRole('button', { name: 'Resolve + Suspend' })[0]!,
+    );
 
     await waitFor(() => {
       expect(mockedAdminApi.updateMarketplaceModerationReport).toHaveBeenCalledWith(
         'report-1',
         {
           status: 'resolved',
+          escalationReason: null,
           evidenceReviewStatus: 'supports_report',
           investigationSummary: 'Matched prior complaint artifacts.',
           resolutionNote: 'Hidden after review.',
@@ -257,13 +331,48 @@ describe('marketplace moderation page', () => {
     });
 
     await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Claim filter' }),
+      'claimed',
+    );
+
+    await waitFor(() => {
+      expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+        { limit: 50, subjectType: 'opportunity', claimState: 'claimed' },
+        'access-token-123',
+      );
+    });
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Escalation filter' }),
+      'true',
+    );
+
+    await waitFor(() => {
+      expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+        {
+          limit: 50,
+          subjectType: 'opportunity',
+          claimState: 'claimed',
+          escalated: true,
+        },
+        'access-token-123',
+      );
+    });
+
+    await user.selectOptions(
       screen.getByRole('combobox', { name: 'Evidence review filter' }),
       'supports_report',
     );
 
     await waitFor(() => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
-        { limit: 50, subjectType: 'opportunity', evidenceReviewStatus: 'supports_report' },
+        {
+          limit: 50,
+          subjectType: 'opportunity',
+          claimState: 'claimed',
+          escalated: true,
+          evidenceReviewStatus: 'supports_report',
+        },
         'access-token-123',
       );
     });

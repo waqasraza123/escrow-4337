@@ -1,0 +1,6 @@
+ALTER TABLE marketplace_abuse_reports
+  ADD COLUMN IF NOT EXISTS claimed_by_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS claimed_at_ms BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS escalation_reason TEXT NULL,
+  ADD COLUMN IF NOT EXISTS escalated_by_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS escalated_at_ms BIGINT NULL;
