@@ -225,9 +225,6 @@ export type MarketplaceAbuseReportRecord = {
   subjectModerationStatus: ModerationStatus | null;
   subjectModeratedByUserId: string | null;
   subjectModeratedAt: number | null;
-  queuePriority: MarketplaceAbuseReportQueuePriority;
-  ageHours: number;
-  hoursSinceUpdate: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -360,6 +357,9 @@ export type MarketplaceAbuseReportView = {
     email: string;
   } | null;
   subjectModeratedAt: number | null;
+  queuePriority: MarketplaceAbuseReportQueuePriority;
+  ageHours: number;
+  hoursSinceUpdate: number;
   createdAt: number;
   updatedAt: number;
 };
