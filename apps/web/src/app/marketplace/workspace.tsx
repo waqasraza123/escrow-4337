@@ -1172,7 +1172,11 @@ export function MarketplaceWorkspace() {
               <p className={styles.stateText}>{workspaceMessages.noOpportunities}</p>
             ) : (
               myOpportunities.map((opportunity) => (
-                <article key={opportunity.id} className={styles.actionPanel}>
+                <article
+                  key={opportunity.id}
+                  className={styles.actionPanel}
+                  data-testid={`marketplace-my-opportunity-${opportunity.id}`}
+                >
                   <div className={styles.stack}>
                     <strong>{opportunity.title}</strong>
                     <p className={styles.stateText}>
@@ -1336,7 +1340,11 @@ export function MarketplaceWorkspace() {
               <p className={styles.stateText}>{workspaceMessages.noApplications}</p>
             ) : (
               myApplications.map((application) => (
-                <article key={application.id} className={styles.actionPanel}>
+                <article
+                  key={application.id}
+                  className={styles.actionPanel}
+                  data-testid={`marketplace-my-application-${application.id}`}
+                >
                   <strong>{application.opportunity.title}</strong>
                   <p className={styles.stateText}>
                     {formatApplicationStatus(application.status)} •{' '}
@@ -1387,7 +1395,11 @@ export function MarketplaceWorkspace() {
                   applicationDrafts[opportunity.id] ??
                   createApplicationDraft(opportunity, profile);
                 return (
-                  <article key={opportunity.id} className={styles.actionPanel}>
+                  <article
+                    key={opportunity.id}
+                    className={styles.actionPanel}
+                    data-testid={`marketplace-open-brief-${opportunity.id}`}
+                  >
                     <div className={styles.stack}>
                     <strong>{opportunity.title}</strong>
                     <p className={styles.stateText}>{opportunity.summary}</p>
@@ -1411,7 +1423,7 @@ export function MarketplaceWorkspace() {
                         {workspaceMessages.viewPublicBrief}
                       </Link>
                     </div>
-                      {tokens && user?.id !== opportunity.owner.userId ? (
+                      {tokens && user && user.id !== opportunity.owner.userId ? (
                         <div className={styles.stack}>
                           <label className={styles.field}>
                             <span>{workspaceMessages.coverNote}</span>

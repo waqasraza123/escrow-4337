@@ -14,6 +14,27 @@ import {
   upsertMarketplaceProfileForApiSession,
 } from './marketplace-api';
 
+type SeededMarketplaceProfileInput = {
+  slug: string;
+  displayName: string;
+  headline: string;
+  bio: string;
+  skills: string[];
+  portfolioUrls?: string[];
+};
+
+type SeededMarketplaceOpportunityInput = {
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  currencyAddress: string;
+  requiredSkills: string[];
+  budgetMin: string;
+  budgetMax: string;
+  timeline: string;
+};
+
 export async function seedJoinReadyJobViaApi(input: {
   apiBaseUrl: string;
   client: {
@@ -104,41 +125,49 @@ export async function seedMarketplaceHireReadyOpportunityViaApi(input: {
   client: {
     session: BootstrapSessionTokens;
     wallet: Wallet;
-    profile: {
-      slug: string;
-      displayName: string;
-      headline: string;
-      bio: string;
-      skills: string[];
-      portfolioUrls?: string[];
-    };
+    profile: SeededMarketplaceProfileInput;
     ensureWalletLinked?: boolean;
     ensureSmartAccountProvisioned?: boolean;
   };
   talent: {
     session: BootstrapSessionTokens;
     wallet: Wallet;
-    profile: {
-      slug: string;
-      displayName: string;
-      headline: string;
-      bio: string;
-      skills: string[];
-      portfolioUrls?: string[];
-    };
+    profile: SeededMarketplaceProfileInput;
     ensureWalletLinked?: boolean;
   };
-  opportunity: {
-    title: string;
-    summary: string;
-    description: string;
-    category: string;
-    currencyAddress: string;
-    requiredSkills: string[];
-    budgetMin: string;
-    budgetMax: string;
-    timeline: string;
+  opportunity: SeededMarketplaceOpportunityInput;
+}) {
+  const { opportunityId } = await seedMarketplacePublishedOpportunityViaApi(input);
+
+  await applyToMarketplaceOpportunityForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.talent.session,
+    opportunityId,
+    selectedWalletAddress: input.talent.wallet.address,
+    portfolioUrls: input.talent.profile.portfolioUrls ?? [],
+  });
+
+  return {
+    opportunityId,
   };
+}
+
+export async function seedMarketplacePublishedOpportunityViaApi(input: {
+  apiBaseUrl: string;
+  client: {
+    session: BootstrapSessionTokens;
+    wallet: Wallet;
+    profile: SeededMarketplaceProfileInput;
+    ensureWalletLinked?: boolean;
+    ensureSmartAccountProvisioned?: boolean;
+  };
+  talent: {
+    session: BootstrapSessionTokens;
+    wallet: Wallet;
+    profile: SeededMarketplaceProfileInput;
+    ensureWalletLinked?: boolean;
+  };
+  opportunity: SeededMarketplaceOpportunityInput;
 }) {
   if (input.client.ensureWalletLinked ?? true) {
     await linkWalletForApiSession({
@@ -197,14 +226,6 @@ export async function seedMarketplaceHireReadyOpportunityViaApi(input: {
     apiBaseUrl: input.apiBaseUrl,
     session: input.talent.session,
     profile: input.talent.profile,
-  });
-
-  await applyToMarketplaceOpportunityForApiSession({
-    apiBaseUrl: input.apiBaseUrl,
-    session: input.talent.session,
-    opportunityId: createdOpportunity.opportunity.id,
-    selectedWalletAddress: input.talent.wallet.address,
-    portfolioUrls: input.talent.profile.portfolioUrls ?? [],
   });
 
   return {

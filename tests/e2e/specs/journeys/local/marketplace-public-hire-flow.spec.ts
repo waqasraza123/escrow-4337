@@ -46,7 +46,7 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   const opportunityTitle = `Marketplace Product Engineer ${runId}`;
   const opportunitySummary = `Ship the client workspace ${runId}`;
 
-  await seedMarketplaceHireReadyOpportunityViaApi({
+  const { opportunityId } = await seedMarketplaceHireReadyOpportunityViaApi({
     apiBaseUrl,
     client: {
       session: clientActor.session,
@@ -98,9 +98,8 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   const talentPage = await talentContext.newPage();
 
   await clientPage.goto(`${webBaseUrl}/app/marketplace`);
-  const clientOpportunityCard = panelCard(
-    workspacePanel(clientPage, 'My opportunities'),
-    opportunityTitle,
+  const clientOpportunityCard = clientPage.getByTestId(
+    `marketplace-my-opportunity-${opportunityId}`,
   );
   await expect(clientOpportunityCard.getByText('Public brief • Published')).toBeVisible();
   await clientOpportunityCard.getByRole('button', { name: 'Load review board' }).click();
