@@ -1286,6 +1286,7 @@ export class MarketplaceService {
   ): Promise<MarketplaceAbuseReportResponse> {
     await this.requireModerationAccess(userId);
     const report = await this.requireAbuseReport(reportId);
+    const now = Date.now();
 
     if (
       (dto.status === 'resolved' || dto.status === 'dismissed') &&
@@ -1296,8 +1297,17 @@ export class MarketplaceService {
       );
     }
 
+    if (dto.subjectModerationStatus !== undefined) {
+      await this.applyReportSubjectModeration(
+        report,
+        dto.subjectModerationStatus,
+        userId,
+        now,
+      );
+    }
+
     report.status = dto.status;
-    report.updatedAt = Date.now();
+    report.updatedAt = now;
 
     if (dto.status === 'resolved' || dto.status === 'dismissed') {
       report.resolutionNote = dto.resolutionNote?.trim() ?? null;
@@ -1471,6 +1481,9 @@ export class MarketplaceService {
     const resolvedBy = report.resolvedByUserId
       ? await this.usersService.getRequiredById(report.resolvedByUserId)
       : null;
+    const subjectModeratedBy = report.subjectModeratedByUserId
+      ? await this.usersService.getRequiredById(report.subjectModeratedByUserId)
+      : null;
 
     return {
       id: report.id,
@@ -1490,6 +1503,14 @@ export class MarketplaceService {
             email: resolvedBy.email,
           }
         : null,
+      subjectModerationStatus: report.subjectModerationStatus,
+      subjectModeratedBy: subjectModeratedBy
+        ? {
+            userId: subjectModeratedBy.id,
+            email: subjectModeratedBy.email,
+          }
+        : null,
+      subjectModeratedAt: report.subjectModeratedAt,
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
     };
@@ -2011,6 +2032,9 @@ export class MarketplaceService {
       status: 'open',
       resolutionNote: null,
       resolvedByUserId: null,
+      subjectModerationStatus: null,
+      subjectModeratedByUserId: null,
+      subjectModeratedAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -2023,6 +2047,36 @@ export class MarketplaceService {
 
   private async requireModerationAccess(userId: string) {
     await this.escrowActorService.resolveArbitrator(userId);
+  }
+
+  private async applyReportSubjectModeration(
+    report: MarketplaceAbuseReportRecord,
+    moderationStatus: ModerationStatus | null,
+    userId: string,
+    now: number,
+  ) {
+    if (moderationStatus === null) {
+      report.subjectModerationStatus = null;
+      report.subjectModeratedByUserId = null;
+      report.subjectModeratedAt = null;
+      return;
+    }
+
+    if (report.subjectType === 'profile') {
+      const profile = await this.requireProfileByUserId(report.subjectId);
+      profile.moderationStatus = moderationStatus;
+      profile.updatedAt = now;
+      await this.marketplaceRepository.saveProfile(profile);
+    } else {
+      const opportunity = await this.requireOpportunity(report.subjectId);
+      opportunity.moderationStatus = moderationStatus;
+      opportunity.updatedAt = now;
+      await this.marketplaceRepository.saveOpportunity(opportunity);
+    }
+
+    report.subjectModerationStatus = moderationStatus;
+    report.subjectModeratedByUserId = userId;
+    report.subjectModeratedAt = now;
   }
 
   private compareAbuseReportPriority(

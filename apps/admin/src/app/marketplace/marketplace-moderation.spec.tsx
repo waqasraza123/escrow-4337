@@ -95,6 +95,9 @@ describe('marketplace moderation page', () => {
           status: 'open',
           resolutionNote: null,
           resolvedBy: null,
+          subjectModerationStatus: null,
+          subjectModeratedBy: null,
+          subjectModeratedAt: null,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -173,6 +176,9 @@ describe('marketplace moderation page', () => {
           status: 'open',
           resolutionNote: null,
           resolvedBy: null,
+          subjectModerationStatus: null,
+          subjectModeratedBy: null,
+          subjectModeratedAt: null,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -202,21 +208,11 @@ describe('marketplace moderation page', () => {
       'access-token-123',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Suspend subject' }));
-
-    await waitFor(() => {
-      expect(mockedAdminApi.moderateMarketplaceProfile).toHaveBeenCalledWith(
-        'user-1',
-        'suspended',
-        'access-token-123',
-      );
-    });
-
     await user.type(
       screen.getByRole('textbox', { name: 'Resolution note' }),
       'Hidden after review.',
     );
-    await user.click(screen.getByRole('button', { name: 'Resolve' }));
+    await user.click(screen.getByRole('button', { name: 'Resolve + Suspend' }));
 
     await waitFor(() => {
       expect(mockedAdminApi.updateMarketplaceModerationReport).toHaveBeenCalledWith(
@@ -224,6 +220,7 @@ describe('marketplace moderation page', () => {
         {
           status: 'resolved',
           resolutionNote: 'Hidden after review.',
+          subjectModerationStatus: 'suspended',
         },
         'access-token-123',
       );

@@ -100,6 +100,9 @@ function normalizeAbuseReport(
     details: report.details?.trim() || null,
     evidenceUrls: normalizeTextList(report.evidenceUrls),
     resolutionNote: report.resolutionNote?.trim() || null,
+    subjectModerationStatus: report.subjectModerationStatus ?? null,
+    subjectModeratedByUserId: report.subjectModeratedByUserId ?? null,
+    subjectModeratedAt: report.subjectModeratedAt ?? null,
   };
 }
 

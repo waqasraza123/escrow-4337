@@ -313,6 +313,12 @@ export type MarketplaceAbuseReport = {
     userId: string;
     email: string;
   } | null;
+  subjectModerationStatus: MarketplaceModerationStatus | null;
+  subjectModeratedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  subjectModeratedAt: number | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -1172,6 +1178,7 @@ export const adminApi = {
     input: {
       status: MarketplaceAbuseReportStatus;
       resolutionNote?: string | null;
+      subjectModerationStatus?: MarketplaceModerationStatus | null;
     },
     accessToken: string,
   ) {

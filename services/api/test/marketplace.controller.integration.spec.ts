@@ -222,7 +222,7 @@ describe('MarketplaceController integration', () => {
     expect(detail.opportunity.visibility).toBe('private');
   });
 
-  it('accepts abuse reports through the controller and exposes them to arbitrator moderation', async () => {
+  it('accepts abuse reports through the controller and exposes atomic arbitrator moderation updates', async () => {
     await controller.upsertProfile(
       clientUser,
       buildProfileInput({
@@ -295,10 +295,12 @@ describe('MarketplaceController integration', () => {
       {
         status: 'dismissed',
         resolutionNote: 'Insufficient evidence after review.',
+        subjectModerationStatus: 'visible',
       },
     );
     expect(updated.report.status).toBe('dismissed');
     expect(updated.report.resolutionNote).toContain('Insufficient evidence');
+    expect(updated.report.subjectModerationStatus).toBe('visible');
     expect(opportunityReport.report.id).not.toBe(profileReport.report.id);
   });
 });

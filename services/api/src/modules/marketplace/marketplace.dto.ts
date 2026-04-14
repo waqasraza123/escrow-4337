@@ -205,6 +205,10 @@ export const updateMarketplaceAbuseReportSchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
     resolutionNote: z.string().trim().min(1).max(2000).nullable().optional(),
+    subjectModerationStatus: z
+      .enum(['visible', 'hidden', 'suspended'])
+      .nullable()
+      .optional(),
   })
   .strict();
 

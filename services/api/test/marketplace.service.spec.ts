@@ -346,7 +346,7 @@ describe('MarketplaceService', () => {
     expect(profiles.profiles).toHaveLength(0);
   });
 
-  it('captures abuse reports, blocks duplicate active reports, and lets arbitrators close them', async () => {
+  it('captures abuse reports, blocks duplicate active reports, and lets arbitrators close them atomically with subject moderation', async () => {
     await marketplaceService.upsertProfile(
       clientUserId,
       buildProfileInput({
@@ -433,12 +433,21 @@ describe('MarketplaceService', () => {
       {
         status: 'resolved',
         resolutionNote: 'Profile hidden pending owner response.',
+        subjectModerationStatus: 'hidden',
       },
     );
     expect(closedReport.report.status).toBe('resolved');
     expect(closedReport.report.resolvedBy?.email).toBe(
       'arbitrator@example.com',
     );
+    expect(closedReport.report.subjectModerationStatus).toBe('hidden');
+    expect(closedReport.report.subjectModeratedBy?.email).toBe(
+      'arbitrator@example.com',
+    );
+
+    const moderatedProfile =
+      await marketplaceRepository.getProfileByUserId(applicantUserId);
+    expect(moderatedProfile?.moderationStatus).toBe('hidden');
 
     const dashboard =
       await marketplaceService.getModerationDashboard(arbitratorUserId);

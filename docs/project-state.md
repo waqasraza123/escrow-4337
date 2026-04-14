@@ -39,7 +39,7 @@
 
 - API and frontend now include an escrow-first marketplace layer: talent profiles, opportunities, applications, deterministic public browse surfaces, authenticated CRUD, shortlist or reject or withdraw or hire transitions, a first admin moderation dashboard with funnel metrics and aging no-hire briefs, richer marketplace workspace pipeline summaries, contract deep-links after hire, and a hire bridge that turns a selected application into the existing single-contractor escrow job model without changing the onchain contract shape.
 - Marketplace now also includes a crypto-native hiring quality layer: structured hiring specs, structured proposals, proof-artifact management, escrow-derived execution reputation, deterministic fit scoring with explicit breakdowns and risk flags, public reputation-rich profile and opportunity detail views, and dossier endpoints that let clients review applicants before hire.
-- Marketplace trust-and-safety now also includes authenticated abuse-report intake for public profile or opportunity detail pages, persisted abuse-report records in file-backed and Postgres adapters, arbitrator-only moderation queue reads and report status updates, and dashboard abuse-report counts plus recent-report visibility in the admin console.
+- Marketplace trust-and-safety now also includes authenticated abuse-report intake for public profile or opportunity detail pages, persisted abuse-report records in file-backed and Postgres adapters, arbitrator-only moderation queue reads and report status updates, atomic report disposition that can persist subject moderation actions with the same operator decision, and dashboard abuse-report counts plus recent-report visibility in the admin console.
 - `WorkstreamEscrow` contract supports job creation, funding, milestone delivery/release, disputes, resolution, and remainder refunds.
 - Contract tests cover happy-path release/dispute and refund behavior.
 - API auth prototype supports OTP start/verify, refresh, logout, `me`, and Shariah preference toggling.
@@ -181,7 +181,7 @@
 
 ## Risks / Watchouts
 
-- Marketplace moderation is still intentionally minimal. Abuse reports and an operator queue now exist, but there is still no richer policy engine, investigation workflow, search abuse detection, or broader trust-and-safety automation.
+- Marketplace moderation is still intentionally minimal. Abuse reports, operator queue filters, and atomic subject-action disposition now exist, but there is still no richer policy engine, investigation workflow, search abuse detection, or broader trust-and-safety automation.
 - Marketplace ranking is still deterministic and shallow, driven by explicit dossier factors such as must-have coverage, category overlap, screening completeness, crypto readiness, and escrow history rather than a dedicated search index, recommendation system, or fraud model.
 - The new hire bridge keeps the one-client or one-contractor escrow shape deliberately unchanged. Marketplace hires still terminate in the existing invite or join escrow workflow, so there is not yet multi-award, agency, or pooled talent support.
 - Frontend apps now expose real console workflows, but they still depend on the prototype API surface and manual environment configuration rather than hardened production deployment.

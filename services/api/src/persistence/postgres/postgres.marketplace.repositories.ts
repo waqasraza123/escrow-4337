@@ -96,6 +96,11 @@ type MarketplaceAbuseReportRow = QueryResultRow & {
   status: MarketplaceAbuseReportStatus;
   resolution_note: string | null;
   resolved_by_user_id: string | null;
+  subject_moderation_status:
+    | MarketplaceProfileRecord['moderationStatus']
+    | null;
+  subject_moderated_by_user_id: string | null;
+  subject_moderated_at_ms: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -199,6 +204,12 @@ function mapAbuseReport(
     status: row.status,
     resolutionNote: row.resolution_note,
     resolvedByUserId: row.resolved_by_user_id,
+    subjectModerationStatus: row.subject_moderation_status,
+    subjectModeratedByUserId: row.subject_moderated_by_user_id,
+    subjectModeratedAt:
+      row.subject_moderated_at_ms === null
+        ? null
+        : Number(row.subject_moderated_at_ms),
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -570,11 +581,14 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           status,
           resolution_note,
           resolved_by_user_id,
+          subject_moderation_status,
+          subject_moderated_by_user_id,
+          subject_moderated_at_ms,
           created_at_ms,
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10::uuid, $11, $12
+          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10::uuid, $11, $12::uuid, $13, $14, $15
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -587,6 +601,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           status = EXCLUDED.status,
           resolution_note = EXCLUDED.resolution_note,
           resolved_by_user_id = EXCLUDED.resolved_by_user_id,
+          subject_moderation_status = EXCLUDED.subject_moderation_status,
+          subject_moderated_by_user_id = EXCLUDED.subject_moderated_by_user_id,
+          subject_moderated_at_ms = EXCLUDED.subject_moderated_at_ms,
           updated_at_ms = EXCLUDED.updated_at_ms
       `,
       [
@@ -600,6 +617,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         report.status,
         report.resolutionNote,
         report.resolvedByUserId,
+        report.subjectModerationStatus,
+        report.subjectModeratedByUserId,
+        report.subjectModeratedAt === null
+          ? null
+          : String(report.subjectModeratedAt),
         String(report.createdAt),
         String(report.updatedAt),
       ],

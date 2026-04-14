@@ -197,6 +197,9 @@ export type MarketplaceAbuseReportRecord = {
   status: MarketplaceAbuseReportStatus;
   resolutionNote: string | null;
   resolvedByUserId: string | null;
+  subjectModerationStatus: ModerationStatus | null;
+  subjectModeratedByUserId: string | null;
+  subjectModeratedAt: number | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -305,6 +308,12 @@ export type MarketplaceAbuseReportView = {
     userId: string;
     email: string;
   } | null;
+  subjectModerationStatus: ModerationStatus | null;
+  subjectModeratedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  subjectModeratedAt: number | null;
   createdAt: number;
   updatedAt: number;
 };

@@ -163,37 +163,10 @@ export function MarketplaceModerationConsole() {
     await load(tokens);
   }
 
-  async function handleModerateReportSubject(
-    report: MarketplaceAbuseReport,
-    moderationStatus: MarketplaceModerationStatus,
-  ) {
-    if (!tokens) {
-      return;
-    }
-
-    if (report.subject.type === 'profile') {
-      await adminApi.moderateMarketplaceProfile(
-        report.subject.id,
-        moderationStatus,
-        tokens.accessToken,
-      );
-    } else {
-      await adminApi.moderateMarketplaceOpportunity(
-        report.subject.id,
-        moderationStatus,
-        tokens.accessToken,
-      );
-    }
-
-    setMessage(
-      `${report.subject.type === 'profile' ? 'Profile' : 'Opportunity'} moderation updated to ${moderationStatus}.`,
-    );
-    await load(tokens);
-  }
-
   async function handleUpdateReport(
     reportId: string,
     status: MarketplaceAbuseReportStatus,
+    subjectModerationStatus?: MarketplaceModerationStatus | null,
   ) {
     if (!tokens) {
       return;
@@ -211,10 +184,15 @@ export function MarketplaceModerationConsole() {
       {
         status,
         resolutionNote,
+        subjectModerationStatus,
       },
       tokens.accessToken,
     );
-    setMessage(`Abuse report updated to ${status}.`);
+    setMessage(
+      subjectModerationStatus
+        ? `Abuse report updated to ${status} and subject set to ${subjectModerationStatus}.`
+        : `Abuse report updated to ${status}.`,
+    );
     await load(tokens);
   }
 
@@ -465,6 +443,14 @@ export function MarketplaceModerationConsole() {
                       <p className={styles.stateText}>
                         {report.details ?? 'No details supplied.'}
                       </p>
+                      {report.subjectModerationStatus ? (
+                        <p className={styles.stateText}>
+                          Subject action: {report.subjectModerationStatus}
+                          {report.subjectModeratedBy
+                            ? ` by ${report.subjectModeratedBy.email}`
+                            : ''}
+                        </p>
+                      ) : null}
                       {report.evidenceUrls.length > 0 ? (
                         <div className={styles.stack}>
                           {report.evidenceUrls.map((url) => (
@@ -504,42 +490,42 @@ export function MarketplaceModerationConsole() {
                         <button
                           type="button"
                           onClick={() =>
-                            void handleUpdateReport(report.id, 'resolved')
+                            void handleUpdateReport(report.id, 'resolved', 'hidden')
                           }
                         >
-                          Resolve
+                          Resolve + Hide
                         </button>
                         <button
                           type="button"
                           onClick={() =>
-                            void handleUpdateReport(report.id, 'dismissed')
+                            void handleUpdateReport(
+                              report.id,
+                              'resolved',
+                              'suspended',
+                            )
                           }
                         >
-                          Dismiss
+                          Resolve + Suspend
                         </button>
                         <button
                           type="button"
                           onClick={() =>
-                            void handleModerateReportSubject(report, 'visible')
+                            void handleUpdateReport(
+                              report.id,
+                              'dismissed',
+                              'visible',
+                            )
                           }
                         >
-                          Restore subject
+                          Dismiss + Restore
                         </button>
                         <button
                           type="button"
                           onClick={() =>
-                            void handleModerateReportSubject(report, 'hidden')
+                            void handleUpdateReport(report.id, 'reviewing', 'hidden')
                           }
                         >
-                          Hide subject
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleModerateReportSubject(report, 'suspended')
-                          }
-                        >
-                          Suspend subject
+                          Reviewing + Hide
                         </button>
                       </div>
                     </article>
