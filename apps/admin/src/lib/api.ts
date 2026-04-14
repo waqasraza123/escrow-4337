@@ -253,6 +253,16 @@ export type MarketplaceModerationDashboard = {
     totalAbuseReports: number;
     openAbuseReports: number;
     reviewingAbuseReports: number;
+    claimedAbuseReports: number;
+    unclaimedAbuseReports: number;
+    escalatedAbuseReports: number;
+    agingAbuseReports: number;
+    staleAbuseReports: number;
+    oldestActiveAbuseReportHours: number | null;
+  };
+  thresholds: {
+    abuseReportAgingHours: number;
+    abuseReportStaleHours: number;
   };
   agingOpportunities: Array<{
     opportunityId: string;
@@ -285,6 +295,16 @@ export type MarketplaceAbuseReportEvidenceReviewStatus =
   | 'insufficient_evidence'
   | 'contradicts_report';
 export type MarketplaceAbuseReportClaimState = 'claimed' | 'unclaimed';
+export type MarketplaceAbuseReportSortBy =
+  | 'priority'
+  | 'oldest_open'
+  | 'stale_activity'
+  | 'recent_activity';
+export type MarketplaceAbuseReportQueuePriority =
+  | 'critical'
+  | 'high'
+  | 'normal'
+  | 'closed';
 
 export type MarketplaceAbuseReportSubjectSummary =
   | {
@@ -343,6 +363,9 @@ export type MarketplaceAbuseReport = {
     email: string;
   } | null;
   subjectModeratedAt: number | null;
+  queuePriority: MarketplaceAbuseReportQueuePriority;
+  ageHours: number;
+  hoursSinceUpdate: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -1152,6 +1175,7 @@ export const adminApi = {
       status?: MarketplaceAbuseReportStatus;
       subjectType?: 'profile' | 'opportunity';
       claimState?: MarketplaceAbuseReportClaimState;
+      sortBy?: MarketplaceAbuseReportSortBy;
       escalated?: boolean;
       evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
       limit?: number;
@@ -1162,6 +1186,7 @@ export const adminApi = {
     if (input.status) search.set('status', input.status);
     if (input.subjectType) search.set('subjectType', input.subjectType);
     if (input.claimState) search.set('claimState', input.claimState);
+    if (input.sortBy) search.set('sortBy', input.sortBy);
     if (input.escalated !== undefined) {
       search.set('escalated', String(input.escalated));
     }

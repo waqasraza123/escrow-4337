@@ -8,6 +8,8 @@ import {
   type MarketplaceAbuseReport,
   type MarketplaceAbuseReportClaimState,
   type MarketplaceAbuseReportEvidenceReviewStatus,
+  type MarketplaceAbuseReportQueuePriority,
+  type MarketplaceAbuseReportSortBy,
   type MarketplaceAbuseReportStatus,
   type MarketplaceAdminOpportunity,
   type MarketplaceAdminProfile,
@@ -26,6 +28,12 @@ const evidenceReviewLabels: Record<
   supports_report: 'Supports report',
   insufficient_evidence: 'Insufficient evidence',
   contradicts_report: 'Contradicts report',
+};
+const queuePriorityLabels: Record<MarketplaceAbuseReportQueuePriority, string> = {
+  critical: 'Critical',
+  high: 'High',
+  normal: 'Normal',
+  closed: 'Closed',
 };
 
 function readSession(): SessionTokens | null {
@@ -82,9 +90,12 @@ export function MarketplaceModerationConsole() {
     status?: MarketplaceAbuseReportStatus;
     subjectType?: 'profile' | 'opportunity';
     claimState?: MarketplaceAbuseReportClaimState;
+    sortBy?: MarketplaceAbuseReportSortBy;
     escalated?: boolean;
     evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
-  }>({});
+  }>({
+    sortBy: 'priority',
+  });
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -420,6 +431,34 @@ export function MarketplaceModerationConsole() {
               <span className={styles.metaLabel}>Reviewing reports</span>
               <strong>{dashboard.summary.reviewingAbuseReports}</strong>
             </article>
+            <article>
+              <span className={styles.metaLabel}>Claimed reports</span>
+              <strong>{dashboard.summary.claimedAbuseReports}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Unclaimed reports</span>
+              <strong>{dashboard.summary.unclaimedAbuseReports}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Escalated reports</span>
+              <strong>{dashboard.summary.escalatedAbuseReports}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Aging reports</span>
+              <strong>{dashboard.summary.agingAbuseReports}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Stale reports</span>
+              <strong>{dashboard.summary.staleAbuseReports}</strong>
+            </article>
+            <article>
+              <span className={styles.metaLabel}>Oldest active report</span>
+              <strong>
+                {dashboard.summary.oldestActiveAbuseReportHours === null
+                  ? 'None'
+                  : `${dashboard.summary.oldestActiveAbuseReportHours}h`}
+              </strong>
+            </article>
           </section>
 
           <section className={styles.grid}>
@@ -608,6 +647,24 @@ export function MarketplaceModerationConsole() {
                 </label>
 
                 <label className={styles.field}>
+                  <span>Sort</span>
+                  <select
+                    value={reportFilters.sortBy ?? 'priority'}
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        sortBy: event.target.value as MarketplaceAbuseReportSortBy,
+                      }))
+                    }
+                  >
+                    <option value="priority">Priority</option>
+                    <option value="oldest_open">Oldest open</option>
+                    <option value="stale_activity">Stale activity</option>
+                    <option value="recent_activity">Recent activity</option>
+                  </select>
+                </label>
+
+                <label className={styles.field}>
                   <span>Evidence review filter</span>
                   <select
                     value={reportFilters.evidenceReviewStatus ?? ''}
@@ -644,6 +701,10 @@ export function MarketplaceModerationConsole() {
                       </p>
                       <p className={styles.stateText}>
                         {report.details ?? 'No details supplied.'}
+                      </p>
+                      <p className={styles.stateText}>
+                        Priority {queuePriorityLabels[report.queuePriority]} • age{' '}
+                        {report.ageHours}h • last update {report.hoursSinceUpdate}h ago
                       </p>
                       <p className={styles.stateText}>
                         {report.claimedBy
@@ -875,7 +936,8 @@ export function MarketplaceModerationConsole() {
                     <article key={report.id} className={styles.timelineCard}>
                       <strong>{report.subject.label}</strong>
                       <p className={styles.stateText}>
-                        {report.reason} • {report.status} • {report.reporter.email}
+                        {queuePriorityLabels[report.queuePriority]} • {report.reason} •{' '}
+                        {report.status} • {report.reporter.email}
                       </p>
                     </article>
                   ))

@@ -421,11 +421,28 @@ describe('MarketplaceService', () => {
     );
     expect(opportunityReport.report.subject.type).toBe('opportunity');
 
+    const agedOpportunityReport =
+      await marketplaceRepository.getAbuseReportById(
+        opportunityReport.report.id,
+      );
+    if (!agedOpportunityReport) {
+      throw new Error('Expected opportunity report to exist');
+    }
+    agedOpportunityReport.createdAt -= 72 * 60 * 60 * 1000;
+    agedOpportunityReport.updatedAt -= 30 * 60 * 60 * 1000;
+    await marketplaceRepository.saveAbuseReport(agedOpportunityReport);
+
     const openReports = await marketplaceService.listModerationReports(
       arbitratorUserId,
       { limit: 50, status: 'open' },
     );
     expect(openReports.reports).toHaveLength(2);
+
+    const oldestOpenReports = await marketplaceService.listModerationReports(
+      arbitratorUserId,
+      { limit: 50, sortBy: 'oldest_open' },
+    );
+    expect(oldestOpenReports.reports[0]?.id).toBe(opportunityReport.report.id);
 
     await expect(
       marketplaceService.updateModerationReport(
@@ -576,7 +593,20 @@ describe('MarketplaceService', () => {
     expect(dashboard.summary.totalAbuseReports).toBe(2);
     expect(dashboard.summary.openAbuseReports).toBe(1);
     expect(dashboard.summary.reviewingAbuseReports).toBe(0);
+    expect(dashboard.summary.claimedAbuseReports).toBe(0);
+    expect(dashboard.summary.unclaimedAbuseReports).toBe(1);
+    expect(dashboard.summary.escalatedAbuseReports).toBe(0);
+    expect(dashboard.summary.agingAbuseReports).toBe(1);
+    expect(dashboard.summary.staleAbuseReports).toBe(1);
+    expect(
+      dashboard.summary.oldestActiveAbuseReportHours,
+    ).toBeGreaterThanOrEqual(72);
+    expect(dashboard.thresholds.abuseReportAgingHours).toBe(48);
+    expect(dashboard.thresholds.abuseReportStaleHours).toBe(24);
     expect(dashboard.recentAbuseReports).toHaveLength(2);
+    expect(dashboard.recentAbuseReports[0]?.id).toBe(
+      opportunityReport.report.id,
+    );
   });
 
   it('reports moderation dashboard metrics for aging briefs and hire conversion', async () => {

@@ -64,6 +64,16 @@ describe('marketplace moderation page', () => {
         totalAbuseReports: 2,
         openAbuseReports: 1,
         reviewingAbuseReports: 1,
+        claimedAbuseReports: 1,
+        unclaimedAbuseReports: 1,
+        escalatedAbuseReports: 1,
+        agingAbuseReports: 1,
+        staleAbuseReports: 1,
+        oldestActiveAbuseReportHours: 72,
+      },
+      thresholds: {
+        abuseReportAgingHours: 48,
+        abuseReportStaleHours: 24,
       },
       agingOpportunities: [
         {
@@ -110,6 +120,9 @@ describe('marketplace moderation page', () => {
           subjectModerationStatus: null,
           subjectModeratedBy: null,
           subjectModeratedAt: null,
+          queuePriority: 'high',
+          ageHours: 72,
+          hoursSinceUpdate: 30,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -203,6 +216,9 @@ describe('marketplace moderation page', () => {
           subjectModerationStatus: null,
           subjectModeratedBy: null,
           subjectModeratedAt: null,
+          queuePriority: 'high',
+          ageHours: 72,
+          hoursSinceUpdate: 30,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -244,6 +260,9 @@ describe('marketplace moderation page', () => {
           subjectModerationStatus: null,
           subjectModeratedBy: null,
           subjectModeratedAt: null,
+          queuePriority: 'critical',
+          ageHours: 12,
+          hoursSinceUpdate: 26,
           createdAt: 2,
           updatedAt: 2,
         },
@@ -269,8 +288,9 @@ describe('marketplace moderation page', () => {
     expect(screen.getByText('Abuse queue')).toBeInTheDocument();
     expect(screen.getByText('Suspicious copied portfolio.')).toBeInTheDocument();
     expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
+    expect(screen.getByText(/Priority High/)).toBeInTheDocument();
     expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
-      { limit: 50 },
+      { limit: 50, sortBy: 'priority' },
       'access-token-123',
     );
 
@@ -325,7 +345,7 @@ describe('marketplace moderation page', () => {
 
     await waitFor(() => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
-        { limit: 50, subjectType: 'opportunity' },
+        { limit: 50, sortBy: 'priority', subjectType: 'opportunity' },
         'access-token-123',
       );
     });
@@ -337,7 +357,12 @@ describe('marketplace moderation page', () => {
 
     await waitFor(() => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
-        { limit: 50, subjectType: 'opportunity', claimState: 'claimed' },
+        {
+          limit: 50,
+          sortBy: 'priority',
+          subjectType: 'opportunity',
+          claimState: 'claimed',
+        },
         'access-token-123',
       );
     });
@@ -351,6 +376,7 @@ describe('marketplace moderation page', () => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
         {
           limit: 50,
+          sortBy: 'priority',
           subjectType: 'opportunity',
           claimState: 'claimed',
           escalated: true,
@@ -368,6 +394,23 @@ describe('marketplace moderation page', () => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
         {
           limit: 50,
+          sortBy: 'priority',
+          subjectType: 'opportunity',
+          claimState: 'claimed',
+          escalated: true,
+          evidenceReviewStatus: 'supports_report',
+        },
+        'access-token-123',
+      );
+    });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'stale_activity');
+
+    await waitFor(() => {
+      expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+        {
+          limit: 50,
+          sortBy: 'stale_activity',
           subjectType: 'opportunity',
           claimState: 'claimed',
           escalated: true,

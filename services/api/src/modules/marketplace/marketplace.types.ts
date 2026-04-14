@@ -55,6 +55,16 @@ export type MarketplaceAbuseReportEvidenceReviewStatus =
   | 'insufficient_evidence'
   | 'contradicts_report';
 export type MarketplaceAbuseReportClaimState = 'claimed' | 'unclaimed';
+export type MarketplaceAbuseReportSortBy =
+  | 'priority'
+  | 'oldest_open'
+  | 'stale_activity'
+  | 'recent_activity';
+export type MarketplaceAbuseReportQueuePriority =
+  | 'critical'
+  | 'high'
+  | 'normal'
+  | 'closed';
 
 export type MarketplaceTalentProofArtifact = {
   id: string;
@@ -215,6 +225,9 @@ export type MarketplaceAbuseReportRecord = {
   subjectModerationStatus: ModerationStatus | null;
   subjectModeratedByUserId: string | null;
   subjectModeratedAt: number | null;
+  queuePriority: MarketplaceAbuseReportQueuePriority;
+  ageHours: number;
+  hoursSinceUpdate: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -373,6 +386,16 @@ export type MarketplaceModerationDashboard = {
     totalAbuseReports: number;
     openAbuseReports: number;
     reviewingAbuseReports: number;
+    claimedAbuseReports: number;
+    unclaimedAbuseReports: number;
+    escalatedAbuseReports: number;
+    agingAbuseReports: number;
+    staleAbuseReports: number;
+    oldestActiveAbuseReportHours: number | null;
+  };
+  thresholds: {
+    abuseReportAgingHours: number;
+    abuseReportStaleHours: number;
   };
   agingOpportunities: Array<{
     opportunityId: string;

@@ -44,8 +44,10 @@ import type {
   EscrowReadinessStatus,
   HireApplicationResponse,
   MarketplaceAbuseReportRecord,
+  MarketplaceAbuseReportQueuePriority,
   MarketplaceAbuseReportResponse,
   MarketplaceAbuseReportsListResponse,
+  MarketplaceAbuseReportSortBy,
   MarketplaceAbuseReportStatus,
   MarketplaceAbuseReportSubjectSummary,
   MarketplaceAbuseReportView,
@@ -77,6 +79,10 @@ import type {
   MarketplaceVerificationLevel,
   ModerationStatus,
 } from './marketplace.types';
+
+const abuseReportAgingHours = 48;
+const abuseReportStaleHours = 24;
+const hourMs = 60 * 60 * 1000;
 
 function normalizeTextArray(values: string[]) {
   return Array.from(
@@ -1074,6 +1080,9 @@ export class MarketplaceService {
       profiles.map((profile) => [profile.userId, profile]),
     );
     const agingNow = Date.now();
+    const activeReports = reports.filter((report) =>
+      this.isActiveAbuseReport(report),
+    );
     const hiredApplications = applications.filter(
       (application) => application.status === 'hired',
     ).length;
@@ -1156,14 +1165,39 @@ export class MarketplaceService {
         reviewingAbuseReports: reports.filter(
           (report) => report.status === 'reviewing',
         ).length,
+        claimedAbuseReports: activeReports.filter(
+          (report) => report.claimedByUserId !== null,
+        ).length,
+        unclaimedAbuseReports: activeReports.filter(
+          (report) => report.claimedByUserId === null,
+        ).length,
+        escalatedAbuseReports: activeReports.filter(
+          (report) => report.escalationReason !== null,
+        ).length,
+        agingAbuseReports: activeReports.filter((report) =>
+          this.isAgingAbuseReport(report, agingNow),
+        ).length,
+        staleAbuseReports: activeReports.filter((report) =>
+          this.isStaleAbuseReport(report, agingNow),
+        ).length,
+        oldestActiveAbuseReportHours:
+          activeReports.length === 0
+            ? null
+            : Math.max(
+                ...activeReports.map((report) =>
+                  this.getAbuseReportAgeHours(report, agingNow),
+                ),
+              ),
+      },
+      thresholds: {
+        abuseReportAgingHours,
+        abuseReportStaleHours,
       },
       agingOpportunities,
       recentAbuseReports: await Promise.all(
         reports
-          .sort(
-            (left, right) =>
-              this.compareAbuseReportPriority(left.status, right.status) ||
-              right.updatedAt - left.updatedAt,
+          .sort((left, right) =>
+            this.compareAbuseReportQueue(left, right, 'priority', agingNow),
           )
           .slice(0, 5)
           .map((report) => this.toAbuseReportView(report)),
@@ -1262,10 +1296,13 @@ export class MarketplaceService {
             }
             return true;
           })
-          .sort(
-            (left, right) =>
-              this.compareAbuseReportPriority(left.status, right.status) ||
-              right.updatedAt - left.updatedAt,
+          .sort((left, right) =>
+            this.compareAbuseReportQueue(
+              left,
+              right,
+              query.sortBy ?? 'priority',
+              Date.now(),
+            ),
           )
           .slice(0, query.limit)
           .map((report) => this.toAbuseReportView(report)),
@@ -1595,6 +1632,7 @@ export class MarketplaceService {
   private async toAbuseReportView(
     report: MarketplaceAbuseReportRecord,
   ): Promise<MarketplaceAbuseReportView> {
+    const now = Date.now();
     const reporter = await this.usersService.getRequiredById(
       report.reporterUserId,
     );
@@ -1664,6 +1702,9 @@ export class MarketplaceService {
           }
         : null,
       subjectModeratedAt: report.subjectModeratedAt,
+      queuePriority: this.computeAbuseReportQueuePriority(report, now),
+      ageHours: this.getAbuseReportAgeHours(report, now),
+      hoursSinceUpdate: this.getAbuseReportHoursSinceUpdate(report, now),
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
     };
@@ -2349,5 +2390,146 @@ export class MarketplaceService {
     };
 
     return order[left] - order[right];
+  }
+
+  private isActiveAbuseReport(report: MarketplaceAbuseReportRecord) {
+    return report.status === 'open' || report.status === 'reviewing';
+  }
+
+  private getAbuseReportAgeHours(
+    report: MarketplaceAbuseReportRecord,
+    now: number,
+  ) {
+    return Math.floor(Math.max(0, now - report.createdAt) / hourMs);
+  }
+
+  private getAbuseReportHoursSinceUpdate(
+    report: MarketplaceAbuseReportRecord,
+    now: number,
+  ) {
+    return Math.floor(Math.max(0, now - report.updatedAt) / hourMs);
+  }
+
+  private isAgingAbuseReport(
+    report: MarketplaceAbuseReportRecord,
+    now: number,
+  ) {
+    return (
+      this.isActiveAbuseReport(report) &&
+      this.getAbuseReportAgeHours(report, now) >= abuseReportAgingHours
+    );
+  }
+
+  private isStaleAbuseReport(
+    report: MarketplaceAbuseReportRecord,
+    now: number,
+  ) {
+    return (
+      this.isActiveAbuseReport(report) &&
+      this.getAbuseReportHoursSinceUpdate(report, now) >= abuseReportStaleHours
+    );
+  }
+
+  private computeAbuseReportQueuePriority(
+    report: MarketplaceAbuseReportRecord,
+    now: number,
+  ): MarketplaceAbuseReportQueuePriority {
+    if (!this.isActiveAbuseReport(report)) {
+      return 'closed';
+    }
+
+    if (
+      report.escalationReason !== null ||
+      (report.claimedByUserId === null && this.isStaleAbuseReport(report, now))
+    ) {
+      return 'critical';
+    }
+
+    if (
+      report.claimedByUserId === null ||
+      this.isAgingAbuseReport(report, now) ||
+      this.isStaleAbuseReport(report, now)
+    ) {
+      return 'high';
+    }
+
+    return 'normal';
+  }
+
+  private compareAbuseReportQueue(
+    left: MarketplaceAbuseReportRecord,
+    right: MarketplaceAbuseReportRecord,
+    sortBy: MarketplaceAbuseReportSortBy,
+    now: number,
+  ) {
+    if (sortBy === 'recent_activity') {
+      return right.updatedAt - left.updatedAt;
+    }
+
+    const activeDiff =
+      Number(this.isActiveAbuseReport(right)) -
+      Number(this.isActiveAbuseReport(left));
+
+    if (sortBy === 'oldest_open') {
+      if (activeDiff !== 0) {
+        return activeDiff;
+      }
+
+      return (
+        left.createdAt - right.createdAt || left.updatedAt - right.updatedAt
+      );
+    }
+
+    if (sortBy === 'stale_activity') {
+      if (activeDiff !== 0) {
+        return activeDiff;
+      }
+
+      return (
+        left.updatedAt - right.updatedAt || left.createdAt - right.createdAt
+      );
+    }
+
+    const priorityOrder: Record<MarketplaceAbuseReportQueuePriority, number> = {
+      critical: 0,
+      high: 1,
+      normal: 2,
+      closed: 3,
+    };
+    const leftPriority = this.computeAbuseReportQueuePriority(left, now);
+    const rightPriority = this.computeAbuseReportQueuePriority(right, now);
+    const priorityDiff =
+      priorityOrder[leftPriority] - priorityOrder[rightPriority];
+
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    const statusDiff = this.compareAbuseReportPriority(
+      left.status,
+      right.status,
+    );
+    if (statusDiff !== 0) {
+      return statusDiff;
+    }
+
+    const claimDiff =
+      Number(left.claimedByUserId !== null) -
+      Number(right.claimedByUserId !== null);
+    if (claimDiff !== 0) {
+      return claimDiff;
+    }
+
+    const staleDiff =
+      this.getAbuseReportHoursSinceUpdate(right, now) -
+      this.getAbuseReportHoursSinceUpdate(left, now);
+    if (staleDiff !== 0) {
+      return staleDiff;
+    }
+
+    return (
+      this.getAbuseReportAgeHours(right, now) -
+      this.getAbuseReportAgeHours(left, now)
+    );
   }
 }

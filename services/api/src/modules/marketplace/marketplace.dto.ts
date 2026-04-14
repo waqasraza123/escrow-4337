@@ -198,6 +198,9 @@ export const marketplaceModerationReportsQuerySchema = z
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']).optional(),
     subjectType: z.enum(['profile', 'opportunity']).optional(),
     claimState: z.enum(['claimed', 'unclaimed']).optional(),
+    sortBy: z
+      .enum(['priority', 'oldest_open', 'stale_activity', 'recent_activity'])
+      .optional(),
     escalated: z
       .enum(['true', 'false'])
       .transform((value) => value === 'true')

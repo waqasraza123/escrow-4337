@@ -289,6 +289,15 @@ describe('MarketplaceController integration', () => {
     });
     expect(reports.reports).toHaveLength(2);
 
+    const oldestOpenReports = await controller.listModerationReports(
+      arbitratorUser,
+      {
+        limit: 50,
+        sortBy: 'oldest_open',
+      },
+    );
+    expect(oldestOpenReports.reports[0]?.id).toBe(profileReport.report.id);
+
     const claimed = await controller.updateModerationReport(
       arbitratorUser,
       profileReport.report.id,
