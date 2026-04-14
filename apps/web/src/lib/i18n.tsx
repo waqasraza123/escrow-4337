@@ -240,7 +240,9 @@ const webMessages = {
           draft: 'Draft',
           published: 'Published',
           paused: 'Paused',
+          closed: 'Closed',
           hired: 'Hired',
+          archived: 'Archived',
         },
         applicationStatus: {
           submitted: 'Submitted',
@@ -1164,7 +1166,9 @@ const webMessages = {
           draft: 'مسودة',
           published: 'منشور',
           paused: 'متوقف مؤقتاً',
+          closed: 'مغلق',
           hired: 'تم التوظيف',
+          archived: 'مؤرشف',
         },
         applicationStatus: {
           submitted: 'تم الإرسال',
