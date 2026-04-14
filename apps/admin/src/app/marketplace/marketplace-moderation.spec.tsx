@@ -93,6 +93,10 @@ describe('marketplace moderation page', () => {
           details: 'Suspicious copied portfolio.',
           evidenceUrls: ['https://example.com/evidence'],
           status: 'open',
+          evidenceReviewStatus: 'pending',
+          investigationSummary: null,
+          evidenceReviewedBy: null,
+          evidenceReviewedAt: null,
           resolutionNote: null,
           resolvedBy: null,
           subjectModerationStatus: null,
@@ -174,6 +178,10 @@ describe('marketplace moderation page', () => {
           details: 'Suspicious copied portfolio.',
           evidenceUrls: ['https://example.com/evidence'],
           status: 'open',
+          evidenceReviewStatus: 'pending',
+          investigationSummary: null,
+          evidenceReviewedBy: null,
+          evidenceReviewedAt: null,
           resolutionNote: null,
           resolvedBy: null,
           subjectModerationStatus: null,
@@ -209,6 +217,14 @@ describe('marketplace moderation page', () => {
     );
 
     await user.type(
+      screen.getByRole('textbox', { name: 'Investigation summary' }),
+      'Matched prior complaint artifacts.',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Evidence review' }),
+      'supports_report',
+    );
+    await user.type(
       screen.getByRole('textbox', { name: 'Resolution note' }),
       'Hidden after review.',
     );
@@ -219,6 +235,8 @@ describe('marketplace moderation page', () => {
         'report-1',
         {
           status: 'resolved',
+          evidenceReviewStatus: 'supports_report',
+          investigationSummary: 'Matched prior complaint artifacts.',
           resolutionNote: 'Hidden after review.',
           subjectModerationStatus: 'suspended',
         },
@@ -234,6 +252,18 @@ describe('marketplace moderation page', () => {
     await waitFor(() => {
       expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
         { limit: 50, subjectType: 'opportunity' },
+        'access-token-123',
+      );
+    });
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Evidence review filter' }),
+      'supports_report',
+    );
+
+    await waitFor(() => {
+      expect(mockedAdminApi.listMarketplaceModerationReports).toHaveBeenCalledWith(
+        { limit: 50, subjectType: 'opportunity', evidenceReviewStatus: 'supports_report' },
         'access-token-123',
       );
     });

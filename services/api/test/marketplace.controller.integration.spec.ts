@@ -294,13 +294,27 @@ describe('MarketplaceController integration', () => {
       profileReport.report.id,
       {
         status: 'dismissed',
+        evidenceReviewStatus: 'insufficient_evidence',
+        investigationSummary:
+          'The report includes screenshots, but they do not tie the account to the alleged behavior.',
         resolutionNote: 'Insufficient evidence after review.',
         subjectModerationStatus: 'visible',
       },
     );
     expect(updated.report.status).toBe('dismissed');
+    expect(updated.report.evidenceReviewStatus).toBe('insufficient_evidence');
+    expect(updated.report.investigationSummary).toContain(
+      'do not tie the account',
+    );
     expect(updated.report.resolutionNote).toContain('Insufficient evidence');
     expect(updated.report.subjectModerationStatus).toBe('visible');
+
+    const filtered = await controller.listModerationReports(arbitratorUser, {
+      limit: 50,
+      evidenceReviewStatus: 'insufficient_evidence',
+    });
+    expect(filtered.reports).toHaveLength(1);
+    expect(filtered.reports[0]?.id).toBe(profileReport.report.id);
     expect(opportunityReport.report.id).not.toBe(profileReport.report.id);
   });
 });

@@ -197,6 +197,14 @@ export const marketplaceModerationReportsQuerySchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']).optional(),
     subjectType: z.enum(['profile', 'opportunity']).optional(),
+    evidenceReviewStatus: z
+      .enum([
+        'pending',
+        'supports_report',
+        'insufficient_evidence',
+        'contradicts_report',
+      ])
+      .optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();
@@ -204,6 +212,21 @@ export const marketplaceModerationReportsQuerySchema = z
 export const updateMarketplaceAbuseReportSchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
+    evidenceReviewStatus: z
+      .enum([
+        'pending',
+        'supports_report',
+        'insufficient_evidence',
+        'contradicts_report',
+      ])
+      .optional(),
+    investigationSummary: z
+      .string()
+      .trim()
+      .min(1)
+      .max(4000)
+      .nullable()
+      .optional(),
     resolutionNote: z.string().trim().min(1).max(2000).nullable().optional(),
     subjectModerationStatus: z
       .enum(['visible', 'hidden', 'suspended'])

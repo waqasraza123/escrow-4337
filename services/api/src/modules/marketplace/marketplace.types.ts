@@ -49,6 +49,11 @@ export type MarketplaceAbuseReportStatus =
   | 'reviewing'
   | 'resolved'
   | 'dismissed';
+export type MarketplaceAbuseReportEvidenceReviewStatus =
+  | 'pending'
+  | 'supports_report'
+  | 'insufficient_evidence'
+  | 'contradicts_report';
 
 export type MarketplaceTalentProofArtifact = {
   id: string;
@@ -195,6 +200,10 @@ export type MarketplaceAbuseReportRecord = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
+  investigationSummary: string | null;
+  evidenceReviewedByUserId: string | null;
+  evidenceReviewedAt: number | null;
   resolutionNote: string | null;
   resolvedByUserId: string | null;
   subjectModerationStatus: ModerationStatus | null;
@@ -303,6 +312,13 @@ export type MarketplaceAbuseReportView = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
+  investigationSummary: string | null;
+  evidenceReviewedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  evidenceReviewedAt: number | null;
   resolutionNote: string | null;
   resolvedBy: {
     userId: string;

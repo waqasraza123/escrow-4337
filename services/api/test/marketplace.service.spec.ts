@@ -427,16 +427,39 @@ describe('MarketplaceService', () => {
     );
     expect(openReports.reports).toHaveLength(2);
 
+    await expect(
+      marketplaceService.updateModerationReport(
+        arbitratorUserId,
+        profileReport.report.id,
+        {
+          status: 'resolved',
+          resolutionNote: 'Closing without evidence review should fail.',
+        },
+      ),
+    ).rejects.toThrow(
+      'Evidence review status is required when closing an abuse report',
+    );
+
     const closedReport = await marketplaceService.updateModerationReport(
       arbitratorUserId,
       profileReport.report.id,
       {
         status: 'resolved',
+        evidenceReviewStatus: 'supports_report',
+        investigationSummary:
+          'Evidence links match the existing impersonation complaint and profile claims.',
         resolutionNote: 'Profile hidden pending owner response.',
         subjectModerationStatus: 'hidden',
       },
     );
     expect(closedReport.report.status).toBe('resolved');
+    expect(closedReport.report.evidenceReviewStatus).toBe('supports_report');
+    expect(closedReport.report.investigationSummary).toContain(
+      'impersonation complaint',
+    );
+    expect(closedReport.report.evidenceReviewedBy?.email).toBe(
+      'arbitrator@example.com',
+    );
     expect(closedReport.report.resolvedBy?.email).toBe(
       'arbitrator@example.com',
     );
@@ -448,6 +471,16 @@ describe('MarketplaceService', () => {
     const moderatedProfile =
       await marketplaceRepository.getProfileByUserId(applicantUserId);
     expect(moderatedProfile?.moderationStatus).toBe('hidden');
+
+    const supportsReports = await marketplaceService.listModerationReports(
+      arbitratorUserId,
+      {
+        limit: 50,
+        evidenceReviewStatus: 'supports_report',
+      },
+    );
+    expect(supportsReports.reports).toHaveLength(1);
+    expect(supportsReports.reports[0]?.id).toBe(profileReport.report.id);
 
     const dashboard =
       await marketplaceService.getModerationDashboard(arbitratorUserId);

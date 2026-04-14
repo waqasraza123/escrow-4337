@@ -6,6 +6,7 @@ import styles from '../page.module.css';
 import {
   adminApi,
   type MarketplaceAbuseReport,
+  type MarketplaceAbuseReportEvidenceReviewStatus,
   type MarketplaceAbuseReportStatus,
   type MarketplaceAdminOpportunity,
   type MarketplaceAdminProfile,
@@ -16,6 +17,15 @@ import {
 } from '../../lib/api';
 
 const sessionStorageKey = 'escrow4337.admin.session';
+const evidenceReviewLabels: Record<
+  MarketplaceAbuseReportEvidenceReviewStatus,
+  string
+> = {
+  pending: 'Pending review',
+  supports_report: 'Supports report',
+  insufficient_evidence: 'Insufficient evidence',
+  contradicts_report: 'Contradicts report',
+};
 
 function readSession(): SessionTokens | null {
   if (typeof window === 'undefined') {
@@ -59,9 +69,15 @@ export function MarketplaceModerationConsole() {
   );
   const [reports, setReports] = useState<MarketplaceAbuseReport[]>([]);
   const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
+  const [reportInvestigationSummaries, setReportInvestigationSummaries] =
+    useState<Record<string, string>>({});
+  const [reportEvidenceReviews, setReportEvidenceReviews] = useState<
+    Record<string, MarketplaceAbuseReportEvidenceReviewStatus>
+  >({});
   const [reportFilters, setReportFilters] = useState<{
     status?: MarketplaceAbuseReportStatus;
     subjectType?: 'profile' | 'opportunity';
+    evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
   }>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -164,7 +180,7 @@ export function MarketplaceModerationConsole() {
   }
 
   async function handleUpdateReport(
-    reportId: string,
+    report: MarketplaceAbuseReport,
     status: MarketplaceAbuseReportStatus,
     subjectModerationStatus?: MarketplaceModerationStatus | null,
   ) {
@@ -172,17 +188,43 @@ export function MarketplaceModerationConsole() {
       return;
     }
 
-    const resolutionNote = reportNotes[reportId]?.trim() || null;
+    const resolutionNote = reportNotes[report.id]?.trim() || null;
+    const investigationSummaryDraft = reportInvestigationSummaries[report.id];
+    const investigationSummary =
+      investigationSummaryDraft === undefined
+        ? report.investigationSummary
+        : investigationSummaryDraft.trim() || null;
+    const evidenceReviewStatus =
+      reportEvidenceReviews[report.id] ?? report.evidenceReviewStatus;
+
     if ((status === 'resolved' || status === 'dismissed') && !resolutionNote) {
       setError('Resolution note is required before closing a report.');
       return;
     }
 
+    if (
+      (status === 'resolved' || status === 'dismissed') &&
+      evidenceReviewStatus === 'pending'
+    ) {
+      setError('Evidence review status is required before closing a report.');
+      return;
+    }
+
+    if (
+      (status === 'resolved' || status === 'dismissed') &&
+      !investigationSummary
+    ) {
+      setError('Investigation summary is required before closing a report.');
+      return;
+    }
+
     setError(null);
     await adminApi.updateMarketplaceModerationReport(
-      reportId,
+      report.id,
       {
         status,
+        evidenceReviewStatus,
+        investigationSummary,
         resolutionNote,
         subjectModerationStatus,
       },
@@ -429,6 +471,31 @@ export function MarketplaceModerationConsole() {
                     <option value="opportunity">Opportunities</option>
                   </select>
                 </label>
+
+                <label className={styles.field}>
+                  <span>Evidence review filter</span>
+                  <select
+                    value={reportFilters.evidenceReviewStatus ?? ''}
+                    onChange={(event) =>
+                      setReportFilters((current) => ({
+                        ...current,
+                        evidenceReviewStatus:
+                          event.target.value === ''
+                            ? undefined
+                            : (event.target
+                                .value as MarketplaceAbuseReportEvidenceReviewStatus),
+                      }))
+                    }
+                  >
+                    <option value="">All evidence reviews</option>
+                    <option value="pending">Pending review</option>
+                    <option value="supports_report">Supports report</option>
+                    <option value="insufficient_evidence">
+                      Insufficient evidence
+                    </option>
+                    <option value="contradicts_report">Contradicts report</option>
+                  </select>
+                </label>
               </div>
               <div className={styles.stack}>
                 {reports.length === 0 ? (
@@ -443,6 +510,17 @@ export function MarketplaceModerationConsole() {
                       <p className={styles.stateText}>
                         {report.details ?? 'No details supplied.'}
                       </p>
+                      <p className={styles.stateText}>
+                        Evidence review: {evidenceReviewLabels[report.evidenceReviewStatus]}
+                        {report.evidenceReviewedBy
+                          ? ` by ${report.evidenceReviewedBy.email}`
+                          : ''}
+                      </p>
+                      {report.investigationSummary ? (
+                        <p className={styles.stateText}>
+                          Investigation: {report.investigationSummary}
+                        </p>
+                      ) : null}
                       {report.subjectModerationStatus ? (
                         <p className={styles.stateText}>
                           Subject action: {report.subjectModerationStatus}
@@ -461,6 +539,48 @@ export function MarketplaceModerationConsole() {
                         </div>
                       ) : null}
                       <label className={styles.field}>
+                        <span>Evidence review</span>
+                        <select
+                          value={
+                            reportEvidenceReviews[report.id] ??
+                            report.evidenceReviewStatus
+                          }
+                          onChange={(event) =>
+                            setReportEvidenceReviews((current) => ({
+                              ...current,
+                              [report.id]:
+                                event.target
+                                  .value as MarketplaceAbuseReportEvidenceReviewStatus,
+                            }))
+                          }
+                        >
+                          <option value="pending">Pending review</option>
+                          <option value="supports_report">Supports report</option>
+                          <option value="insufficient_evidence">
+                            Insufficient evidence
+                          </option>
+                          <option value="contradicts_report">
+                            Contradicts report
+                          </option>
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>Investigation summary</span>
+                        <textarea
+                          value={
+                            reportInvestigationSummaries[report.id] ??
+                            report.investigationSummary ??
+                            ''
+                          }
+                          onChange={(event) =>
+                            setReportInvestigationSummaries((current) => ({
+                              ...current,
+                              [report.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className={styles.field}>
                         <span>Resolution note</span>
                         <textarea
                           value={reportNotes[report.id] ?? report.resolutionNote ?? ''}
@@ -475,22 +595,20 @@ export function MarketplaceModerationConsole() {
                       <div className={styles.inlineActions}>
                         <button
                           type="button"
-                          onClick={() => void handleUpdateReport(report.id, 'open')}
+                          onClick={() => void handleUpdateReport(report, 'open')}
                         >
                           Open
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            void handleUpdateReport(report.id, 'reviewing')
-                          }
+                          onClick={() => void handleUpdateReport(report, 'reviewing')}
                         >
                           Reviewing
                         </button>
                         <button
                           type="button"
                           onClick={() =>
-                            void handleUpdateReport(report.id, 'resolved', 'hidden')
+                            void handleUpdateReport(report, 'resolved', 'hidden')
                           }
                         >
                           Resolve + Hide
@@ -499,7 +617,7 @@ export function MarketplaceModerationConsole() {
                           type="button"
                           onClick={() =>
                             void handleUpdateReport(
-                              report.id,
+                              report,
                               'resolved',
                               'suspended',
                             )
@@ -511,7 +629,7 @@ export function MarketplaceModerationConsole() {
                           type="button"
                           onClick={() =>
                             void handleUpdateReport(
-                              report.id,
+                              report,
                               'dismissed',
                               'visible',
                             )
@@ -522,7 +640,7 @@ export function MarketplaceModerationConsole() {
                         <button
                           type="button"
                           onClick={() =>
-                            void handleUpdateReport(report.id, 'reviewing', 'hidden')
+                            void handleUpdateReport(report, 'reviewing', 'hidden')
                           }
                         >
                           Reviewing + Hide

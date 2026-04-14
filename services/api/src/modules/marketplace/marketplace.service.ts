@@ -1236,6 +1236,12 @@ export class MarketplaceService {
             if (query.subjectType && report.subjectType !== query.subjectType) {
               return false;
             }
+            if (
+              query.evidenceReviewStatus &&
+              report.evidenceReviewStatus !== query.evidenceReviewStatus
+            ) {
+              return false;
+            }
             return true;
           })
           .sort(
@@ -1287,6 +1293,12 @@ export class MarketplaceService {
     await this.requireModerationAccess(userId);
     const report = await this.requireAbuseReport(reportId);
     const now = Date.now();
+    const nextEvidenceReviewStatus =
+      dto.evidenceReviewStatus ?? report.evidenceReviewStatus;
+    const nextInvestigationSummary =
+      dto.investigationSummary === undefined
+        ? report.investigationSummary
+        : (dto.investigationSummary?.trim() ?? null);
 
     if (
       (dto.status === 'resolved' || dto.status === 'dismissed') &&
@@ -1295,6 +1307,54 @@ export class MarketplaceService {
       throw new BadRequestException(
         'Resolution note is required when closing an abuse report',
       );
+    }
+
+    if (
+      (dto.status === 'resolved' || dto.status === 'dismissed') &&
+      nextEvidenceReviewStatus === 'pending'
+    ) {
+      throw new BadRequestException(
+        'Evidence review status is required when closing an abuse report',
+      );
+    }
+
+    if (
+      (dto.status === 'resolved' || dto.status === 'dismissed') &&
+      !nextInvestigationSummary
+    ) {
+      throw new BadRequestException(
+        'Investigation summary is required when closing an abuse report',
+      );
+    }
+
+    if (
+      dto.status === 'resolved' &&
+      nextEvidenceReviewStatus !== 'supports_report'
+    ) {
+      throw new BadRequestException(
+        'Resolved abuse reports must use an evidence review that supports the report',
+      );
+    }
+
+    if (
+      dto.status === 'dismissed' &&
+      nextEvidenceReviewStatus === 'supports_report'
+    ) {
+      throw new BadRequestException(
+        'Dismissed abuse reports cannot use an evidence review that supports the report',
+      );
+    }
+
+    if (
+      dto.evidenceReviewStatus !== undefined ||
+      dto.investigationSummary !== undefined
+    ) {
+      this.applyReportEvidenceReview(report, {
+        evidenceReviewStatus: nextEvidenceReviewStatus,
+        investigationSummary: nextInvestigationSummary,
+        userId,
+        reviewedAt: now,
+      });
     }
 
     if (dto.subjectModerationStatus !== undefined) {
@@ -1481,6 +1541,9 @@ export class MarketplaceService {
     const resolvedBy = report.resolvedByUserId
       ? await this.usersService.getRequiredById(report.resolvedByUserId)
       : null;
+    const evidenceReviewedBy = report.evidenceReviewedByUserId
+      ? await this.usersService.getRequiredById(report.evidenceReviewedByUserId)
+      : null;
     const subjectModeratedBy = report.subjectModeratedByUserId
       ? await this.usersService.getRequiredById(report.subjectModeratedByUserId)
       : null;
@@ -1496,6 +1559,15 @@ export class MarketplaceService {
       details: report.details,
       evidenceUrls: report.evidenceUrls,
       status: report.status,
+      evidenceReviewStatus: report.evidenceReviewStatus,
+      investigationSummary: report.investigationSummary,
+      evidenceReviewedBy: evidenceReviewedBy
+        ? {
+            userId: evidenceReviewedBy.id,
+            email: evidenceReviewedBy.email,
+          }
+        : null,
+      evidenceReviewedAt: report.evidenceReviewedAt,
       resolutionNote: report.resolutionNote,
       resolvedBy: resolvedBy
         ? {
@@ -2030,6 +2102,10 @@ export class MarketplaceService {
       details: input.dto.details?.trim() || null,
       evidenceUrls: normalizeTextArray(input.dto.evidenceUrls),
       status: 'open',
+      evidenceReviewStatus: 'pending',
+      investigationSummary: null,
+      evidenceReviewedByUserId: null,
+      evidenceReviewedAt: null,
       resolutionNote: null,
       resolvedByUserId: null,
       subjectModerationStatus: null,
@@ -2077,6 +2153,31 @@ export class MarketplaceService {
     report.subjectModerationStatus = moderationStatus;
     report.subjectModeratedByUserId = userId;
     report.subjectModeratedAt = now;
+  }
+
+  private applyReportEvidenceReview(
+    report: MarketplaceAbuseReportRecord,
+    input: {
+      evidenceReviewStatus: MarketplaceAbuseReportRecord['evidenceReviewStatus'];
+      investigationSummary: string | null;
+      userId: string;
+      reviewedAt: number;
+    },
+  ) {
+    report.evidenceReviewStatus = input.evidenceReviewStatus;
+    report.investigationSummary = input.investigationSummary;
+
+    if (
+      input.evidenceReviewStatus === 'pending' &&
+      input.investigationSummary === null
+    ) {
+      report.evidenceReviewedByUserId = null;
+      report.evidenceReviewedAt = null;
+      return;
+    }
+
+    report.evidenceReviewedByUserId = input.userId;
+    report.evidenceReviewedAt = input.reviewedAt;
   }
 
   private compareAbuseReportPriority(

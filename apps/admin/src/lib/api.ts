@@ -279,6 +279,11 @@ export type MarketplaceAbuseReportStatus =
   | 'reviewing'
   | 'resolved'
   | 'dismissed';
+export type MarketplaceAbuseReportEvidenceReviewStatus =
+  | 'pending'
+  | 'supports_report'
+  | 'insufficient_evidence'
+  | 'contradicts_report';
 
 export type MarketplaceAbuseReportSubjectSummary =
   | {
@@ -308,6 +313,13 @@ export type MarketplaceAbuseReport = {
   details: string | null;
   evidenceUrls: string[];
   status: MarketplaceAbuseReportStatus;
+  evidenceReviewStatus: MarketplaceAbuseReportEvidenceReviewStatus;
+  investigationSummary: string | null;
+  evidenceReviewedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  evidenceReviewedAt: number | null;
   resolutionNote: string | null;
   resolvedBy: {
     userId: string;
@@ -1127,6 +1139,7 @@ export const adminApi = {
     input: {
       status?: MarketplaceAbuseReportStatus;
       subjectType?: 'profile' | 'opportunity';
+      evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
       limit?: number;
     },
     accessToken: string,
@@ -1134,6 +1147,9 @@ export const adminApi = {
     const search = new URLSearchParams();
     if (input.status) search.set('status', input.status);
     if (input.subjectType) search.set('subjectType', input.subjectType);
+    if (input.evidenceReviewStatus) {
+      search.set('evidenceReviewStatus', input.evidenceReviewStatus);
+    }
     if (input.limit) search.set('limit', String(input.limit));
     const suffix = search.toString() ? `?${search.toString()}` : '';
     return requestJson<{ reports: MarketplaceAbuseReport[] }>(
@@ -1177,6 +1193,8 @@ export const adminApi = {
     reportId: string,
     input: {
       status: MarketplaceAbuseReportStatus;
+      evidenceReviewStatus?: MarketplaceAbuseReportEvidenceReviewStatus;
+      investigationSummary?: string | null;
       resolutionNote?: string | null;
       subjectModerationStatus?: MarketplaceModerationStatus | null;
     },

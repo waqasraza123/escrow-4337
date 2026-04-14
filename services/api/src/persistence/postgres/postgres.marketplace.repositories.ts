@@ -94,6 +94,10 @@ type MarketplaceAbuseReportRow = QueryResultRow & {
   details: string | null;
   evidence_urls_json: string[];
   status: MarketplaceAbuseReportStatus;
+  evidence_review_status: MarketplaceAbuseReportRecord['evidenceReviewStatus'];
+  investigation_summary: string | null;
+  evidence_reviewed_by_user_id: string | null;
+  evidence_reviewed_at_ms: string | null;
   resolution_note: string | null;
   resolved_by_user_id: string | null;
   subject_moderation_status:
@@ -202,6 +206,13 @@ function mapAbuseReport(
     details: row.details,
     evidenceUrls: row.evidence_urls_json ?? [],
     status: row.status,
+    evidenceReviewStatus: row.evidence_review_status,
+    investigationSummary: row.investigation_summary,
+    evidenceReviewedByUserId: row.evidence_reviewed_by_user_id,
+    evidenceReviewedAt:
+      row.evidence_reviewed_at_ms === null
+        ? null
+        : Number(row.evidence_reviewed_at_ms),
     resolutionNote: row.resolution_note,
     resolvedByUserId: row.resolved_by_user_id,
     subjectModerationStatus: row.subject_moderation_status,
@@ -579,6 +590,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           details,
           evidence_urls_json,
           status,
+          evidence_review_status,
+          investigation_summary,
+          evidence_reviewed_by_user_id,
+          evidence_reviewed_at_ms,
           resolution_note,
           resolved_by_user_id,
           subject_moderation_status,
@@ -588,7 +603,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10::uuid, $11, $12::uuid, $13, $14, $15
+          $1, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8, $9, $10, $11::uuid, $12, $13, $14::uuid, $15, $16::uuid, $17, $18, $19
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -599,6 +614,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           details = EXCLUDED.details,
           evidence_urls_json = EXCLUDED.evidence_urls_json,
           status = EXCLUDED.status,
+          evidence_review_status = EXCLUDED.evidence_review_status,
+          investigation_summary = EXCLUDED.investigation_summary,
+          evidence_reviewed_by_user_id = EXCLUDED.evidence_reviewed_by_user_id,
+          evidence_reviewed_at_ms = EXCLUDED.evidence_reviewed_at_ms,
           resolution_note = EXCLUDED.resolution_note,
           resolved_by_user_id = EXCLUDED.resolved_by_user_id,
           subject_moderation_status = EXCLUDED.subject_moderation_status,
@@ -615,6 +634,12 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         report.details,
         JSON.stringify(report.evidenceUrls),
         report.status,
+        report.evidenceReviewStatus,
+        report.investigationSummary,
+        report.evidenceReviewedByUserId,
+        report.evidenceReviewedAt === null
+          ? null
+          : String(report.evidenceReviewedAt),
         report.resolutionNote,
         report.resolvedByUserId,
         report.subjectModerationStatus,
