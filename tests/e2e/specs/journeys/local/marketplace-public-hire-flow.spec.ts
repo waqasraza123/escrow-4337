@@ -1,40 +1,30 @@
 import { Wallet } from 'ethers';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { makeTestCurrencyAddress } from '../../../data/builders';
 import {
+  apiBaseUrl,
   closeLocalProfileDb,
   webBaseUrl,
 } from '../../../fixtures/local-profile';
+import { seedMarketplaceHireReadyOpportunityViaApi } from '../../../fixtures/journey-setup';
 import { expect, test } from '../../../fixtures/local-journeys';
 
 test.afterAll(async () => {
   await closeLocalProfileDb();
 });
 
-async function saveMarketplaceProfile(input: {
-  page: Page;
-  slug: string;
-  displayName: string;
-  headline: string;
-  bio: string;
-  skills: string;
-  portfolioUrl: string;
-}) {
-  await input.page.goto(`${webBaseUrl}/app/marketplace`);
-  await expect(
-    input.page.getByRole('heading', { name: 'Marketplace profile' }),
-  ).toBeVisible();
-  await input.page.getByLabel('Slug').fill(input.slug);
-  await input.page.getByLabel('Display name').fill(input.displayName);
-  await input.page.getByLabel('Headline').fill(input.headline);
-  await input.page.getByLabel('Bio').fill(input.bio);
-  await input.page.getByLabel('Skills').fill(input.skills);
-  await input.page.getByLabel('Portfolio URLs').fill(input.portfolioUrl);
-  await input.page.getByRole('button', { name: 'Save profile' }).click();
-  await expect(input.page.getByText('Marketplace profile saved.')).toBeVisible();
+function workspacePanel(page: Page, heading: string): Locator {
+  return page
+    .locator('article')
+    .filter({ has: page.getByRole('heading', { name: heading }) })
+    .first();
 }
 
-test('local marketplace journey publishes, applies, and hires into escrow', async ({
+function panelCard(panel: Locator, title: string): Locator {
+  return panel.locator('article').filter({ hasText: title }).first();
+}
+
+test('seeded marketplace journey reviews an application and hires into escrow', async ({
   browser,
   localSessionFactory,
   runId,
@@ -53,6 +43,51 @@ test('local marketplace journey publishes, applies, and hires into escrow', asyn
     linkedWallet: talentWallet,
   });
 
+  const opportunityTitle = `Marketplace Product Engineer ${runId}`;
+  const opportunitySummary = `Ship the client workspace ${runId}`;
+
+  await seedMarketplaceHireReadyOpportunityViaApi({
+    apiBaseUrl,
+    client: {
+      session: clientActor.session,
+      wallet: clientWallet,
+      ensureWalletLinked: false,
+      ensureSmartAccountProvisioned: false,
+      profile: {
+        slug: `client-${runId}`.slice(0, 40),
+        displayName: `Client ${runId}`,
+        headline: 'Startup hiring through escrow',
+        bio: 'We want one contractor and one escrow-backed workflow.',
+        skills: ['product', 'react'],
+        portfolioUrls: [`https://example.com/client/${runId}`],
+      },
+    },
+    talent: {
+      session: talentActor.session,
+      wallet: talentWallet,
+      ensureWalletLinked: false,
+      profile: {
+        slug: `talent-${runId}`.slice(0, 40),
+        displayName: `Talent ${runId}`,
+        headline: 'Full-stack contractor',
+        bio: 'I apply with a verified wallet and expect escrow.',
+        skills: ['typescript', 'react'],
+        portfolioUrls: [`https://example.com/talent/${runId}`],
+      },
+    },
+    opportunity: {
+      title: opportunityTitle,
+      summary: opportunitySummary,
+      description: 'Build the first marketplace and escrow workspace.',
+      category: 'software-development',
+      currencyAddress: makeTestCurrencyAddress('6'),
+      requiredSkills: ['typescript', 'react'],
+      budgetMin: '1500',
+      budgetMax: '3000',
+      timeline: `2 weeks ${runId}`,
+    },
+  });
+
   const clientContext = await browser.newContext({
     storageState: clientActor.storageState,
   });
@@ -62,102 +97,37 @@ test('local marketplace journey publishes, applies, and hires into escrow', asyn
   const clientPage = await clientContext.newPage();
   const talentPage = await talentContext.newPage();
 
-  const opportunityTitle = `Marketplace Product Engineer ${runId}`;
-  const opportunitySummary = `Ship the client workspace ${runId}`;
-  const opportunityTimeline = `2 weeks ${runId}`;
-  const currencyAddress = makeTestCurrencyAddress('6');
-
-  await saveMarketplaceProfile({
-    page: clientPage,
-    slug: `client-${runId}`.slice(0, 40),
-    displayName: `Client ${runId}`,
-    headline: 'Startup hiring through escrow',
-    bio: 'We want one contractor and one escrow-backed workflow.',
-    skills: 'product, react',
-    portfolioUrl: `https://example.com/client/${runId}`,
-  });
-
-  await clientPage.getByLabel('Title').fill(opportunityTitle);
-  await clientPage.getByLabel('Summary').fill(opportunitySummary);
-  await clientPage
-    .getByLabel('Description')
-    .fill('Build the first marketplace and escrow workspace.');
-  await clientPage.getByLabel('Category').fill('software-development');
-  await clientPage.getByLabel('Visibility').selectOption('public');
-  await clientPage.getByLabel('Settlement token address').fill(currencyAddress);
-  await clientPage.getByLabel('Budget minimum').fill('1500');
-  await clientPage.getByLabel('Budget maximum').fill('3000');
-  await clientPage.getByLabel('Timeline').fill(opportunityTimeline);
-  await clientPage.getByLabel('Required skills').fill('typescript, react');
-  await clientPage.getByRole('button', { name: 'Create draft brief' }).click();
-  await expect(clientPage.getByText('Marketplace brief created as draft.')).toBeVisible();
-
-  const clientOpportunityCard = clientPage.locator('article').filter({
-    hasText: opportunityTitle,
-  }).first();
-  await clientOpportunityCard
-    .getByRole('button', { name: 'Publish' })
-    .click();
-  await expect(clientPage.getByText('Marketplace brief published.')).toBeVisible();
-  await expect(clientOpportunityCard.getByText('public • published • 0 applications')).toBeVisible();
-
-  await saveMarketplaceProfile({
-    page: talentPage,
-    slug: `talent-${runId}`.slice(0, 40),
-    displayName: `Talent ${runId}`,
-    headline: 'Full-stack contractor',
-    bio: 'I apply with a verified wallet and expect escrow.',
-    skills: 'typescript, react',
-    portfolioUrl: `https://example.com/talent/${runId}`,
-  });
-
-  await talentPage.reload();
-  const publicOpportunityCard = talentPage.locator('article').filter({
-    hasText: opportunityTitle,
-  }).first();
-  await expect(publicOpportunityCard.getByText(opportunitySummary)).toBeVisible();
-  await publicOpportunityCard
-    .getByPlaceholder('Add a short application note')
-    .fill(`Ready to ship this build ${runId}`);
-  await publicOpportunityCard.getByRole('button', { name: 'Apply' }).click();
-  await expect(talentPage.getByText('Application submitted.')).toBeVisible();
-  await expect(talentPage.getByText(opportunityTitle)).toBeVisible();
-
-  await clientPage.reload();
-  const reloadedOpportunityCard = clientPage.locator('article').filter({
-    hasText: opportunityTitle,
-  }).first();
-  await reloadedOpportunityCard
-    .getByRole('button', { name: 'Load applications' })
-    .click();
-  await expect(reloadedOpportunityCard.getByText(`Talent ${runId}`)).toBeVisible();
-  await reloadedOpportunityCard
-    .getByRole('button', { name: 'Shortlist' })
-    .click();
+  await clientPage.goto(`${webBaseUrl}/app/marketplace`);
+  const clientOpportunityCard = panelCard(
+    workspacePanel(clientPage, 'My opportunities'),
+    opportunityTitle,
+  );
+  await expect(clientOpportunityCard.getByText('Public brief • Published')).toBeVisible();
+  await clientOpportunityCard.getByRole('button', { name: 'Load review board' }).click();
+  await expect(clientOpportunityCard.getByText(`Talent ${runId}`)).toBeVisible();
+  await clientOpportunityCard.getByRole('button', { name: 'Shortlist' }).click();
   await expect(clientPage.getByText('Application shortlisted.')).toBeVisible();
-  await reloadedOpportunityCard
-    .getByRole('button', { name: 'Hire to escrow' })
-    .click();
+  await clientOpportunityCard.getByRole('button', { name: 'Hire into escrow' }).click();
   await expect(
     clientPage.getByText(/Application hired and escrow contract .* created\./),
   ).toBeVisible();
-  await expect(
-    reloadedOpportunityCard.getByRole('link', { name: 'View contract' }),
-  ).toBeVisible();
-
-  await reloadedOpportunityCard.getByRole('link', { name: 'View contract' }).click();
-  await expect(
-    clientPage.getByRole('heading', { name: opportunityTitle }),
-  ).toBeVisible();
+  const clientContractLink = clientOpportunityCard.getByRole('link', {
+    name: 'View contract',
+  });
+  await expect(clientContractLink).toBeVisible();
+  await expect(clientContractLink).toHaveAttribute('href', /\/app\/contracts\//);
 
   await talentPage.goto(`${webBaseUrl}/app/marketplace`);
-  const hiredApplicationCard = talentPage.locator('article').filter({
-    hasText: opportunityTitle,
-  }).first();
-  await expect(hiredApplicationCard.getByText(`Client ${runId} • hired`)).toBeVisible();
-  await expect(
-    hiredApplicationCard.getByRole('link', { name: 'View contract' }),
-  ).toBeVisible();
+  const hiredApplicationCard = panelCard(
+    workspacePanel(talentPage, 'My applications'),
+    opportunityTitle,
+  );
+  await expect(hiredApplicationCard.getByText('Hired')).toBeVisible();
+  const talentContractLink = hiredApplicationCard.getByRole('link', {
+    name: 'View contract',
+  });
+  await expect(talentContractLink).toBeVisible();
+  await expect(talentContractLink).toHaveAttribute('href', /\/app\/contracts\//);
 
   await Promise.all([clientContext.close(), talentContext.close()]);
 });

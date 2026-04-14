@@ -7,6 +7,12 @@ import {
   provisionSmartAccountForApiSession,
   setMilestonesForApiSession,
 } from './escrow-api';
+import {
+  applyToMarketplaceOpportunityForApiSession,
+  createMarketplaceOpportunityForApiSession,
+  publishMarketplaceOpportunityForApiSession,
+  upsertMarketplaceProfileForApiSession,
+} from './marketplace-api';
 
 export async function seedJoinReadyJobViaApi(input: {
   apiBaseUrl: string;
@@ -91,4 +97,117 @@ export async function seedJoinReadyJobViaApi(input: {
   });
 
   return { jobId };
+}
+
+export async function seedMarketplaceHireReadyOpportunityViaApi(input: {
+  apiBaseUrl: string;
+  client: {
+    session: BootstrapSessionTokens;
+    wallet: Wallet;
+    profile: {
+      slug: string;
+      displayName: string;
+      headline: string;
+      bio: string;
+      skills: string[];
+      portfolioUrls?: string[];
+    };
+    ensureWalletLinked?: boolean;
+    ensureSmartAccountProvisioned?: boolean;
+  };
+  talent: {
+    session: BootstrapSessionTokens;
+    wallet: Wallet;
+    profile: {
+      slug: string;
+      displayName: string;
+      headline: string;
+      bio: string;
+      skills: string[];
+      portfolioUrls?: string[];
+    };
+    ensureWalletLinked?: boolean;
+  };
+  opportunity: {
+    title: string;
+    summary: string;
+    description: string;
+    category: string;
+    currencyAddress: string;
+    requiredSkills: string[];
+    budgetMin: string;
+    budgetMax: string;
+    timeline: string;
+  };
+}) {
+  if (input.client.ensureWalletLinked ?? true) {
+    await linkWalletForApiSession({
+      apiBaseUrl: input.apiBaseUrl,
+      session: input.client.session,
+      wallet: input.client.wallet,
+    });
+  }
+
+  if (input.client.ensureSmartAccountProvisioned ?? true) {
+    await provisionSmartAccountForApiSession({
+      apiBaseUrl: input.apiBaseUrl,
+      session: input.client.session,
+      ownerAddress: input.client.wallet.address,
+    });
+  }
+
+  if (input.talent.ensureWalletLinked ?? true) {
+    await linkWalletForApiSession({
+      apiBaseUrl: input.apiBaseUrl,
+      session: input.talent.session,
+      wallet: input.talent.wallet,
+    });
+  }
+
+  await upsertMarketplaceProfileForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.client.session,
+    profile: input.client.profile,
+  });
+
+  const createdOpportunity = await createMarketplaceOpportunityForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.client.session,
+    opportunity: {
+      title: input.opportunity.title,
+      summary: input.opportunity.summary,
+      description: input.opportunity.description,
+      category: input.opportunity.category,
+      currencyAddress: input.opportunity.currencyAddress,
+      requiredSkills: input.opportunity.requiredSkills,
+      budgetMin: input.opportunity.budgetMin,
+      budgetMax: input.opportunity.budgetMax,
+      timeline: input.opportunity.timeline,
+      visibility: 'public',
+    },
+  });
+
+  await publishMarketplaceOpportunityForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.client.session,
+    opportunityId: createdOpportunity.opportunity.id,
+  });
+
+  await upsertMarketplaceProfileForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.talent.session,
+    profile: input.talent.profile,
+  });
+
+  await applyToMarketplaceOpportunityForApiSession({
+    apiBaseUrl: input.apiBaseUrl,
+    session: input.talent.session,
+    opportunityId: createdOpportunity.opportunity.id,
+    selectedWalletAddress: input.talent.wallet.address,
+    portfolioUrls: input.talent.profile.portfolioUrls ?? [],
+  });
+
+  return {
+    opportunityId: createdOpportunity.opportunity.id,
+  };
 }

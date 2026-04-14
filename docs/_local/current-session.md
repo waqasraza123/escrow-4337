@@ -4,30 +4,36 @@
 - 2026-04-14
 
 ## Current Objective
-- Continue frontend marketplace production hardening with browser-level locale and RTL verification across the public marketplace routes and authenticated marketplace workspace.
+- Continue frontend marketplace production hardening with browser-level marketplace journey coverage that survives current UI changes and multi-actor setup complexity.
 
 ## Last Completed Step
-- Added browser-level marketplace locale persistence and RTL coverage: a new local Playwright journey now proves English/Arabic switching persists between `/marketplace` and `/app/marketplace`, and that `lang`, `dir`, and locale state remain correct across public and authenticated marketplace routes.
+- Added seeded local Playwright coverage for marketplace review-to-hire: multi-actor marketplace setup now has reusable API seeding helpers for profiles, briefs, publish, and application submission, and the local browser journey proves client review-board loading, shortlist, hire-into-escrow, and talent-side hired-contract visibility.
 
 ## Current Step
-- Task complete. Marketplace browser locale/RTL coverage is shipped and targeted verification is green.
+- Task complete. Marketplace browser journey coverage now includes both locale/RTL persistence and a seeded review/hire flow, with targeted verification green.
 
 ## Why This Step Exists
-- The public marketplace and workspace localization pass improved component-level quality, but there was still no browser proof that locale switching and RTL state survived real navigation between the public and authenticated marketplace surfaces.
+- The public marketplace polish work needed deeper browser proof on core hiring workflows, but the older end-to-end marketplace journey had drifted from the current UI and was too brittle to trust as a regression signal.
 
 ## Changed Files
+- Browser test fixtures:
+  `tests/e2e/fixtures/marketplace-api.ts`
+  `tests/e2e/fixtures/journey-setup.ts`
 - Browser tests:
+  `tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts`
   `tests/e2e/specs/journeys/local/marketplace-locale-rtl.spec.ts`
 - Docs:
   `docs/_local/current-session.md`
 
 ## Key Constraints
-- Keep scope within marketplace browser-proof hardening rather than widening into unrelated app journeys.
-- Prove persisted locale and RTL behavior through the real browser flow without masking unrelated stale browser specs as if they were fixed.
-- Reuse the existing locale cookie and shared marketplace message layer rather than adding route-specific locale state.
+- Keep scope within marketplace browser-proof hardening rather than widening into unrelated product areas.
+- Prefer stable API-seeded setup for brittle multi-actor preconditions so browser coverage focuses on the decision-heavy UI path instead of re-testing every setup form.
+- Reuse the existing local session bootstrap model and zero-cost local stack; do not add deployment-only dependencies.
 
 ## Verification Commands
+- `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts --project=local-journeys`
 - `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-locale-rtl.spec.ts --project=local-journeys`
+- `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts tests/e2e/specs/journeys/local/marketplace-locale-rtl.spec.ts --project=local-journeys`
 - `git diff --check`
 
 ## Verification Status
@@ -35,7 +41,7 @@
   - all commands above
 
 ## Expected Result
-- Marketplace locale handling now has browser-level proof: language switching persists across public and authenticated marketplace routes, Arabic pages remain RTL after navigation, and returning to English restores LTR state without manual refreshes or route-specific drift.
+- Marketplace browser hardening now covers two real risk areas: locale/RTL persistence across public/authenticated routes, and the seeded client review/hire path that converts an application into an escrow contract while keeping talent-side visibility intact.
 
 ## Next Likely Step
-- Continue marketplace frontend hardening with deeper browser workflow proof, starting with the stale marketplace publish/apply/hire journey so current UI and browser behavior are aligned end to end.
+- Continue marketplace browser hardening with either a seeded public-detail-to-workspace apply canary or a deeper contract-creation follow-through after hire so the marketplace browser lane proves more than the review board handoff.
