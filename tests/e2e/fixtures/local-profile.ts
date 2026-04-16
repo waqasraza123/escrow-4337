@@ -198,6 +198,22 @@ export async function createLocalSession(email: string): Promise<LocalSessionTok
   };
 }
 
+export async function findLocalUserEmailByWalletAddress(address: string) {
+  const db = getPool();
+  const result = await db.query<{ email: string }>(
+    `
+      SELECT u.email
+      FROM users u
+      INNER JOIN user_wallets w ON w.user_id = u.id
+      WHERE w.address = $1
+      LIMIT 1
+    `,
+    [address.toLowerCase()],
+  );
+
+  return result.rows[0]?.email ?? null;
+}
+
 export async function linkWalletForSession(
   session: LocalSessionTokens,
   wallet: Wallet,

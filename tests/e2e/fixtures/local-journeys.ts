@@ -4,6 +4,7 @@ import {
   adminBaseUrl,
   adminSessionStorageKey,
   createLocalSession,
+  findLocalUserEmailByWalletAddress,
   linkWalletForSession,
   provisionSmartAccountForSession,
   type LocalSessionTokens,
@@ -44,14 +45,32 @@ export const test = base.extend<{
       await use(async (input) => {
         actorSequence += 1;
         const app = input.app ?? 'web';
-        const email = makeTestEmail(
+        let email = makeTestEmail(
           `${input.role}.${workerPrefix}.${actorSequence}`,
           workerPrefix,
         );
-        const session = await createLocalSession(email);
+        let session = await createLocalSession(email);
 
         if (input.linkedWallet) {
-          await linkWalletForSession(session, input.linkedWallet);
+          try {
+            await linkWalletForSession(session, input.linkedWallet);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Unknown wallet link failure';
+            if (message !== 'Wallet address is already linked') {
+              throw error;
+            }
+
+            const existingEmail = await findLocalUserEmailByWalletAddress(
+              input.linkedWallet.address,
+            );
+            if (!existingEmail) {
+              throw error;
+            }
+
+            email = existingEmail;
+            session = await createExistingWalletOwnerSession(existingEmail);
+          }
         }
 
         if (input.provisionSmartAccountOwner) {
@@ -84,3 +103,19 @@ export const test = base.extend<{
 });
 
 export { expect };
+
+async function createExistingWalletOwnerSession(email: string) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await createLocalSession(email);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown session bootstrap failure';
+      if (message !== 'Invalid or expired code' || attempt === 2) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(`Unable to create a local session for ${email}`);
+}

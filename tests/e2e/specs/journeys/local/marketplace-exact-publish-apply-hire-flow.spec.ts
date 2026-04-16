@@ -2,7 +2,16 @@ import { Wallet } from 'ethers';
 import type { Locator, Page } from '@playwright/test';
 import { makeTestCurrencyAddress } from '../../../data/builders';
 import {
+  commitSelectedJobMilestones,
+  deliverSelectedMilestone,
+  fundSelectedJob,
+  openMilestoneDispute,
+  resolveDisputedMilestone,
+} from '../../../flows/launch-candidate-flow';
+import {
+  adminBaseUrl,
   closeLocalProfileDb,
+  localArbitratorWallet,
   webBaseUrl,
 } from '../../../fixtures/local-profile';
 import { expect, test } from '../../../fixtures/local-journeys';
@@ -43,7 +52,7 @@ async function saveMarketplaceProfile(input: {
   ).toBeVisible();
 }
 
-test('exact marketplace journey publishes, applies, and hires into escrow', async ({
+test('exact marketplace journey publishes, applies, hires, and resolves through escrow', async ({
   browser,
   localSessionFactory,
   runId,
@@ -52,6 +61,9 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
 
   const clientWallet = Wallet.createRandom();
   const talentWallet = Wallet.createRandom();
+  const disputeReason = `Marketplace dispute ${runId}`;
+  const disputeEvidenceUrl = `https://example.com/marketplace-dispute/${runId}`;
+  const resolutionNote = `Marketplace operator release ${runId}`;
   const clientActor = await localSessionFactory({
     role: `marketplace-exact-client.${runId}`,
     linkedWallet: clientWallet,
@@ -61,6 +73,11 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
     role: `marketplace-exact-talent.${runId}`,
     linkedWallet: talentWallet,
   });
+  const operatorActor = await localSessionFactory({
+    role: `marketplace-exact-operator.${runId}`,
+    app: 'admin',
+    linkedWallet: localArbitratorWallet,
+  });
 
   const clientContext = await browser.newContext({
     storageState: clientActor.storageState,
@@ -68,13 +85,19 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
   const talentContext = await browser.newContext({
     storageState: talentActor.storageState,
   });
+  const operatorContext = await browser.newContext({
+    storageState: operatorActor.storageState,
+  });
   const clientPage = await clientContext.newPage();
   const talentPage = await talentContext.newPage();
+  const operatorPage = await operatorContext.newPage();
 
   const opportunityTitle = `Marketplace Exact Engineer ${runId}`;
   const opportunitySummary = `Ship the exact funnel ${runId}`;
   const opportunityTimeline = `2 weeks ${runId}`;
   const currencyAddress = makeTestCurrencyAddress('8');
+  const deliveryNote = `Marketplace delivery note ${runId}`;
+  const deliveryEvidenceUrl = `https://example.com/marketplace-delivery/${runId}`;
 
   await saveMarketplaceProfile({
     page: clientPage,
@@ -187,9 +210,17 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
   if (!clientContractHref) {
     throw new Error('Client hired opportunity did not expose a contract href');
   }
+  const clientContractUrl = new URL(clientContractHref, webBaseUrl);
+  const clientContractPath = clientContractUrl.pathname;
+  const jobId = clientContractPath.split('/').at(-1);
+  if (!jobId) {
+    throw new Error('Unable to derive the hired job id from the client contract link');
+  }
 
-  await clientPage.goto(`${webBaseUrl}${clientContractHref}`);
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}`);
   await expect(clientPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await fundSelectedJob(clientPage);
+  await commitSelectedJobMilestones(clientPage);
 
   await talentPage.goto(`${webBaseUrl}/app/marketplace`);
   const hiredApplicationCard = myApplicationsPanel
@@ -205,9 +236,8 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
   if (!talentContractHref) {
     throw new Error('Hired application did not expose a contract href');
   }
-  expect(new URL(talentContractHref, webBaseUrl).pathname).toBe(
-    new URL(clientContractHref, webBaseUrl).pathname,
-  );
+  const talentContractUrl = new URL(talentContractHref, webBaseUrl);
+  expect(talentContractUrl.pathname).toBe(clientContractPath);
   expect(talentContractHref).toContain('invite=');
 
   await talentPage.goto(`${webBaseUrl}${talentContractHref}`);
@@ -224,10 +254,47 @@ test('exact marketplace journey publishes, applies, and hires into escrow', asyn
     ),
   ).toBeVisible();
 
-  await talentPage.goto(`${webBaseUrl}${talentContractHref}/deliver`);
+  await talentPage.goto(
+    `${webBaseUrl}${talentContractUrl.pathname}/deliver${talentContractUrl.search}`,
+  );
+  await deliverSelectedMilestone({
+    page: talentPage,
+    note: deliveryNote,
+    evidenceUrl: deliveryEvidenceUrl,
+  });
+
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}`);
+  await expect(clientPage.getByText(deliveryNote, { exact: true }).first()).toBeVisible();
   await expect(
-    talentPage.getByRole('button', { name: 'Deliver selected milestone' }),
+    clientPage.getByRole('link', { name: deliveryEvidenceUrl }),
   ).toBeVisible();
 
-  await Promise.all([clientContext.close(), talentContext.close()]);
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}/dispute`);
+  await expect(clientPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await openMilestoneDispute({
+    page: clientPage,
+    reason: disputeReason,
+    evidenceUrl: disputeEvidenceUrl,
+  });
+
+  await operatorPage.goto(`${adminBaseUrl}/cases/${jobId}`);
+  await expect(operatorPage.getByText('Operator case loaded.')).toBeVisible();
+  await expect(operatorPage.getByText(operatorActor.email)).toBeVisible();
+  await resolveDisputedMilestone({
+    page: operatorPage,
+    action: 'release',
+    note: resolutionNote,
+  });
+
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}`);
+  await expect(clientPage.getByText('Resolution', { exact: true }).first()).toBeVisible();
+  await expect(
+    clientPage.getByText(`release: ${resolutionNote}`, { exact: true }),
+  ).toBeVisible();
+  await expect(clientPage.getByText(disputeReason, { exact: true }).first()).toBeVisible();
+  await expect(
+    clientPage.getByRole('link', { name: disputeEvidenceUrl }),
+  ).toBeVisible();
+
+  await Promise.all([clientContext.close(), talentContext.close(), operatorContext.close()]);
 });

@@ -187,13 +187,13 @@ export async function createGuidedJob(input: {
 
 export async function commitSelectedJobMilestones(page: Page) {
   await page.getByRole('button', { name: 'Commit milestones' }).click();
-  await expect(page.getByText('1. Discovery')).toBeVisible();
-  await expect(page.getByText('2. Delivery')).toBeVisible();
+  await expect(page.getByRole('button', { name: /1\. Discovery/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /2\. Delivery/ })).toBeVisible();
 }
 
 export async function fundSelectedJob(page: Page) {
   await page.getByRole('button', { name: 'Fund selected job' }).click();
-  await expect(page.getByText('Funding confirmed')).toBeVisible();
+  await expect(page.getByText('Funding confirmed', { exact: true })).toBeVisible();
 }
 
 export async function copyContractorJoinLink(page: Page) {
@@ -223,7 +223,9 @@ export async function deliverSelectedMilestone(input: {
   const { evidenceUrl, note, page } = input;
 
   await page.getByRole('textbox', { name: 'Delivery note' }).fill(note);
-  await page.getByRole('textbox', { name: 'Evidence URLs' }).fill(evidenceUrl);
+  await page
+    .getByRole('textbox', { name: 'Evidence URLs', exact: true })
+    .fill(evidenceUrl);
   await page.getByRole('button', { name: 'Deliver selected milestone' }).click();
 
   await expect(page.getByText(note, { exact: true })).toBeVisible();

@@ -1,49 +1,43 @@
 # Current Session
 
 ## Date
-- 2026-04-14
+- 2026-04-16
 
 ## Current Objective
-- Continue frontend marketplace production hardening with post-hire contract handoff proof on top of the exact marketplace publish/apply/hire browser canary.
+- Complete marketplace post-hire escrow browser proof in one slice: exact publish/apply/hire coverage through dispute and operator resolution, plus a seeded fast companion lane covering the same downstream escrow behavior.
 
 ## Last Completed Step
-- Fixed the post-hire marketplace-to-contract handoff so applicant-side hired application links now carry the escrow invite token, then extended the exact local Playwright marketplace canary through contract join and delivery access while keeping the broader marketplace journey lane green.
+- Extended both marketplace local Playwright journeys beyond hire so marketplace-originated contracts now prove join, first delivery, client dispute, and admin operator resolution. Hardened local session bootstrap to reuse persisted wallet owners safely under parallel Playwright workers.
 
 ## Current Step
-- Task complete. Marketplace browser journey coverage now includes locale/RTL persistence, seeded public-detail apply, seeded review/hire, a full exact publish/apply/hire canary, and post-hire contract join follow-through from the hired applicant workspace.
+- Task complete. Marketplace local journey coverage now includes locale/RTL persistence, seeded public-detail apply, seeded review-to-hire-to-resolution coverage, and an exact publish/apply/hire canary that follows the hired applicant from invite-backed contract join through delivery, dispute, and operator release resolution.
 
 ## Why This Step Exists
-- The exact marketplace canary previously stopped at `View contract`, which hid a real product defect: hired applicants were sent to a plain contract route without the contractor invite token, so the marketplace handoff did not actually complete the join flow.
+- Marketplace proof previously stopped at join and delivery access, which left the downstream escrow lifecycle unverified for marketplace-originated contracts and hid shared-state issues around the persisted local arbitrator wallet under parallel browser runs.
 
 ## Changed Files
-- API:
-  `services/api/src/modules/marketplace/marketplace.service.ts`
-  `services/api/src/modules/marketplace/marketplace.types.ts`
-- API tests:
-  `services/api/test/marketplace.service.spec.ts`
-  `services/api/test/marketplace.controller.integration.spec.ts`
-- Web:
-  `apps/web/src/lib/api.ts`
-  `apps/web/src/app/marketplace/workspace.tsx`
-  `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx`
+- E2E fixtures:
+  `tests/e2e/fixtures/local-journeys.ts`
+  `tests/e2e/fixtures/local-profile.ts`
+- Shared journey helpers:
+  `tests/e2e/flows/launch-candidate-flow.ts`
 - Browser tests:
   `tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
+  `tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts`
 - Docs:
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
 ## Key Constraints
-- Keep scope within marketplace browser-proof hardening rather than widening into unrelated product areas.
-- Preserve the existing escrow invite/join gate and fix the marketplace handoff at the shared application-view layer instead of bypassing the invite token requirement in the contract UI.
-- Reuse the existing local session bootstrap model and zero-cost local stack; do not add deployment-only dependencies.
-- Keep applicant-only invite tokens out of client-side application review views; only the applicant-facing marketplace application list should receive the invite-backed contract path.
-- Keep the exact canary honest: browser-create the brief, browser-publish the brief, browser-apply, browser-hire, and browser-join the resulting contract instead of silently stopping at a generic contract link.
+- Keep scope inside Playwright/browser-proof hardening; do not add product UI, API, or seed endpoints.
+- Preserve marketplace-origin truth: exact flow must still browser-create the brief and follow the hired application invite-backed contract link.
+- Reuse existing escrow helper actions for funding, milestone commit, delivery, dispute, and resolution rather than introducing marketplace-specific flow helpers.
+- Keep the seeded companion faster than the exact lane by seeding only marketplace publication/application state, then browser-driving hire and downstream escrow steps.
+- Keep local parallel journey execution stable against shared Postgres state and the persisted arbitrator wallet.
 
 ## Verification Commands
-- `pnpm --filter escrow4334-api test -- --runInBand marketplace.service.spec.ts marketplace.controller.integration.spec.ts`
-- `pnpm --filter web test -- src/app/marketplace/marketplace-workspace.spec.tsx`
-- `pnpm --filter web lint`
 - `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts --project=local-journeys`
+- `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts --project=local-journeys`
 - `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-locale-rtl.spec.ts tests/e2e/specs/journeys/local/marketplace-public-apply-flow.spec.ts tests/e2e/specs/journeys/local/marketplace-public-hire-flow.spec.ts tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts --project=local-journeys`
 - `git diff --check`
 
@@ -52,7 +46,9 @@
   - all commands above
 
 ## Expected Result
-- Marketplace browser hardening now covers the core funnel through the first contract workspace action: seeded coverage for fast stable signal, an exact end-to-end canary proving browser-created brief publication, browser application submission, browser hire-into-escrow, and applicant-side contract join with delivery access on the live marketplace UI.
+- Marketplace browser proof now covers the real downstream escrow lifecycle from both lanes:
+  - exact lane: browser-publish, browser-apply, browser-hire, invite-backed join, delivery, dispute, and operator release resolution
+  - seeded lane: API-seeded publication/application, browser-hire, join, delivery, dispute, and operator release resolution
 
 ## Next Likely Step
-- Continue marketplace browser hardening with deeper post-hire escrow behavior, such as seeded or exact proof that a marketplace-created contract can deliver the first milestone and surface downstream dispute or operator flows without leaving the marketplace-originated journey.
+- Extend marketplace-origin proof beyond the happy release path, such as refund-side dispute resolution, export/audit verification from the resulting contract, or deployed-profile marketplace canaries once staged secrets and operator posture are available.

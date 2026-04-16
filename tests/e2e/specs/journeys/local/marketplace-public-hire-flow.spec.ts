@@ -2,10 +2,19 @@ import { Wallet } from 'ethers';
 import type { Locator, Page } from '@playwright/test';
 import { makeTestCurrencyAddress } from '../../../data/builders';
 import {
+  adminBaseUrl,
   apiBaseUrl,
   closeLocalProfileDb,
+  localArbitratorWallet,
   webBaseUrl,
 } from '../../../fixtures/local-profile';
+import {
+  commitSelectedJobMilestones,
+  deliverSelectedMilestone,
+  fundSelectedJob,
+  openMilestoneDispute,
+  resolveDisputedMilestone,
+} from '../../../flows/launch-candidate-flow';
 import { seedMarketplaceHireReadyOpportunityViaApi } from '../../../fixtures/journey-setup';
 import { expect, test } from '../../../fixtures/local-journeys';
 
@@ -24,7 +33,7 @@ function panelCard(panel: Locator, title: string): Locator {
   return panel.locator('article').filter({ hasText: title }).first();
 }
 
-test('seeded marketplace journey reviews an application and hires into escrow', async ({
+test('seeded marketplace journey hires from review and resolves the downstream escrow flow', async ({
   browser,
   localSessionFactory,
   runId,
@@ -33,6 +42,11 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
 
   const clientWallet = Wallet.createRandom();
   const talentWallet = Wallet.createRandom();
+  const deliveryNote = `Marketplace seeded delivery ${runId}`;
+  const deliveryEvidenceUrl = `https://example.com/marketplace-seeded-delivery/${runId}`;
+  const disputeReason = `Marketplace seeded dispute ${runId}`;
+  const disputeEvidenceUrl = `https://example.com/marketplace-seeded-dispute/${runId}`;
+  const resolutionNote = `Marketplace seeded operator release ${runId}`;
   const clientActor = await localSessionFactory({
     role: `marketplace-client.${runId}`,
     linkedWallet: clientWallet,
@@ -41,6 +55,11 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   const talentActor = await localSessionFactory({
     role: `marketplace-talent.${runId}`,
     linkedWallet: talentWallet,
+  });
+  const operatorActor = await localSessionFactory({
+    role: `marketplace-operator.${runId}`,
+    app: 'admin',
+    linkedWallet: localArbitratorWallet,
   });
 
   const opportunityTitle = `Marketplace Product Engineer ${runId}`;
@@ -94,8 +113,12 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   const talentContext = await browser.newContext({
     storageState: talentActor.storageState,
   });
+  const operatorContext = await browser.newContext({
+    storageState: operatorActor.storageState,
+  });
   const clientPage = await clientContext.newPage();
   const talentPage = await talentContext.newPage();
+  const operatorPage = await operatorContext.newPage();
 
   await clientPage.goto(`${webBaseUrl}/app/marketplace`);
   const clientOpportunityCard = clientPage.getByTestId(
@@ -115,6 +138,20 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   });
   await expect(clientContractLink).toBeVisible();
   await expect(clientContractLink).toHaveAttribute('href', /\/app\/contracts\//);
+  const clientContractHref = await clientContractLink.getAttribute('href');
+  if (!clientContractHref) {
+    throw new Error('Seeded marketplace hire did not expose a client contract href');
+  }
+  const clientContractUrl = new URL(clientContractHref, webBaseUrl);
+  const clientContractPath = clientContractUrl.pathname;
+  const jobId = clientContractPath.split('/').at(-1);
+  if (!jobId) {
+    throw new Error('Unable to derive the hired job id from the seeded marketplace contract link');
+  }
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}`);
+  await expect(clientPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await fundSelectedJob(clientPage);
+  await commitSelectedJobMilestones(clientPage);
 
   await talentPage.goto(`${webBaseUrl}/app/marketplace`);
   const hiredApplicationCard = panelCard(
@@ -127,6 +164,66 @@ test('seeded marketplace journey reviews an application and hires into escrow', 
   });
   await expect(talentContractLink).toBeVisible();
   await expect(talentContractLink).toHaveAttribute('href', /\/app\/contracts\//);
+  const talentContractHref = await talentContractLink.getAttribute('href');
+  if (!talentContractHref) {
+    throw new Error('Seeded marketplace hire did not expose a worker contract href');
+  }
+  const talentContractUrl = new URL(talentContractHref, webBaseUrl);
+  expect(talentContractUrl.pathname).toBe(clientContractPath);
+  expect(talentContractHref).toContain('invite=');
 
-  await Promise.all([clientContext.close(), talentContext.close()]);
+  await talentPage.goto(`${webBaseUrl}${talentContractHref}`);
+  await expect(talentPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await talentPage.getByRole('button', { name: 'Join contract' }).click();
+  await expect(
+    talentPage.getByText(
+      'Contract joined. Worker delivery is now enabled for this session.',
+    ),
+  ).toBeVisible();
+
+  await talentPage.goto(
+    `${webBaseUrl}${talentContractUrl.pathname}/deliver${talentContractUrl.search}`,
+  );
+  await deliverSelectedMilestone({
+    page: talentPage,
+    note: deliveryNote,
+    evidenceUrl: deliveryEvidenceUrl,
+  });
+
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}/dispute`);
+  await expect(clientPage.getByRole('heading', { name: opportunityTitle })).toBeVisible();
+  await openMilestoneDispute({
+    page: clientPage,
+    reason: disputeReason,
+    evidenceUrl: disputeEvidenceUrl,
+  });
+
+  await operatorPage.goto(`${adminBaseUrl}/cases/${jobId}`);
+  await expect(operatorPage.getByText('Operator case loaded.')).toBeVisible();
+  await expect(operatorPage.getByText(operatorActor.email)).toBeVisible();
+  await resolveDisputedMilestone({
+    page: operatorPage,
+    action: 'release',
+    note: resolutionNote,
+  });
+
+  await clientPage.goto(`${webBaseUrl}${clientContractPath}`);
+  await expect(clientPage.getByText('Resolution', { exact: true }).first()).toBeVisible();
+  await expect(
+    clientPage.getByText(`release: ${resolutionNote}`, { exact: true }),
+  ).toBeVisible();
+  await expect(clientPage.getByText(disputeReason, { exact: true }).first()).toBeVisible();
+  await expect(
+    clientPage.getByRole('link', { name: disputeEvidenceUrl }),
+  ).toBeVisible();
+  await expect(clientPage.getByText(deliveryNote, { exact: true }).first()).toBeVisible();
+  await expect(
+    clientPage.getByRole('link', { name: deliveryEvidenceUrl }),
+  ).toBeVisible();
+
+  await Promise.all([
+    clientContext.close(),
+    talentContext.close(),
+    operatorContext.close(),
+  ]);
 });
