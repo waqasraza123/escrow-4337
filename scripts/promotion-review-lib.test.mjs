@@ -253,11 +253,9 @@ test('buildPromotionReview requires artifact-search selections to include artifa
     expectedLaunchRunId: '301',
     deployedSmokeSelection: {
       source: 'artifact-search',
-      artifactName: 'deployed-smoke-review-staging-candidate-101',
     },
     launchCandidateSelection: {
       source: 'artifact-search',
-      artifactName: 'launch-candidate-review-staging-candidate-101',
     },
     imageManifest: {
       generatedAt: '2026-04-13T00:00:00.000Z',
@@ -331,12 +329,22 @@ test('buildPromotionReview requires artifact-search selections to include artifa
 
   assert.ok(
     review.blockers.includes(
+      'Deployed smoke review selection is missing artifact name when selection source is present.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
       'Deployed smoke review selection is missing artifact id for artifact-search selection.',
     ),
   );
   assert.ok(
     review.blockers.includes(
       'Deployed smoke review selection is missing selected timestamp for artifact-search selection.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate review selection is missing artifact name when selection source is present.',
     ),
   );
   assert.ok(

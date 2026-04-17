@@ -258,6 +258,14 @@ export function validateReleasePointer(
       );
     }
   }
+  if (
+    pointer?.deployedSmokeSelectionSource &&
+    !normalizeOptionalString(pointer?.deployedSmokeArtifactName)
+  ) {
+    issues.push(
+      'Release pointer deployed smoke artifact name is required when selection source is present.',
+    );
+  }
   if (pointer?.launchCandidateSelectionSource === 'artifact-search') {
     if (!normalizeOptionalString(pointer?.launchCandidateArtifactId)) {
       issues.push(
@@ -269,6 +277,14 @@ export function validateReleasePointer(
         'Release pointer launch candidate selected timestamp is required for artifact-search selection.',
       );
     }
+  }
+  if (
+    pointer?.launchCandidateSelectionSource &&
+    !normalizeOptionalString(pointer?.launchCandidateArtifactName)
+  ) {
+    issues.push(
+      'Release pointer launch candidate artifact name is required when selection source is present.',
+    );
   }
 
   if (requireReadyLaunchPosture) {

@@ -125,6 +125,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
     'Release pointer deployed smoke selection source must be input or artifact-search when present.',
     'Release pointer launch candidate selection source must be input or artifact-search when present.',
+    'Release pointer deployed smoke artifact name is required when selection source is present.',
+    'Release pointer launch candidate artifact name is required when selection source is present.',
   ]);
 });
 
@@ -172,8 +174,10 @@ test('validateReleasePointer requires review selection artifact details for arti
   assert.deepEqual(issues, [
     'Release pointer deployed smoke artifact id is required for artifact-search selection.',
     'Release pointer deployed smoke selected timestamp is required for artifact-search selection.',
+    'Release pointer deployed smoke artifact name is required when selection source is present.',
     'Release pointer launch candidate artifact id is required for artifact-search selection.',
     'Release pointer launch candidate selected timestamp is required for artifact-search selection.',
+    'Release pointer launch candidate artifact name is required when selection source is present.',
   ]);
 });
 

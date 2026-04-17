@@ -632,6 +632,12 @@ function validateSelection({ label, selection }) {
   const issues = [];
   const source = trimToNull(selection?.source);
 
+  if (source) {
+    if (!trimToNull(selection?.artifactName)) {
+      issues.push(`${label} is missing artifact name when selection source is present.`);
+    }
+  }
+
   if (source === 'artifact-search') {
     if (!trimToNull(selection?.artifactId)) {
       issues.push(`${label} is missing artifact id for artifact-search selection.`);

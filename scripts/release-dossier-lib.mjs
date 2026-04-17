@@ -526,6 +526,12 @@ function validateReviewSelection({ label, workflow }) {
   const issues = [];
   const source = trimToNull(workflow?.selectionSource);
 
+  if (source) {
+    if (!trimToNull(workflow?.artifactName)) {
+      issues.push(`${label} is missing artifact name when selection source is present.`);
+    }
+  }
+
   if (source === 'artifact-search') {
     if (!trimToNull(workflow?.artifactId)) {
       issues.push(`${label} is missing artifact id for artifact-search selection.`);
