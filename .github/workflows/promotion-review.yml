@@ -112,7 +112,15 @@ jobs:
             --expected-repository "${{ github.repository }}" \
             --expected-candidate-run-id "${{ inputs.candidate_run_id }}" \
             --expected-smoke-run-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_RUN_ID }}" \
-            --expected-launch-run-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_RUN_ID }}"
+            --expected-launch-run-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_RUN_ID }}" \
+            --deployed-smoke-selection-source "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_SELECTION_SOURCE }}" \
+            --deployed-smoke-artifact-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_ARTIFACT_ID }}" \
+            --deployed-smoke-artifact-name "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_ARTIFACT_NAME }}" \
+            --deployed-smoke-created-at "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_DEPLOYED_SMOKE_CREATED_AT }}" \
+            --launch-candidate-selection-source "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_SELECTION_SOURCE }}" \
+            --launch-candidate-artifact-id "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_ID }}" \
+            --launch-candidate-artifact-name "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_NAME }}" \
+            --launch-candidate-created-at "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_CREATED_AT }}"
 
       - name: Generate release dossier
         if: always()

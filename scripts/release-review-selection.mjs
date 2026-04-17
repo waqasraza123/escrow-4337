@@ -47,8 +47,14 @@ try {
       [
         `PROMOTION_REVIEW_DEPLOYED_SMOKE_RUN_ID=${selection.deployedSmoke.runId}`,
         `PROMOTION_REVIEW_DEPLOYED_SMOKE_ARTIFACT_NAME=${selection.deployedSmoke.artifactName}`,
+        `PROMOTION_REVIEW_DEPLOYED_SMOKE_SELECTION_SOURCE=${selection.deployedSmoke.source}`,
+        `PROMOTION_REVIEW_DEPLOYED_SMOKE_ARTIFACT_ID=${selection.deployedSmoke.artifactId ?? ''}`,
+        `PROMOTION_REVIEW_DEPLOYED_SMOKE_CREATED_AT=${selection.deployedSmoke.createdAt ?? ''}`,
         `PROMOTION_REVIEW_LAUNCH_CANDIDATE_RUN_ID=${selection.launchCandidate.runId}`,
         `PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_NAME=${selection.launchCandidate.artifactName}`,
+        `PROMOTION_REVIEW_LAUNCH_CANDIDATE_SELECTION_SOURCE=${selection.launchCandidate.source}`,
+        `PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_ID=${selection.launchCandidate.artifactId ?? ''}`,
+        `PROMOTION_REVIEW_LAUNCH_CANDIDATE_CREATED_AT=${selection.launchCandidate.createdAt ?? ''}`,
       ].join('\n') + '\n',
       'utf8',
     );

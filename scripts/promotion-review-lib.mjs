@@ -184,6 +184,8 @@ export function buildPromotionReview({
   deployedSmokeRecord,
   launchPromotionRecord,
   launchEvidenceManifest,
+  deployedSmokeSelection = {},
+  launchCandidateSelection = {},
   expectedEnvironment = null,
   expectedRepository = null,
   expectedCandidateRunId = null,
@@ -332,6 +334,10 @@ export function buildPromotionReview({
         runId: smokeMetadata.runId ?? null,
         runUrl: smokeMetadata.runUrl ?? null,
         candidateRunId: smokeMetadata.candidateRunId ?? null,
+        selectionSource: trimToNull(deployedSmokeSelection.source),
+        artifactId: trimToNull(deployedSmokeSelection.artifactId),
+        artifactName: trimToNull(deployedSmokeSelection.artifactName),
+        selectedCreatedAt: trimToNull(deployedSmokeSelection.createdAt),
         smokePassed: deployedSmokeRecord?.checks?.smokePassed === true,
         seededCanaryPassed: deployedSmokeRecord?.checks?.seededCanaryPassed === true,
         marketplaceSeededCanaryPassed:
@@ -343,6 +349,10 @@ export function buildPromotionReview({
         runId: launchMetadata.runId ?? null,
         runUrl: launchMetadata.runUrl ?? null,
         candidateRunId: launchMetadata.candidateRunId ?? null,
+        selectionSource: trimToNull(launchCandidateSelection.source),
+        artifactId: trimToNull(launchCandidateSelection.artifactId),
+        artifactName: trimToNull(launchCandidateSelection.artifactName),
+        selectedCreatedAt: trimToNull(launchCandidateSelection.createdAt),
         launchReady: launchPromotionRecord?.launchCandidate?.launchReady === true,
         evidenceComplete: missingLaunchArtifacts.length === 0,
         missingArtifacts: missingLaunchArtifacts,
@@ -377,10 +387,12 @@ export function buildPromotionReviewMarkdown(review) {
 - Image reference: ${review.candidate.imageReference ?? 'n/a'}
 - Deployed smoke run ID: ${review.reviews.deployedSmoke.runId ?? 'n/a'}
 - Deployed smoke status: ${review.reviews.deployedSmoke.status}
+- Deployed smoke selection: ${review.reviews.deployedSmoke.selectionSource ?? 'n/a'} ${review.reviews.deployedSmoke.artifactName ?? 'n/a'}
 - Deployed smoke seeded canary passed: ${review.reviews.deployedSmoke.seededCanaryPassed ? 'true' : 'false'}
 - Deployed smoke marketplace seeded canary passed: ${review.reviews.deployedSmoke.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
+- Launch candidate selection: ${review.reviews.launchCandidate.selectionSource ?? 'n/a'} ${review.reviews.launchCandidate.artifactName ?? 'n/a'}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}
 - Launch rollback image SHA: ${review.reviews.launchCandidate.rollbackImageSha ?? 'n/a'}
 - Launch rollback source: ${review.reviews.launchCandidate.rollbackSource ?? 'n/a'}

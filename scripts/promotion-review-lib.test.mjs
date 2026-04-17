@@ -101,6 +101,18 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
     expectedCandidateRunId: '101',
     expectedSmokeRunId: '201',
     expectedLaunchRunId: '301',
+    deployedSmokeSelection: {
+      source: 'artifact-search',
+      artifactId: '22',
+      artifactName: 'deployed-smoke-review-staging-candidate-101',
+      createdAt: '2026-04-13T01:00:00Z',
+    },
+    launchCandidateSelection: {
+      source: 'input',
+      artifactId: '12',
+      artifactName: 'launch-candidate-review-staging-candidate-101',
+      createdAt: '2026-04-13T02:00:00Z',
+    },
     imageManifest: {
       generatedAt: '2026-04-13T00:00:00.000Z',
       repository: 'mc/escrow4337',
@@ -212,6 +224,8 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
       'Launch candidate promotion record rollback source does not match launch metadata.',
     ),
   );
+  assert.equal(review.reviews.deployedSmoke.selectionSource, 'artifact-search');
+  assert.equal(review.reviews.launchCandidate.selectionSource, 'input');
   assert.ok(
     review.blockers.includes(
       'Launch candidate promotion record reports marketplace exact canary failures.',
@@ -226,6 +240,18 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
     expectedCandidateRunId: '101',
     expectedSmokeRunId: '201',
     expectedLaunchRunId: '301',
+    deployedSmokeSelection: {
+      source: 'artifact-search',
+      artifactId: '22',
+      artifactName: 'deployed-smoke-review-staging-candidate-101',
+      createdAt: '2026-04-13T01:00:00Z',
+    },
+    launchCandidateSelection: {
+      source: 'artifact-search',
+      artifactId: '12',
+      artifactName: 'launch-candidate-review-staging-candidate-101',
+      createdAt: '2026-04-13T02:00:00Z',
+    },
     imageManifest: {
       generatedAt: '2026-04-13T00:00:00.000Z',
       repository: 'mc/escrow4337',
@@ -307,6 +333,10 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
 
   assert.equal(review.status, 'ready');
   assert.deepEqual(review.blockers, []);
+  assert.equal(review.reviews.deployedSmoke.selectionSource, 'artifact-search');
+  assert.equal(review.reviews.deployedSmoke.artifactName, 'deployed-smoke-review-staging-candidate-101');
+  assert.equal(review.reviews.launchCandidate.selectionSource, 'artifact-search');
+  assert.equal(review.reviews.launchCandidate.artifactName, 'launch-candidate-review-staging-candidate-101');
   assert.equal(review.reviews.launchCandidate.rollbackSource, 'release-pointer');
   assert.equal(review.reviews.launchCandidate.rollbackPointerRunId, '701');
   assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
