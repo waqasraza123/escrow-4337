@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   buildReleaseDossier,
+  buildReleaseDossierMarkdown,
   buildReleaseDossierMetadata,
   buildChecksumsText,
   copyReleaseDossierSources,
@@ -294,4 +295,10 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.deepEqual(record.decision.warnings, [
     'Rollback image SHA is not yet recorded for this candidate.',
   ]);
+
+  const markdown = buildReleaseDossierMarkdown(record);
+  assert.ok(markdown.includes('Selection artifact ID: 22'));
+  assert.ok(markdown.includes('Selection selected at: 2026-04-13T01:00:00Z'));
+  assert.ok(markdown.includes('Selection artifact ID: 12'));
+  assert.ok(markdown.includes('Selection selected at: 2026-04-13T02:00:00Z'));
 });

@@ -400,9 +400,15 @@ export function buildReleaseDossierMarkdown(record) {
 
 - Candidate CI: ${formatWorkflow(record.workflows.candidateCi)}
 - Deployed Smoke: ${formatWorkflow(record.workflows.deployedSmoke)}
-  Selection: ${formatSelection(record.workflows.deployedSmoke)}
+  Selection source: ${record.workflows.deployedSmoke.selectionSource ?? 'n/a'}
+  Selection artifact: ${record.workflows.deployedSmoke.artifactName ?? 'n/a'}
+  Selection artifact ID: ${record.workflows.deployedSmoke.artifactId ?? 'n/a'}
+  Selection selected at: ${record.workflows.deployedSmoke.selectedCreatedAt ?? 'n/a'}
 - Launch Candidate: ${formatWorkflow(record.workflows.launchCandidate)}
-  Selection: ${formatSelection(record.workflows.launchCandidate)}
+  Selection source: ${record.workflows.launchCandidate.selectionSource ?? 'n/a'}
+  Selection artifact: ${record.workflows.launchCandidate.artifactName ?? 'n/a'}
+  Selection artifact ID: ${record.workflows.launchCandidate.artifactId ?? 'n/a'}
+  Selection selected at: ${record.workflows.launchCandidate.selectedCreatedAt ?? 'n/a'}
 - Promotion Review: ${formatWorkflow(record.workflows.promotionReview)}
 
 ## Blockers
@@ -480,16 +486,6 @@ function formatWorkflow(workflow) {
   const status = trimToNull(workflow?.status);
   const url = trimToNull(workflow?.runUrl);
   return `${name} run ${runId}${status ? ` (${status})` : ''}${url ? ` ${url}` : ''}`;
-}
-
-function formatSelection(workflow) {
-  const source = trimToNull(workflow?.selectionSource) ?? 'n/a';
-  const artifact = trimToNull(workflow?.artifactName) ?? 'n/a';
-  const artifactId = trimToNull(workflow?.artifactId);
-  const selectedCreatedAt = trimToNull(workflow?.selectedCreatedAt);
-  return `${source} ${artifact}${artifactId ? ` id=${artifactId}` : ''}${
-    selectedCreatedAt ? ` created=${selectedCreatedAt}` : ''
-  }`;
 }
 
 function compareField({ issues, leftLabel, leftValue, rightLabel, rightValue }) {
