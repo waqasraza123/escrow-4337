@@ -127,6 +127,8 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         smokeFailures: 1,
         seededCanaryFailures: 0,
         exactCanaryFailures: 0,
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 2,
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: false,
         authorityAuditSource: 'aggregate',
@@ -159,6 +161,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch candidate evidence manifest is missing required artifacts: authority-evidence/summary.json.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate promotion record reports marketplace exact canary failures.',
     ),
   );
 });
@@ -224,6 +231,8 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         smokeFailures: 0,
         seededCanaryFailures: 0,
         exactCanaryFailures: 0,
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 0,
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: true,
         authorityAuditSource: 'chain_projection',
@@ -239,5 +248,7 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
 
   assert.equal(review.status, 'ready');
   assert.deepEqual(review.blockers, []);
+  assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
+  assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
   assert.deepEqual(review.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

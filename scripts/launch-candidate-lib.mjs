@@ -279,6 +279,8 @@ export function buildPromotionRecord({
       smokeFailures: summary.smoke.failed,
       seededCanaryFailures: summary.seededCanary.failed,
       exactCanaryFailures: summary.exactCanary.failed,
+      marketplaceSeededCanaryFailures: summary.marketplaceSeededCanary.failed,
+      marketplaceExactCanaryFailures: summary.marketplaceExactCanary.failed,
       walkthroughCanaryFailures: summary.walkthroughCanary.failed,
       authorityEvidenceOk: summary.authorityEvidence.ok,
       authorityAuditSource: summary.authorityEvidence.auditSource,
@@ -325,6 +327,8 @@ export function buildPromotionMarkdown(record) {
 - Rollback image SHA: ${record.metadata.rollbackImageSha ?? 'n/a'}
 - Launch readiness: ${record.launchCandidate.launchReady ? 'ready' : 'blocked'}
 - Authority audit source: ${record.launchCandidate.authorityAuditSource}
+- Marketplace seeded canary failures: ${record.launchCandidate.marketplaceSeededCanaryFailures}
+- Marketplace exact canary failures: ${record.launchCandidate.marketplaceExactCanaryFailures}
 - Daemon health: ${record.observability.daemonHealthStatus}
 - Alert drill configured: ${record.observability.alertDrill.configured ? 'true' : 'false'}
 - Alert drill reason: ${record.observability.alertDrill.reason ?? 'n/a'}

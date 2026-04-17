@@ -335,6 +335,10 @@ export function buildPromotionReview({
         launchReady: launchPromotionRecord?.launchCandidate?.launchReady === true,
         evidenceComplete: missingLaunchArtifacts.length === 0,
         missingArtifacts: missingLaunchArtifacts,
+        marketplaceSeededCanaryPassed:
+          (launchPromotionRecord?.launchCandidate?.marketplaceSeededCanaryFailures ?? 0) === 0,
+        marketplaceExactCanaryPassed:
+          (launchPromotionRecord?.launchCandidate?.marketplaceExactCanaryFailures ?? 0) === 0,
         authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
       },
     },
@@ -360,6 +364,8 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}
+- Launch marketplace seeded canary passed: ${review.reviews.launchCandidate.marketplaceSeededCanaryPassed ? 'true' : 'false'}
+- Launch marketplace exact canary passed: ${review.reviews.launchCandidate.marketplaceExactCanaryPassed ? 'true' : 'false'}
 - Launch authority audit source: ${review.reviews.launchCandidate.authorityAuditSource ?? 'n/a'}
 
 ## Blockers
@@ -460,6 +466,12 @@ function validateLaunchPromotionReview({
   }
   if ((record?.launchCandidate?.exactCanaryFailures ?? 0) > 0) {
     issues.push('Launch candidate promotion record reports exact canary failures.');
+  }
+  if ((record?.launchCandidate?.marketplaceSeededCanaryFailures ?? 0) > 0) {
+    issues.push('Launch candidate promotion record reports marketplace seeded canary failures.');
+  }
+  if ((record?.launchCandidate?.marketplaceExactCanaryFailures ?? 0) > 0) {
+    issues.push('Launch candidate promotion record reports marketplace exact canary failures.');
   }
   if ((record?.launchCandidate?.walkthroughCanaryFailures ?? 0) > 0) {
     issues.push('Launch candidate promotion record reports walkthrough canary failures.');

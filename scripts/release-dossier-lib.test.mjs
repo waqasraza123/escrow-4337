@@ -180,6 +180,8 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
       },
       launchCandidate: {
         authorityAuditSource: 'chain_projection',
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 0,
       },
     },
     launchEvidenceManifest: {
@@ -211,6 +213,8 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.evidence.fileCount, 2);
   assert.equal(record.evidence.totalBytes, 200);
   assert.equal(record.launchEvidence.authorityAuditSource, 'chain_projection');
+  assert.equal(record.launchEvidence.marketplaceSeededCanaryFailures, 0);
+  assert.equal(record.launchEvidence.marketplaceExactCanaryFailures, 0);
   assert.deepEqual(record.decision.warnings, [
     'Rollback image SHA is not yet recorded for this candidate.',
   ]);

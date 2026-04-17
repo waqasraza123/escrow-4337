@@ -248,6 +248,10 @@ export function buildReleaseDossier({
       requiredArtifactCount: launchEvidenceManifest?.requiredArtifacts?.total ?? null,
       missingArtifacts,
       authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
+      marketplaceSeededCanaryFailures:
+        launchPromotionRecord?.launchCandidate?.marketplaceSeededCanaryFailures ?? null,
+      marketplaceExactCanaryFailures:
+        launchPromotionRecord?.launchCandidate?.marketplaceExactCanaryFailures ?? null,
     },
     evidence: {
       fileCount: evidenceFiles.length,
@@ -269,6 +273,8 @@ export function buildReleaseDossierMarkdown(record) {
 - Commit SHA: ${record.candidate.commitSha ?? 'n/a'}
 - Image digest: ${record.candidate.imageDigest ?? 'n/a'}
 - Launch authority audit source: ${record.launchEvidence.authorityAuditSource ?? 'n/a'}
+- Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}
+- Launch marketplace exact canary failures: ${record.launchEvidence.marketplaceExactCanaryFailures ?? 'n/a'}
 - Evidence files: ${record.evidence.fileCount}
 - Evidence bytes: ${record.evidence.totalBytes}
 
