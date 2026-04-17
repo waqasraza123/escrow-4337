@@ -133,6 +133,14 @@ function runValidate(argv) {
         `RELEASE_POINTER_DEPLOYED_SMOKE_PASSED=${pointer.deployedSmokePassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeSeededCanaryPassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeMarketplaceSeededCanaryPassed ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_SELECTION_SOURCE=${pointer.deployedSmokeSelectionSource ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_ARTIFACT_ID=${pointer.deployedSmokeArtifactId ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_ARTIFACT_NAME=${pointer.deployedSmokeArtifactName ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_SELECTED_CREATED_AT=${pointer.deployedSmokeSelectedCreatedAt ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_CANDIDATE_SELECTION_SOURCE=${pointer.launchCandidateSelectionSource ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_CANDIDATE_ARTIFACT_ID=${pointer.launchCandidateArtifactId ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_CANDIDATE_ARTIFACT_NAME=${pointer.launchCandidateArtifactName ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_CANDIDATE_SELECTED_CREATED_AT=${pointer.launchCandidateSelectedCreatedAt ?? ''}`,
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_SEEDED_CANARY_FAILURES=${pointer.launchMarketplaceSeededCanaryFailures ?? ''}`,
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CANARY_FAILURES=${pointer.launchMarketplaceExactCanaryFailures ?? ''}`,
         `RELEASE_POINTER_AUTHORITY_AUDIT_SOURCE=${pointer.authorityAuditSource ?? ''}`,
@@ -203,6 +211,14 @@ function buildMarkdown(pointer) {
 - Deployed smoke passed: ${formatOptionalBoolean(pointer.deployedSmokePassed)}
 - Deployed smoke seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeSeededCanaryPassed)}
 - Deployed smoke marketplace seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeMarketplaceSeededCanaryPassed)}
+- Deployed smoke selection source: ${pointer.deployedSmokeSelectionSource ?? 'n/a'}
+- Deployed smoke artifact ID: ${pointer.deployedSmokeArtifactId ?? 'n/a'}
+- Deployed smoke artifact name: ${pointer.deployedSmokeArtifactName ?? 'n/a'}
+- Deployed smoke selected at: ${pointer.deployedSmokeSelectedCreatedAt ?? 'n/a'}
+- Launch candidate selection source: ${pointer.launchCandidateSelectionSource ?? 'n/a'}
+- Launch candidate artifact ID: ${pointer.launchCandidateArtifactId ?? 'n/a'}
+- Launch candidate artifact name: ${pointer.launchCandidateArtifactName ?? 'n/a'}
+- Launch candidate selected at: ${pointer.launchCandidateSelectedCreatedAt ?? 'n/a'}
 - Launch marketplace seeded canary failures: ${pointer.launchMarketplaceSeededCanaryFailures ?? 'n/a'}
 - Launch marketplace exact canary failures: ${pointer.launchMarketplaceExactCanaryFailures ?? 'n/a'}
 - Authority audit source: ${pointer.authorityAuditSource ?? 'n/a'}

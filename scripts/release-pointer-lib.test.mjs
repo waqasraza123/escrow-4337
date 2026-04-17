@@ -28,6 +28,16 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
           smokePassed: true,
           seededCanaryPassed: true,
           marketplaceSeededCanaryPassed: true,
+          selectionSource: 'artifact-search',
+          artifactId: '22',
+          artifactName: 'deployed-smoke-review-production-candidate-101',
+          selectedCreatedAt: '2026-04-13T01:00:00Z',
+        },
+        launchCandidate: {
+          selectionSource: 'input',
+          artifactId: '12',
+          artifactName: 'launch-candidate-review-production-candidate-101',
+          selectedCreatedAt: '2026-04-13T02:00:00Z',
         },
       },
       launchEvidence: {
@@ -58,6 +68,14 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.rollbackPointerRunId, '651');
   assert.equal(pointer.rollbackPointerArtifactName, 'release-pointer-staging');
   assert.equal(pointer.deployedSmokeMarketplaceSeededCanaryPassed, true);
+  assert.equal(pointer.deployedSmokeSelectionSource, 'artifact-search');
+  assert.equal(pointer.deployedSmokeArtifactId, '22');
+  assert.equal(pointer.deployedSmokeArtifactName, 'deployed-smoke-review-production-candidate-101');
+  assert.equal(pointer.deployedSmokeSelectedCreatedAt, '2026-04-13T01:00:00Z');
+  assert.equal(pointer.launchCandidateSelectionSource, 'input');
+  assert.equal(pointer.launchCandidateArtifactId, '12');
+  assert.equal(pointer.launchCandidateArtifactName, 'launch-candidate-review-production-candidate-101');
+  assert.equal(pointer.launchCandidateSelectedCreatedAt, '2026-04-13T02:00:00Z');
   assert.equal(pointer.launchMarketplaceSeededCanaryFailures, 0);
   assert.equal(pointer.launchMarketplaceExactCanaryFailures, 0);
   assert.equal(pointer.authorityAuditSource, 'chain_projection');
@@ -79,6 +97,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       imageReference: 'ghcr.io/mc/escrow-4337-api:main',
       rollbackSource: 'pointer',
       deployedSmokeMarketplaceSeededCanaryPassed: 'true',
+      deployedSmokeSelectionSource: 'manual',
+      launchCandidateSelectionSource: 'manual',
       launchMarketplaceExactCanaryFailures: -1,
     },
     {
@@ -95,6 +115,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer rollback image SHA is required when rollback source is present.',
     'Release pointer deployed smoke marketplace seeded canary passed must be boolean when present.',
     'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
+    'Release pointer deployed smoke selection source must be input or artifact-search when present.',
+    'Release pointer launch candidate selection source must be input or artifact-search when present.',
   ]);
 });
 

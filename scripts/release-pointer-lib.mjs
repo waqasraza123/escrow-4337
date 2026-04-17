@@ -69,6 +69,24 @@ export function buildReleasePointer({
     deployedSmokeMarketplaceSeededCanaryPassed: normalizeOptionalBoolean(
       releaseDossier?.workflows?.deployedSmoke?.marketplaceSeededCanaryPassed,
     ),
+    deployedSmokeSelectionSource: normalizeOptionalString(
+      releaseDossier?.workflows?.deployedSmoke?.selectionSource,
+    ),
+    deployedSmokeArtifactId: normalizeOptionalString(releaseDossier?.workflows?.deployedSmoke?.artifactId),
+    deployedSmokeArtifactName: normalizeOptionalString(releaseDossier?.workflows?.deployedSmoke?.artifactName),
+    deployedSmokeSelectedCreatedAt: normalizeOptionalString(
+      releaseDossier?.workflows?.deployedSmoke?.selectedCreatedAt,
+    ),
+    launchCandidateSelectionSource: normalizeOptionalString(
+      releaseDossier?.workflows?.launchCandidate?.selectionSource,
+    ),
+    launchCandidateArtifactId: normalizeOptionalString(releaseDossier?.workflows?.launchCandidate?.artifactId),
+    launchCandidateArtifactName: normalizeOptionalString(
+      releaseDossier?.workflows?.launchCandidate?.artifactName,
+    ),
+    launchCandidateSelectedCreatedAt: normalizeOptionalString(
+      releaseDossier?.workflows?.launchCandidate?.selectedCreatedAt,
+    ),
     launchMarketplaceSeededCanaryFailures: normalizeOptionalNumber(
       releaseDossier?.launchEvidence?.marketplaceSeededCanaryFailures,
     ),
@@ -182,6 +200,15 @@ export function validateReleasePointer(
       if (!Number.isInteger(pointer[field]) || pointer[field] < 0) {
         issues.push(`Release pointer ${label} must be a non-negative integer when present.`);
       }
+    }
+  }
+
+  for (const [field, label] of [
+    ['deployedSmokeSelectionSource', 'deployed smoke selection source'],
+    ['launchCandidateSelectionSource', 'launch candidate selection source'],
+  ]) {
+    if (pointer?.[field] && pointer[field] !== 'input' && pointer[field] !== 'artifact-search') {
+      issues.push(`Release pointer ${label} must be input or artifact-search when present.`);
     }
   }
 
