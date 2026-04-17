@@ -214,6 +214,9 @@ jobs:
           LAUNCH_CANDIDATE_ROLLBACK_SOURCE: ${{ steps.rollback_image.outputs.rollback_source }}
           LAUNCH_CANDIDATE_ROLLBACK_POINTER_RUN_ID: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_RUN_ID }}
           LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_NAME: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_ARTIFACT_NAME }}
+          LAUNCH_CANDIDATE_ROLLBACK_POINTER_SELECTION_SOURCE: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_SELECTION_SOURCE }}
+          LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_ID: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_ARTIFACT_ID }}
+          LAUNCH_CANDIDATE_ROLLBACK_POINTER_SELECTED_CREATED_AT: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_SELECTED_CREATED_AT }}
 
       - name: Upload launch candidate artifacts
         if: always()

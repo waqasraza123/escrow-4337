@@ -107,6 +107,7 @@ test('validateLaunchMetadata requires rollback pointer provenance when source is
   assert.deepEqual(issues, [
     'Launch candidate metadata is missing rollback release pointer run id.',
     'Launch candidate metadata is missing rollback release pointer artifact name.',
+    'Launch candidate metadata is missing rollback release pointer selection source.',
   ]);
 });
 
@@ -219,6 +220,9 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
       rollbackSource: null,
       rollbackPointerRunId: null,
       rollbackPointerArtifactName: null,
+      rollbackPointerSelectionSource: null,
+      rollbackPointerArtifactId: null,
+      rollbackPointerSelectedCreatedAt: null,
     },
     runtimeProfile: {
       operations: {
@@ -294,6 +298,7 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
   assert.equal(record.status, 'ready');
   assert.equal(record.rollback.ready, true);
   assert.equal(record.rollback.rollbackSource, null);
+  assert.equal(record.rollback.rollbackPointerSelectionSource, null);
   assert.equal(record.observability.alertDrill.configured, true);
   assert.equal(record.evidence.presentArtifactCount, 15);
   assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);

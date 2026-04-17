@@ -213,6 +213,27 @@ export function validateReleaseDossierInputs({
     rightLabel: 'launch candidate metadata rollback pointer artifact name',
     rightValue: launchPromotionRecord?.metadata?.rollbackPointerArtifactName,
   });
+  compareField({
+    issues,
+    leftLabel: 'Launch candidate rollback pointer selection source',
+    leftValue: launchPromotionRecord?.rollback?.rollbackPointerSelectionSource,
+    rightLabel: 'launch candidate metadata rollback pointer selection source',
+    rightValue: launchPromotionRecord?.metadata?.rollbackPointerSelectionSource,
+  });
+  compareField({
+    issues,
+    leftLabel: 'Launch candidate rollback pointer artifact id',
+    leftValue: launchPromotionRecord?.rollback?.rollbackPointerArtifactId,
+    rightLabel: 'launch candidate metadata rollback pointer artifact id',
+    rightValue: launchPromotionRecord?.metadata?.rollbackPointerArtifactId,
+  });
+  compareField({
+    issues,
+    leftLabel: 'Launch candidate rollback pointer selected timestamp',
+    leftValue: launchPromotionRecord?.rollback?.rollbackPointerSelectedCreatedAt,
+    rightLabel: 'launch candidate metadata rollback pointer selected timestamp',
+    rightValue: launchPromotionRecord?.metadata?.rollbackPointerSelectedCreatedAt,
+  });
   compareBooleanField({
     issues,
     leftLabel: 'Deployed smoke seeded canary passed',
@@ -329,6 +350,12 @@ export function buildReleaseDossier({
       rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
       rollbackPointerArtifactName:
         launchPromotionRecord?.rollback?.rollbackPointerArtifactName ?? null,
+      rollbackPointerSelectionSource:
+        launchPromotionRecord?.rollback?.rollbackPointerSelectionSource ?? null,
+      rollbackPointerArtifactId:
+        launchPromotionRecord?.rollback?.rollbackPointerArtifactId ?? null,
+      rollbackPointerSelectedCreatedAt:
+        launchPromotionRecord?.rollback?.rollbackPointerSelectedCreatedAt ?? null,
       marketplaceSeededCanaryFailures:
         launchPromotionRecord?.launchCandidate?.marketplaceSeededCanaryFailures ?? null,
       marketplaceExactCanaryFailures:
@@ -360,6 +387,9 @@ export function buildReleaseDossierMarkdown(record) {
 - Launch rollback source: ${record.launchEvidence.rollbackSource ?? 'n/a'}
 - Launch rollback pointer run ID: ${record.launchEvidence.rollbackPointerRunId ?? 'n/a'}
 - Launch rollback pointer artifact: ${record.launchEvidence.rollbackPointerArtifactName ?? 'n/a'}
+- Launch rollback pointer selection source: ${record.launchEvidence.rollbackPointerSelectionSource ?? 'n/a'}
+- Launch rollback pointer artifact ID: ${record.launchEvidence.rollbackPointerArtifactId ?? 'n/a'}
+- Launch rollback pointer selected at: ${record.launchEvidence.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Launch authority audit source: ${record.launchEvidence.authorityAuditSource ?? 'n/a'}
 - Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}
 - Launch marketplace exact canary failures: ${record.launchEvidence.marketplaceExactCanaryFailures ?? 'n/a'}

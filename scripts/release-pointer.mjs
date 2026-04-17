@@ -86,6 +86,9 @@ async function runResolve(argv) {
       [
         `RELEASE_POINTER_RUN_ID=${selection.runId}`,
         `RELEASE_POINTER_ARTIFACT_NAME=${selection.artifactName}`,
+        `RELEASE_POINTER_SELECTION_SOURCE=${selection.source ?? ''}`,
+        `RELEASE_POINTER_ARTIFACT_ID=${selection.artifactId ?? ''}`,
+        `RELEASE_POINTER_SELECTED_CREATED_AT=${selection.createdAt ?? ''}`,
       ].join('\n') + '\n',
       'utf8',
     );
@@ -130,6 +133,9 @@ function runValidate(argv) {
         `RELEASE_POINTER_ROLLBACK_SOURCE=${pointer.rollbackSource ?? ''}`,
         `RELEASE_POINTER_ROLLBACK_POINTER_RUN_ID=${pointer.rollbackPointerRunId ?? ''}`,
         `RELEASE_POINTER_ROLLBACK_POINTER_ARTIFACT_NAME=${pointer.rollbackPointerArtifactName ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_POINTER_SELECTION_SOURCE=${pointer.rollbackPointerSelectionSource ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_POINTER_ARTIFACT_ID=${pointer.rollbackPointerArtifactId ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_POINTER_SELECTED_CREATED_AT=${pointer.rollbackPointerSelectedCreatedAt ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_PASSED=${pointer.deployedSmokePassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeSeededCanaryPassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeMarketplaceSeededCanaryPassed ?? ''}`,
@@ -208,6 +214,9 @@ function buildMarkdown(pointer) {
 - Rollback source: ${pointer.rollbackSource ?? 'n/a'}
 - Rollback pointer run ID: ${pointer.rollbackPointerRunId ?? 'n/a'}
 - Rollback pointer artifact: ${pointer.rollbackPointerArtifactName ?? 'n/a'}
+- Rollback pointer selection source: ${pointer.rollbackPointerSelectionSource ?? 'n/a'}
+- Rollback pointer artifact ID: ${pointer.rollbackPointerArtifactId ?? 'n/a'}
+- Rollback pointer selected at: ${pointer.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Deployed smoke passed: ${formatOptionalBoolean(pointer.deployedSmokePassed)}
 - Deployed smoke seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeSeededCanaryPassed)}
 - Deployed smoke marketplace seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeMarketplaceSeededCanaryPassed)}

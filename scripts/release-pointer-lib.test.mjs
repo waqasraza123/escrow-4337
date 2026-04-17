@@ -45,6 +45,9 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '651',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
         authorityAuditSource: 'chain_projection',
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
@@ -67,6 +70,9 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.rollbackSource, 'release-pointer');
   assert.equal(pointer.rollbackPointerRunId, '651');
   assert.equal(pointer.rollbackPointerArtifactName, 'release-pointer-staging');
+  assert.equal(pointer.rollbackPointerSelectionSource, 'artifact-search');
+  assert.equal(pointer.rollbackPointerArtifactId, '41');
+  assert.equal(pointer.rollbackPointerSelectedCreatedAt, '2026-04-13T03:00:00Z');
   assert.equal(pointer.deployedSmokeMarketplaceSeededCanaryPassed, true);
   assert.equal(pointer.deployedSmokeSelectionSource, 'artifact-search');
   assert.equal(pointer.deployedSmokeArtifactId, '22');
@@ -96,6 +102,7 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       imageDigest: 'deadbeef',
       imageReference: 'ghcr.io/mc/escrow-4337-api:main',
       rollbackSource: 'pointer',
+      rollbackPointerSelectionSource: 'manual',
       deployedSmokeMarketplaceSeededCanaryPassed: 'true',
       deployedSmokeSelectionSource: 'manual',
       launchCandidateSelectionSource: 'manual',
@@ -113,6 +120,7 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer environment staging does not match expected environment production.',
     'Release pointer rollback source must be input or release-pointer but was pointer.',
     'Release pointer rollback image SHA is required when rollback source is present.',
+    'Release pointer rollback pointer selection source must be input or artifact-search when present.',
     'Release pointer deployed smoke marketplace seeded canary passed must be boolean when present.',
     'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
     'Release pointer deployed smoke selection source must be input or artifact-search when present.',

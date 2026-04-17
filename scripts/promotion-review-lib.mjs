@@ -361,6 +361,12 @@ export function buildPromotionReview({
         rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
         rollbackPointerArtifactName:
           launchPromotionRecord?.rollback?.rollbackPointerArtifactName ?? null,
+        rollbackPointerSelectionSource:
+          launchPromotionRecord?.rollback?.rollbackPointerSelectionSource ?? null,
+        rollbackPointerArtifactId:
+          launchPromotionRecord?.rollback?.rollbackPointerArtifactId ?? null,
+        rollbackPointerSelectedCreatedAt:
+          launchPromotionRecord?.rollback?.rollbackPointerSelectedCreatedAt ?? null,
         marketplaceSeededCanaryPassed:
           (launchPromotionRecord?.launchCandidate?.marketplaceSeededCanaryFailures ?? 0) === 0,
         marketplaceExactCanaryPassed:
@@ -398,6 +404,9 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch rollback source: ${review.reviews.launchCandidate.rollbackSource ?? 'n/a'}
 - Launch rollback pointer run ID: ${review.reviews.launchCandidate.rollbackPointerRunId ?? 'n/a'}
 - Launch rollback pointer artifact: ${review.reviews.launchCandidate.rollbackPointerArtifactName ?? 'n/a'}
+- Launch rollback pointer selection source: ${review.reviews.launchCandidate.rollbackPointerSelectionSource ?? 'n/a'}
+- Launch rollback pointer artifact ID: ${review.reviews.launchCandidate.rollbackPointerArtifactId ?? 'n/a'}
+- Launch rollback pointer selected at: ${review.reviews.launchCandidate.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Launch marketplace seeded canary passed: ${review.reviews.launchCandidate.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch marketplace exact canary passed: ${review.reviews.launchCandidate.marketplaceExactCanaryPassed ? 'true' : 'false'}
 - Launch authority audit source: ${review.reviews.launchCandidate.authorityAuditSource ?? 'n/a'}
@@ -510,6 +519,30 @@ function validateLaunchPromotionReview({
   ) {
     issues.push(
       'Launch candidate promotion record rollback pointer artifact name does not match launch metadata.',
+    );
+  }
+  if (
+    trimToNull(record?.rollback?.rollbackPointerSelectionSource) !==
+    trimToNull(metadata.rollbackPointerSelectionSource)
+  ) {
+    issues.push(
+      'Launch candidate promotion record rollback pointer selection source does not match launch metadata.',
+    );
+  }
+  if (
+    trimToNull(record?.rollback?.rollbackPointerArtifactId) !==
+    trimToNull(metadata.rollbackPointerArtifactId)
+  ) {
+    issues.push(
+      'Launch candidate promotion record rollback pointer artifact id does not match launch metadata.',
+    );
+  }
+  if (
+    trimToNull(record?.rollback?.rollbackPointerSelectedCreatedAt) !==
+    trimToNull(metadata.rollbackPointerSelectedCreatedAt)
+  ) {
+    issues.push(
+      'Launch candidate promotion record rollback pointer selected timestamp does not match launch metadata.',
     );
   }
   if ((record?.launchCandidate?.smokeFailures ?? 0) > 0) {

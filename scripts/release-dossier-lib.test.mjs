@@ -116,12 +116,18 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       rollback: {
         rollbackImageSha: 'sha256:old',
         rollbackSource: 'input',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'input',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
     },
     launchEvidenceManifest: {
@@ -155,6 +161,7 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
     'Image manifest commit SHA abc123 does not match promotion review commit SHA wrong.',
     'Deployed smoke review artifact name deployed-smoke-review-staging-candidate-999 does not match deployed smoke review expected artifact name deployed-smoke-review-staging-candidate-101.',
     'Launch candidate rollback source input does not match launch candidate metadata rollback source release-pointer.',
+    'Launch candidate rollback pointer selection source input does not match launch candidate metadata rollback pointer selection source artifact-search.',
     'Deployed smoke marketplace seeded canary passed false does not match promotion review deployed smoke marketplace seeded canary passed true.',
     'Release dossier launch evidence completeness disagrees with missing artifacts: authority-evidence/summary.json.',
   ]);
@@ -207,6 +214,9 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       launchCandidate: {
         authorityAuditSource: 'chain_projection',
@@ -218,6 +228,9 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
     },
     launchEvidenceManifest: {
@@ -267,6 +280,8 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.launchEvidence.rollbackSource, 'release-pointer');
   assert.equal(record.launchEvidence.rollbackPointerRunId, '701');
   assert.equal(record.launchEvidence.rollbackPointerArtifactName, 'release-pointer-staging');
+  assert.equal(record.launchEvidence.rollbackPointerSelectionSource, 'artifact-search');
+  assert.equal(record.launchEvidence.rollbackPointerArtifactId, '41');
   assert.equal(record.workflows.deployedSmoke.selectionSource, 'artifact-search');
   assert.equal(record.workflows.deployedSmoke.artifactId, '22');
   assert.equal(record.workflows.launchCandidate.selectionSource, 'input');

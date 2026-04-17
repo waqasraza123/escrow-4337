@@ -62,6 +62,15 @@ export function buildReleasePointer({
     rollbackPointerArtifactName: normalizeOptionalString(
       releaseDossier?.launchEvidence?.rollbackPointerArtifactName,
     ),
+    rollbackPointerSelectionSource: normalizeOptionalString(
+      releaseDossier?.launchEvidence?.rollbackPointerSelectionSource,
+    ),
+    rollbackPointerArtifactId: normalizeOptionalString(
+      releaseDossier?.launchEvidence?.rollbackPointerArtifactId,
+    ),
+    rollbackPointerSelectedCreatedAt: normalizeOptionalString(
+      releaseDossier?.launchEvidence?.rollbackPointerSelectedCreatedAt,
+    ),
     deployedSmokePassed: normalizeOptionalBoolean(releaseDossier?.workflows?.deployedSmoke?.smokePassed),
     deployedSmokeSeededCanaryPassed: normalizeOptionalBoolean(
       releaseDossier?.workflows?.deployedSmoke?.seededCanaryPassed,
@@ -179,7 +188,21 @@ export function validateReleasePointer(
           'Release pointer rollback pointer artifact name is required when rollback source is release-pointer.',
         );
       }
+      if (!normalizeOptionalString(pointer?.rollbackPointerSelectionSource)) {
+        issues.push(
+          'Release pointer rollback pointer selection source is required when rollback source is release-pointer.',
+        );
+      }
     }
+  }
+  if (
+    pointer?.rollbackPointerSelectionSource &&
+    pointer.rollbackPointerSelectionSource !== 'input' &&
+    pointer.rollbackPointerSelectionSource !== 'artifact-search'
+  ) {
+    issues.push(
+      'Release pointer rollback pointer selection source must be input or artifact-search when present.',
+    );
   }
 
   for (const [field, label] of [

@@ -166,6 +166,9 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       launchCandidate: {
         launchReady: false,
@@ -183,6 +186,9 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         rollbackSource: 'input',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'input',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       warnings: [],
     },
@@ -222,6 +228,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch candidate promotion record rollback source does not match launch metadata.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate promotion record rollback pointer selection source does not match launch metadata.',
     ),
   );
   assert.equal(review.reviews.deployedSmoke.selectionSource, 'artifact-search');
@@ -304,6 +315,9 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       launchCandidate: {
         launchReady: true,
@@ -321,6 +335,9 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '701',
         rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
       warnings: ['Rollback image SHA is not yet recorded for this candidate.'],
     },
@@ -339,6 +356,7 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
   assert.equal(review.reviews.launchCandidate.artifactName, 'launch-candidate-review-staging-candidate-101');
   assert.equal(review.reviews.launchCandidate.rollbackSource, 'release-pointer');
   assert.equal(review.reviews.launchCandidate.rollbackPointerRunId, '701');
+  assert.equal(review.reviews.launchCandidate.rollbackPointerSelectionSource, 'artifact-search');
   assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
