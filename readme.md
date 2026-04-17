@@ -1,8 +1,24 @@
+![README: English](https://img.shields.io/badge/README-English-0B7285)
+![README: العربية](https://img.shields.io/badge/README-%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-1C7ED6)
+![Network: Base](https://img.shields.io/badge/network-Base-0052FF)
+![ERC-4337](https://img.shields.io/badge/ERC--4337-enabled-111827)
+![Token: USDC](https://img.shields.io/badge/token-USDC-2775CA)
+![Node.js](https://img.shields.io/badge/node-20.x-339933)
+![pnpm](https://img.shields.io/badge/pnpm-9.7.0-F69220)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
+![Solidity](https://img.shields.io/badge/Solidity-0.8.x-363636)
+
 # Milestone Escrow
 
 Production-oriented foundation for a Base-native milestone escrow product with smart-account onboarding, programmable milestone release, dispute handling, and compliance-aware workflows.
 
 This repository is being hardened as a serious engineering repo, not presented as a finished product. The contract layer is the most mature slice today. The API, frontends, indexing, and operations layers are still in progress.
+
+## Screenshots
+
+![alt text](.github/screenshots/image2.jpg)
+![alt text](.github/screenshots/image1.jpg)
+![alt text](.github/screenshots/image3.jpg)
 
 ## What This Product Is
 

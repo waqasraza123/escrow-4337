@@ -5,6 +5,7 @@ dist
 out
 coverage
 *.tsbuildinfo
+.DS_Store
 .env*
 !services/api/.env.example
 !services/api/.env.local.example
