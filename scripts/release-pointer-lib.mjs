@@ -56,6 +56,20 @@ export function buildReleasePointer({
     imageDigest,
     imageReference: normalizeOptionalString(releaseDossier?.candidate?.imageReference),
     imageName: normalizeOptionalString(releaseDossier?.candidate?.imageName),
+    deployedSmokePassed: normalizeOptionalBoolean(releaseDossier?.workflows?.deployedSmoke?.smokePassed),
+    deployedSmokeSeededCanaryPassed: normalizeOptionalBoolean(
+      releaseDossier?.workflows?.deployedSmoke?.seededCanaryPassed,
+    ),
+    deployedSmokeMarketplaceSeededCanaryPassed: normalizeOptionalBoolean(
+      releaseDossier?.workflows?.deployedSmoke?.marketplaceSeededCanaryPassed,
+    ),
+    launchMarketplaceSeededCanaryFailures: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.marketplaceSeededCanaryFailures,
+    ),
+    launchMarketplaceExactCanaryFailures: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.marketplaceExactCanaryFailures,
+    ),
+    authorityAuditSource: normalizeOptionalString(releaseDossier?.launchEvidence?.authorityAuditSource),
   };
 }
 
@@ -118,6 +132,27 @@ export function validateReleasePointer(pointer, { expectedEnvironment = null } =
     issues.push(
       `Release pointer environment ${pointer?.environment ?? '<missing>'} does not match expected environment ${normalizeRequiredSegment(expectedEnvironment, 'expectedEnvironment')}.`,
     );
+  }
+
+  for (const [field, label] of [
+    ['deployedSmokePassed', 'deployed smoke passed'],
+    ['deployedSmokeSeededCanaryPassed', 'deployed smoke seeded canary passed'],
+    ['deployedSmokeMarketplaceSeededCanaryPassed', 'deployed smoke marketplace seeded canary passed'],
+  ]) {
+    if (pointer?.[field] !== undefined && pointer?.[field] !== null && typeof pointer[field] !== 'boolean') {
+      issues.push(`Release pointer ${label} must be boolean when present.`);
+    }
+  }
+
+  for (const [field, label] of [
+    ['launchMarketplaceSeededCanaryFailures', 'launch marketplace seeded canary failures'],
+    ['launchMarketplaceExactCanaryFailures', 'launch marketplace exact canary failures'],
+  ]) {
+    if (pointer?.[field] !== undefined && pointer?.[field] !== null) {
+      if (!Number.isInteger(pointer[field]) || pointer[field] < 0) {
+        issues.push(`Release pointer ${label} must be a non-negative integer when present.`);
+      }
+    }
   }
 
   return issues;
@@ -194,4 +229,12 @@ function normalizeOptionalString(value) {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? null : trimmed;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeOptionalNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }

@@ -23,6 +23,18 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
       decision: {
         status: 'ready',
       },
+      workflows: {
+        deployedSmoke: {
+          smokePassed: true,
+          seededCanaryPassed: true,
+          marketplaceSeededCanaryPassed: true,
+        },
+      },
+      launchEvidence: {
+        authorityAuditSource: 'chain_projection',
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 0,
+      },
       candidate: {
         runId: '101',
         runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
@@ -37,6 +49,10 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.artifactName, 'release-pointer-production');
   assert.equal(pointer.imageDigest, 'sha256:deadbeef');
   assert.equal(pointer.releaseReviewRunId, '701');
+  assert.equal(pointer.deployedSmokeMarketplaceSeededCanaryPassed, true);
+  assert.equal(pointer.launchMarketplaceSeededCanaryFailures, 0);
+  assert.equal(pointer.launchMarketplaceExactCanaryFailures, 0);
+  assert.equal(pointer.authorityAuditSource, 'chain_projection');
 });
 
 test('validateReleasePointer catches environment drift and invalid digests', () => {
@@ -53,6 +69,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       commitSha: 'abc123',
       imageDigest: 'deadbeef',
       imageReference: 'ghcr.io/mc/escrow-4337-api:main',
+      deployedSmokeMarketplaceSeededCanaryPassed: 'true',
+      launchMarketplaceExactCanaryFailures: -1,
     },
     {
       expectedEnvironment: 'production',
@@ -64,6 +82,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer artifact name release-pointer-prod does not match expected artifact name release-pointer-staging.',
     'Release pointer image reference must include the image digest when present.',
     'Release pointer environment staging does not match expected environment production.',
+    'Release pointer deployed smoke marketplace seeded canary passed must be boolean when present.',
+    'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
   ]);
 });
 

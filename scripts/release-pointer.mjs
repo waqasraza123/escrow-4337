@@ -124,6 +124,12 @@ function runValidate(argv) {
         `RELEASE_POINTER_IMAGE_DIGEST=${pointer.imageDigest}`,
         `RELEASE_POINTER_IMAGE_REFERENCE=${pointer.imageReference ?? ''}`,
         `RELEASE_POINTER_IMAGE_NAME=${pointer.imageName ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_PASSED=${pointer.deployedSmokePassed ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeSeededCanaryPassed ?? ''}`,
+        `RELEASE_POINTER_DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeMarketplaceSeededCanaryPassed ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_SEEDED_CANARY_FAILURES=${pointer.launchMarketplaceSeededCanaryFailures ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CANARY_FAILURES=${pointer.launchMarketplaceExactCanaryFailures ?? ''}`,
+        `RELEASE_POINTER_AUTHORITY_AUDIT_SOURCE=${pointer.authorityAuditSource ?? ''}`,
       ].join('\n') + '\n',
       'utf8',
     );
@@ -184,6 +190,12 @@ function buildMarkdown(pointer) {
 - Commit SHA: ${pointer.commitSha}
 - Image digest: ${pointer.imageDigest}
 - Image reference: ${pointer.imageReference ?? 'n/a'}
+- Deployed smoke passed: ${formatOptionalBoolean(pointer.deployedSmokePassed)}
+- Deployed smoke seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeSeededCanaryPassed)}
+- Deployed smoke marketplace seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeMarketplaceSeededCanaryPassed)}
+- Launch marketplace seeded canary failures: ${pointer.launchMarketplaceSeededCanaryFailures ?? 'n/a'}
+- Launch marketplace exact canary failures: ${pointer.launchMarketplaceExactCanaryFailures ?? 'n/a'}
+- Authority audit source: ${pointer.authorityAuditSource ?? 'n/a'}
 `;
 }
 
@@ -223,4 +235,8 @@ function printHelp() {
 generate: writes a ready-only release pointer derived from release-dossier.json.
 resolve: finds the newest non-expired release pointer artifact for an environment and prints the run id plus artifact name.
 validate: validates release-pointer.json and can write its fields as shell env assignments.`);
+}
+
+function formatOptionalBoolean(value) {
+  return typeof value === 'boolean' ? String(value) : 'n/a';
 }
