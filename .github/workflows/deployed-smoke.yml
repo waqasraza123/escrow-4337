@@ -97,6 +97,7 @@ jobs:
         run: pnpm --filter escrow4334-api deployment:validate
 
       - name: Run deployed smoke tests
+        id: deployed_smoke
         run: pnpm smoke:deployed
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -163,6 +164,7 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
 
       - name: Run seeded deployed canary
+        id: seeded_canary
         run: pnpm e2e:canary:deployed
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -224,7 +226,71 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
 
+      - name: Run marketplace seeded deployed canary
+        id: marketplace_seeded_canary
+        run: pnpm e2e:canary:deployed:marketplace:seeded
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+          JWT_ACCESS_TTL_SEC: ${{ secrets.JWT_ACCESS_TTL_SEC }}
+          JWT_REFRESH_TTL_SEC: ${{ secrets.JWT_REFRESH_TTL_SEC }}
+          AUTH_SESSION_TTL_SEC: ${{ secrets.AUTH_SESSION_TTL_SEC }}
+          AUTH_OTP_TTL_SEC: ${{ secrets.AUTH_OTP_TTL_SEC }}
+          AUTH_OTP_VERIFY_MAX_ATTEMPTS: ${{ secrets.AUTH_OTP_VERIFY_MAX_ATTEMPTS }}
+          AUTH_OTP_LOCK_SEC: ${{ secrets.AUTH_OTP_LOCK_SEC }}
+          AUTH_OTP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_SEND_WINDOW_SEC }}
+          AUTH_OTP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_SEND_MAX_PER_WINDOW }}
+          AUTH_OTP_IP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_IP_SEND_WINDOW_SEC }}
+          AUTH_OTP_IP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_IP_SEND_MAX_PER_WINDOW }}
+          NEST_API_TRUST_PROXY: ${{ secrets.NEST_API_TRUST_PROXY }}
+          AUTH_EMAIL_MODE: ${{ secrets.AUTH_EMAIL_MODE }}
+          AUTH_EMAIL_FROM_EMAIL: ${{ secrets.AUTH_EMAIL_FROM_EMAIL }}
+          AUTH_EMAIL_FROM_NAME: ${{ secrets.AUTH_EMAIL_FROM_NAME }}
+          AUTH_EMAIL_REPLY_TO: ${{ secrets.AUTH_EMAIL_REPLY_TO }}
+          AUTH_EMAIL_RELAY_BASE_URL: ${{ secrets.AUTH_EMAIL_RELAY_BASE_URL }}
+          AUTH_EMAIL_RELAY_API_KEY: ${{ secrets.AUTH_EMAIL_RELAY_API_KEY }}
+          AUTH_EMAIL_OTP_SUBJECT: ${{ secrets.AUTH_EMAIL_OTP_SUBJECT }}
+          WALLET_SMART_ACCOUNT_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_MODE }}
+          WALLET_SMART_ACCOUNT_CHAIN_ID: ${{ secrets.WALLET_SMART_ACCOUNT_CHAIN_ID }}
+          WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS }}
+          WALLET_SMART_ACCOUNT_FACTORY_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_FACTORY_ADDRESS }}
+          WALLET_SMART_ACCOUNT_BUNDLER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_BUNDLER_URL }}
+          WALLET_SMART_ACCOUNT_RELAY_BASE_URL: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_BASE_URL }}
+          WALLET_SMART_ACCOUNT_RELAY_API_KEY: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_API_KEY }}
+          WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE }}
+          WALLET_SMART_ACCOUNT_PAYMASTER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_PAYMASTER_URL }}
+          ESCROW_CONTRACT_MODE: ${{ secrets.ESCROW_CONTRACT_MODE }}
+          ESCROW_CHAIN_ID: ${{ secrets.ESCROW_CHAIN_ID }}
+          ESCROW_CONTRACT_ADDRESS: ${{ secrets.ESCROW_CONTRACT_ADDRESS }}
+          ESCROW_ARBITRATOR_ADDRESS: ${{ secrets.ESCROW_ARBITRATOR_ADDRESS }}
+          ESCROW_RELAY_BASE_URL: ${{ secrets.ESCROW_RELAY_BASE_URL }}
+          ESCROW_RELAY_API_KEY: ${{ secrets.ESCROW_RELAY_API_KEY }}
+          OPERATIONS_ESCROW_RPC_URL: ${{ secrets.OPERATIONS_ESCROW_RPC_URL }}
+          OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED }}
+          OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL }}
+          PLAYWRIGHT_DEPLOYED_WEB_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_WEB_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_API_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_API_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE: ${{ secrets.PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE }}
+          PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID: ${{ secrets.PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID }}
+          PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP }}
+          PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
+
       - name: Generate deployed smoke review artifact
+        if: ${{ always() }}
         run: node ./scripts/promotion-review.mjs smoke-record --output-dir artifacts/deployed-smoke-review
         env:
           DEPLOYED_SMOKE_ENVIRONMENT: staging
@@ -238,8 +304,12 @@ jobs:
           DEPLOYED_SMOKE_GIT_REF: ${{ steps.candidate_manifest.outputs.git_ref }}
           DEPLOYED_SMOKE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
           DEPLOYED_SMOKE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
+          DEPLOYED_SMOKE_PASSED: ${{ steps.deployed_smoke.outcome == 'success' }}
+          DEPLOYED_SMOKE_SEEDED_CANARY_PASSED: ${{ steps.seeded_canary.outcome == 'success' }}
+          DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED: ${{ steps.marketplace_seeded_canary.outcome == 'success' }}
 
       - name: Upload deployed smoke review artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: deployed-smoke-review-staging-candidate-${{ github.event.workflow_run.id }}
@@ -318,6 +388,7 @@ jobs:
         run: pnpm --filter escrow4334-api deployment:validate
 
       - name: Run deployed smoke tests
+        id: deployed_smoke
         run: pnpm smoke:deployed
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -384,6 +455,7 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
 
       - name: Run seeded deployed canary
+        id: seeded_canary
         run: pnpm e2e:canary:deployed
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -445,7 +517,71 @@ jobs:
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
           PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
 
+      - name: Run marketplace seeded deployed canary
+        id: marketplace_seeded_canary
+        run: pnpm e2e:canary:deployed:marketplace:seeded
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+          JWT_ACCESS_TTL_SEC: ${{ secrets.JWT_ACCESS_TTL_SEC }}
+          JWT_REFRESH_TTL_SEC: ${{ secrets.JWT_REFRESH_TTL_SEC }}
+          AUTH_SESSION_TTL_SEC: ${{ secrets.AUTH_SESSION_TTL_SEC }}
+          AUTH_OTP_TTL_SEC: ${{ secrets.AUTH_OTP_TTL_SEC }}
+          AUTH_OTP_VERIFY_MAX_ATTEMPTS: ${{ secrets.AUTH_OTP_VERIFY_MAX_ATTEMPTS }}
+          AUTH_OTP_LOCK_SEC: ${{ secrets.AUTH_OTP_LOCK_SEC }}
+          AUTH_OTP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_SEND_WINDOW_SEC }}
+          AUTH_OTP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_SEND_MAX_PER_WINDOW }}
+          AUTH_OTP_IP_SEND_WINDOW_SEC: ${{ secrets.AUTH_OTP_IP_SEND_WINDOW_SEC }}
+          AUTH_OTP_IP_SEND_MAX_PER_WINDOW: ${{ secrets.AUTH_OTP_IP_SEND_MAX_PER_WINDOW }}
+          NEST_API_TRUST_PROXY: ${{ secrets.NEST_API_TRUST_PROXY }}
+          AUTH_EMAIL_MODE: ${{ secrets.AUTH_EMAIL_MODE }}
+          AUTH_EMAIL_FROM_EMAIL: ${{ secrets.AUTH_EMAIL_FROM_EMAIL }}
+          AUTH_EMAIL_FROM_NAME: ${{ secrets.AUTH_EMAIL_FROM_NAME }}
+          AUTH_EMAIL_REPLY_TO: ${{ secrets.AUTH_EMAIL_REPLY_TO }}
+          AUTH_EMAIL_RELAY_BASE_URL: ${{ secrets.AUTH_EMAIL_RELAY_BASE_URL }}
+          AUTH_EMAIL_RELAY_API_KEY: ${{ secrets.AUTH_EMAIL_RELAY_API_KEY }}
+          AUTH_EMAIL_OTP_SUBJECT: ${{ secrets.AUTH_EMAIL_OTP_SUBJECT }}
+          WALLET_SMART_ACCOUNT_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_MODE }}
+          WALLET_SMART_ACCOUNT_CHAIN_ID: ${{ secrets.WALLET_SMART_ACCOUNT_CHAIN_ID }}
+          WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_ENTRY_POINT_ADDRESS }}
+          WALLET_SMART_ACCOUNT_FACTORY_ADDRESS: ${{ secrets.WALLET_SMART_ACCOUNT_FACTORY_ADDRESS }}
+          WALLET_SMART_ACCOUNT_BUNDLER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_BUNDLER_URL }}
+          WALLET_SMART_ACCOUNT_RELAY_BASE_URL: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_BASE_URL }}
+          WALLET_SMART_ACCOUNT_RELAY_API_KEY: ${{ secrets.WALLET_SMART_ACCOUNT_RELAY_API_KEY }}
+          WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE: ${{ secrets.WALLET_SMART_ACCOUNT_SPONSORSHIP_MODE }}
+          WALLET_SMART_ACCOUNT_PAYMASTER_URL: ${{ secrets.WALLET_SMART_ACCOUNT_PAYMASTER_URL }}
+          ESCROW_CONTRACT_MODE: ${{ secrets.ESCROW_CONTRACT_MODE }}
+          ESCROW_CHAIN_ID: ${{ secrets.ESCROW_CHAIN_ID }}
+          ESCROW_CONTRACT_ADDRESS: ${{ secrets.ESCROW_CONTRACT_ADDRESS }}
+          ESCROW_ARBITRATOR_ADDRESS: ${{ secrets.ESCROW_ARBITRATOR_ADDRESS }}
+          ESCROW_RELAY_BASE_URL: ${{ secrets.ESCROW_RELAY_BASE_URL }}
+          ESCROW_RELAY_API_KEY: ${{ secrets.ESCROW_RELAY_API_KEY }}
+          OPERATIONS_ESCROW_RPC_URL: ${{ secrets.OPERATIONS_ESCROW_RPC_URL }}
+          OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED }}
+          OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL }}
+          PLAYWRIGHT_DEPLOYED_WEB_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_WEB_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_API_BASE_URL: ${{ secrets.PLAYWRIGHT_DEPLOYED_API_BASE_URL }}
+          PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE: ${{ secrets.PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE }}
+          PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID: ${{ secrets.PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID }}
+          PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP }}
+          PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST: ${{ secrets.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CURRENCY_ADDRESS }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CLIENT_PRIVATE_KEY }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_CONTRACTOR_PRIVATE_KEY }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_EMAIL }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_OTP_CODE }}
+          PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY: ${{ secrets.PLAYWRIGHT_DEPLOYED_FLOW_OPERATOR_PRIVATE_KEY }}
+
       - name: Generate deployed smoke review artifact
+        if: ${{ always() }}
         run: node ./scripts/promotion-review.mjs smoke-record --output-dir artifacts/deployed-smoke-review
         env:
           DEPLOYED_SMOKE_ENVIRONMENT: ${{ inputs.environment }}
@@ -459,8 +595,12 @@ jobs:
           DEPLOYED_SMOKE_GIT_REF: ${{ steps.candidate_manifest.outputs.git_ref }}
           DEPLOYED_SMOKE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
           DEPLOYED_SMOKE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
+          DEPLOYED_SMOKE_PASSED: ${{ steps.deployed_smoke.outcome == 'success' }}
+          DEPLOYED_SMOKE_SEEDED_CANARY_PASSED: ${{ steps.seeded_canary.outcome == 'success' }}
+          DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED: ${{ steps.marketplace_seeded_canary.outcome == 'success' }}
 
       - name: Upload deployed smoke review artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: deployed-smoke-review-${{ inputs.environment }}-candidate-${{ inputs.candidate_run_id }}

@@ -61,15 +61,20 @@ export function buildDeployedSmokeRecord({
   metadata,
   smokePassed = true,
   seededCanaryPassed = true,
+  marketplaceSeededCanaryPassed = true,
 }) {
   const checks = {
     smokePassed: smokePassed === true,
     seededCanaryPassed: seededCanaryPassed === true,
+    marketplaceSeededCanaryPassed: marketplaceSeededCanaryPassed === true,
   };
 
   return {
     generatedAt,
-    status: checks.smokePassed && checks.seededCanaryPassed ? 'ready' : 'blocked',
+    status:
+      checks.smokePassed && checks.seededCanaryPassed && checks.marketplaceSeededCanaryPassed
+        ? 'ready'
+        : 'blocked',
     metadata,
     checks,
   };
@@ -113,6 +118,9 @@ export function validateDeployedSmokeRecord(
   }
   if (record?.checks?.seededCanaryPassed !== true) {
     issues.push('Deployed smoke review artifact does not confirm seeded canary passed.');
+  }
+  if (record?.checks?.marketplaceSeededCanaryPassed !== true) {
+    issues.push('Deployed smoke review artifact does not confirm marketplace seeded canary passed.');
   }
 
   if (
@@ -166,6 +174,7 @@ export function buildDeployedSmokeRecordMarkdown(record) {
 - Deployed image reference: ${record.metadata.deployedImageReference ?? 'n/a'}
 - Read-only smoke passed: ${record.checks.smokePassed ? 'true' : 'false'}
 - Seeded canary passed: ${record.checks.seededCanaryPassed ? 'true' : 'false'}
+- Marketplace seeded canary passed: ${record.checks.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 `;
 }
 
@@ -325,6 +334,8 @@ export function buildPromotionReview({
         candidateRunId: smokeMetadata.candidateRunId ?? null,
         smokePassed: deployedSmokeRecord?.checks?.smokePassed === true,
         seededCanaryPassed: deployedSmokeRecord?.checks?.seededCanaryPassed === true,
+        marketplaceSeededCanaryPassed:
+          deployedSmokeRecord?.checks?.marketplaceSeededCanaryPassed === true,
       },
       launchCandidate: {
         status: launchPromotionRecord?.status ?? 'missing',
@@ -361,6 +372,8 @@ export function buildPromotionReviewMarkdown(review) {
 - Image reference: ${review.candidate.imageReference ?? 'n/a'}
 - Deployed smoke run ID: ${review.reviews.deployedSmoke.runId ?? 'n/a'}
 - Deployed smoke status: ${review.reviews.deployedSmoke.status}
+- Deployed smoke seeded canary passed: ${review.reviews.deployedSmoke.seededCanaryPassed ? 'true' : 'false'}
+- Deployed smoke marketplace seeded canary passed: ${review.reviews.deployedSmoke.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}

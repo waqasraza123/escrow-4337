@@ -66,6 +66,34 @@ test('validateDeployedSmokeRecord catches mismatched environment and run ids', (
   ]);
 });
 
+test('validateDeployedSmokeRecord blocks when marketplace seeded canary evidence is missing', () => {
+  const issues = validateDeployedSmokeRecord(
+    buildDeployedSmokeRecord({
+      metadata: {
+        environment: 'staging',
+        repository: 'mc/escrow4337',
+        workflow: 'Deployed Smoke',
+        runId: '201',
+        runAttempt: '1',
+        runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+        actor: 'mc',
+        candidateRunId: '101',
+        candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+        commitSha: 'abc123',
+        gitRef: 'main',
+        deployedImageSha: 'sha256:deadbeef',
+        deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+      },
+      marketplaceSeededCanaryPassed: false,
+    }),
+  );
+
+  assert.deepEqual(issues, [
+    'Deployed smoke review artifact status must be ready but was blocked.',
+    'Deployed smoke review artifact does not confirm marketplace seeded canary passed.',
+  ]);
+});
+
 test('buildPromotionReview reports cross-artifact mismatches and incomplete evidence', () => {
   const review = buildPromotionReview({
     expectedEnvironment: 'staging',
@@ -106,6 +134,7 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         deployedImageSha: 'sha256:badc0de',
         deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:badc0de',
       },
+      marketplaceSeededCanaryPassed: false,
     }),
     launchPromotionRecord: {
       status: 'blocked',
@@ -151,6 +180,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Candidate image manifest image digest sha256:deadbeef does not match deployed smoke review image digest sha256:badc0de.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Deployed smoke review artifact does not confirm marketplace seeded canary passed.',
     ),
   );
   assert.ok(
@@ -248,6 +282,7 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
 
   assert.equal(review.status, 'ready');
   assert.deepEqual(review.blockers, []);
+  assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
   assert.deepEqual(review.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);

@@ -60,6 +60,12 @@ function runSmokeRecord(argv) {
 
   const record = buildDeployedSmokeRecord({
     metadata,
+    smokePassed: readBooleanEnv(process.env.DEPLOYED_SMOKE_PASSED, true),
+    seededCanaryPassed: readBooleanEnv(process.env.DEPLOYED_SMOKE_SEEDED_CANARY_PASSED, true),
+    marketplaceSeededCanaryPassed: readBooleanEnv(
+      process.env.DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED,
+      true,
+    ),
   });
   const markdown = buildDeployedSmokeRecordMarkdown(record);
 
@@ -149,4 +155,20 @@ function printHelp() {
 
 smoke-record: writes deployed-smoke-record.json and .md for a completed deployed smoke workflow run.
 review: reconciles the CI image manifest, deployed smoke review, and launch-candidate review into promotion-review.json and .md.`);
+}
+
+function readBooleanEnv(rawValue, defaultValue) {
+  if (typeof rawValue !== 'string') {
+    return defaultValue;
+  }
+
+  const normalized = rawValue.trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+
+  return defaultValue;
 }
