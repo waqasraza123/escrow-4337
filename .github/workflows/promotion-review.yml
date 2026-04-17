@@ -137,6 +137,14 @@ jobs:
             --release-dossier artifacts/release-dossier/release-dossier.json \
             --output-dir artifacts/release-pointer
 
+      - name: Validate generated release pointer
+        if: success()
+        run: |
+          node ./scripts/release-pointer.mjs validate \
+            --pointer artifacts/release-pointer/release-pointer.json \
+            --expected-environment "${{ inputs.environment }}" \
+            --require-ready-launch-posture
+
       - name: Upload promotion review artifact
         if: always()
         uses: actions/upload-artifact@v4

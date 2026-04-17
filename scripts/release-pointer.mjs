@@ -55,6 +55,7 @@ function runGenerate(argv) {
   });
   const issues = validateReleasePointer(pointer, {
     expectedEnvironment: pointer.environment,
+    requireReadyLaunchPosture: true,
   });
   if (issues.length > 0) {
     throw new Error(['Release pointer validation failed.', ...issues.map((issue) => `- ${issue}`)].join('\n'));
