@@ -8,5 +8,5 @@ cd "$repo_root/packages/contracts"
 echo "contracts-check: forge fmt --check"
 forge fmt --check
 
-echo "contracts-check: forge test"
-forge test
+echo "contracts-check: forge test --offline"
+forge test --offline
