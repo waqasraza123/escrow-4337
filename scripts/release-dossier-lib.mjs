@@ -165,6 +165,28 @@ export function validateReleaseDossierInputs({
   });
   compareField({
     issues,
+    leftLabel: 'Deployed smoke review artifact name',
+    leftValue: promotionReview?.reviews?.deployedSmoke?.artifactName,
+    rightLabel: 'deployed smoke review expected artifact name',
+    rightValue: buildReviewArtifactName({
+      kind: 'deployed-smoke-review',
+      environment: metadata?.environment,
+      candidateRunId: candidate.runId,
+    }),
+  });
+  compareField({
+    issues,
+    leftLabel: 'Launch candidate review artifact name',
+    leftValue: promotionReview?.reviews?.launchCandidate?.artifactName,
+    rightLabel: 'launch candidate review expected artifact name',
+    rightValue: buildReviewArtifactName({
+      kind: 'launch-candidate-review',
+      environment: metadata?.environment,
+      candidateRunId: candidate.runId,
+    }),
+  });
+  compareField({
+    issues,
     leftLabel: 'Launch candidate rollback image SHA',
     leftValue: launchPromotionRecord?.rollback?.rollbackImageSha,
     rightLabel: 'launch candidate metadata rollback image SHA',
@@ -272,6 +294,10 @@ export function buildReleaseDossier({
         runId: deployedSmokeRecord?.metadata?.runId ?? null,
         runUrl: deployedSmokeRecord?.metadata?.runUrl ?? null,
         status: deployedSmokeRecord?.status ?? 'missing',
+        selectionSource: promotionReview?.reviews?.deployedSmoke?.selectionSource ?? null,
+        artifactId: promotionReview?.reviews?.deployedSmoke?.artifactId ?? null,
+        artifactName: promotionReview?.reviews?.deployedSmoke?.artifactName ?? null,
+        selectedCreatedAt: promotionReview?.reviews?.deployedSmoke?.selectedCreatedAt ?? null,
         smokePassed: deployedSmokeRecord?.checks?.smokePassed ?? null,
         seededCanaryPassed: deployedSmokeRecord?.checks?.seededCanaryPassed ?? null,
         marketplaceSeededCanaryPassed:
@@ -282,6 +308,10 @@ export function buildReleaseDossier({
         runId: launchPromotionRecord?.metadata?.runId ?? null,
         runUrl: launchPromotionRecord?.metadata?.runUrl ?? null,
         status: launchPromotionRecord?.status ?? 'missing',
+        selectionSource: promotionReview?.reviews?.launchCandidate?.selectionSource ?? null,
+        artifactId: promotionReview?.reviews?.launchCandidate?.artifactId ?? null,
+        artifactName: promotionReview?.reviews?.launchCandidate?.artifactName ?? null,
+        selectedCreatedAt: promotionReview?.reviews?.launchCandidate?.selectedCreatedAt ?? null,
       },
       promotionReview: {
         workflow: metadata.workflow,
@@ -340,7 +370,9 @@ export function buildReleaseDossierMarkdown(record) {
 
 - Candidate CI: ${formatWorkflow(record.workflows.candidateCi)}
 - Deployed Smoke: ${formatWorkflow(record.workflows.deployedSmoke)}
+  Selection: ${formatSelection(record.workflows.deployedSmoke)}
 - Launch Candidate: ${formatWorkflow(record.workflows.launchCandidate)}
+  Selection: ${formatSelection(record.workflows.launchCandidate)}
 - Promotion Review: ${formatWorkflow(record.workflows.promotionReview)}
 
 ## Blockers
@@ -420,6 +452,16 @@ function formatWorkflow(workflow) {
   return `${name} run ${runId}${status ? ` (${status})` : ''}${url ? ` ${url}` : ''}`;
 }
 
+function formatSelection(workflow) {
+  const source = trimToNull(workflow?.selectionSource) ?? 'n/a';
+  const artifact = trimToNull(workflow?.artifactName) ?? 'n/a';
+  const artifactId = trimToNull(workflow?.artifactId);
+  const selectedCreatedAt = trimToNull(workflow?.selectedCreatedAt);
+  return `${source} ${artifact}${artifactId ? ` id=${artifactId}` : ''}${
+    selectedCreatedAt ? ` created=${selectedCreatedAt}` : ''
+  }`;
+}
+
 function compareField({ issues, leftLabel, leftValue, rightLabel, rightValue }) {
   const normalizedLeft = trimToNull(leftValue);
   const normalizedRight = trimToNull(rightValue);
@@ -440,6 +482,30 @@ function compareBooleanField({ issues, leftLabel, leftValue, rightLabel, rightVa
 
 function formatBoolean(value) {
   return typeof value === 'boolean' ? String(value) : 'n/a';
+}
+
+function buildReviewArtifactName({ kind, environment, candidateRunId }) {
+  const normalizedKind = trimToNull(kind);
+  const normalizedEnvironment = normalizeSegment(environment);
+  const normalizedCandidateRunId = normalizeSegment(candidateRunId);
+  if (!normalizedKind || !normalizedEnvironment || !normalizedCandidateRunId) {
+    return null;
+  }
+
+  return `${normalizedKind}-${normalizedEnvironment}-candidate-${normalizedCandidateRunId}`;
+}
+
+function normalizeSegment(value) {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized.length === 0 ? null : normalized;
 }
 
 function trimToNull(value) {
