@@ -73,7 +73,10 @@ export function buildReleasePointer({
   };
 }
 
-export function validateReleasePointer(pointer, { expectedEnvironment = null } = {}) {
+export function validateReleasePointer(
+  pointer,
+  { expectedEnvironment = null, requireReadyLaunchPosture = false } = {},
+) {
   const issues = [];
 
   for (const [field, label] of [
@@ -152,6 +155,29 @@ export function validateReleasePointer(pointer, { expectedEnvironment = null } =
       if (!Number.isInteger(pointer[field]) || pointer[field] < 0) {
         issues.push(`Release pointer ${label} must be a non-negative integer when present.`);
       }
+    }
+  }
+
+  if (requireReadyLaunchPosture) {
+    if (pointer?.deployedSmokePassed !== true) {
+      issues.push('Release pointer does not confirm deployed smoke passed.');
+    }
+    if (pointer?.deployedSmokeSeededCanaryPassed !== true) {
+      issues.push('Release pointer does not confirm deployed smoke seeded canary passed.');
+    }
+    if (pointer?.deployedSmokeMarketplaceSeededCanaryPassed !== true) {
+      issues.push('Release pointer does not confirm deployed smoke marketplace seeded canary passed.');
+    }
+    if ((pointer?.launchMarketplaceSeededCanaryFailures ?? 0) > 0) {
+      issues.push('Release pointer reports launch marketplace seeded canary failures.');
+    }
+    if ((pointer?.launchMarketplaceExactCanaryFailures ?? 0) > 0) {
+      issues.push('Release pointer reports launch marketplace exact canary failures.');
+    }
+    if (normalizeOptionalString(pointer?.authorityAuditSource) !== 'chain_projection') {
+      issues.push(
+        `Release pointer authority audit source must be chain_projection but was ${pointer?.authorityAuditSource ?? '<missing>'}.`,
+      );
     }
   }
 

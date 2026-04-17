@@ -100,6 +100,7 @@ function runValidate(argv) {
   const pointer = JSON.parse(readFileSync(pointerPath, 'utf8'));
   const issues = validateReleasePointer(pointer, {
     expectedEnvironment,
+    requireReadyLaunchPosture: argv.includes('--require-ready-launch-posture'),
   });
   if (issues.length > 0) {
     throw new Error(['Release pointer validation failed.', ...issues.map((issue) => `- ${issue}`)].join('\n'));
@@ -230,11 +231,11 @@ function printHelp() {
   console.log(`Usage:
   node ./scripts/release-pointer.mjs generate --release-dossier <path> [--output-dir <path>]
   node ./scripts/release-pointer.mjs resolve --environment <env> [--write-env <path>]
-  node ./scripts/release-pointer.mjs validate --pointer <path> [--expected-environment <env>] [--write-env <path>]
+  node ./scripts/release-pointer.mjs validate --pointer <path> [--expected-environment <env>] [--require-ready-launch-posture] [--write-env <path>]
 
 generate: writes a ready-only release pointer derived from release-dossier.json.
 resolve: finds the newest non-expired release pointer artifact for an environment and prints the run id plus artifact name.
-validate: validates release-pointer.json and can write its fields as shell env assignments.`);
+validate: validates release-pointer.json, can require green launch posture fields, and can write its fields as shell env assignments.`);
 }
 
 function formatOptionalBoolean(value) {

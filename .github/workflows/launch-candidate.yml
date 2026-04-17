@@ -175,6 +175,7 @@ jobs:
           node ./scripts/release-pointer.mjs validate \
             --pointer "${{ runner.temp }}/release-pointer/release-pointer.json" \
             --expected-environment "${{ inputs.environment }}" \
+            --require-ready-launch-posture \
             --write-env "$RUNNER_TEMP/release-pointer.env"
           cat "$RUNNER_TEMP/release-pointer.env" >> "$GITHUB_OUTPUT"
 

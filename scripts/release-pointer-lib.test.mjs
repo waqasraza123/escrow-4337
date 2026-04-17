@@ -87,6 +87,42 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
   ]);
 });
 
+test('validateReleasePointer can require ready marketplace launch posture', () => {
+  const issues = validateReleasePointer(
+    {
+      generatedAt: '2026-04-13T00:00:00.000Z',
+      environment: 'production',
+      repository: 'mc/escrow4337',
+      artifactName: 'release-pointer-production',
+      releaseReviewRunId: '701',
+      releaseReviewRunUrl: 'https://github.com/mc/escrow4337/actions/runs/701',
+      candidateRunId: '101',
+      candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+      commitSha: 'abc123',
+      imageDigest: 'sha256:deadbeef',
+      imageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+      deployedSmokePassed: true,
+      deployedSmokeSeededCanaryPassed: false,
+      deployedSmokeMarketplaceSeededCanaryPassed: false,
+      launchMarketplaceSeededCanaryFailures: 1,
+      launchMarketplaceExactCanaryFailures: 2,
+      authorityAuditSource: 'aggregate',
+    },
+    {
+      expectedEnvironment: 'production',
+      requireReadyLaunchPosture: true,
+    },
+  );
+
+  assert.deepEqual(issues, [
+    'Release pointer does not confirm deployed smoke seeded canary passed.',
+    'Release pointer does not confirm deployed smoke marketplace seeded canary passed.',
+    'Release pointer reports launch marketplace seeded canary failures.',
+    'Release pointer reports launch marketplace exact canary failures.',
+    'Release pointer authority audit source must be chain_projection but was aggregate.',
+  ]);
+});
+
 test('selectLatestReleasePointerArtifact chooses newest non-expired pointer artifact', () => {
   const selection = selectLatestReleasePointerArtifact({
     environment: 'production',
