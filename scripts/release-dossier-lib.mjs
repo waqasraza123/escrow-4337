@@ -248,6 +248,18 @@ export function validateReleaseDossierInputs({
     rightLabel: 'promotion review deployed smoke marketplace seeded canary passed',
     rightValue: promotionReview?.reviews?.deployedSmoke?.marketplaceSeededCanaryPassed,
   });
+  issues.push(
+    ...validateReviewSelection({
+      label: 'Release dossier deployed smoke review selection',
+      workflow: promotionReview?.reviews?.deployedSmoke,
+    }),
+  );
+  issues.push(
+    ...validateReviewSelection({
+      label: 'Release dossier launch candidate review selection',
+      workflow: promotionReview?.reviews?.launchCandidate,
+    }),
+  );
 
   const missingArtifacts = Array.isArray(launchEvidenceManifest?.requiredArtifacts?.missing)
     ? launchEvidenceManifest.requiredArtifacts.missing
@@ -508,6 +520,22 @@ function compareBooleanField({ issues, leftLabel, leftValue, rightLabel, rightVa
 
 function formatBoolean(value) {
   return typeof value === 'boolean' ? String(value) : 'n/a';
+}
+
+function validateReviewSelection({ label, workflow }) {
+  const issues = [];
+  const source = trimToNull(workflow?.selectionSource);
+
+  if (source === 'artifact-search') {
+    if (!trimToNull(workflow?.artifactId)) {
+      issues.push(`${label} is missing artifact id for artifact-search selection.`);
+    }
+    if (!trimToNull(workflow?.selectedCreatedAt)) {
+      issues.push(`${label} is missing selected timestamp for artifact-search selection.`);
+    }
+  }
+
+  return issues;
 }
 
 function buildReviewArtifactName({ kind, environment, candidateRunId }) {

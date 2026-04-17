@@ -153,6 +153,30 @@ test('validateReleasePointer requires rollback pointer artifact details for arti
   ]);
 });
 
+test('validateReleasePointer requires review selection artifact details for artifact-search selection', () => {
+  const issues = validateReleasePointer({
+    generatedAt: '2026-04-13T00:00:00.000Z',
+    environment: 'production',
+    repository: 'mc/escrow4337',
+    artifactName: 'release-pointer-production',
+    releaseReviewRunId: '701',
+    releaseReviewRunUrl: 'https://github.com/mc/escrow4337/actions/runs/701',
+    candidateRunId: '101',
+    candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+    commitSha: 'abc123',
+    imageDigest: 'sha256:deadbeef',
+    deployedSmokeSelectionSource: 'artifact-search',
+    launchCandidateSelectionSource: 'artifact-search',
+  });
+
+  assert.deepEqual(issues, [
+    'Release pointer deployed smoke artifact id is required for artifact-search selection.',
+    'Release pointer deployed smoke selected timestamp is required for artifact-search selection.',
+    'Release pointer launch candidate artifact id is required for artifact-search selection.',
+    'Release pointer launch candidate selected timestamp is required for artifact-search selection.',
+  ]);
+});
+
 test('validateReleasePointer can require ready marketplace launch posture', () => {
   const issues = validateReleasePointer(
     {

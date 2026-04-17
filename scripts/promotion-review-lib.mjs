@@ -226,6 +226,19 @@ export function buildPromotionReview({
     ? launchEvidenceManifest.requiredArtifacts.missing
     : [];
 
+  blockers.push(
+    ...validateSelection({
+      label: 'Deployed smoke review selection',
+      selection: deployedSmokeSelection,
+    }),
+  );
+  blockers.push(
+    ...validateSelection({
+      label: 'Launch candidate review selection',
+      selection: launchCandidateSelection,
+    }),
+  );
+
   compareField({
     blockers,
     leftLabel: 'Candidate image manifest commit SHA',
@@ -613,6 +626,22 @@ function compareField({
   }
 
   blockers.push(message);
+}
+
+function validateSelection({ label, selection }) {
+  const issues = [];
+  const source = trimToNull(selection?.source);
+
+  if (source === 'artifact-search') {
+    if (!trimToNull(selection?.artifactId)) {
+      issues.push(`${label} is missing artifact id for artifact-search selection.`);
+    }
+    if (!trimToNull(selection?.createdAt)) {
+      issues.push(`${label} is missing selected timestamp for artifact-search selection.`);
+    }
+  }
+
+  return issues;
 }
 
 function trimToNull(value) {

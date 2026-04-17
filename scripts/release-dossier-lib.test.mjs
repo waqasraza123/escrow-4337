@@ -144,6 +144,7 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
       },
       reviews: {
         deployedSmoke: {
+          selectionSource: 'artifact-search',
           runId: '201',
           artifactName: 'deployed-smoke-review-staging-candidate-999',
           seededCanaryPassed: true,
@@ -164,6 +165,8 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
     'Launch candidate rollback source input does not match launch candidate metadata rollback source release-pointer.',
     'Launch candidate rollback pointer selection source input does not match launch candidate metadata rollback pointer selection source artifact-search.',
     'Deployed smoke marketplace seeded canary passed false does not match promotion review deployed smoke marketplace seeded canary passed true.',
+    'Release dossier deployed smoke review selection is missing artifact id for artifact-search selection.',
+    'Release dossier deployed smoke review selection is missing selected timestamp for artifact-search selection.',
     'Release dossier launch evidence completeness disagrees with missing artifacts: authority-evidence/summary.json.',
   ]);
 });

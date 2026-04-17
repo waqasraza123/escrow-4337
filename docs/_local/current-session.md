@@ -4,21 +4,25 @@
 - 2026-04-17
 
 ## Current Objective
-- Propagate marketplace-origin Phase 8 evidence through every promotion artifact and rollback gate so marketplace support remains explicit from deployed smoke through promotion review, release dossier, stable approved-release pointer publication, production rollback selection, launch-candidate rollback provenance, final release-packet rollback provenance, approved-pointer rollback provenance, promotion-review rollback provenance, promotion-review artifact-selection provenance, final release-packet artifact-selection provenance, approved-pointer artifact-selection provenance, rollback release-pointer selection provenance, strict artifact-search rollback-pointer provenance validation, and explicit release-dossier review-selection rendering.
+- Propagate marketplace-origin Phase 8 evidence through every promotion artifact and rollback gate so marketplace support remains explicit from deployed smoke through promotion review, release dossier, stable approved-release pointer publication, production rollback selection, launch-candidate rollback provenance, final release-packet rollback provenance, approved-pointer rollback provenance, promotion-review rollback provenance, promotion-review artifact-selection provenance, final release-packet artifact-selection provenance, approved-pointer artifact-selection provenance, rollback release-pointer selection provenance, strict artifact-search rollback-pointer provenance validation, explicit release-dossier review-selection rendering, and strict artifact-search review-selection provenance validation.
 
 ## Last Completed Step
-- Artifact-search rollback-pointer provenance is now mandatory: launch-candidate and stable release-pointer validation reject auto-discovered rollback pointers unless the selected artifact id and selection timestamp are present, and promotion-review markdown now renders explicit selection ids and timestamps for review artifacts.
+- Release dossier markdown now renders review-selection provenance explicitly: deployed-smoke and launch-candidate sections show selection source, artifact name, artifact id, and selected timestamp as separate lines instead of compressing them into a single opaque selection string.
 
 ## Current Step
-- Task complete. Release dossier markdown now renders review-selection provenance explicitly: deployed-smoke and launch-candidate sections show selection source, artifact name, artifact id, and selected timestamp as separate lines instead of compressing them into a single opaque selection string.
+- Task complete. Artifact-search review selection provenance is now mandatory across the promotion chain: promotion review blocks incomplete auto-discovered deployed-smoke or launch-candidate selections, the release dossier validator enforces the same contract, and approved release pointers reject artifact-search review selections that omit artifact ids or selected timestamps.
 
 ## Why This Step Exists
-- The release dossier is the final human-reviewed promotion packet. Even though the JSON already preserved review selection provenance, the markdown still compressed it, which made audit review unnecessarily opaque.
+- Preserving review selection provenance is not enough if auto-discovered review artifacts can still drop their artifact ids or selected timestamps. Phase 8 promotion artifacts should reject incomplete artifact-search review selections instead of quietly carrying partial provenance.
 
 ## Changed Files
-- Release dossier review-selection rendering:
+- Strict artifact-search review-selection provenance validation:
+  `scripts/promotion-review-lib.mjs`
+  `scripts/promotion-review-lib.test.mjs`
   `scripts/release-dossier-lib.mjs`
   `scripts/release-dossier-lib.test.mjs`
+  `scripts/release-pointer-lib.mjs`
+  `scripts/release-pointer-lib.test.mjs`
 - Docs:
   `docs/_local/current-session.md`
 
@@ -26,7 +30,7 @@
 - Keep scope inside promotion-artifact hardening; do not add new environment secrets or staging-only code paths.
 - Treat marketplace canaries as part of the supported launch surface rather than an optional note attached to generic seeded or exact canaries.
 - Preserve backward-compatible artifact schemas where possible while still surfacing the new marketplace-specific fields plainly in JSON and markdown outputs.
-- Keep the release dossier markdown aligned with the already-persisted JSON contract; improve readability without changing artifact semantics or weakening the existing rollback and review provenance checks.
+- Enforce artifact-search review-selection completeness without weakening manual `input` review selection support, existing rollback provenance checks, or the persisted artifact schemas.
 
 ## Verification Commands
 - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs scripts/release-review-selection-lib.test.mjs`
@@ -57,8 +61,9 @@
   - promotion-review workflow run proving rollback release-pointer selection provenance is preserved in the real release dossier
   - promotion-review workflow run proving rollback release-pointer selection provenance is preserved in the real approved release pointer
   - promotion-review workflow run proving release-dossier markdown renders explicit review-selection artifact ids and timestamps from real staged evidence
+  - promotion-review workflow run proving artifact-search deployed-smoke and launch-candidate review selections fail when artifact id or selected timestamp is missing
   - full `pnpm launch:candidate` evidence run against staging or production
   - `pnpm verify:authority:deployed`
 
 ## Next Likely Step
-- Run the exact and seeded deployed marketplace canaries plus the updated deployed-smoke workflow against a real staged environment, then generate launch-candidate, promotion-review, release-dossier, and release-pointer artifacts from real evidence and verify rollback provenance, artifact-selection provenance, rollback release-pointer selection provenance, strict artifact-search provenance validation, and explicit release-dossier selection rendering end to end against an approved pointer-backed production candidate.
+- Run the exact and seeded deployed marketplace canaries plus the updated deployed-smoke workflow against a real staged environment, then generate launch-candidate, promotion-review, release-dossier, and release-pointer artifacts from real evidence and verify rollback provenance, artifact-selection provenance, rollback release-pointer selection provenance, strict artifact-search rollback and review provenance validation, and explicit release-dossier selection rendering end to end against an approved pointer-backed production candidate.

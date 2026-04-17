@@ -244,6 +244,113 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   );
 });
 
+test('buildPromotionReview requires artifact-search selections to include artifact details', () => {
+  const review = buildPromotionReview({
+    expectedEnvironment: 'staging',
+    expectedRepository: 'mc/escrow4337',
+    expectedCandidateRunId: '101',
+    expectedSmokeRunId: '201',
+    expectedLaunchRunId: '301',
+    deployedSmokeSelection: {
+      source: 'artifact-search',
+      artifactName: 'deployed-smoke-review-staging-candidate-101',
+    },
+    launchCandidateSelection: {
+      source: 'artifact-search',
+      artifactName: 'launch-candidate-review-staging-candidate-101',
+    },
+    imageManifest: {
+      generatedAt: '2026-04-13T00:00:00.000Z',
+      repository: 'mc/escrow4337',
+      workflow: 'CI',
+      runId: '101',
+      runAttempt: '1',
+      runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+      eventName: 'push',
+      gitRef: 'main',
+      commitSha: 'abc123',
+      image: {
+        name: 'ghcr.io/mc/escrow-4337-api',
+        digest: 'sha256:deadbeef',
+        canonicalReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+        tags: ['sha-abc123', 'main'],
+      },
+    },
+    deployedSmokeRecord: buildDeployedSmokeRecord({
+      metadata: {
+        environment: 'staging',
+        repository: 'mc/escrow4337',
+        workflow: 'Deployed Smoke',
+        runId: '201',
+        runAttempt: '1',
+        runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+        actor: 'mc',
+        candidateRunId: '101',
+        candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+        commitSha: 'abc123',
+        gitRef: 'main',
+        deployedImageSha: 'sha256:deadbeef',
+        deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+      },
+    }),
+    launchPromotionRecord: {
+      status: 'ready',
+      metadata: {
+        environment: 'staging',
+        repository: 'mc/escrow4337',
+        workflow: 'Launch Candidate',
+        runId: '301',
+        runUrl: 'https://github.com/mc/escrow4337/actions/runs/301',
+        candidateRunId: '101',
+        candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+        commitSha: 'abc123',
+        gitRef: 'main',
+        deployedImageSha: 'sha256:deadbeef',
+        deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+      },
+      launchCandidate: {
+        launchReady: true,
+        smokeFailures: 0,
+        seededCanaryFailures: 0,
+        exactCanaryFailures: 0,
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 0,
+        walkthroughCanaryFailures: 0,
+        authorityEvidenceOk: true,
+        authorityAuditSource: 'chain_projection',
+      },
+      rollback: {},
+      warnings: [],
+    },
+    launchEvidenceManifest: {
+      requiredArtifacts: {
+        missing: [],
+      },
+    },
+  });
+
+  assert.ok(
+    review.blockers.includes(
+      'Deployed smoke review selection is missing artifact id for artifact-search selection.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Deployed smoke review selection is missing selected timestamp for artifact-search selection.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate review selection is missing artifact id for artifact-search selection.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate review selection is missing selected timestamp for artifact-search selection.',
+    ),
+  );
+});
+
 test('buildPromotionReview returns ready when manifest, smoke, and launch evidence agree', () => {
   const review = buildPromotionReview({
     expectedEnvironment: 'staging',

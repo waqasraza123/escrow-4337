@@ -246,6 +246,30 @@ export function validateReleasePointer(
       issues.push(`Release pointer ${label} must be input or artifact-search when present.`);
     }
   }
+  if (pointer?.deployedSmokeSelectionSource === 'artifact-search') {
+    if (!normalizeOptionalString(pointer?.deployedSmokeArtifactId)) {
+      issues.push(
+        'Release pointer deployed smoke artifact id is required for artifact-search selection.',
+      );
+    }
+    if (!normalizeOptionalString(pointer?.deployedSmokeSelectedCreatedAt)) {
+      issues.push(
+        'Release pointer deployed smoke selected timestamp is required for artifact-search selection.',
+      );
+    }
+  }
+  if (pointer?.launchCandidateSelectionSource === 'artifact-search') {
+    if (!normalizeOptionalString(pointer?.launchCandidateArtifactId)) {
+      issues.push(
+        'Release pointer launch candidate artifact id is required for artifact-search selection.',
+      );
+    }
+    if (!normalizeOptionalString(pointer?.launchCandidateSelectedCreatedAt)) {
+      issues.push(
+        'Release pointer launch candidate selected timestamp is required for artifact-search selection.',
+      );
+    }
+  }
 
   if (requireReadyLaunchPosture) {
     if (pointer?.deployedSmokePassed !== true) {
