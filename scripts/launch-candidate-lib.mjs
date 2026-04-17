@@ -188,6 +188,18 @@ export function validateLaunchMetadata(metadata, env = process.env) {
       `Launch candidate rollback release pointer selection source must be input or artifact-search but was ${metadata.rollbackPointerSelectionSource}.`,
     );
   }
+  if (metadata.rollbackPointerSelectionSource === 'artifact-search') {
+    if (!metadata.rollbackPointerArtifactId) {
+      issues.push(
+        'Launch candidate metadata is missing rollback release pointer artifact id for artifact-search selection.',
+      );
+    }
+    if (!metadata.rollbackPointerSelectedCreatedAt) {
+      issues.push(
+        'Launch candidate metadata is missing rollback release pointer selected timestamp for artifact-search selection.',
+      );
+    }
+  }
 
   return issues;
 }

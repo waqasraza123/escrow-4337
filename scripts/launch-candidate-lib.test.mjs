@@ -111,6 +111,38 @@ test('validateLaunchMetadata requires rollback pointer provenance when source is
   ]);
 });
 
+test('validateLaunchMetadata requires rollback pointer artifact details for artifact-search selection', () => {
+  const metadata = buildLaunchMetadata({
+    GITHUB_ACTIONS: 'true',
+    GITHUB_REPOSITORY: 'mc/escrow4337',
+    GITHUB_WORKFLOW: 'Launch Candidate',
+    GITHUB_RUN_ID: '12',
+    GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_SHA: 'abc123',
+    GITHUB_REF_NAME: 'main',
+    GITHUB_ACTOR: 'mc',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_ID: '44',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_URL:
+      'https://github.com/mc/escrow4337/actions/runs/44',
+    LAUNCH_CANDIDATE_ENVIRONMENT: 'production',
+    LAUNCH_CANDIDATE_RUN_URL: 'https://github.com/mc/escrow4337/actions/runs/12',
+    LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: 'sha256:new',
+    LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: 'sha256:old',
+    LAUNCH_CANDIDATE_ROLLBACK_SOURCE: 'release-pointer',
+    LAUNCH_CANDIDATE_ROLLBACK_POINTER_RUN_ID: '701',
+    LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_NAME: 'release-pointer-production',
+    LAUNCH_CANDIDATE_ROLLBACK_POINTER_SELECTION_SOURCE: 'artifact-search',
+  });
+  const issues = validateLaunchMetadata(metadata, {
+    GITHUB_ACTIONS: 'true',
+  });
+
+  assert.deepEqual(issues, [
+    'Launch candidate metadata is missing rollback release pointer artifact id for artifact-search selection.',
+    'Launch candidate metadata is missing rollback release pointer selected timestamp for artifact-search selection.',
+  ]);
+});
+
 test('buildEvidenceManifest reports missing artifacts and incident evidence coverage', () => {
   const root = mkdtempSync(resolve(tmpdir(), 'launch-candidate-lib-'));
 

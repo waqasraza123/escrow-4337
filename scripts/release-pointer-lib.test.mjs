@@ -128,6 +128,31 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
   ]);
 });
 
+test('validateReleasePointer requires rollback pointer artifact details for artifact-search selection', () => {
+  const issues = validateReleasePointer({
+    generatedAt: '2026-04-13T00:00:00.000Z',
+    environment: 'production',
+    repository: 'mc/escrow4337',
+    artifactName: 'release-pointer-production',
+    releaseReviewRunId: '701',
+    releaseReviewRunUrl: 'https://github.com/mc/escrow4337/actions/runs/701',
+    candidateRunId: '101',
+    candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+    commitSha: 'abc123',
+    imageDigest: 'sha256:deadbeef',
+    rollbackImageSha: 'sha256:old',
+    rollbackSource: 'release-pointer',
+    rollbackPointerRunId: '651',
+    rollbackPointerArtifactName: 'release-pointer-staging',
+    rollbackPointerSelectionSource: 'artifact-search',
+  });
+
+  assert.deepEqual(issues, [
+    'Release pointer rollback pointer artifact id is required for artifact-search selection.',
+    'Release pointer rollback pointer selected timestamp is required for artifact-search selection.',
+  ]);
+});
+
 test('validateReleasePointer can require ready marketplace launch posture', () => {
   const issues = validateReleasePointer(
     {

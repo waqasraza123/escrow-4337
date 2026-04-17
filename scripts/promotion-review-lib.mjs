@@ -394,11 +394,15 @@ export function buildPromotionReviewMarkdown(review) {
 - Deployed smoke run ID: ${review.reviews.deployedSmoke.runId ?? 'n/a'}
 - Deployed smoke status: ${review.reviews.deployedSmoke.status}
 - Deployed smoke selection: ${review.reviews.deployedSmoke.selectionSource ?? 'n/a'} ${review.reviews.deployedSmoke.artifactName ?? 'n/a'}
+- Deployed smoke selection artifact ID: ${review.reviews.deployedSmoke.artifactId ?? 'n/a'}
+- Deployed smoke selection selected at: ${review.reviews.deployedSmoke.selectedCreatedAt ?? 'n/a'}
 - Deployed smoke seeded canary passed: ${review.reviews.deployedSmoke.seededCanaryPassed ? 'true' : 'false'}
 - Deployed smoke marketplace seeded canary passed: ${review.reviews.deployedSmoke.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
 - Launch candidate selection: ${review.reviews.launchCandidate.selectionSource ?? 'n/a'} ${review.reviews.launchCandidate.artifactName ?? 'n/a'}
+- Launch candidate selection artifact ID: ${review.reviews.launchCandidate.artifactId ?? 'n/a'}
+- Launch candidate selection selected at: ${review.reviews.launchCandidate.selectedCreatedAt ?? 'n/a'}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}
 - Launch rollback image SHA: ${review.reviews.launchCandidate.rollbackImageSha ?? 'n/a'}
 - Launch rollback source: ${review.reviews.launchCandidate.rollbackSource ?? 'n/a'}

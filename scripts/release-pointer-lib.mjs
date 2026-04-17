@@ -204,6 +204,18 @@ export function validateReleasePointer(
       'Release pointer rollback pointer selection source must be input or artifact-search when present.',
     );
   }
+  if (pointer?.rollbackPointerSelectionSource === 'artifact-search') {
+    if (!normalizeOptionalString(pointer?.rollbackPointerArtifactId)) {
+      issues.push(
+        'Release pointer rollback pointer artifact id is required for artifact-search selection.',
+      );
+    }
+    if (!normalizeOptionalString(pointer?.rollbackPointerSelectedCreatedAt)) {
+      issues.push(
+        'Release pointer rollback pointer selected timestamp is required for artifact-search selection.',
+      );
+    }
+  }
 
   for (const [field, label] of [
     ['deployedSmokePassed', 'deployed smoke passed'],
