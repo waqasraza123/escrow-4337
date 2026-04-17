@@ -11,6 +11,43 @@ export type ExportProbe = {
   requiredText: string;
 };
 
+export function buildEscrowExportProbes(jobId: string): ExportProbe[] {
+  return [
+    {
+      artifact: 'job-history',
+      format: 'json',
+      buttonName: 'Export job history JSON',
+      successMessage: 'Downloaded job-history JSON export.',
+      fileNamePattern: new RegExp(`^escrow-${jobId}-job-history-.*\\.json$`),
+      requiredText: jobId,
+    },
+    {
+      artifact: 'job-history',
+      format: 'csv',
+      buttonName: 'Export job history CSV',
+      successMessage: 'Downloaded job-history CSV export.',
+      fileNamePattern: new RegExp(`^escrow-${jobId}-job-history-.*\\.csv$`),
+      requiredText: jobId,
+    },
+    {
+      artifact: 'dispute-case',
+      format: 'json',
+      buttonName: 'Export dispute case JSON',
+      successMessage: 'Downloaded dispute-case JSON export.',
+      fileNamePattern: new RegExp(`^escrow-${jobId}-dispute-case-.*\\.json$`),
+      requiredText: jobId,
+    },
+    {
+      artifact: 'dispute-case',
+      format: 'csv',
+      buttonName: 'Export dispute case CSV',
+      successMessage: 'Downloaded dispute-case CSV export.',
+      fileNamePattern: new RegExp(`^escrow-${jobId}-dispute-case-.*\\.csv$`),
+      requiredText: jobId,
+    },
+  ];
+}
+
 async function readDownloadText(download: Download) {
   const filePath = await download.path();
 

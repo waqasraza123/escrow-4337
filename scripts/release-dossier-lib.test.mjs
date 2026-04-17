@@ -184,7 +184,7 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
     },
     launchEvidenceManifest: {
       requiredArtifacts: {
-        total: 13,
+        total: 15,
         missing: [],
       },
     },

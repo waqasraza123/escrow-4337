@@ -170,6 +170,26 @@ async function main() {
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
     },
   );
+  const marketplaceSeededCanaryReport = await runJsonCommand(
+    'deployed-marketplace-seeded-canary',
+    ['pnpm', 'e2e:canary:deployed:marketplace:seeded'],
+    resolve(artifactsDir, 'deployed-marketplace-seeded-canary.raw.log'),
+    resolve(artifactsDir, 'deployed-marketplace-seeded-canary.json'),
+    {
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
+  const marketplaceExactCanaryReport = await runJsonCommand(
+    'deployed-marketplace-exact-canary',
+    ['pnpm', 'e2e:canary:deployed:marketplace:exact'],
+    resolve(artifactsDir, 'deployed-marketplace-exact-canary.raw.log'),
+    resolve(artifactsDir, 'deployed-marketplace-exact-canary.json'),
+    {
+      PLAYWRIGHT_REPORTER: 'json',
+      PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+    },
+  );
   const walkthroughCanaryReport = await runJsonCommand(
     'deployed-walkthrough',
     ['pnpm', 'e2e:walkthrough:deployed'],
@@ -195,6 +215,8 @@ async function main() {
   const smokeSummary = summarizePlaywrightReport(smokeReport);
   const seededCanarySummary = summarizePlaywrightReport(seededCanaryReport);
   const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
+  const marketplaceSeededCanarySummary = summarizePlaywrightReport(marketplaceSeededCanaryReport);
+  const marketplaceExactCanarySummary = summarizePlaywrightReport(marketplaceExactCanaryReport);
   const walkthroughCanarySummary = summarizePlaywrightReport(walkthroughCanaryReport);
   writeFileSync(
     resolve(artifactsDir, 'promotion-record.json'),
@@ -218,6 +240,8 @@ async function main() {
     smokeSummary,
     seededCanarySummary,
     exactCanarySummary,
+    marketplaceSeededCanarySummary,
+    marketplaceExactCanarySummary,
     walkthroughCanarySummary,
     authorityEvidence,
     evidenceManifest,
@@ -267,6 +291,8 @@ async function main() {
     smoke: smokeSummary,
     seededCanary: seededCanarySummary,
     exactCanary: exactCanarySummary,
+    marketplaceSeededCanary: marketplaceSeededCanarySummary,
+    marketplaceExactCanary: marketplaceExactCanarySummary,
     walkthroughCanary: walkthroughCanarySummary,
     authorityEvidence: {
       ok: authorityEvidence.ok,
@@ -344,6 +370,8 @@ async function main() {
     smokeSummary,
     seededCanarySummary,
     exactCanarySummary,
+    marketplaceSeededCanarySummary,
+    marketplaceExactCanarySummary,
     walkthroughCanarySummary,
     authorityEvidence,
     evidenceManifest,
@@ -548,6 +576,8 @@ function collectBlockers({
   smokeSummary,
   seededCanarySummary,
   exactCanarySummary,
+  marketplaceSeededCanarySummary,
+  marketplaceExactCanarySummary,
   walkthroughCanarySummary,
   authorityEvidence,
   evidenceManifest,
@@ -597,6 +627,28 @@ function collectBlockers({
   }
   if (exactCanarySummary.skipped > 0 || exactCanarySummary.total === 0) {
     blockers.push('Exact deployed canary did not execute its required staged launch path.');
+  }
+  if (marketplaceSeededCanarySummary.failed > 0) {
+    blockers.push('Seeded deployed marketplace canary reported failures.');
+  }
+  if (
+    marketplaceSeededCanarySummary.skipped > 0 ||
+    marketplaceSeededCanarySummary.total === 0
+  ) {
+    blockers.push(
+      'Seeded deployed marketplace canary did not execute its required staged marketplace path.',
+    );
+  }
+  if (marketplaceExactCanarySummary.failed > 0) {
+    blockers.push('Exact deployed marketplace canary reported failures.');
+  }
+  if (
+    marketplaceExactCanarySummary.skipped > 0 ||
+    marketplaceExactCanarySummary.total === 0
+  ) {
+    blockers.push(
+      'Exact deployed marketplace canary did not execute its required browser-auth marketplace path.',
+    );
   }
   if (walkthroughCanarySummary.failed > 0) {
     blockers.push('Deployed walkthrough canary reported failures.');

@@ -24,6 +24,8 @@
     "e2e:journeys:deployed": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test --project=deployed-seeded --project=deployed-exact",
     "e2e:canary:deployed": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test --project=deployed-seeded",
     "e2e:canary:deployed:exact": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test --project=deployed-exact",
+    "e2e:canary:deployed:marketplace:seeded": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts --project=deployed-seeded",
+    "e2e:canary:deployed:marketplace:exact": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts --project=deployed-exact",
     "e2e:walkthrough:deployed": "PLAYWRIGHT_PROFILE=deployed PLAYWRIGHT_RETRIES=0 playwright test --project=deployed-walkthrough",
     "e2e:deployed:list": "PLAYWRIGHT_PROFILE=deployed playwright test --list",
     "smoke:deployed": "pnpm e2e:smoke:deployed",

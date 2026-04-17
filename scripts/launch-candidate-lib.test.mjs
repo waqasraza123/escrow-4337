@@ -93,6 +93,8 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
     writeFileSync(resolve(root, 'smoke-deployed.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-seeded-canary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-exact-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-marketplace-seeded-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-marketplace-exact-canary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-walkthrough.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-authority-evidence.json'), '{}\n', 'utf8');
     mkdirSync(resolve(root, 'authority-evidence'), {
@@ -120,7 +122,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     });
 
-    assert.equal(manifest.requiredArtifacts.total, 13);
+    assert.equal(manifest.requiredArtifacts.total, 15);
     assert.deepEqual(manifest.requiredArtifacts.missing, []);
     assert.deepEqual(manifest.incidents, [
       {
@@ -215,8 +217,8 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
     },
     evidenceManifest: {
       requiredArtifacts: {
-        total: 13,
-        present: Array.from({ length: 13 }, (_, index) => `artifact-${index}`),
+        total: 15,
+        present: Array.from({ length: 15 }, (_, index) => `artifact-${index}`),
         missing: [],
       },
       incidents: [],
@@ -234,6 +236,12 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
         failed: 0,
       },
       exactCanary: {
+        failed: 0,
+      },
+      marketplaceSeededCanary: {
+        failed: 0,
+      },
+      marketplaceExactCanary: {
         failed: 0,
       },
       walkthroughCanary: {
@@ -254,6 +262,6 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
   assert.equal(record.status, 'ready');
   assert.equal(record.rollback.ready, true);
   assert.equal(record.observability.alertDrill.configured, true);
-  assert.equal(record.evidence.presentArtifactCount, 13);
+  assert.equal(record.evidence.presentArtifactCount, 15);
   assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

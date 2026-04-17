@@ -10,6 +10,8 @@ export const launchCandidateRequiredArtifacts = [
   'smoke-deployed.json',
   'deployed-seeded-canary.json',
   'deployed-exact-canary.json',
+  'deployed-marketplace-seeded-canary.json',
+  'deployed-marketplace-exact-canary.json',
   'deployed-walkthrough.json',
   'deployed-authority-evidence.json',
   'authority-evidence/summary.json',

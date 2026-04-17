@@ -14,7 +14,7 @@ import {
   resolveDisputedMilestone,
 } from '../../../flows/launch-candidate-flow';
 import {
-  type ExportProbe,
+  buildEscrowExportProbes,
   expectExportDownload,
 } from '../../../flows/operator-export-flow';
 
@@ -220,42 +220,7 @@ test('[@seeded] deployed environment can exercise the seeded marketplace hire-to
   ).toBeVisible();
   await expect(operatorPage.getByText('Audit source:', { exact: false }).first()).toBeVisible();
 
-  const probes: ExportProbe[] = [
-    {
-      artifact: 'job-history',
-      format: 'json',
-      buttonName: 'Export job history JSON',
-      successMessage: 'Downloaded job-history JSON export.',
-      fileNamePattern: new RegExp(`^escrow-${jobId}-job-history-.*\\.json$`),
-      requiredText: jobId,
-    },
-    {
-      artifact: 'job-history',
-      format: 'csv',
-      buttonName: 'Export job history CSV',
-      successMessage: 'Downloaded job-history CSV export.',
-      fileNamePattern: new RegExp(`^escrow-${jobId}-job-history-.*\\.csv$`),
-      requiredText: jobId,
-    },
-    {
-      artifact: 'dispute-case',
-      format: 'json',
-      buttonName: 'Export dispute case JSON',
-      successMessage: 'Downloaded dispute-case JSON export.',
-      fileNamePattern: new RegExp(`^escrow-${jobId}-dispute-case-.*\\.json$`),
-      requiredText: jobId,
-    },
-    {
-      artifact: 'dispute-case',
-      format: 'csv',
-      buttonName: 'Export dispute case CSV',
-      successMessage: 'Downloaded dispute-case CSV export.',
-      fileNamePattern: new RegExp(`^escrow-${jobId}-dispute-case-.*\\.csv$`),
-      requiredText: jobId,
-    },
-  ];
-
-  for (const probe of probes) {
+  for (const probe of buildEscrowExportProbes(jobId)) {
     await expectExportDownload(operatorPage, probe);
   }
 
