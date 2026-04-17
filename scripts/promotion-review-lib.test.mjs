@@ -150,6 +150,10 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         gitRef: 'main',
         deployedImageSha: 'sha256:deadbeef',
         deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
       launchCandidate: {
         launchReady: false,
@@ -161,6 +165,12 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: false,
         authorityAuditSource: 'aggregate',
+      },
+      rollback: {
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'input',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
       warnings: [],
     },
@@ -195,6 +205,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch candidate evidence manifest is missing required artifacts: authority-evidence/summary.json.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate promotion record rollback source does not match launch metadata.',
     ),
   );
   assert.ok(
@@ -259,6 +274,10 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         gitRef: 'main',
         deployedImageSha: 'sha256:deadbeef',
         deployedImageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
       launchCandidate: {
         launchReady: true,
@@ -271,6 +290,12 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         authorityEvidenceOk: true,
         authorityAuditSource: 'chain_projection',
       },
+      rollback: {
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
+      },
       warnings: ['Rollback image SHA is not yet recorded for this candidate.'],
     },
     launchEvidenceManifest: {
@@ -282,6 +307,8 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
 
   assert.equal(review.status, 'ready');
   assert.deepEqual(review.blockers, []);
+  assert.equal(review.reviews.launchCandidate.rollbackSource, 'release-pointer');
+  assert.equal(review.reviews.launchCandidate.rollbackPointerRunId, '701');
   assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);

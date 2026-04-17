@@ -346,6 +346,11 @@ export function buildPromotionReview({
         launchReady: launchPromotionRecord?.launchCandidate?.launchReady === true,
         evidenceComplete: missingLaunchArtifacts.length === 0,
         missingArtifacts: missingLaunchArtifacts,
+        rollbackImageSha: launchPromotionRecord?.rollback?.rollbackImageSha ?? null,
+        rollbackSource: launchPromotionRecord?.rollback?.rollbackSource ?? null,
+        rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
+        rollbackPointerArtifactName:
+          launchPromotionRecord?.rollback?.rollbackPointerArtifactName ?? null,
         marketplaceSeededCanaryPassed:
           (launchPromotionRecord?.launchCandidate?.marketplaceSeededCanaryFailures ?? 0) === 0,
         marketplaceExactCanaryPassed:
@@ -377,6 +382,10 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}
+- Launch rollback image SHA: ${review.reviews.launchCandidate.rollbackImageSha ?? 'n/a'}
+- Launch rollback source: ${review.reviews.launchCandidate.rollbackSource ?? 'n/a'}
+- Launch rollback pointer run ID: ${review.reviews.launchCandidate.rollbackPointerRunId ?? 'n/a'}
+- Launch rollback pointer artifact: ${review.reviews.launchCandidate.rollbackPointerArtifactName ?? 'n/a'}
 - Launch marketplace seeded canary passed: ${review.reviews.launchCandidate.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch marketplace exact canary passed: ${review.reviews.launchCandidate.marketplaceExactCanaryPassed ? 'true' : 'false'}
 - Launch authority audit source: ${review.reviews.launchCandidate.authorityAuditSource ?? 'n/a'}
@@ -470,6 +479,26 @@ function validateLaunchPromotionReview({
 
   if (record?.launchCandidate?.launchReady !== true) {
     issues.push('Launch candidate promotion record does not confirm launch readiness passed.');
+  }
+  if (trimToNull(record?.rollback?.rollbackImageSha) !== trimToNull(metadata.rollbackImageSha)) {
+    issues.push('Launch candidate promotion record rollback image SHA does not match launch metadata.');
+  }
+  if (trimToNull(record?.rollback?.rollbackSource) !== trimToNull(metadata.rollbackSource)) {
+    issues.push('Launch candidate promotion record rollback source does not match launch metadata.');
+  }
+  if (
+    trimToNull(record?.rollback?.rollbackPointerRunId) !==
+    trimToNull(metadata.rollbackPointerRunId)
+  ) {
+    issues.push('Launch candidate promotion record rollback pointer run id does not match launch metadata.');
+  }
+  if (
+    trimToNull(record?.rollback?.rollbackPointerArtifactName) !==
+    trimToNull(metadata.rollbackPointerArtifactName)
+  ) {
+    issues.push(
+      'Launch candidate promotion record rollback pointer artifact name does not match launch metadata.',
+    );
   }
   if ((record?.launchCandidate?.smokeFailures ?? 0) > 0) {
     issues.push('Launch candidate promotion record reports deployed smoke failures.');
