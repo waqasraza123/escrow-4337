@@ -163,6 +163,20 @@ export function validateReleaseDossierInputs({
     rightLabel: 'promotion review launch candidate run id',
     rightValue: promotionReview?.reviews?.launchCandidate?.runId,
   });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Deployed smoke seeded canary passed',
+    leftValue: deployedSmokeRecord?.checks?.seededCanaryPassed,
+    rightLabel: 'promotion review deployed smoke seeded canary passed',
+    rightValue: promotionReview?.reviews?.deployedSmoke?.seededCanaryPassed,
+  });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Deployed smoke marketplace seeded canary passed',
+    leftValue: deployedSmokeRecord?.checks?.marketplaceSeededCanaryPassed,
+    rightLabel: 'promotion review deployed smoke marketplace seeded canary passed',
+    rightValue: promotionReview?.reviews?.deployedSmoke?.marketplaceSeededCanaryPassed,
+  });
 
   const missingArtifacts = Array.isArray(launchEvidenceManifest?.requiredArtifacts?.missing)
     ? launchEvidenceManifest.requiredArtifacts.missing
@@ -230,6 +244,10 @@ export function buildReleaseDossier({
         runId: deployedSmokeRecord?.metadata?.runId ?? null,
         runUrl: deployedSmokeRecord?.metadata?.runUrl ?? null,
         status: deployedSmokeRecord?.status ?? 'missing',
+        smokePassed: deployedSmokeRecord?.checks?.smokePassed ?? null,
+        seededCanaryPassed: deployedSmokeRecord?.checks?.seededCanaryPassed ?? null,
+        marketplaceSeededCanaryPassed:
+          deployedSmokeRecord?.checks?.marketplaceSeededCanaryPassed ?? null,
       },
       launchCandidate: {
         workflow: launchPromotionRecord?.metadata?.workflow ?? null,
@@ -272,6 +290,9 @@ export function buildReleaseDossierMarkdown(record) {
 - Candidate CI run URL: ${record.candidate.runUrl ?? 'n/a'}
 - Commit SHA: ${record.candidate.commitSha ?? 'n/a'}
 - Image digest: ${record.candidate.imageDigest ?? 'n/a'}
+- Deployed smoke passed: ${formatBoolean(record.workflows.deployedSmoke.smokePassed)}
+- Deployed smoke seeded canary passed: ${formatBoolean(record.workflows.deployedSmoke.seededCanaryPassed)}
+- Deployed smoke marketplace seeded canary passed: ${formatBoolean(record.workflows.deployedSmoke.marketplaceSeededCanaryPassed)}
 - Launch authority audit source: ${record.launchEvidence.authorityAuditSource ?? 'n/a'}
 - Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}
 - Launch marketplace exact canary failures: ${record.launchEvidence.marketplaceExactCanaryFailures ?? 'n/a'}
@@ -370,6 +391,18 @@ function compareField({ issues, leftLabel, leftValue, rightLabel, rightValue }) 
   }
 
   issues.push(`${leftLabel} ${normalizedLeft} does not match ${rightLabel} ${normalizedRight}.`);
+}
+
+function compareBooleanField({ issues, leftLabel, leftValue, rightLabel, rightValue }) {
+  if (typeof leftValue !== 'boolean' || typeof rightValue !== 'boolean' || leftValue === rightValue) {
+    return;
+  }
+
+  issues.push(`${leftLabel} ${leftValue} does not match ${rightLabel} ${rightValue}.`);
+}
+
+function formatBoolean(value) {
+  return typeof value === 'boolean' ? String(value) : 'n/a';
 }
 
 function trimToNull(value) {

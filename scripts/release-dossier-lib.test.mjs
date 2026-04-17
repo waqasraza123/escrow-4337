@@ -104,6 +104,10 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
       metadata: {
         runId: '201',
       },
+      checks: {
+        seededCanaryPassed: true,
+        marketplaceSeededCanaryPassed: false,
+      },
     },
     launchPromotionRecord: {
       metadata: {
@@ -124,6 +128,8 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
       reviews: {
         deployedSmoke: {
           runId: '201',
+          seededCanaryPassed: true,
+          marketplaceSeededCanaryPassed: true,
         },
         launchCandidate: {
           runId: '301',
@@ -135,6 +141,7 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
 
   assert.deepEqual(issues, [
     'Image manifest commit SHA abc123 does not match promotion review commit SHA wrong.',
+    'Deployed smoke marketplace seeded canary passed false does not match promotion review deployed smoke marketplace seeded canary passed true.',
     'Release dossier launch evidence completeness disagrees with missing artifacts: authority-evidence/summary.json.',
   ]);
 });
@@ -169,6 +176,11 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         workflow: 'Deployed Smoke',
         runId: '201',
         runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+      },
+      checks: {
+        smokePassed: true,
+        seededCanaryPassed: true,
+        marketplaceSeededCanaryPassed: true,
       },
     },
     launchPromotionRecord: {
@@ -213,6 +225,9 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.evidence.fileCount, 2);
   assert.equal(record.evidence.totalBytes, 200);
   assert.equal(record.launchEvidence.authorityAuditSource, 'chain_projection');
+  assert.equal(record.workflows.deployedSmoke.smokePassed, true);
+  assert.equal(record.workflows.deployedSmoke.seededCanaryPassed, true);
+  assert.equal(record.workflows.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(record.launchEvidence.marketplaceSeededCanaryFailures, 0);
   assert.equal(record.launchEvidence.marketplaceExactCanaryFailures, 0);
   assert.deepEqual(record.decision.warnings, [
