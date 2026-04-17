@@ -126,6 +126,10 @@ function runValidate(argv) {
         `RELEASE_POINTER_IMAGE_DIGEST=${pointer.imageDigest}`,
         `RELEASE_POINTER_IMAGE_REFERENCE=${pointer.imageReference ?? ''}`,
         `RELEASE_POINTER_IMAGE_NAME=${pointer.imageName ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_IMAGE_SHA=${pointer.rollbackImageSha ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_SOURCE=${pointer.rollbackSource ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_POINTER_RUN_ID=${pointer.rollbackPointerRunId ?? ''}`,
+        `RELEASE_POINTER_ROLLBACK_POINTER_ARTIFACT_NAME=${pointer.rollbackPointerArtifactName ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_PASSED=${pointer.deployedSmokePassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeSeededCanaryPassed ?? ''}`,
         `RELEASE_POINTER_DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED=${pointer.deployedSmokeMarketplaceSeededCanaryPassed ?? ''}`,
@@ -192,6 +196,10 @@ function buildMarkdown(pointer) {
 - Commit SHA: ${pointer.commitSha}
 - Image digest: ${pointer.imageDigest}
 - Image reference: ${pointer.imageReference ?? 'n/a'}
+- Rollback image SHA: ${pointer.rollbackImageSha ?? 'n/a'}
+- Rollback source: ${pointer.rollbackSource ?? 'n/a'}
+- Rollback pointer run ID: ${pointer.rollbackPointerRunId ?? 'n/a'}
+- Rollback pointer artifact: ${pointer.rollbackPointerArtifactName ?? 'n/a'}
 - Deployed smoke passed: ${formatOptionalBoolean(pointer.deployedSmokePassed)}
 - Deployed smoke seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeSeededCanaryPassed)}
 - Deployed smoke marketplace seeded canary passed: ${formatOptionalBoolean(pointer.deployedSmokeMarketplaceSeededCanaryPassed)}

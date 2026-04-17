@@ -31,6 +31,10 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
         },
       },
       launchEvidence: {
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '651',
+        rollbackPointerArtifactName: 'release-pointer-staging',
         authorityAuditSource: 'chain_projection',
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
@@ -49,6 +53,10 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.artifactName, 'release-pointer-production');
   assert.equal(pointer.imageDigest, 'sha256:deadbeef');
   assert.equal(pointer.releaseReviewRunId, '701');
+  assert.equal(pointer.rollbackImageSha, 'sha256:old');
+  assert.equal(pointer.rollbackSource, 'release-pointer');
+  assert.equal(pointer.rollbackPointerRunId, '651');
+  assert.equal(pointer.rollbackPointerArtifactName, 'release-pointer-staging');
   assert.equal(pointer.deployedSmokeMarketplaceSeededCanaryPassed, true);
   assert.equal(pointer.launchMarketplaceSeededCanaryFailures, 0);
   assert.equal(pointer.launchMarketplaceExactCanaryFailures, 0);
@@ -69,6 +77,7 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       commitSha: 'abc123',
       imageDigest: 'deadbeef',
       imageReference: 'ghcr.io/mc/escrow-4337-api:main',
+      rollbackSource: 'pointer',
       deployedSmokeMarketplaceSeededCanaryPassed: 'true',
       launchMarketplaceExactCanaryFailures: -1,
     },
@@ -82,6 +91,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer artifact name release-pointer-prod does not match expected artifact name release-pointer-staging.',
     'Release pointer image reference must include the image digest when present.',
     'Release pointer environment staging does not match expected environment production.',
+    'Release pointer rollback source must be input or release-pointer but was pointer.',
+    'Release pointer rollback image SHA is required when rollback source is present.',
     'Release pointer deployed smoke marketplace seeded canary passed must be boolean when present.',
     'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
   ]);
@@ -101,6 +112,8 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
       commitSha: 'abc123',
       imageDigest: 'sha256:deadbeef',
       imageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+      rollbackImageSha: 'sha256:old',
+      rollbackSource: null,
       deployedSmokePassed: true,
       deployedSmokeSeededCanaryPassed: false,
       deployedSmokeMarketplaceSeededCanaryPassed: false,
@@ -120,6 +133,7 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
     'Release pointer reports launch marketplace seeded canary failures.',
     'Release pointer reports launch marketplace exact canary failures.',
     'Release pointer authority audit source must be chain_projection but was aggregate.',
+    'Release pointer does not record rollback source.',
   ]);
 });
 

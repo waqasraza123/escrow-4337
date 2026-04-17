@@ -56,6 +56,12 @@ export function buildReleasePointer({
     imageDigest,
     imageReference: normalizeOptionalString(releaseDossier?.candidate?.imageReference),
     imageName: normalizeOptionalString(releaseDossier?.candidate?.imageName),
+    rollbackImageSha: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackImageSha),
+    rollbackSource: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackSource),
+    rollbackPointerRunId: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackPointerRunId),
+    rollbackPointerArtifactName: normalizeOptionalString(
+      releaseDossier?.launchEvidence?.rollbackPointerArtifactName,
+    ),
     deployedSmokePassed: normalizeOptionalBoolean(releaseDossier?.workflows?.deployedSmoke?.smokePassed),
     deployedSmokeSeededCanaryPassed: normalizeOptionalBoolean(
       releaseDossier?.workflows?.deployedSmoke?.seededCanaryPassed,
@@ -137,6 +143,27 @@ export function validateReleasePointer(
     );
   }
 
+  if (pointer?.rollbackSource) {
+    if (pointer.rollbackSource !== 'input' && pointer.rollbackSource !== 'release-pointer') {
+      issues.push(
+        `Release pointer rollback source must be input or release-pointer but was ${pointer.rollbackSource}.`,
+      );
+    }
+    if (!normalizeOptionalString(pointer?.rollbackImageSha)) {
+      issues.push('Release pointer rollback image SHA is required when rollback source is present.');
+    }
+    if (pointer.rollbackSource === 'release-pointer') {
+      if (!normalizeOptionalString(pointer?.rollbackPointerRunId)) {
+        issues.push('Release pointer rollback pointer run id is required when rollback source is release-pointer.');
+      }
+      if (!normalizeOptionalString(pointer?.rollbackPointerArtifactName)) {
+        issues.push(
+          'Release pointer rollback pointer artifact name is required when rollback source is release-pointer.',
+        );
+      }
+    }
+  }
+
   for (const [field, label] of [
     ['deployedSmokePassed', 'deployed smoke passed'],
     ['deployedSmokeSeededCanaryPassed', 'deployed smoke seeded canary passed'],
@@ -178,6 +205,9 @@ export function validateReleasePointer(
       issues.push(
         `Release pointer authority audit source must be chain_projection but was ${pointer?.authorityAuditSource ?? '<missing>'}.`,
       );
+    }
+    if (!normalizeOptionalString(pointer?.rollbackSource)) {
+      issues.push('Release pointer does not record rollback source.');
     }
   }
 
