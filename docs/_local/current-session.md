@@ -4,22 +4,21 @@
 - 2026-04-17
 
 ## Current Objective
-- Propagate marketplace-origin Phase 8 evidence through every promotion artifact and rollback gate so marketplace support remains explicit from deployed smoke through promotion review, release dossier, stable approved-release pointer publication, production rollback selection, and launch-candidate rollback provenance.
+- Propagate marketplace-origin Phase 8 evidence through every promotion artifact and rollback gate so marketplace support remains explicit from deployed smoke through promotion review, release dossier, stable approved-release pointer publication, production rollback selection, launch-candidate rollback provenance, and final release-packet rollback provenance.
 
 ## Last Completed Step
-- Approved release pointers are now validated at publication time too, not only when later reused for rollback selection.
+- Launch-candidate evidence now preserves explicit rollback provenance, including whether the designated rollback image came from manual input or an approved release pointer.
 
 ## Current Step
-- Task complete. Launch-candidate evidence now preserves rollback provenance explicitly: launch metadata and promotion records record whether the designated rollback image came from manual input or an approved release pointer, and when it came from a pointer they also record the source pointer run id and artifact name.
+- Task complete. Release dossiers now preserve rollback provenance explicitly: the final audit packet records rollback image SHA, rollback source, and rollback pointer run or artifact identity from the launch promotion record, and it validates those rollback fields remain internally consistent between launch metadata and rollback sections.
 
 ## Why This Step Exists
-- Phase 8 rollback posture should be auditable from the launch-candidate artifact bundle itself. If a production launch candidate uses an approved pointer as rollback source, the resulting promotion record should say so explicitly instead of only preserving the resolved image digest.
+- Phase 8 rollback posture should still be auditable from the final release packet, not only from intermediate launch artifacts. If a production candidate uses an approved pointer as rollback source, the release dossier should preserve that provenance instead of collapsing back to a bare rollback image SHA.
 
 ## Changed Files
-- Launch candidate rollback provenance tooling:
-  `.github/workflows/launch-candidate.yml`
-  `scripts/launch-candidate-lib.mjs`
-  `scripts/launch-candidate-lib.test.mjs`
+- Release dossier rollback provenance tooling:
+  `scripts/release-dossier-lib.mjs`
+  `scripts/release-dossier-lib.test.mjs`
 - Docs:
   `docs/_local/current-session.md`
 
@@ -27,15 +26,15 @@
 - Keep scope inside promotion-artifact hardening; do not add new environment secrets or staging-only code paths.
 - Treat marketplace canaries as part of the supported launch surface rather than an optional note attached to generic seeded or exact canaries.
 - Preserve backward-compatible artifact schemas where possible while still surfacing the new marketplace-specific fields plainly in JSON and markdown outputs.
-- Ensure launch-candidate artifacts preserve rollback provenance explicitly without weakening the existing rollback-pointer validation path.
+- Ensure rollback provenance survives into the final release dossier without weakening the existing rollback-pointer validation path or promotion-review checks.
 
 ## Verification Commands
-- `node --test scripts/launch-candidate-lib.test.mjs scripts/release-pointer-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+- `node --test scripts/release-dossier-lib.test.mjs scripts/launch-candidate-lib.test.mjs scripts/release-pointer-lib.test.mjs scripts/promotion-review-lib.test.mjs`
 - `git diff --check`
 
 ## Verification Status
 - Passed:
-  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-pointer-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+  - `node --test scripts/release-dossier-lib.test.mjs scripts/launch-candidate-lib.test.mjs scripts/release-pointer-lib.test.mjs scripts/promotion-review-lib.test.mjs`
   - `git diff --check`
 - Blocked or not run:
   - exact deployed marketplace canary against a real staged target
@@ -46,6 +45,7 @@
   - production launch-candidate workflow run proving rollback auto-resolution rejects stale or incomplete approved pointers
   - promotion-review workflow run proving invalid generated pointers fail before upload
   - launch-candidate workflow run proving rollback source and pointer provenance land in the real promotion record
+  - promotion-review workflow run proving rollback provenance lands in the real release dossier
   - full `pnpm launch:candidate` evidence run against staging or production
   - `pnpm verify:authority:deployed`
 

@@ -112,6 +112,16 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
     launchPromotionRecord: {
       metadata: {
         runId: '301',
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
+      },
+      rollback: {
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'input',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
     },
     launchEvidenceManifest: {
@@ -141,6 +151,7 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
 
   assert.deepEqual(issues, [
     'Image manifest commit SHA abc123 does not match promotion review commit SHA wrong.',
+    'Launch candidate rollback source input does not match launch candidate metadata rollback source release-pointer.',
     'Deployed smoke marketplace seeded canary passed false does not match promotion review deployed smoke marketplace seeded canary passed true.',
     'Release dossier launch evidence completeness disagrees with missing artifacts: authority-evidence/summary.json.',
   ]);
@@ -189,11 +200,21 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         workflow: 'Launch Candidate',
         runId: '301',
         runUrl: 'https://github.com/mc/escrow4337/actions/runs/301',
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
       launchCandidate: {
         authorityAuditSource: 'chain_projection',
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
+      },
+      rollback: {
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
       },
     },
     launchEvidenceManifest: {
@@ -225,6 +246,10 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.evidence.fileCount, 2);
   assert.equal(record.evidence.totalBytes, 200);
   assert.equal(record.launchEvidence.authorityAuditSource, 'chain_projection');
+  assert.equal(record.launchEvidence.rollbackImageSha, 'sha256:old');
+  assert.equal(record.launchEvidence.rollbackSource, 'release-pointer');
+  assert.equal(record.launchEvidence.rollbackPointerRunId, '701');
+  assert.equal(record.launchEvidence.rollbackPointerArtifactName, 'release-pointer-staging');
   assert.equal(record.workflows.deployedSmoke.smokePassed, true);
   assert.equal(record.workflows.deployedSmoke.seededCanaryPassed, true);
   assert.equal(record.workflows.deployedSmoke.marketplaceSeededCanaryPassed, true);
