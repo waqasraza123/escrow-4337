@@ -211,6 +211,9 @@ jobs:
           LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: ${{ steps.candidate_manifest.outputs.image_digest }}
           LAUNCH_CANDIDATE_DEPLOYED_IMAGE_REFERENCE: ${{ steps.candidate_manifest.outputs.image_reference }}
           LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: ${{ steps.rollback_image.outputs.rollback_image_sha }}
+          LAUNCH_CANDIDATE_ROLLBACK_SOURCE: ${{ steps.rollback_image.outputs.rollback_source }}
+          LAUNCH_CANDIDATE_ROLLBACK_POINTER_RUN_ID: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_RUN_ID }}
+          LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_NAME: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_ARTIFACT_NAME }}
 
       - name: Upload launch candidate artifacts
         if: always()

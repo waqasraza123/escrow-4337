@@ -114,6 +114,9 @@ export function buildLaunchMetadata(env = process.env) {
     deployedImageSha: trimToNull(env.LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA),
     deployedImageReference: trimToNull(env.LAUNCH_CANDIDATE_DEPLOYED_IMAGE_REFERENCE),
     rollbackImageSha: trimToNull(env.LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA),
+    rollbackSource: trimToNull(env.LAUNCH_CANDIDATE_ROLLBACK_SOURCE),
+    rollbackPointerRunId: trimToNull(env.LAUNCH_CANDIDATE_ROLLBACK_POINTER_RUN_ID),
+    rollbackPointerArtifactName: trimToNull(env.LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_NAME),
   };
 }
 
@@ -143,6 +146,27 @@ export function validateLaunchMetadata(metadata, env = process.env) {
   ]) {
     if (!metadata[field]) {
       issues.push(`Launch candidate metadata is missing ${label}.`);
+    }
+  }
+
+  if (metadata.rollbackImageSha && !metadata.rollbackSource) {
+    issues.push('Launch candidate metadata is missing rollback source.');
+  }
+  if (
+    metadata.rollbackSource &&
+    metadata.rollbackSource !== 'input' &&
+    metadata.rollbackSource !== 'release-pointer'
+  ) {
+    issues.push(
+      `Launch candidate rollback source must be input or release-pointer but was ${metadata.rollbackSource}.`,
+    );
+  }
+  if (metadata.rollbackSource === 'release-pointer') {
+    if (!metadata.rollbackPointerRunId) {
+      issues.push('Launch candidate metadata is missing rollback release pointer run id.');
+    }
+    if (!metadata.rollbackPointerArtifactName) {
+      issues.push('Launch candidate metadata is missing rollback release pointer artifact name.');
     }
   }
 
@@ -288,6 +312,9 @@ export function buildPromotionRecord({
     rollback: {
       deployedImageSha: metadata.deployedImageSha,
       rollbackImageSha: metadata.rollbackImageSha,
+      rollbackSource: metadata.rollbackSource,
+      rollbackPointerRunId: metadata.rollbackPointerRunId,
+      rollbackPointerArtifactName: metadata.rollbackPointerArtifactName,
       required: metadata.environment === 'production',
       ready:
         metadata.environment === 'production'
@@ -325,6 +352,9 @@ export function buildPromotionMarkdown(record) {
 - Commit SHA: ${record.metadata.commitSha ?? 'n/a'}
 - Deployed image SHA: ${record.metadata.deployedImageSha ?? 'n/a'}
 - Rollback image SHA: ${record.metadata.rollbackImageSha ?? 'n/a'}
+- Rollback source: ${record.rollback.rollbackSource ?? 'n/a'}
+- Rollback pointer run ID: ${record.rollback.rollbackPointerRunId ?? 'n/a'}
+- Rollback pointer artifact: ${record.rollback.rollbackPointerArtifactName ?? 'n/a'}
 - Launch readiness: ${record.launchCandidate.launchReady ? 'ready' : 'blocked'}
 - Authority audit source: ${record.launchCandidate.authorityAuditSource}
 - Marketplace seeded canary failures: ${record.launchCandidate.marketplaceSeededCanaryFailures}
@@ -390,6 +420,9 @@ export function buildSummaryMarkdown(summary) {
 - Deployed image SHA: ${metadata.deployedImageSha ?? 'n/a'}
 - Deployed image reference: ${metadata.deployedImageReference ?? 'n/a'}
 - Rollback image SHA: ${metadata.rollbackImageSha ?? 'n/a'}
+- Rollback source: ${metadata.rollbackSource ?? 'n/a'}
+- Rollback pointer run ID: ${metadata.rollbackPointerRunId ?? 'n/a'}
+- Rollback pointer artifact: ${metadata.rollbackPointerArtifactName ?? 'n/a'}
 - Expect launch ready: ${summary.expectLaunchReady ? 'true' : 'false'}
 - Deployment validation: ${summary.deploymentValidation.ok ? 'ok' : 'failed'}
 - Daemon health: ${summary.daemonHealth.status}

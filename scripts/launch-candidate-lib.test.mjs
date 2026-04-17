@@ -81,6 +81,35 @@ test('validateLaunchMetadata requires promotion metadata for GitHub runs', () =>
   ]);
 });
 
+test('validateLaunchMetadata requires rollback pointer provenance when source is release-pointer', () => {
+  const metadata = buildLaunchMetadata({
+    GITHUB_ACTIONS: 'true',
+    GITHUB_REPOSITORY: 'mc/escrow4337',
+    GITHUB_WORKFLOW: 'Launch Candidate',
+    GITHUB_RUN_ID: '12',
+    GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_SHA: 'abc123',
+    GITHUB_REF_NAME: 'main',
+    GITHUB_ACTOR: 'mc',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_ID: '44',
+    LAUNCH_CANDIDATE_CANDIDATE_RUN_URL:
+      'https://github.com/mc/escrow4337/actions/runs/44',
+    LAUNCH_CANDIDATE_ENVIRONMENT: 'production',
+    LAUNCH_CANDIDATE_RUN_URL: 'https://github.com/mc/escrow4337/actions/runs/12',
+    LAUNCH_CANDIDATE_DEPLOYED_IMAGE_SHA: 'sha256:new',
+    LAUNCH_CANDIDATE_ROLLBACK_IMAGE_SHA: 'sha256:old',
+    LAUNCH_CANDIDATE_ROLLBACK_SOURCE: 'release-pointer',
+  });
+  const issues = validateLaunchMetadata(metadata, {
+    GITHUB_ACTIONS: 'true',
+  });
+
+  assert.deepEqual(issues, [
+    'Launch candidate metadata is missing rollback release pointer run id.',
+    'Launch candidate metadata is missing rollback release pointer artifact name.',
+  ]);
+});
+
 test('buildEvidenceManifest reports missing artifacts and incident evidence coverage', () => {
   const root = mkdtempSync(resolve(tmpdir(), 'launch-candidate-lib-'));
 
@@ -187,6 +216,9 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
       environment: 'staging',
       deployedImageSha: 'sha256:new',
       rollbackImageSha: null,
+      rollbackSource: null,
+      rollbackPointerRunId: null,
+      rollbackPointerArtifactName: null,
     },
     runtimeProfile: {
       operations: {
@@ -261,6 +293,7 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
 
   assert.equal(record.status, 'ready');
   assert.equal(record.rollback.ready, true);
+  assert.equal(record.rollback.rollbackSource, null);
   assert.equal(record.observability.alertDrill.configured, true);
   assert.equal(record.evidence.presentArtifactCount, 15);
   assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
