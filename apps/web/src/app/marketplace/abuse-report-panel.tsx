@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button, SectionCard, StatusNotice } from '@escrow4334/frontend-core';
 import styles from '../page.styles';
 import type { MarketplaceAbuseReportReason, SessionTokens } from '../../lib/api';
 import { useWebI18n } from '../../lib/i18n';
@@ -102,15 +103,17 @@ export function AbuseReportPanel({
   }
 
   return (
-    <article className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <div>
-          <span className={styles.panelEyebrow}>{reportingMessages.eyebrow}</span>
-          <h2>{reportingMessages.title}</h2>
-        </div>
-      </div>
-      <p className={styles.stateText}>{reportingMessages.intro}</p>
-      <form className={styles.stack} onSubmit={(event) => void handleSubmit(event)}>
+    <SectionCard
+      eyebrow={reportingMessages.eyebrow}
+      title={reportingMessages.title}
+      className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+      headerClassName="mb-5"
+      contentClassName="gap-4"
+    >
+      <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+        {reportingMessages.intro}
+      </p>
+      <form className="grid gap-4" onSubmit={(event) => void handleSubmit(event)}>
         <label className={styles.field}>
           <span>{reportingMessages.reason}</span>
           <select value={reason} onChange={(event) => setReason(event.target.value as MarketplaceAbuseReportReason)}>
@@ -146,15 +149,25 @@ export function AbuseReportPanel({
           />
         </label>
 
-        <div className={styles.inlineActions}>
-          <button type="submit" disabled={submitting}>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={submitting}>
             {submitting ? reportingMessages.submitting : reportingMessages.submit}
-          </button>
+          </Button>
         </div>
       </form>
 
-      {message ? <p className={styles.stateText}>{message}</p> : null}
-      {error ? <p className={styles.stateText}>{error}</p> : null}
-    </article>
+      {message ? (
+        <StatusNotice
+          message={message}
+          messageClassName="text-sm leading-6 text-[var(--foreground-soft)]"
+        />
+      ) : null}
+      {error ? (
+        <StatusNotice
+          message={error}
+          messageClassName="text-sm leading-6 text-[var(--foreground-soft)]"
+        />
+      ) : null}
+    </SectionCard>
   );
 }

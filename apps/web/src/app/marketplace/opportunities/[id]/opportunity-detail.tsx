@@ -2,8 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatTimestamp } from '@escrow4334/frontend-core';
-import styles from '../../../page.styles';
+import {
+  Button,
+  FactGrid,
+  FactItem,
+  PageContainer,
+  PageTopBar,
+  SectionCard,
+  SectionHeading,
+  SurfaceCard,
+  formatTimestamp,
+} from '@escrow4334/frontend-core';
 import { AbuseReportPanel } from '../../abuse-report-panel';
 import {
   webApi,
@@ -55,167 +64,139 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
   }, [id, marketplaceMessages.opportunityDetail.unavailableBody]);
 
   return (
-    <main className={styles.page}>
-      <div className={styles.console}>
-        <div className={styles.topBar}>
-          <div className={styles.topBarContent}>
-            <span className={styles.topBarLabel}>
-              {marketplaceMessages.opportunityDetail.topBarLabel}
-            </span>
-            <p className={styles.topBarMeta}>
-              {marketplaceMessages.opportunityDetail.topBarMeta}
-            </p>
-          </div>
-          <div className={styles.inlineActions}>
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-              href="/marketplace"
-            >
-              {marketplaceMessages.actions.backToMarketplace}
-            </Link>
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
-              href="/app/marketplace"
-            >
-              {marketplaceMessages.openWorkspace}
-            </Link>
-          </div>
-        </div>
+    <main className="min-h-screen">
+      <PageContainer className="w-[min(1480px,calc(100vw-40px))]">
+        <PageTopBar
+          eyebrow={marketplaceMessages.opportunityDetail.topBarLabel}
+          description={marketplaceMessages.opportunityDetail.topBarMeta}
+          actions={
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/marketplace">
+                  {marketplaceMessages.actions.backToMarketplace}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
+              </Button>
+            </>
+          }
+        />
 
         {error ? (
-          <section className={styles.panel}>
-            <h2>{marketplaceMessages.opportunityDetail.unavailableTitle}</h2>
-            <p className={styles.stateText}>{error}</p>
-          </section>
+          <SectionCard title={marketplaceMessages.opportunityDetail.unavailableTitle}>
+            <p className="text-sm leading-6 text-[var(--foreground-soft)]">{error}</p>
+          </SectionCard>
         ) : null}
 
         {!opportunity && !error ? (
-          <section className={styles.panel}>
-            <h2>{marketplaceMessages.opportunityDetail.loadingTitle}</h2>
-          </section>
+          <SectionCard title={marketplaceMessages.opportunityDetail.loadingTitle} />
         ) : null}
 
         {opportunity ? (
           <>
-            <section className={styles.hero}>
-              <div>
-                <p className={styles.eyebrow}>
-                  {marketplaceMessages.opportunityDetail.briefEyebrow(
-                    marketplaceMessages.labels.visibility[opportunity.visibility],
-                  )}
-                </p>
-                <h1>{opportunity.title}</h1>
-                <p className={styles.heroCopy}>{opportunity.summary}</p>
-              </div>
-              <div className={styles.heroCard}>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.client}
-                  </span>
-                  <strong>{opportunity.owner.displayName}</strong>
-                </div>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.applications}
-                  </span>
-                  <strong>{opportunity.applicationCount}</strong>
-                </div>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.escrowReadiness}
-                  </span>
-                  <strong>
-                    {marketplaceMessages.labels.escrowReadiness[
-                      opportunity.escrowReadiness
-                    ]}
-                  </strong>
-                </div>
-              </div>
+            <section className="grid items-start gap-7 rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
+              <SectionHeading
+                eyebrow={marketplaceMessages.opportunityDetail.briefEyebrow(
+                  marketplaceMessages.labels.visibility[opportunity.visibility],
+                )}
+                title={opportunity.title}
+                titleClassName="max-w-[9.8ch] text-[clamp(2.9rem,6vw,5.5rem)] leading-[0.92]"
+                description={opportunity.summary}
+                descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
+              />
+              <SurfaceCard
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-6"
+                elevated
+              >
+                <FactGrid className="md:grid-cols-1">
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.client}
+                    value={opportunity.owner.displayName}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.applications}
+                    value={opportunity.applicationCount}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.escrowReadiness}
+                    value={
+                      marketplaceMessages.labels.escrowReadiness[
+                        opportunity.escrowReadiness
+                      ]
+                    }
+                  />
+                </FactGrid>
+              </SurfaceCard>
             </section>
 
-            <section className={styles.grid}>
-              <article className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <span className={styles.panelEyebrow}>
-                      {marketplaceMessages.opportunityDetail.scopeEyebrow}
-                    </span>
-                    <h2>{marketplaceMessages.opportunityDetail.scopeTitle}</h2>
-                  </div>
-                </div>
-                <p className={styles.stateText}>{opportunity.description}</p>
-                <div className={styles.summaryGrid}>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.category}
-                    </span>
-                    <strong>{opportunity.category}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.timeline}
-                    </span>
-                    <strong>{opportunity.timeline}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.budget}
-                    </span>
-                    <strong className={styles.ltrValue} data-ltr="true">
-                      {opportunity.budgetMin || opportunity.budgetMax
+            <section className="grid gap-5 xl:grid-cols-2">
+              <SectionCard
+                eyebrow={marketplaceMessages.opportunityDetail.scopeEyebrow}
+                title={marketplaceMessages.opportunityDetail.scopeTitle}
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                headerClassName="mb-5"
+              >
+                <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+                  {opportunity.description}
+                </p>
+                <FactGrid className="md:grid-cols-3">
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.category}
+                    value={opportunity.category}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.timeline}
+                    value={opportunity.timeline}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.budget}
+                    value={
+                      opportunity.budgetMin || opportunity.budgetMax
                         ? `${opportunity.budgetMin ?? '—'} to ${opportunity.budgetMax ?? '—'}`
-                        : marketplaceMessages.opportunityDetail.notSpecified}
-                    </strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.settlementToken}
-                    </span>
-                    <strong className={styles.ltrValue} data-ltr="true">
-                      {opportunity.currencyAddress}
-                    </strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.desiredStart}
-                    </span>
-                    <strong>{formatDateTime(opportunity.desiredStartAt)}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.opportunityDetail.timezoneOverlap}
-                    </span>
-                    <strong>
-                      {opportunity.timezoneOverlapHours === null
+                        : marketplaceMessages.opportunityDetail.notSpecified
+                    }
+                    dir="ltr"
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.settlementToken}
+                    value={opportunity.currencyAddress}
+                    dir="ltr"
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.desiredStart}
+                    value={formatDateTime(opportunity.desiredStartAt)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.timezoneOverlap}
+                    value={
+                      opportunity.timezoneOverlapHours === null
                         ? marketplaceMessages.opportunityDetail.notSpecified
                         : marketplaceMessages.opportunityDetail.hours(
                             opportunity.timezoneOverlapHours,
-                          )}
-                    </strong>
-                  </article>
-                </div>
-              </article>
+                          )
+                    }
+                  />
+                </FactGrid>
+              </SectionCard>
 
-              <article className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <span className={styles.panelEyebrow}>
-                      {marketplaceMessages.opportunityDetail.hiringSpecEyebrow}
-                    </span>
-                    <h2>{marketplaceMessages.opportunityDetail.fitRequirementsTitle}</h2>
-                  </div>
-                </div>
-                <div className={styles.stack}>
-                  <p className={styles.stateText}>
+              <SectionCard
+                eyebrow={marketplaceMessages.opportunityDetail.hiringSpecEyebrow}
+                title={marketplaceMessages.opportunityDetail.fitRequirementsTitle}
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                headerClassName="mb-5"
+              >
+                <div className="grid gap-4">
+                  <p className="text-sm leading-6 text-[var(--foreground-soft)]">
                     {marketplaceMessages.opportunityDetail.requiredSkills}:{' '}
                     {opportunity.requiredSkills.join(' • ')}
                   </p>
-                  <p className={styles.stateText}>
+                  <p className="text-sm leading-6 text-[var(--foreground-soft)]">
                     {marketplaceMessages.opportunityDetail.mustHaveSkills}:{' '}
                     {opportunity.mustHaveSkills.join(' • ') ||
                       messages.publicMarketplace.profileDetail.noneListed}
                   </p>
-                  <p className={styles.stateText}>
+                  <p className="text-sm leading-6 text-[var(--foreground-soft)]">
                     {marketplaceMessages.opportunityDetail.engagementType}:{' '}
                     {
                       marketplaceMessages.labels.engagementType[
@@ -223,7 +204,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                       ]
                     }
                   </p>
-                  <p className={styles.stateText}>
+                  <p className="text-sm leading-6 text-[var(--foreground-soft)]">
                     {marketplaceMessages.opportunityDetail.cryptoReadinessRequired}:{' '}
                     {
                       marketplaceMessages.labels.cryptoReadiness[
@@ -231,44 +212,60 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                       ]
                     }
                   </p>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.outcomes}
-                  </span>
-                  {opportunity.outcomes.map((item) => (
-                    <p key={item} className={styles.stateText}>
-                      {item}
-                    </p>
-                  ))}
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.acceptanceCriteria}
-                  </span>
-                  {opportunity.acceptanceCriteria.map((item) => (
-                    <p key={item} className={styles.stateText}>
-                      {item}
-                    </p>
-                  ))}
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.opportunityDetail.screeningQuestions}
-                  </span>
-                  {opportunity.screeningQuestions.length === 0 ? (
-                    <p className={styles.stateText}>
-                      {marketplaceMessages.opportunityDetail.noScreeningQuestions}
-                    </p>
-                  ) : (
-                    opportunity.screeningQuestions.map((question) => (
-                      <p key={question.id} className={styles.stateText}>
-                        {question.prompt}
+                  <div className="grid gap-2">
+                    <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
+                      {marketplaceMessages.opportunityDetail.outcomes}
+                    </span>
+                    {opportunity.outcomes.map((item) => (
+                      <p
+                        key={item}
+                        className="text-sm leading-6 text-[var(--foreground-soft)]"
+                      >
+                        {item}
                       </p>
-                    ))
-                  )}
-                  <Link
-                    className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
-                    href="/app/marketplace"
-                  >
-                    {marketplaceMessages.actions.applyFromWorkspace}
-                  </Link>
+                    ))}
+                  </div>
+                  <div className="grid gap-2">
+                    <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
+                      {marketplaceMessages.opportunityDetail.acceptanceCriteria}
+                    </span>
+                    {opportunity.acceptanceCriteria.map((item) => (
+                      <p
+                        key={item}
+                        className="text-sm leading-6 text-[var(--foreground-soft)]"
+                      >
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="grid gap-2">
+                    <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
+                      {marketplaceMessages.opportunityDetail.screeningQuestions}
+                    </span>
+                    {opportunity.screeningQuestions.length === 0 ? (
+                      <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+                        {marketplaceMessages.opportunityDetail.noScreeningQuestions}
+                      </p>
+                    ) : (
+                      opportunity.screeningQuestions.map((question) => (
+                        <p
+                          key={question.id}
+                          className="text-sm leading-6 text-[var(--foreground-soft)]"
+                        >
+                          {question.prompt}
+                        </p>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button asChild>
+                      <Link href="/app/marketplace">
+                        {marketplaceMessages.actions.applyFromWorkspace}
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              </article>
+              </SectionCard>
 
               <AbuseReportPanel
                 subjectLabel={opportunity.title}
@@ -281,7 +278,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
             </section>
           </>
         ) : null}
-      </div>
+      </PageContainer>
     </main>
   );
 }

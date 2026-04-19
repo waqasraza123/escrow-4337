@@ -2,6 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import {
+  Button,
+  FeatureCard,
+  PageContainer,
+  SectionHeading,
+  SurfaceCard,
+} from '@escrow4334/frontend-core';
 import styles from '../../page.styles';
 import { startOperatorWalkthrough } from '../../operator-walkthrough';
 
@@ -10,16 +17,16 @@ export default function OperatorCaseFlowHelpPage() {
 
   return (
     <main className={styles.page}>
+      <PageContainer className="mx-auto grid w-[min(1360px,calc(100vw-48px))] gap-6 py-12 pb-[4.5rem] max-md:w-[min(100vw-28px,1360px)] max-md:py-7 max-md:pb-12">
       <section className={styles.hero}>
-        <div>
-          <p className={styles.panelEyebrow}>Manual</p>
-          <h1>Operator case-flow manual</h1>
-          <p className={styles.heroCopy}>
-            This guide explains the real dispute-resolution path the operator console supports
-            today. Use it when you want quick instructions without the walkthrough overlay.
-          </p>
-        </div>
-        <div className={styles.heroCard}>
+        <SectionHeading
+          eyebrow="Manual"
+          title="Operator case-flow manual"
+          titleClassName="text-[clamp(2.8rem,5vw,5rem)] leading-[0.95] max-w-[11ch]"
+          description="This guide explains the real dispute-resolution path the operator console supports today. Use it when you want quick instructions without the walkthrough overlay."
+          descriptionClassName={styles.heroCopy}
+        />
+        <SurfaceCard className={styles.heroCard} elevated>
           <div>
             <span className={styles.metaLabel}>Best starting point</span>
             <strong>/cases/&lt;job-id&gt;</strong>
@@ -32,55 +39,30 @@ export default function OperatorCaseFlowHelpPage() {
             <span className={styles.metaLabel}>Restart the overlay</span>
             <strong>Use Walkthrough in the top bar</strong>
           </div>
-        </div>
+        </SurfaceCard>
       </section>
 
       {notice ? (
-        <article className={styles.panel}>
-          <strong>Walkthrough ready</strong>
-          <p className={styles.stateText}>{notice}</p>
-        </article>
+        <FeatureCard
+          body={notice}
+          className={styles.panel}
+          title="Walkthrough ready"
+        />
       ) : null}
 
       <section className={styles.panel}>
-        <header className={styles.panelHeader}>
-          <div>
-            <p className={styles.panelEyebrow}>Operator</p>
-            <h2>Resolve a disputed milestone safely</h2>
-          </div>
-        </header>
+        <SectionHeading
+          eyebrow="Operator"
+          title="Resolve a disputed milestone safely"
+          className={styles.panelHeader}
+        />
         <div className={styles.stack}>
-          <article className={styles.panel}>
-            <strong>1. Load the disputed case</strong>
-            <p className={styles.stateText}>
-              Open the specific `/cases/&lt;job-id&gt;` route so the console can load the public
-              bundle, dispute state, and receipts for that escrow job.
-            </p>
-          </article>
-          <article className={styles.panel}>
-            <strong>2. Authenticate the operator session</strong>
-            <p className={styles.stateText}>
-              Use OTP sign-in in the Operator session and wallet authority panel. Protected actions
-              do not unlock until the session is authenticated.
-            </p>
-          </article>
-          <article className={styles.panel}>
-            <strong>3. Link the configured arbitrator wallet</strong>
-            <p className={styles.stateText}>
-              Create the SIWE challenge, sign it with the configured arbitrator wallet, and verify
-              the signature. Resolution stays blocked until this succeeds.
-            </p>
-          </article>
-          <article className={styles.panel}>
-            <strong>4. Resolve with a clear note</strong>
-            <p className={styles.stateText}>
-              Review the disputed milestone, choose release or refund, add the operator note, and
-              submit the decision. You are on track when the disputed milestone disappears from the
-              case and the resolution state confirms submission.
-            </p>
-          </article>
+          <FeatureCard className={styles.panel} title="1. Load the disputed case" body="Open the specific `/cases/<job-id>` route so the console can load the public bundle, dispute state, and receipts for that escrow job." />
+          <FeatureCard className={styles.panel} title="2. Authenticate the operator session" body="Use OTP sign-in in the Operator session and wallet authority panel. Protected actions do not unlock until the session is authenticated." />
+          <FeatureCard className={styles.panel} title="3. Link the configured arbitrator wallet" body="Create the SIWE challenge, sign it with the configured arbitrator wallet, and verify the signature. Resolution stays blocked until this succeeds." />
+          <FeatureCard className={styles.panel} title="4. Resolve with a clear note" body="Review the disputed milestone, choose release or refund, add the operator note, and submit the decision. You are on track when the disputed milestone disappears from the case and the resolution state confirms submission." />
           <div className={styles.inlineActions}>
-            <button
+            <Button
               type="button"
               onClick={() => {
                 startOperatorWalkthrough();
@@ -90,13 +72,14 @@ export default function OperatorCaseFlowHelpPage() {
               }}
             >
               Start operator walkthrough
-            </button>
-            <Link href="/" className={styles.secondaryButton}>
-              Go to dashboard
-            </Link>
+            </Button>
+            <Button asChild variant="secondary" className={styles.secondaryButton}>
+              <Link href="/">Go to dashboard</Link>
+            </Button>
           </div>
         </div>
       </section>
+      </PageContainer>
     </main>
   );
 }

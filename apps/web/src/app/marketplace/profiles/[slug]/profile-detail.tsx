@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import styles from '../../../page.styles';
+import {
+  Button,
+  FactGrid,
+  FactItem,
+  PageContainer,
+  PageTopBar,
+  SectionCard,
+  SectionHeading,
+  SurfaceCard,
+} from '@escrow4334/frontend-core';
 import { AbuseReportPanel } from '../../abuse-report-panel';
 import { webApi, type MarketplaceProfile } from '../../../../lib/api';
 import { useWebI18n } from '../../../../lib/i18n';
@@ -47,227 +56,199 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
   }, [slug, marketplaceMessages.profileDetail.unavailableBody]);
 
   return (
-    <main className={styles.page}>
-      <div className={styles.console}>
-        <div className={styles.topBar}>
-          <div className={styles.topBarContent}>
-            <span className={styles.topBarLabel}>
-              {marketplaceMessages.profileDetail.topBarLabel}
-            </span>
-            <p className={styles.topBarMeta}>{marketplaceMessages.profileDetail.topBarMeta}</p>
-          </div>
-          <div className={styles.inlineActions}>
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-              href="/marketplace"
-            >
-              {marketplaceMessages.actions.backToMarketplace}
-            </Link>
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
-              href="/app/marketplace"
-            >
-              {marketplaceMessages.openWorkspace}
-            </Link>
-          </div>
-        </div>
+    <main className="min-h-screen">
+      <PageContainer className="w-[min(1480px,calc(100vw-40px))]">
+        <PageTopBar
+          eyebrow={marketplaceMessages.profileDetail.topBarLabel}
+          description={marketplaceMessages.profileDetail.topBarMeta}
+          actions={
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/marketplace">
+                  {marketplaceMessages.actions.backToMarketplace}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
+              </Button>
+            </>
+          }
+        />
 
         {error ? (
-          <section className={styles.panel}>
-            <h2>{marketplaceMessages.profileDetail.unavailableTitle}</h2>
-            <p className={styles.stateText}>{error}</p>
-          </section>
+          <SectionCard title={marketplaceMessages.profileDetail.unavailableTitle}>
+            <p className="text-sm leading-6 text-[var(--foreground-soft)]">{error}</p>
+          </SectionCard>
         ) : null}
 
         {!profile && !error ? (
-          <section className={styles.panel}>
-            <h2>{marketplaceMessages.profileDetail.loadingTitle}</h2>
-          </section>
+          <SectionCard title={marketplaceMessages.profileDetail.loadingTitle} />
         ) : null}
 
         {profile ? (
           <>
-            <section className={styles.hero}>
-              <div>
-                <p className={styles.eyebrow}>
-                  {marketplaceMessages.profileDetail.heroEyebrow}
-                </p>
-                <h1>{profile.displayName}</h1>
-                <p className={styles.heroCopy}>{profile.headline}</p>
-              </div>
-              <div className={styles.heroCard}>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.profileDetail.verification}
-                  </span>
-                  <strong>
-                    {marketplaceMessages.labels.verificationLevel[
-                      profile.verificationLevel
-                    ]}
-                  </strong>
-                </div>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.profileDetail.cryptoReadiness}
-                  </span>
-                  <strong>
-                    {marketplaceMessages.labels.cryptoReadiness[profile.cryptoReadiness]}
-                  </strong>
-                </div>
-                <div>
-                  <span className={styles.metaLabel}>
-                    {marketplaceMessages.profileDetail.completedEscrowJobs}
-                  </span>
-                  <strong>{profile.completedEscrowCount}</strong>
-                </div>
-              </div>
+            <section className="grid items-start gap-7 rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
+              <SectionHeading
+                eyebrow={marketplaceMessages.profileDetail.heroEyebrow}
+                title={profile.displayName}
+                titleClassName="max-w-[9.8ch] text-[clamp(2.9rem,6vw,5.5rem)] leading-[0.92]"
+                description={profile.headline}
+                descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
+              />
+              <SurfaceCard
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-6"
+                elevated
+              >
+                <FactGrid className="md:grid-cols-1">
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.verification}
+                    value={
+                      marketplaceMessages.labels.verificationLevel[
+                        profile.verificationLevel
+                      ]
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.cryptoReadiness}
+                    value={
+                      marketplaceMessages.labels.cryptoReadiness[
+                        profile.cryptoReadiness
+                      ]
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.completedEscrowJobs}
+                    value={profile.completedEscrowCount}
+                  />
+                </FactGrid>
+              </SurfaceCard>
             </section>
 
-            <section className={styles.grid}>
-              <article className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <span className={styles.panelEyebrow}>
-                      {marketplaceMessages.profileDetail.aboutEyebrow}
-                    </span>
-                    <h2>{marketplaceMessages.profileDetail.credibilityTitle}</h2>
-                  </div>
-                </div>
-                <p className={styles.stateText}>{profile.bio}</p>
-                <div className={styles.summaryGrid}>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.skills}
-                    </span>
-                    <strong>{profile.skills.join(' • ')}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.specialties}
-                    </span>
-                    <strong>
-                      {profile.specialties.join(' • ') ||
-                        marketplaceMessages.profileDetail.noneListed}
-                    </strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.preferredEngagements}
-                    </span>
-                    <strong>
-                      {profile.preferredEngagements.length > 0
+            <section className="grid gap-5 xl:grid-cols-2">
+              <SectionCard
+                eyebrow={marketplaceMessages.profileDetail.aboutEyebrow}
+                title={marketplaceMessages.profileDetail.credibilityTitle}
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                headerClassName="mb-5"
+              >
+                <p className="text-sm leading-6 text-[var(--foreground-soft)]">{profile.bio}</p>
+                <FactGrid>
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.skills}
+                    value={profile.skills.join(' • ')}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.specialties}
+                    value={
+                      profile.specialties.join(' • ') ||
+                      marketplaceMessages.profileDetail.noneListed
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.preferredEngagements}
+                    value={
+                      profile.preferredEngagements.length > 0
                         ? profile.preferredEngagements
                             .map(
                               (engagement) =>
                                 marketplaceMessages.labels.engagementType[engagement],
                             )
                             .join(' • ')
-                        : marketplaceMessages.profileDetail.noneListed}
-                    </strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.rateRange}
-                    </span>
-                    <strong className={styles.ltrValue} data-ltr="true">
-                      {profile.rateMin || profile.rateMax
+                        : marketplaceMessages.profileDetail.noneListed
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.rateRange}
+                    value={
+                      profile.rateMin || profile.rateMax
                         ? `${profile.rateMin ?? '—'} to ${profile.rateMax ?? '—'}`
-                        : marketplaceMessages.profileDetail.notListed}
-                    </strong>
-                  </article>
-                </div>
-              </article>
+                        : marketplaceMessages.profileDetail.notListed
+                    }
+                    dir="ltr"
+                  />
+                </FactGrid>
+              </SectionCard>
 
-              <article className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <span className={styles.panelEyebrow}>
-                      {marketplaceMessages.profileDetail.escrowSignalEyebrow}
-                    </span>
-                    <h2>{marketplaceMessages.profileDetail.executionTitle}</h2>
-                  </div>
-                </div>
-                <div className={styles.summaryGrid}>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.completionRate}
-                    </span>
-                    <strong>{formatPercent(profile.escrowStats.completionRate)}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.disputeRate}
-                    </span>
-                    <strong>{formatPercent(profile.escrowStats.disputeRate)}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.onTimeDelivery}
-                    </span>
-                    <strong>{formatPercent(profile.escrowStats.onTimeDeliveryRate)}</strong>
-                  </article>
-                  <article>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.averageContractBand}
-                    </span>
-                    <strong>
-                      {
-                        marketplaceMessages.labels.averageContractValueBand[
-                          profile.escrowStats.averageContractValueBand
-                        ]
-                      }
-                    </strong>
-                  </article>
-                </div>
-                <div className={styles.stack}>
-                  <span className={styles.metaLabel}>
+              <SectionCard
+                eyebrow={marketplaceMessages.profileDetail.escrowSignalEyebrow}
+                title={marketplaceMessages.profileDetail.executionTitle}
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                headerClassName="mb-5"
+              >
+                <FactGrid>
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.completionRate}
+                    value={formatPercent(profile.escrowStats.completionRate)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.disputeRate}
+                    value={formatPercent(profile.escrowStats.disputeRate)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.onTimeDelivery}
+                    value={formatPercent(profile.escrowStats.onTimeDeliveryRate)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.averageContractBand}
+                    value={
+                      marketplaceMessages.labels.averageContractValueBand[
+                        profile.escrowStats.averageContractValueBand
+                      ]
+                    }
+                  />
+                </FactGrid>
+                <div className="grid gap-3">
+                  <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
                     {marketplaceMessages.profileDetail.completedByCategory}
                   </span>
                   {profile.escrowStats.completedByCategory.length === 0 ? (
-                    <p className={styles.stateText}>
+                    <p className="text-sm leading-6 text-[var(--foreground-soft)]">
                       {marketplaceMessages.profileDetail.noEscrowHistory}
                     </p>
                   ) : (
                     profile.escrowStats.completedByCategory.map((entry) => (
-                      <p key={entry.category} className={styles.stateText}>
+                      <p
+                        key={entry.category}
+                        className="text-sm leading-6 text-[var(--foreground-soft)]"
+                      >
                         {entry.category}: {entry.count}
                       </p>
                     ))
                   )}
                 </div>
-              </article>
+              </SectionCard>
             </section>
 
-            <section className={styles.grid}>
-              <article className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <span className={styles.panelEyebrow}>
-                      {marketplaceMessages.profileDetail.proofEyebrow}
-                    </span>
-                    <h2>{marketplaceMessages.profileDetail.walletAndProofTitle}</h2>
-                  </div>
+            <section className="grid gap-5 xl:grid-cols-2">
+              <SectionCard
+                eyebrow={marketplaceMessages.profileDetail.proofEyebrow}
+                title={marketplaceMessages.profileDetail.walletAndProofTitle}
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                headerClassName="mb-5"
+              >
+                <FactItem
+                  label={marketplaceMessages.profileDetail.verifiedWallet}
+                  value={
+                    profile.verifiedWalletAddress ??
+                    marketplaceMessages.profileDetail.noVerifiedWallet
+                  }
+                  dir="ltr"
+                />
+                <div className="grid gap-2">
+                  {profile.proofArtifacts.map((artifact) => (
+                    <a
+                      key={artifact.id}
+                      href={artifact.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm leading-6 text-[var(--foreground)] underline decoration-[rgba(92,67,46,0.24)] underline-offset-4"
+                    >
+                      {artifact.label} •{' '}
+                      {marketplaceMessages.labels.proofArtifactKind[artifact.kind]}
+                    </a>
+                  ))}
                 </div>
-                <div className={styles.stack}>
-                  <div>
-                    <span className={styles.metaLabel}>
-                      {marketplaceMessages.profileDetail.verifiedWallet}
-                    </span>
-                    <strong className={styles.ltrValue} data-ltr="true">
-                      {profile.verifiedWalletAddress ??
-                        marketplaceMessages.profileDetail.noVerifiedWallet}
-                    </strong>
-                  </div>
-                  <div className={styles.linkList}>
-                    {profile.proofArtifacts.map((artifact) => (
-                      <a key={artifact.id} href={artifact.url} target="_blank" rel="noreferrer">
-                        {artifact.label} •{' '}
-                        {marketplaceMessages.labels.proofArtifactKind[artifact.kind]}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </article>
+              </SectionCard>
 
               <AbuseReportPanel
                 subjectLabel={profile.displayName}
@@ -280,7 +261,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
             </section>
           </>
         ) : null}
-      </div>
+      </PageContainer>
     </main>
   );
 }

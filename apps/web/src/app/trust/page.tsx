@@ -1,6 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import {
+  FeatureCard,
+  PageContainer,
+  SectionHeading,
+} from '@escrow4334/frontend-core';
 import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
 import { useWebI18n } from '../../lib/i18n';
@@ -11,7 +16,7 @@ export default function TrustPage() {
 
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
+      <PageContainer className={styles.shell}>
         <nav className={styles.nav}>
           <strong className={styles.brand}>{messages.common.brand}</strong>
           <div className={styles.navLinks}>
@@ -19,16 +24,11 @@ export default function TrustPage() {
             <Link href="/app/sign-in">{messages.common.signIn}</Link>
             <Link href="/app/new-contract">{messages.common.startContract}</Link>
           </div>
-          <LanguageSwitcher
-            className={styles.languageSwitcher}
-            labelClassName={styles.languageSwitcherLabel}
-            optionClassName={styles.languageSwitcherOption}
-            optionActiveClassName={styles.languageSwitcherOptionActive}
-          />
+          <LanguageSwitcher className={styles.languageSwitcher} theme="web" />
         </nav>
 
         <section className={styles.section}>
-          <h2>{trustMessages.escrowTitle}</h2>
+          <SectionHeading title={trustMessages.escrowTitle} />
           <div className={styles.sectionBody}>
             <p>{trustMessages.escrowIntro}</p>
             <ul className={styles.list}>
@@ -40,7 +40,7 @@ export default function TrustPage() {
         </section>
 
         <section className={styles.section}>
-          <h2>{trustMessages.disputesTitle}</h2>
+          <SectionHeading title={trustMessages.disputesTitle} />
           <div className={styles.sectionBody}>
             <p>{trustMessages.disputesIntro}</p>
             <ul className={styles.list}>
@@ -52,17 +52,19 @@ export default function TrustPage() {
         </section>
 
         <section className={styles.section}>
-          <h2>{trustMessages.implementedTitle}</h2>
+          <SectionHeading title={trustMessages.implementedTitle} />
           <div className={styles.proofGrid}>
             {trustMessages.proofCards.map((card) => (
-              <article key={card.title} className={styles.proofCard}>
-                <strong>{card.title}</strong>
-                <p>{card.body}</p>
-              </article>
+              <FeatureCard
+                key={card.title}
+                body={card.body}
+                className={styles.proofCard}
+                title={card.title}
+              />
             ))}
           </div>
         </section>
-      </div>
+      </PageContainer>
     </main>
   );
 }

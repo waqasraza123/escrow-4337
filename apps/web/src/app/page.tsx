@@ -1,6 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import {
+  Button,
+  Eyebrow,
+  FeatureCard,
+  PageContainer,
+  SectionHeading,
+} from '@escrow4334/frontend-core';
 import styles from './marketing.styles';
 import { LanguageSwitcher } from './language-switcher';
 import { useWebI18n } from '../lib/i18n';
@@ -10,7 +17,7 @@ export default function Home() {
 
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
+      <PageContainer className={styles.shell}>
         <nav className={styles.nav}>
           <strong className={styles.brand}>{messages.common.brand}</strong>
           <div className={styles.navLinks}>
@@ -19,72 +26,75 @@ export default function Home() {
             <Link href="/app/sign-in">{messages.common.signIn}</Link>
             <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
           </div>
-          <LanguageSwitcher
-            className={styles.languageSwitcher}
-            labelClassName={styles.languageSwitcherLabel}
-            optionClassName={styles.languageSwitcherOption}
-            optionActiveClassName={styles.languageSwitcherOptionActive}
-          />
+          <LanguageSwitcher className={styles.languageSwitcher} theme="web" />
         </nav>
 
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>{messages.marketing.heroEyebrow}</p>
+            <Eyebrow className={styles.eyebrow}>
+              {messages.marketing.heroEyebrow}
+            </Eyebrow>
             <h1>{messages.marketing.heroTitle}</h1>
             <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Link
-                className={`${styles.ctaLink} ${styles.ctaSecondary}`}
-                href="/marketplace"
-              >
-                {messages.common.marketplace}
-              </Link>
-              <Link
-                className={`${styles.ctaLink} ${styles.ctaPrimary}`}
-                href="/app/new-contract"
-              >
-                {messages.common.startEscrow}
-              </Link>
-              <Link className={`${styles.ctaLink} ${styles.ctaTertiary}`} href="/trust">
-                {messages.marketing.trustCta}
-              </Link>
+              <Button asChild className={`${styles.ctaLink} ${styles.ctaSecondary}`} variant="secondary">
+                <Link href="/marketplace">
+                  {messages.common.marketplace}
+                </Link>
+              </Button>
+              <Button asChild className={`${styles.ctaLink} ${styles.ctaPrimary}`}>
+                <Link href="/app/new-contract">
+                  {messages.common.startEscrow}
+                </Link>
+              </Button>
+              <Button asChild className={`${styles.ctaLink} ${styles.ctaTertiary}`} variant="secondary">
+                <Link href="/trust">
+                  {messages.marketing.trustCta}
+                </Link>
+              </Button>
             </div>
           </div>
           <div className={styles.cardStack}>
             {messages.marketing.stats.map((card) => (
-              <article key={card.title} className={styles.statCard}>
-                <strong>{card.title}</strong>
-                <p>{card.body}</p>
-              </article>
+              <FeatureCard
+                key={card.title}
+                body={card.body}
+                className={styles.statCard}
+                title={card.title}
+              />
             ))}
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>{messages.marketing.howItWorksTitle}</h2>
+          <SectionHeading title={messages.marketing.howItWorksTitle} />
           <div className={styles.steps}>
             {messages.marketing.steps.map((step, index) => (
-              <article key={step.title} className={styles.stepCard}>
-                <span>{`0${index + 1}`}</span>
-                <strong>{step.title}</strong>
-                <p>{step.body}</p>
-              </article>
+              <FeatureCard
+                key={step.title}
+                body={step.body}
+                className={styles.stepCard}
+                leading={<span>{`0${index + 1}`}</span>}
+                title={step.title}
+              />
             ))}
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2>{messages.marketing.productBoundsTitle}</h2>
+          <SectionHeading title={messages.marketing.productBoundsTitle} />
           <div className={styles.objectionGrid}>
             {messages.marketing.bounds.map((entry) => (
-              <article key={entry.title} className={styles.objectionCard}>
-                <strong>{entry.title}</strong>
-                <p>{entry.body}</p>
-              </article>
+              <FeatureCard
+                key={entry.title}
+                body={entry.body}
+                className={styles.objectionCard}
+                title={entry.title}
+              />
             ))}
           </div>
         </section>
-      </div>
+      </PageContainer>
     </main>
   );
 }

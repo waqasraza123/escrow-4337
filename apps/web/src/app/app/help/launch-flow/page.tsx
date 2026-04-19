@@ -3,6 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import {
+  Button,
+  FeatureCard,
+  PageContainer,
+  SectionHeading,
+  SurfaceCard,
+} from '@escrow4334/frontend-core';
 import styles from '../../../page.styles';
 import {
   startClientWalkthrough,
@@ -15,16 +22,18 @@ export default function LaunchFlowHelpPage() {
 
   return (
     <main className={styles.page}>
+      <PageContainer className="mx-auto grid w-[min(1480px,calc(100vw-40px))] gap-7 py-7 pb-22">
       <section className={styles.hero}>
         <div>
-          <p className={styles.panelEyebrow}>Manual</p>
-          <h1>Launch flow manual</h1>
-          <p className={styles.heroCopy}>
-            Use this guide when you want the plain-language version of the launch-candidate flow
-            without the overlay. Every section below follows the real supported escrow journey.
-          </p>
+          <SectionHeading
+            eyebrow="Manual"
+            title="Launch flow manual"
+            titleClassName="text-[clamp(2.9rem,6vw,5.5rem)] leading-[0.92] max-w-[9.8ch]"
+            description="Use this guide when you want the plain-language version of the launch-candidate flow without the overlay. Every section below follows the real supported escrow journey."
+            descriptionClassName={styles.heroCopy}
+          />
         </div>
-        <div className={styles.heroCard}>
+        <SurfaceCard className={styles.heroCard} elevated>
           <div>
             <span className={styles.metaLabel}>Best starting point</span>
             <strong>/app/sign-in</strong>
@@ -37,56 +46,27 @@ export default function LaunchFlowHelpPage() {
             <span className={styles.metaLabel}>Restart the overlay</span>
             <strong>Use Walkthrough in the top bar</strong>
           </div>
-        </div>
+        </SurfaceCard>
       </section>
 
       {notice ? (
-        <article className={styles.statusBanner}>
-          <strong>Walkthrough ready</strong>
-          <p className={styles.muted}>{notice}</p>
-        </article>
+        <FeatureCard
+          body={notice}
+          className={styles.statusBanner}
+          title="Walkthrough ready"
+        />
       ) : null}
 
       <div className={styles.grid}>
         <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <div>
-              <p className={styles.panelEyebrow}>Client</p>
-              <h2>Create and launch the first escrow job</h2>
-            </div>
-          </header>
+          <SectionHeading eyebrow="Client" title="Create and launch the first escrow job" className={styles.panelHeader} />
           <div className={styles.stack}>
-            <article className={styles.statusBanner}>
-              <strong>1. Start with OTP sign-in</strong>
-              <p className={styles.muted}>
-                Use the client email that should own the job. After verification, confirm your
-                email appears in Profile.
-              </p>
-            </article>
-            <article className={styles.statusBanner}>
-              <strong>2. Clear setup blockers</strong>
-              <p className={styles.muted}>
-                In Setup readiness, follow the next blocker only. First link the browser wallet,
-                then provision the smart account that will execute client actions.
-              </p>
-            </article>
-            <article className={styles.statusBanner}>
-              <strong>3. Create the guided job</strong>
-              <p className={styles.muted}>
-                Complete Scope, Counterparty, and Plan. The contractor email and worker wallet must
-                match later during join.
-              </p>
-            </article>
-            <article className={styles.statusBanner}>
-              <strong>4. Finish launch on the contract page</strong>
-              <p className={styles.muted}>
-                Commit milestones, fund the job, then send or copy the contractor join link. You
-                are on track when the selected job shows funding confirmation and the join access
-                card shows a shareable link.
-              </p>
-            </article>
+            <FeatureCard className={styles.statusBanner} title="1. Start with OTP sign-in" body="Use the client email that should own the job. After verification, confirm your email appears in Profile." />
+            <FeatureCard className={styles.statusBanner} title="2. Clear setup blockers" body="In Setup readiness, follow the next blocker only. First link the browser wallet, then provision the smart account that will execute client actions." />
+            <FeatureCard className={styles.statusBanner} title="3. Create the guided job" body="Complete Scope, Counterparty, and Plan. The contractor email and worker wallet must match later during join." />
+            <FeatureCard className={styles.statusBanner} title="4. Finish launch on the contract page" body="Commit milestones, fund the job, then send or copy the contractor join link. You are on track when the selected job shows funding confirmation and the join access card shows a shareable link." />
             <div className={styles.inlineActions}>
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   startClientWalkthrough('/app/sign-in');
@@ -94,48 +74,25 @@ export default function LaunchFlowHelpPage() {
                 }}
               >
                 Start client walkthrough
-              </button>
-              <Link href="/app/sign-in" className={styles.secondaryButton}>
-                Go to sign-in
-              </Link>
-              <Link href="/app/new-contract" className={styles.secondaryButton}>
-                Go to guided composer
-              </Link>
+              </Button>
+              <Button asChild variant="secondary" className={styles.secondaryButton}>
+                <Link href="/app/sign-in">Go to sign-in</Link>
+              </Button>
+              <Button asChild variant="secondary" className={styles.secondaryButton}>
+                <Link href="/app/new-contract">Go to guided composer</Link>
+              </Button>
             </div>
           </div>
         </section>
 
         <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <div>
-              <p className={styles.panelEyebrow}>Contractor</p>
-              <h2>Join and deliver from the invite link</h2>
-            </div>
-          </header>
+          <SectionHeading eyebrow="Contractor" title="Join and deliver from the invite link" className={styles.panelHeader} />
           <div className={styles.stack}>
-            <article className={styles.statusBanner}>
-              <strong>1. Open the exact invite-linked contract route</strong>
-              <p className={styles.muted}>
-                Stay on the provided contract link. That is where the product verifies that the
-                invite token, email, and worker wallet match.
-              </p>
-            </article>
-            <article className={styles.statusBanner}>
-              <strong>2. Join only when blockers are gone</strong>
-              <p className={styles.muted}>
-                The Contractor join access card tells you why join is blocked. You are ready when
-                the Join button becomes available.
-              </p>
-            </article>
-            <article className={styles.statusBanner}>
-              <strong>3. Deliver with evidence</strong>
-              <p className={styles.muted}>
-                Use the delivery route for the selected milestone, add a clear delivery note, and
-                attach evidence links so the client can review confidently.
-              </p>
-            </article>
+            <FeatureCard className={styles.statusBanner} title="1. Open the exact invite-linked contract route" body="Stay on the provided contract link. That is where the product verifies that the invite token, email, and worker wallet match." />
+            <FeatureCard className={styles.statusBanner} title="2. Join only when blockers are gone" body="The Contractor join access card tells you why join is blocked. You are ready when the Join button becomes available." />
+            <FeatureCard className={styles.statusBanner} title="3. Deliver with evidence" body="Use the delivery route for the selected milestone, add a clear delivery note, and attach evidence links so the client can review confidently." />
             <div className={styles.inlineActions}>
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   startContractorWalkthrough();
@@ -145,14 +102,15 @@ export default function LaunchFlowHelpPage() {
                 }}
               >
                 Start contractor walkthrough
-              </button>
-              <Link href="/app/sign-in" className={styles.secondaryButton}>
-                Go to sign-in
-              </Link>
+              </Button>
+              <Button asChild variant="secondary" className={styles.secondaryButton}>
+                <Link href="/app/sign-in">Go to sign-in</Link>
+              </Button>
             </div>
           </div>
         </section>
       </div>
+      </PageContainer>
     </main>
   );
 }
