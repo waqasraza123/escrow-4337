@@ -267,6 +267,17 @@ const webMessages = {
         sessionRequiredBody:
           'Public browse is open, but structured profiles, briefs, proposals, and hires still use the authenticated product session.',
         signOut: 'Sign out',
+        activeWorkspace: {
+          eyebrow: 'Active workspace',
+          organizationLabel: 'Organization',
+          roleLabel: 'Roles',
+          modeLabel: {
+            client: 'Hire',
+            freelancer: 'Freelance',
+          },
+          switchWorkspace: (label: string, mode: string) =>
+            `${mode}: ${label}`,
+        },
         overviewEyebrow: 'Overview',
         pipelineTitle: 'Marketplace pipeline',
         pipelineStats: {
@@ -299,6 +310,24 @@ const webMessages = {
           onTimeDelivery: 'On-time delivery',
           saveProfile: 'Save profile',
           viewPublicProfile: 'View public profile',
+        },
+        organizationEyebrow: 'Client organization',
+        organizationTitle: 'Workspace ownership',
+        organizationBody:
+          'Client briefs and reviews now run through explicit organizations and workspaces. Create a client organization or switch into an existing hiring workspace before publishing.',
+        organizationEmptyState:
+          'No client organizations available yet. Create one to separate hiring ownership from your personal workspace.',
+        organizationKindLabel: 'Organization type',
+        organizationRoleLabel: 'Membership roles',
+        organizationCurrentWorkspace: 'Current workspace',
+        organizationKind: {
+          personal: 'Personal',
+          client: 'Client',
+        },
+        organizationForm: {
+          name: 'Organization name',
+          slug: 'Workspace slug',
+          create: 'Create client organization',
         },
         clientEyebrow: 'Client',
         hiringSpecTitle: 'Create hiring spec',
@@ -363,11 +392,18 @@ const webMessages = {
         messages: {
           loadFailed: 'Failed to load workspace.',
           sessionCleared: 'Marketplace session cleared.',
+          workspaceSwitched: 'Workspace switched.',
           signInBeforeEdit:
             'Sign in through the main app before editing your marketplace profile.',
           profileSaved: 'Marketplace profile and proof artifacts saved.',
           signInBeforeCreate:
             'Sign in through the main app before creating a brief.',
+          signInBeforeCreateOrganization:
+            'Sign in through the main app before creating a client organization.',
+          organizationNameRequired:
+            'Add an organization name before creating a client workspace.',
+          organizationCreated: (name: string) =>
+            `Client organization ${name} created and activated.`,
           briefCreated: 'Decision-ready marketplace brief created as draft.',
           briefPublished: 'Marketplace brief published.',
           briefPaused: 'Marketplace brief paused.',
@@ -1193,6 +1229,17 @@ const webMessages = {
         sessionRequiredBody:
           'التصفح العام متاح، لكن الملفات المنظمة والعروض والطلبات وعمليات التوظيف ما تزال تعتمد على جلسة المنتج الموثقة.',
         signOut: 'تسجيل الخروج',
+        activeWorkspace: {
+          eyebrow: 'مساحة العمل النشطة',
+          organizationLabel: 'المنظمة',
+          roleLabel: 'الأدوار',
+          modeLabel: {
+            client: 'توظيف',
+            freelancer: 'عمل حر',
+          },
+          switchWorkspace: (label: string, mode: string) =>
+            `${mode}: ${label}`,
+        },
         overviewEyebrow: 'نظرة عامة',
         pipelineTitle: 'مسار السوق',
         pipelineStats: {
@@ -1225,6 +1272,24 @@ const webMessages = {
           onTimeDelivery: 'التسليم في الوقت',
           saveProfile: 'حفظ الملف',
           viewPublicProfile: 'عرض الملف العام',
+        },
+        organizationEyebrow: 'منظمة العميل',
+        organizationTitle: 'ملكية مساحة العمل',
+        organizationBody:
+          'أصبحت العروض ومراجعات الطلبات الخاصة بالعملاء تعمل عبر منظمات ومساحات عمل صريحة. أنشئ منظمة عميل أو انتقل إلى مساحة توظيف موجودة قبل النشر.',
+        organizationEmptyState:
+          'لا توجد منظمات عميل متاحة بعد. أنشئ واحدة لفصل ملكية التوظيف عن مساحتك الشخصية.',
+        organizationKindLabel: 'نوع المنظمة',
+        organizationRoleLabel: 'أدوار العضوية',
+        organizationCurrentWorkspace: 'مساحة العمل الحالية',
+        organizationKind: {
+          personal: 'شخصية',
+          client: 'عميل',
+        },
+        organizationForm: {
+          name: 'اسم المنظمة',
+          slug: 'معرّف مساحة العمل',
+          create: 'إنشاء منظمة عميل',
         },
         clientEyebrow: 'العميل',
         hiringSpecTitle: 'إنشاء مواصفات التوظيف',
@@ -1288,11 +1353,18 @@ const webMessages = {
         messages: {
           loadFailed: 'تعذر تحميل مساحة العمل.',
           sessionCleared: 'تم مسح جلسة السوق.',
+          workspaceSwitched: 'تم تبديل مساحة العمل.',
           signInBeforeEdit:
             'سجّل الدخول من التطبيق الرئيسي قبل تعديل ملف السوق الخاص بك.',
           profileSaved: 'تم حفظ ملف السوق ومواد الإثبات.',
           signInBeforeCreate:
             'سجّل الدخول من التطبيق الرئيسي قبل إنشاء عرض موجز.',
+          signInBeforeCreateOrganization:
+            'سجّل الدخول من التطبيق الرئيسي قبل إنشاء منظمة عميل.',
+          organizationNameRequired:
+            'أضف اسم المنظمة قبل إنشاء مساحة عمل عميل.',
+          organizationCreated: (name: string) =>
+            `تم إنشاء منظمة العميل ${name} وتفعيلها.`,
           briefCreated: 'تم إنشاء عرض سوق جاهز للقرار كمسودة.',
           briefPublished: 'تم نشر عرض السوق.',
           briefPaused: 'تم إيقاف عرض السوق مؤقتاً.',

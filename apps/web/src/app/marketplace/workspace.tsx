@@ -31,6 +31,7 @@ import {
   type MarketplaceOpportunity,
   type MarketplaceProfile,
   type MarketplaceProofArtifact,
+  type OrganizationSummary,
   type SessionTokens,
   type UserProfile,
 } from '../../lib/api';
@@ -83,6 +84,11 @@ type ApplicationDraft = {
   estimatedStartAt: string;
   relevantProofUrls: string;
   screeningAnswers: Record<string, string>;
+};
+
+type OrganizationDraft = {
+  name: string;
+  slug: string;
 };
 
 function readSession(): SessionTokens | null {
@@ -208,6 +214,22 @@ function createApplicationDraft(
   };
 }
 
+function createEmptyOrganizationDraft(): OrganizationDraft {
+  return {
+    name: '',
+    slug: '',
+  };
+}
+
+function slugifyWorkspaceName(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
 function parseProofUrls(input: string, kind: MarketplaceProofArtifact['kind']) {
   return splitList(input).map((url, index) => ({
     id: `${kind}-${index + 1}`,
@@ -250,6 +272,7 @@ export function MarketplaceWorkspace() {
     [],
   );
   const [profile, setProfile] = useState<MarketplaceProfile | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(
     createEmptyProfileDraft(),
   );
@@ -265,6 +288,9 @@ export function MarketplaceWorkspace() {
   const [applicationDrafts, setApplicationDrafts] = useState<
     Record<string, ApplicationDraft>
   >({});
+  const [organizationDraft, setOrganizationDraft] = useState<OrganizationDraft>(
+    createEmptyOrganizationDraft(),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -310,6 +336,7 @@ export function MarketplaceWorkspace() {
       if (!nextTokens) {
         setUser(null);
         setProfile(null);
+        setOrganizations([]);
         setMyOpportunities([]);
         setMyApplications([]);
         setContracts([]);
@@ -318,9 +345,10 @@ export function MarketplaceWorkspace() {
         return;
       }
 
-      const [me, jobs] = await Promise.all([
+      const [me, jobs, organizationResponse] = await Promise.all([
         webApi.me(nextTokens.accessToken),
         webApi.listJobs(nextTokens.accessToken),
+        webApi.listOrganizations(nextTokens.accessToken),
       ]);
       const nextWorkspace = me.activeWorkspace;
       const [myProfileResult, myOpportunityResult, myApplicationResult] =
@@ -340,6 +368,7 @@ export function MarketplaceWorkspace() {
 
       setUser(me);
       setProfile(myProfileResult?.profile ?? null);
+      setOrganizations(organizationResponse.organizations);
       setMyOpportunities(myOpportunityResult.opportunities);
       setMyApplications(myApplicationResult.applications);
       setContracts(jobs.jobs.map((entry) => entry.job));
@@ -418,7 +447,34 @@ export function MarketplaceWorkspace() {
 
     setError(null);
     await webApi.selectWorkspace(workspaceId, tokens.accessToken);
-    setMessage('Workspace switched.');
+    setMessage(workspaceMessages.messages.workspaceSwitched);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleCreateOrganization() {
+    if (!tokens) {
+      setError(workspaceMessages.messages.signInBeforeCreateOrganization);
+      return;
+    }
+
+    const name = organizationDraft.name.trim();
+    const slug = organizationDraft.slug.trim() || slugifyWorkspaceName(name);
+    if (!name || !slug) {
+      setError(workspaceMessages.messages.organizationNameRequired);
+      return;
+    }
+
+    setError(null);
+    await webApi.createOrganization(
+      {
+        name,
+        slug,
+        setActive: true,
+      },
+      tokens.accessToken,
+    );
+    setOrganizationDraft(createEmptyOrganizationDraft());
+    setMessage(workspaceMessages.messages.organizationCreated(name));
     await loadWorkspace(tokens);
   }
 
@@ -716,12 +772,20 @@ export function MarketplaceWorkspace() {
         <RevealSection as="div" delay={0.06}>
           <SurfaceCard className={styles.panel}>
             <div className={styles.stack}>
-              <span className={styles.metaLabel}>Active workspace</span>
+              <span className={styles.metaLabel}>
+                {workspaceMessages.activeWorkspace.eyebrow}
+              </span>
               <strong>
-                {activeWorkspace.label} • {activeWorkspace.kind}
+                {activeWorkspace.label} •{' '}
+                {workspaceMessages.activeWorkspace.modeLabel[activeWorkspace.kind]}
               </strong>
               <p className={styles.stateText}>
+                {workspaceMessages.activeWorkspace.organizationLabel}:{' '}
                 {activeWorkspace.organizationName}
+              </p>
+              <p className={styles.stateText}>
+                {workspaceMessages.activeWorkspace.roleLabel}:{' '}
+                {activeWorkspace.roles.join(', ')}
               </p>
               {availableWorkspaces.length > 1 ? (
                 <div className={styles.inlineActions}>
@@ -732,7 +796,10 @@ export function MarketplaceWorkspace() {
                       disabled={workspace.workspaceId === activeWorkspace.workspaceId}
                       onClick={() => void handleSelectWorkspace(workspace.workspaceId)}
                     >
-                      {workspace.kind === 'client' ? 'Hire' : 'Freelance'}
+                      {workspaceMessages.activeWorkspace.switchWorkspace(
+                        workspace.label,
+                        workspaceMessages.activeWorkspace.modeLabel[workspace.kind],
+                      )}
                     </button>
                   ))}
                 </div>
@@ -779,6 +846,108 @@ export function MarketplaceWorkspace() {
       </RevealSection>
 
       <RevealSection className={styles.grid} delay={0.12}>
+        {isClientWorkspace ? (
+          <article className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <div>
+                <span className={styles.panelEyebrow}>
+                  {workspaceMessages.organizationEyebrow}
+                </span>
+                <h2>{workspaceMessages.organizationTitle}</h2>
+              </div>
+            </div>
+            <div className={styles.stack}>
+              <p className={styles.stateText}>
+                {workspaceMessages.organizationBody}
+              </p>
+              {organizations.length === 0 ? (
+                <p className={styles.stateText}>
+                  {workspaceMessages.organizationEmptyState}
+                </p>
+              ) : (
+                organizations.map((organization) => (
+                  <SharedCard
+                    key={organization.id}
+                    className={styles.actionPanel}
+                    data-testid={`marketplace-organization-${organization.id}`}
+                    interactive
+                  >
+                    <div className={styles.stack}>
+                      <strong>{organization.name}</strong>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.organizationKindLabel}:{' '}
+                        {workspaceMessages.organizationKind[organization.kind]}
+                      </p>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.organizationRoleLabel}:{' '}
+                        {organization.roles.join(', ')}
+                      </p>
+                      <div className={styles.inlineActions}>
+                        {organization.workspaces
+                          .filter((workspace) => workspace.kind === 'client')
+                          .map((workspace) => (
+                            <button
+                              key={workspace.workspaceId}
+                              type="button"
+                              disabled={
+                                workspace.workspaceId === activeWorkspace.workspaceId
+                              }
+                              onClick={() =>
+                                void handleSelectWorkspace(workspace.workspaceId)
+                              }
+                            >
+                              {workspace.workspaceId === activeWorkspace.workspaceId
+                                ? workspaceMessages.organizationCurrentWorkspace
+                                : workspaceMessages.activeWorkspace.switchWorkspace(
+                                    workspace.label,
+                                    workspaceMessages.activeWorkspace.modeLabel[
+                                      workspace.kind
+                                    ],
+                                  )}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </SharedCard>
+                ))
+              )}
+              <label className={styles.field}>
+                <span>{workspaceMessages.organizationForm.name}</span>
+                <input
+                  value={organizationDraft.name}
+                  onChange={(event) =>
+                    setOrganizationDraft((current) => ({
+                      ...current,
+                      name: event.target.value,
+                      slug:
+                        current.slug.trim().length > 0
+                          ? current.slug
+                          : slugifyWorkspaceName(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{workspaceMessages.organizationForm.slug}</span>
+                <input
+                  value={organizationDraft.slug}
+                  onChange={(event) =>
+                    setOrganizationDraft((current) => ({
+                      ...current,
+                      slug: slugifyWorkspaceName(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <div className={styles.inlineActions}>
+                <button type="button" onClick={() => void handleCreateOrganization()}>
+                  {workspaceMessages.organizationForm.create}
+                </button>
+              </div>
+            </div>
+          </article>
+        ) : null}
+
         {isFreelancerWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>

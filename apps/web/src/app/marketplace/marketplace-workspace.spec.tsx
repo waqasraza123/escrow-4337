@@ -1,9 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   renderApp,
   seedJsonStorage,
 } from '@escrow4334/frontend-core/testing';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebI18nProvider } from '../../lib/i18n';
 
 const sessionStorageKey = 'escrow4337.web.session';
@@ -12,9 +12,12 @@ const { mockedWebApi } = vi.hoisted(() => ({
   mockedWebApi: {
     listMarketplaceOpportunities: vi.fn(),
     me: vi.fn(),
+    listOrganizations: vi.fn(),
     getMyMarketplaceProfile: vi.fn(),
     listMyMarketplaceOpportunities: vi.fn(),
     listMyMarketplaceApplications: vi.fn(),
+    createOrganization: vi.fn(),
+    selectWorkspace: vi.fn(),
     listJobs: vi.fn(),
     logout: vi.fn(),
   },
@@ -27,6 +30,113 @@ vi.mock('../../lib/api', () => ({
 import MarketplaceWorkspacePage from '../app/marketplace/page';
 
 describe('marketplace workspace', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockedWebApi.listOrganizations.mockResolvedValue({
+      organizations: [
+        {
+          id: 'org-personal-1',
+          slug: 'personal-client-1',
+          name: 'Personal workspace',
+          kind: 'personal',
+          roles: ['client_owner', 'freelancer'],
+          workspaces: [
+            {
+              workspaceId: 'workspace-client-1',
+              kind: 'client',
+              label: 'Personal client workspace',
+              slug: 'personal-client-client-1',
+              organizationId: 'org-personal-1',
+              organizationName: 'Personal workspace',
+              organizationSlug: 'personal-client-1',
+              organizationKind: 'personal',
+              roles: ['client_owner'],
+              capabilities: {
+                manageProfile: false,
+                applyToOpportunity: false,
+                createOpportunity: true,
+                reviewApplications: true,
+                manageWorkspace: true,
+              },
+              isDefault: true,
+            },
+            {
+              workspaceId: 'workspace-freelancer-1',
+              kind: 'freelancer',
+              label: 'Personal freelancer workspace',
+              slug: 'personal-freelancer-client-1',
+              organizationId: 'org-personal-1',
+              organizationName: 'Personal workspace',
+              organizationSlug: 'personal-client-1',
+              organizationKind: 'personal',
+              roles: ['freelancer'],
+              capabilities: {
+                manageProfile: true,
+                applyToOpportunity: true,
+                createOpportunity: false,
+                reviewApplications: false,
+                manageWorkspace: false,
+              },
+              isDefault: true,
+            },
+          ],
+        },
+      ],
+    });
+    mockedWebApi.createOrganization.mockResolvedValue({
+      organization: {
+        id: 'org-client-2',
+        slug: 'atlas-labs',
+        name: 'Atlas Labs',
+        kind: 'client',
+        roles: ['client_owner'],
+        workspaces: [
+          {
+            workspaceId: 'workspace-client-2',
+            kind: 'client',
+            label: 'Atlas Labs hiring',
+            slug: 'atlas-labs-hiring',
+            organizationId: 'org-client-2',
+            organizationName: 'Atlas Labs',
+            organizationSlug: 'atlas-labs',
+            organizationKind: 'client',
+            roles: ['client_owner'],
+            capabilities: {
+              manageProfile: false,
+              applyToOpportunity: false,
+              createOpportunity: true,
+              reviewApplications: true,
+              manageWorkspace: true,
+            },
+            isDefault: false,
+          },
+        ],
+      },
+    });
+    mockedWebApi.selectWorkspace.mockResolvedValue({
+      activeWorkspace: {
+        workspaceId: 'workspace-client-2',
+        kind: 'client',
+        label: 'Atlas Labs hiring',
+        slug: 'atlas-labs-hiring',
+        organizationId: 'org-client-2',
+        organizationName: 'Atlas Labs',
+        organizationSlug: 'atlas-labs',
+        organizationKind: 'client',
+        roles: ['client_owner'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: true,
+          reviewApplications: true,
+          manageWorkspace: true,
+        },
+        isDefault: false,
+      },
+      workspaces: [],
+    });
+  });
+
   it('renders dossier-oriented pipeline metrics and hiring quality fields for an authenticated session', async () => {
     seedJsonStorage(sessionStorageKey, {
       accessToken: 'access-token-123',
@@ -357,6 +467,7 @@ describe('marketplace workspace', () => {
         name: 'View contract',
       }),
     ).toHaveAttribute('href', '/app/contracts/job-123?invite=invite-token-123');
+    expect(screen.getByText('Active workspace')).toBeInTheDocument();
   });
 
   it('renders Arabic workspace headings and action labels through the shared marketplace messages', async () => {
@@ -443,5 +554,251 @@ describe('marketplace workspace', () => {
     );
     expect(screen.getByRole('button', { name: 'تسجيل الخروج' })).toBeInTheDocument();
     expect(screen.getByLabelText('المهارات الأساسية')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ملكية مساحة العمل' })).toBeInTheDocument();
+  });
+
+  it('creates a client organization from the client workspace and refreshes the workspace state', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me
+      .mockResolvedValueOnce({
+        id: 'client-1',
+        email: 'client@example.com',
+        shariahMode: false,
+        defaultExecutionWalletAddress: null,
+        wallets: [],
+        capabilities: {},
+        workspaces: [
+          {
+            workspaceId: 'workspace-client-1',
+            kind: 'client',
+            label: 'Personal client workspace',
+            slug: 'personal-client-client-1',
+            organizationId: 'org-personal-1',
+            organizationName: 'Personal workspace',
+            organizationSlug: 'personal-client-1',
+            organizationKind: 'personal',
+            roles: ['client_owner'],
+            capabilities: {
+              manageProfile: false,
+              applyToOpportunity: false,
+              createOpportunity: true,
+              reviewApplications: true,
+              manageWorkspace: true,
+            },
+            isDefault: true,
+          },
+        ],
+        activeWorkspace: {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+      })
+      .mockResolvedValueOnce({
+        id: 'client-1',
+        email: 'client@example.com',
+        shariahMode: false,
+        defaultExecutionWalletAddress: null,
+        wallets: [],
+        capabilities: {},
+        workspaces: [
+          {
+            workspaceId: 'workspace-client-2',
+            kind: 'client',
+            label: 'Atlas Labs hiring',
+            slug: 'atlas-labs-hiring',
+            organizationId: 'org-client-2',
+            organizationName: 'Atlas Labs',
+            organizationSlug: 'atlas-labs',
+            organizationKind: 'client',
+            roles: ['client_owner'],
+            capabilities: {
+              manageProfile: false,
+              applyToOpportunity: false,
+              createOpportunity: true,
+              reviewApplications: true,
+              manageWorkspace: true,
+            },
+            isDefault: false,
+          },
+        ],
+        activeWorkspace: {
+          workspaceId: 'workspace-client-2',
+          kind: 'client',
+          label: 'Atlas Labs hiring',
+          slug: 'atlas-labs-hiring',
+          organizationId: 'org-client-2',
+          organizationName: 'Atlas Labs',
+          organizationSlug: 'atlas-labs',
+          organizationKind: 'client',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: false,
+        },
+      });
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listOrganizations
+      .mockResolvedValueOnce({
+        organizations: [
+          {
+            id: 'org-personal-1',
+            slug: 'personal-client-1',
+            name: 'Personal workspace',
+            kind: 'personal',
+            roles: ['client_owner'],
+            workspaces: [
+              {
+                workspaceId: 'workspace-client-1',
+                kind: 'client',
+                label: 'Personal client workspace',
+                slug: 'personal-client-client-1',
+                organizationId: 'org-personal-1',
+                organizationName: 'Personal workspace',
+                organizationSlug: 'personal-client-1',
+                organizationKind: 'personal',
+                roles: ['client_owner'],
+                capabilities: {
+                  manageProfile: false,
+                  applyToOpportunity: false,
+                  createOpportunity: true,
+                  reviewApplications: true,
+                  manageWorkspace: true,
+                },
+                isDefault: true,
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        organizations: [
+          {
+            id: 'org-personal-1',
+            slug: 'personal-client-1',
+            name: 'Personal workspace',
+            kind: 'personal',
+            roles: ['client_owner'],
+            workspaces: [
+              {
+                workspaceId: 'workspace-client-1',
+                kind: 'client',
+                label: 'Personal client workspace',
+                slug: 'personal-client-client-1',
+                organizationId: 'org-personal-1',
+                organizationName: 'Personal workspace',
+                organizationSlug: 'personal-client-1',
+                organizationKind: 'personal',
+                roles: ['client_owner'],
+                capabilities: {
+                  manageProfile: false,
+                  applyToOpportunity: false,
+                  createOpportunity: true,
+                  reviewApplications: true,
+                  manageWorkspace: true,
+                },
+                isDefault: true,
+              },
+            ],
+          },
+          {
+            id: 'org-client-2',
+            slug: 'atlas-labs',
+            name: 'Atlas Labs',
+            kind: 'client',
+            roles: ['client_owner'],
+            workspaces: [
+              {
+                workspaceId: 'workspace-client-2',
+                kind: 'client',
+                label: 'Atlas Labs hiring',
+                slug: 'atlas-labs-hiring',
+                organizationId: 'org-client-2',
+                organizationName: 'Atlas Labs',
+                organizationSlug: 'atlas-labs',
+                organizationKind: 'client',
+                roles: ['client_owner'],
+                capabilities: {
+                  manageProfile: false,
+                  applyToOpportunity: false,
+                  createOpportunity: true,
+                  reviewApplications: true,
+                  manageWorkspace: true,
+                },
+                isDefault: false,
+              },
+            ],
+          },
+        ],
+      });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Workspace ownership' })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Organization name'), {
+      target: { value: 'Atlas Labs' },
+    });
+    fireEvent.change(screen.getByLabelText('Workspace slug'), {
+      target: { value: 'atlas-labs' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create client organization' }));
+
+    await waitFor(() => {
+      expect(mockedWebApi.createOrganization).toHaveBeenCalledWith(
+        {
+          name: 'Atlas Labs',
+          slug: 'atlas-labs',
+          setActive: true,
+        },
+        'access-token-123',
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Client organization Atlas Labs created and activated.'),
+      ).toBeInTheDocument();
+    });
   });
 });
