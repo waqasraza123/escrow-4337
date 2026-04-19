@@ -177,6 +177,25 @@ describe('EscrowChainSyncService', () => {
       auditEvents: 4,
       auditChanged: true,
     });
+    expect(report.mirror).toMatchObject({
+      eventCount: 4,
+      replaySource: 'fresh_fetch',
+    });
+    expect(report.mirror.correlationId).toMatch(/^manual_sync_/);
+    expect(report.mirror.latestEvent).toMatchObject({
+      eventName: 'MilestoneDelivered',
+      blockNumber: 1,
+      mirrorStatus: 'preview_only',
+      ingestionKind: 'manual_sync',
+      persistedVia: null,
+    });
+    expect(report.replay).toEqual({
+      status: 'drifted',
+      driftSource: 'audit_digest_mismatch',
+      failedCause:
+        'The replayed chain audit digest differs from persisted audit history.',
+      retryPosture: 'safe_to_retry',
+    });
     expect(report.issues).toEqual([]);
     expect(report.localComparison).toMatchObject({
       aggregateMatches: true,
@@ -253,6 +272,24 @@ describe('EscrowChainSyncService', () => {
 
     expect(report.mode).toBe('persisted');
     expect(report.normalization.auditChanged).toBe(true);
+    expect(report.mirror).toMatchObject({
+      eventCount: 4,
+      replaySource: 'persisted_mirror',
+    });
+    expect(report.mirror.correlationId).toMatch(/^manual_sync_/);
+    expect(report.mirror.latestEvent).toMatchObject({
+      eventName: 'MilestoneDelivered',
+      mirrorStatus: 'persisted',
+      ingestionKind: 'manual_sync',
+      persistedVia: 'upsert',
+    });
+    expect(report.replay).toEqual({
+      status: 'drifted',
+      driftSource: 'audit_digest_mismatch',
+      failedCause:
+        'The replayed chain audit digest differs from persisted audit history.',
+      retryPosture: 'safe_to_retry',
+    });
     expect(report.persistence).toEqual({
       requested: true,
       applied: true,
@@ -341,6 +378,24 @@ describe('EscrowChainSyncService', () => {
     const persisted = await requireJob(createdJob.jobId);
 
     expect(report.mode).toBe('preview');
+    expect(report.mirror).toMatchObject({
+      eventCount: 6,
+      replaySource: 'persisted_mirror',
+    });
+    expect(report.mirror.correlationId).toMatch(/^manual_sync_/);
+    expect(report.mirror.latestEvent).toMatchObject({
+      eventName: 'DisputeResolved',
+      mirrorStatus: 'persisted',
+      ingestionKind: 'manual_sync',
+      persistedVia: 'upsert',
+    });
+    expect(report.replay).toEqual({
+      status: 'blocked',
+      driftSource: 'unsupported_event_shape',
+      failedCause:
+        'The onchain dispute resolution uses a partial client split that the persisted audit model cannot represent.',
+      retryPosture: 'hold_for_model_support',
+    });
     expect(report.persistence).toEqual({
       requested: true,
       applied: false,
@@ -518,6 +573,66 @@ describe('EscrowChainSyncService', () => {
       lastOutcome: 'failed',
       lastMode: 'preview',
       lastErrorMessage: 'RPC request timed out',
+    });
+  });
+
+  it('persists finalized-ingestion mirror metadata before batch replay', async () => {
+    process.env.OPERATIONS_ESCROW_INGESTION_ENABLED = 'true';
+    process.env.OPERATIONS_ESCROW_INGESTION_CONFIRMATIONS = '6';
+    process.env.OPERATIONS_ESCROW_INGESTION_BATCH_BLOCKS = '1000';
+    process.env.OPERATIONS_ESCROW_INGESTION_RESYNC_BLOCKS = '20';
+
+    const createdJob = await createDeliveredJob();
+    const job = await requireJob(createdJob.jobId);
+    mockChainProvider.getLatestBlockNumber.mockResolvedValue(80);
+    mockChainProvider.getLogs.mockResolvedValue(buildDeliveredChainLogs(job));
+
+    const report = await escrowChainSyncService.syncBatch(
+      arbitratorUserId,
+      {
+        scope: 'all',
+        limit: 1,
+        persist: true,
+      },
+      2_000_000_000_000,
+    );
+    const persistedEvents = await escrowRepository.listChainEvents({
+      chainId: job.onchain.chainId,
+      contractAddress: job.onchain.contractAddress,
+      escrowId: job.onchain.escrowId ?? undefined,
+    });
+
+    expect(report.summary).toMatchObject({
+      processedJobs: 1,
+      failedJobs: 0,
+    });
+    expect(persistedEvents).toHaveLength(4);
+    expect(persistedEvents[0]).toMatchObject({
+      source: 'rpc_log',
+      ingestionKind: 'finalized_ingestion',
+      mirrorStatus: 'persisted',
+      persistedVia: 'replace_range',
+    });
+    expect(persistedEvents[0]?.correlationId).toMatch(
+      /^finalized_ingestion_/,
+    );
+    expect(
+      new Set(persistedEvents.map((event) => event.correlationId)).size,
+    ).toBe(1);
+    expect(
+      persistedEvents.every((event) => event.ingestedAt === 2_000_000_000_000),
+    ).toBe(true);
+    await expect(
+      escrowRepository.getChainCursor({
+        chainId: job.onchain.chainId,
+        contractAddress: job.onchain.contractAddress,
+        streamName: 'workstream_escrow',
+      }),
+    ).resolves.toMatchObject({
+      nextFromBlock: 75,
+      lastFinalizedBlock: 74,
+      lastScannedBlock: 74,
+      lastError: null,
     });
   });
 

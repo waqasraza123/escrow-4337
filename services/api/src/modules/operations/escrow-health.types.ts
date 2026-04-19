@@ -207,6 +207,41 @@ export type EscrowChainSyncIssue = {
   txHash: string | null;
 };
 
+export type EscrowChainSyncMirrorSummary = {
+  eventCount: number;
+  replaySource: 'fresh_fetch' | 'persisted_mirror';
+  correlationId: string | null;
+  latestEvent: {
+    eventName: string;
+    blockNumber: number;
+    logIndex: number;
+    txHash: string;
+    blockTimeMs: number;
+    source: 'rpc_log';
+    ingestionKind: 'manual_sync' | 'finalized_ingestion' | 'legacy_backfill';
+    ingestedAt: number | null;
+    mirrorStatus: 'preview_only' | 'persisted';
+    persistedVia: 'upsert' | 'replace_range' | null;
+    correlationId: string | null;
+  } | null;
+};
+
+export type EscrowChainSyncReplaySummary = {
+  status: 'clean' | 'drifted' | 'blocked';
+  driftSource:
+    | 'none'
+    | 'aggregate_mismatch'
+    | 'audit_digest_mismatch'
+    | 'missing_chain_events'
+    | 'ingestion_gap'
+    | 'unsupported_event_shape';
+  failedCause: string | null;
+  retryPosture:
+    | 'safe_to_retry'
+    | 'expand_range_or_reingest'
+    | 'hold_for_model_support';
+};
+
 export type EscrowChainSyncReport = {
   syncedAt: string;
   mode: 'preview' | 'persisted';
@@ -230,6 +265,8 @@ export type EscrowChainSyncReport = {
     auditEvents: number;
     auditChanged: boolean;
   };
+  mirror: EscrowChainSyncMirrorSummary;
+  replay: EscrowChainSyncReplaySummary;
   issues: EscrowChainSyncIssue[];
   chainReconciliation: EscrowReconciliationReport | null;
   localComparison: {

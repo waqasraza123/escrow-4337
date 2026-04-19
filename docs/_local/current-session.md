@@ -486,3 +486,25 @@
   - `pnpm --filter admin build`
 - Result:
   - Passed: all commands above
+## Update (2026-04-19, Phase 0 Chain Event Mirror Baseline)
+- Implemented the next production-grade Phase 0 step from `MARKETPLACE_PHASE_0_BACKLOG_V1.md`: Workstream `0.3` chain event mirror and reconciliation baseline.
+- Backend changes:
+  - extended `EscrowChainEventRecord` with mirror provenance fields: `source`, `ingestionKind`, `ingestedAt`, `correlationId`, `mirrorStatus`, and `persistedVia`
+  - added Postgres migration `015_escrow_chain_event_mirror_metadata.sql` and file-store normalization defaults so legacy mirrored rows are still readable
+  - updated manual sync, persisted replay, and finalized-ingestion flows in `EscrowChainSyncService` so mirrored events carry explicit provenance and chain-sync reports emit `mirror` and `replay` summaries
+- Operator/admin changes:
+  - extended the admin API contract and operator console to render mirror event count, replay source, correlation id, latest mirrored event provenance, drift source, retry posture, and failure cause
+  - hardened the operator console to tolerate older sync reports that do not yet include the new `mirror` or `replay` payloads
+- Added explicit coverage in `services/api/test/escrow-chain-sync.service.spec.ts` for:
+  - preview manual-sync mirror metadata
+  - persisted manual-sync mirror metadata
+  - blocked unsupported replay posture
+  - finalized-ingestion mirror persistence and cursor advancement
+- Verification:
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-chain-sync.service.spec.ts test/escrow-health.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin typecheck`
+  - `git diff --check`
+- Next production-grade target:
+  - continue Phase 0 by hardening reconciliation and execution correlation around the mirrored chain stream, especially explicit event correlation IDs across API, queue, and execution attempts

@@ -694,6 +694,39 @@ export type EscrowChainSyncReport = {
     auditEvents: number;
     auditChanged: boolean;
   };
+  mirror: {
+    eventCount: number;
+    replaySource: 'fresh_fetch' | 'persisted_mirror';
+    correlationId: string | null;
+    latestEvent: {
+      eventName: string;
+      blockNumber: number;
+      logIndex: number;
+      txHash: string;
+      blockTimeMs: number;
+      source: 'rpc_log';
+      ingestionKind: 'manual_sync' | 'finalized_ingestion' | 'legacy_backfill';
+      ingestedAt: number | null;
+      mirrorStatus: 'preview_only' | 'persisted';
+      persistedVia: 'upsert' | 'replace_range' | null;
+      correlationId: string | null;
+    } | null;
+  };
+  replay: {
+    status: 'clean' | 'drifted' | 'blocked';
+    driftSource:
+      | 'none'
+      | 'aggregate_mismatch'
+      | 'audit_digest_mismatch'
+      | 'missing_chain_events'
+      | 'ingestion_gap'
+      | 'unsupported_event_shape';
+    failedCause: string | null;
+    retryPosture:
+      | 'safe_to_retry'
+      | 'expand_range_or_reingest'
+      | 'hold_for_model_support';
+  };
   issues: Array<{
     code:
       | 'funding_currency_mismatch'

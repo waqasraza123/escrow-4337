@@ -97,6 +97,12 @@ type ProjectionBuildResult = {
 type ChainStreamContext = {
   chainId: number;
   contractAddress: string;
+  source: EscrowChainEventRecord['source'];
+  ingestionKind: EscrowChainEventRecord['ingestionKind'];
+  ingestedAt: number | null;
+  correlationId: string | null;
+  mirrorStatus: EscrowChainEventRecord['mirrorStatus'];
+  persistedVia: EscrowChainEventRecord['persistedVia'];
 };
 
 type BuildSyncReportContext = {
@@ -106,6 +112,8 @@ type BuildSyncReportContext = {
   fromBlock: number;
   toBlock: number;
   persistProjection: boolean;
+  replaySource: 'fresh_fetch' | 'persisted_mirror';
+  correlationId: string | null;
   now: number;
 };
 
@@ -137,6 +145,100 @@ function stableSerialize(value: unknown): string {
 
 function digest(value: unknown) {
   return createHash('sha256').update(stableSerialize(value)).digest('hex');
+}
+
+function buildMirrorCorrelationId(scope: string, value: unknown) {
+  return `${scope}_${digest(value).slice(0, 16)}`;
+}
+
+function buildMirrorSummary(
+  chainEvents: EscrowChainEventRecord[],
+  replaySource: 'fresh_fetch' | 'persisted_mirror',
+  correlationId: string | null,
+): EscrowChainSyncReport['mirror'] {
+  const latestEvent = [...chainEvents].sort(sortChainEvents).at(-1) ?? null;
+
+  return {
+    eventCount: chainEvents.length,
+    replaySource,
+    correlationId: correlationId ?? latestEvent?.correlationId ?? null,
+    latestEvent: latestEvent
+      ? {
+          eventName: latestEvent.payload.eventName,
+          blockNumber: latestEvent.blockNumber,
+          logIndex: latestEvent.logIndex,
+          txHash: latestEvent.transactionHash,
+          blockTimeMs: latestEvent.blockTimeMs,
+          source: latestEvent.source,
+          ingestionKind: latestEvent.ingestionKind,
+          ingestedAt: latestEvent.ingestedAt,
+          mirrorStatus: latestEvent.mirrorStatus,
+          persistedVia: latestEvent.persistedVia,
+          correlationId: latestEvent.correlationId,
+        }
+      : null,
+  };
+}
+
+function buildReplaySummary(
+  chainEvents: EscrowChainEventRecord[],
+  issues: EscrowChainSyncIssue[],
+  localComparison: EscrowChainSyncReport['localComparison'],
+): EscrowChainSyncReport['replay'] {
+  const criticalIssue = issues.find((issue) => issue.severity === 'critical');
+
+  if (chainEvents.length === 0) {
+    return {
+      status: 'blocked',
+      driftSource: 'missing_chain_events',
+      failedCause:
+        criticalIssue?.summary ??
+        'No mirrored chain events were available for replay.',
+      retryPosture: 'expand_range_or_reingest',
+    };
+  }
+
+  if (criticalIssue) {
+    return {
+      status: 'blocked',
+      driftSource:
+        criticalIssue.code === 'unsupported_partial_resolution'
+          ? 'unsupported_event_shape'
+          : 'ingestion_gap',
+      failedCause: criticalIssue.summary,
+      retryPosture:
+        criticalIssue.code === 'unsupported_partial_resolution'
+          ? 'hold_for_model_support'
+          : 'expand_range_or_reingest',
+    };
+  }
+
+  if (!localComparison.aggregateMatches) {
+    return {
+      status: 'drifted',
+      driftSource: 'aggregate_mismatch',
+      failedCause:
+        'The replayed chain projection still diverges from persisted aggregate state.',
+      retryPosture: 'safe_to_retry',
+    };
+  }
+
+  if (!localComparison.auditDigestMatches) {
+    return {
+      status: 'drifted',
+      driftSource: 'audit_digest_mismatch',
+      failedCause:
+        'The replayed chain audit digest differs from persisted audit history.',
+      retryPosture: 'safe_to_retry',
+    };
+  }
+
+  return {
+    status: 'clean',
+    driftSource: 'none',
+    failedCause: null,
+    retryPosture: 'safe_to_retry',
+  };
 }
 
 function formatMinorUnits(amountMinorUnits: string) {
@@ -572,10 +674,24 @@ export class EscrowChainSyncService {
 
     const fetchedLogs = await this.readLogs(localJob, fromBlock, toBlock);
     const { unique, duplicateCount } = dedupeLogs(fetchedLogs);
+    const correlationId = buildMirrorCorrelationId('manual_sync', {
+      jobId: input.jobId,
+      fromBlock,
+      toBlock,
+      persist: input.persist === true,
+      latestBlock,
+      now,
+    });
     const fetchedEvents = await this.toChainEventRecords(
       {
         chainId: localJob.onchain.chainId,
         contractAddress: localJob.onchain.contractAddress,
+        source: 'rpc_log',
+        ingestionKind: 'manual_sync',
+        ingestedAt: now,
+        correlationId,
+        mirrorStatus: input.persist === true ? 'persisted' : 'preview_only',
+        persistedVia: input.persist === true ? 'upsert' : null,
       },
       unique,
     );
@@ -600,6 +716,8 @@ export class EscrowChainSyncService {
       fromBlock,
       toBlock,
       persistProjection: input.persist === true,
+      replaySource: input.persist === true ? 'persisted_mirror' : 'fresh_fetch',
+      correlationId,
       now,
     });
   }
@@ -844,6 +962,8 @@ export class EscrowChainSyncService {
           fromBlock,
           toBlock,
           persistProjection: input.persist === true,
+          replaySource: 'persisted_mirror',
+          correlationId: null,
           now: context.now,
         });
       }
@@ -864,10 +984,24 @@ export class EscrowChainSyncService {
 
     const logs = await this.readLogs(localJob, fromBlock, toBlock);
     const dedupedLogs = dedupeLogs(logs);
+    const correlationId = buildMirrorCorrelationId('manual_sync', {
+      jobId: localJob.id,
+      fromBlock,
+      toBlock,
+      persist: input.persist === true,
+      latestBlock: context.latestBlock,
+      now: context.now,
+    });
     const chainEvents = await this.toChainEventRecords(
       {
         chainId: localJob.onchain.chainId,
         contractAddress: localJob.onchain.contractAddress,
+        source: 'rpc_log',
+        ingestionKind: 'manual_sync',
+        ingestedAt: context.now,
+        correlationId,
+        mirrorStatus: input.persist === true ? 'persisted' : 'preview_only',
+        persistedVia: input.persist === true ? 'upsert' : null,
       },
       dedupedLogs.unique,
     );
@@ -883,6 +1017,8 @@ export class EscrowChainSyncService {
       fromBlock,
       toBlock,
       persistProjection: input.persist === true,
+      replaySource: input.persist === true ? 'persisted_mirror' : 'fresh_fetch',
+      correlationId,
       now: context.now,
     });
   }
@@ -914,6 +1050,16 @@ export class EscrowChainSyncService {
       context.persistProjection &&
       !blocked &&
       (projectionChanged || localAggregateChanged);
+    const mirror = buildMirrorSummary(
+      chainEvents,
+      context.replaySource,
+      context.correlationId,
+    );
+    const replay = buildReplaySummary(
+      chainEvents,
+      result.issues,
+      result.localComparison,
+    );
 
     const report: EscrowChainSyncReport = {
       syncedAt: new Date(context.now).toISOString(),
@@ -940,6 +1086,8 @@ export class EscrowChainSyncService {
           !result.localComparison.auditDigestMatches ||
           !result.localComparison.aggregateMatches,
       },
+      mirror,
+      replay,
       issues: result.issues,
       chainReconciliation: result.chainReconciliation,
       localComparison: result.localComparison,
@@ -1352,10 +1500,24 @@ export class EscrowChainSyncService {
         toBlock,
       );
       const deduped = dedupeLogs(logs);
+      const correlationId = buildMirrorCorrelationId('finalized_ingestion', {
+        chainId,
+        contractAddress,
+        fromBlock,
+        toBlock,
+        finalizedBlock,
+        now,
+      });
       const events = await this.toChainEventRecords(
         {
           chainId,
           contractAddress,
+          source: 'rpc_log',
+          ingestionKind: 'finalized_ingestion',
+          ingestedAt: now,
+          correlationId,
+          mirrorStatus: 'persisted',
+          persistedVia: 'replace_range',
         },
         deduped.unique,
       );
@@ -1418,6 +1580,10 @@ export class EscrowChainSyncService {
           toBlock:
             sortedEvents[sortedEvents.length - 1]?.blockNumber ?? toBlock,
           persistProjection: true,
+          replaySource: 'persisted_mirror',
+          correlationId:
+            sortedEvents[sortedEvents.length - 1]?.correlationId ??
+            correlationId,
           now,
         });
       }
@@ -1529,6 +1695,12 @@ export class EscrowChainSyncService {
       blockNumber: log.blockNumber,
       blockHash: log.blockHash,
       blockTimeMs,
+      source: context.source,
+      ingestionKind: context.ingestionKind,
+      ingestedAt: context.ingestedAt,
+      correlationId: context.correlationId,
+      mirrorStatus: context.mirrorStatus,
+      persistedVia: context.persistedVia,
       payload,
     };
   }

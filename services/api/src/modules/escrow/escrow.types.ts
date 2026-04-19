@@ -281,6 +281,17 @@ export type EscrowChainEventPayload =
       splitBpsClient: number;
     };
 
+export type EscrowChainEventSource = 'rpc_log';
+
+export type EscrowChainEventIngestionKind =
+  | 'manual_sync'
+  | 'finalized_ingestion'
+  | 'legacy_backfill';
+
+export type EscrowChainEventMirrorStatus = 'preview_only' | 'persisted';
+
+export type EscrowChainEventPersistedVia = 'upsert' | 'replace_range';
+
 export type EscrowChainEventRecord = {
   chainId: number;
   contractAddress: string;
@@ -290,6 +301,12 @@ export type EscrowChainEventRecord = {
   blockNumber: number;
   blockHash: string;
   blockTimeMs: number;
+  source: EscrowChainEventSource;
+  ingestionKind: EscrowChainEventIngestionKind;
+  ingestedAt: number | null;
+  correlationId: string | null;
+  mirrorStatus: EscrowChainEventMirrorStatus;
+  persistedVia: EscrowChainEventPersistedVia | null;
   payload: EscrowChainEventPayload;
 };
 

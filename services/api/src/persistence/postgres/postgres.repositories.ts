@@ -196,6 +196,12 @@ type ChainEventRow = QueryResultRow & {
   block_number: string;
   block_hash: string;
   block_time_ms: string;
+  source: EscrowChainEventRecord['source'];
+  ingestion_kind: EscrowChainEventRecord['ingestionKind'];
+  ingested_at_ms: string | null;
+  correlation_id: string | null;
+  mirror_status: EscrowChainEventRecord['mirrorStatus'];
+  persisted_via: EscrowChainEventRecord['persistedVia'];
   event_name: EscrowChainEventPayload['eventName'];
   payload_json: EscrowChainEventPayload;
 };
@@ -486,6 +492,12 @@ function mapChainEvent(row: ChainEventRow): EscrowChainEventRecord {
     blockNumber: Number(row.block_number),
     blockHash: row.block_hash,
     blockTimeMs: Number(row.block_time_ms),
+    source: row.source,
+    ingestionKind: row.ingestion_kind,
+    ingestedAt: row.ingested_at_ms === null ? null : Number(row.ingested_at_ms),
+    correlationId: row.correlation_id ?? null,
+    mirrorStatus: row.mirror_status,
+    persistedVia: row.persisted_via ?? null,
     payload: row.payload_json,
   };
 }
@@ -1745,16 +1757,28 @@ export class PostgresEscrowRepository implements EscrowRepository {
               block_number,
               block_hash,
               block_time_ms,
+              source,
+              ingestion_kind,
+              ingested_at_ms,
+              correlation_id,
+              mirror_status,
+              persisted_via,
               event_name,
               payload_json
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
             ON CONFLICT (chain_id, contract_address, transaction_hash, log_index) DO UPDATE
             SET
               escrow_id = EXCLUDED.escrow_id,
               block_number = EXCLUDED.block_number,
               block_hash = EXCLUDED.block_hash,
               block_time_ms = EXCLUDED.block_time_ms,
+              source = EXCLUDED.source,
+              ingestion_kind = EXCLUDED.ingestion_kind,
+              ingested_at_ms = EXCLUDED.ingested_at_ms,
+              correlation_id = EXCLUDED.correlation_id,
+              mirror_status = EXCLUDED.mirror_status,
+              persisted_via = EXCLUDED.persisted_via,
               event_name = EXCLUDED.event_name,
               payload_json = EXCLUDED.payload_json
           `,
@@ -1767,6 +1791,12 @@ export class PostgresEscrowRepository implements EscrowRepository {
             String(event.blockNumber),
             event.blockHash,
             String(event.blockTimeMs),
+            event.source,
+            event.ingestionKind,
+            event.ingestedAt === null ? null : String(event.ingestedAt),
+            event.correlationId,
+            event.mirrorStatus,
+            event.persistedVia,
             event.payload.eventName,
             JSON.stringify(event.payload),
           ],
@@ -1811,10 +1841,16 @@ export class PostgresEscrowRepository implements EscrowRepository {
               block_number,
               block_hash,
               block_time_ms,
+              source,
+              ingestion_kind,
+              ingested_at_ms,
+              correlation_id,
+              mirror_status,
+              persisted_via,
               event_name,
               payload_json
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
           `,
           [
             event.chainId,
@@ -1825,6 +1861,12 @@ export class PostgresEscrowRepository implements EscrowRepository {
             String(event.blockNumber),
             event.blockHash,
             String(event.blockTimeMs),
+            event.source,
+            event.ingestionKind,
+            event.ingestedAt === null ? null : String(event.ingestedAt),
+            event.correlationId,
+            event.mirrorStatus,
+            event.persistedVia,
             event.payload.eventName,
             JSON.stringify(event.payload),
           ],
@@ -1852,6 +1894,12 @@ export class PostgresEscrowRepository implements EscrowRepository {
             block_number,
             block_hash,
             block_time_ms,
+            source,
+            ingestion_kind,
+            ingested_at_ms,
+            correlation_id,
+            mirror_status,
+            persisted_via,
             event_name,
             payload_json
           FROM escrow_chain_events

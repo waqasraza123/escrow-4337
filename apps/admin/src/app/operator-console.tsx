@@ -215,6 +215,110 @@ function getChainSyncModeLabel(mode: EscrowChainSyncReport['mode']) {
   }
 }
 
+function getChainSyncReplayStatusLabel(
+  status: EscrowChainSyncReport['replay']['status'],
+) {
+  switch (status) {
+    case 'clean':
+      return 'Clean';
+    case 'drifted':
+      return 'Drifted';
+    case 'blocked':
+      return 'Blocked';
+  }
+}
+
+function getChainSyncDriftSourceLabel(
+  driftSource: EscrowChainSyncReport['replay']['driftSource'],
+) {
+  switch (driftSource) {
+    case 'none':
+      return 'No drift';
+    case 'aggregate_mismatch':
+      return 'Aggregate mismatch';
+    case 'audit_digest_mismatch':
+      return 'Audit digest mismatch';
+    case 'missing_chain_events':
+      return 'Missing chain events';
+    case 'ingestion_gap':
+      return 'Ingestion gap';
+    case 'unsupported_event_shape':
+      return 'Unsupported event shape';
+  }
+}
+
+function getChainSyncRetryPostureLabel(
+  retryPosture: EscrowChainSyncReport['replay']['retryPosture'],
+) {
+  switch (retryPosture) {
+    case 'safe_to_retry':
+      return 'Safe to retry';
+    case 'expand_range_or_reingest':
+      return 'Expand range or reingest';
+    case 'hold_for_model_support':
+      return 'Hold for model support';
+  }
+}
+
+function getChainEventIngestionKindLabel(
+  ingestionKind: NonNullable<
+    EscrowChainSyncReport['mirror']['latestEvent']
+  >['ingestionKind'],
+) {
+  switch (ingestionKind) {
+    case 'manual_sync':
+      return 'Manual sync';
+    case 'finalized_ingestion':
+      return 'Finalized ingestion';
+    case 'legacy_backfill':
+      return 'Legacy backfill';
+  }
+}
+
+function getChainSyncMirror(
+  report: EscrowChainSyncReport,
+): EscrowChainSyncReport['mirror'] {
+  return (
+    report.mirror ?? {
+      eventCount: report.normalization.auditEvents,
+      replaySource: 'fresh_fetch',
+      correlationId: null,
+      latestEvent: null,
+    }
+  );
+}
+
+function getChainSyncReplay(
+  report: EscrowChainSyncReport,
+): EscrowChainSyncReport['replay'] {
+  return (
+    report.replay ?? {
+      status: report.issues.some((issue) => issue.severity === 'critical')
+        ? 'blocked'
+        : report.localComparison.aggregateMatches &&
+            report.localComparison.auditDigestMatches
+          ? 'clean'
+          : 'drifted',
+      driftSource:
+        report.normalization.auditEvents === 0
+          ? 'missing_chain_events'
+          : report.localComparison.aggregateMatches
+            ? report.localComparison.auditDigestMatches
+              ? 'none'
+              : 'audit_digest_mismatch'
+            : 'aggregate_mismatch',
+      failedCause: report.issues[0]?.summary ?? null,
+      retryPosture: report.issues.some(
+        (issue) => issue.code === 'unsupported_partial_resolution',
+      )
+        ? 'hold_for_model_support'
+        : report.normalization.auditEvents === 0
+          ? 'expand_range_or_reingest'
+          : 'safe_to_retry',
+    }
+  );
+}
+
 function getChainSyncBatchOutcomeLabel(
   outcome: EscrowChainSyncBatchReport['jobs'][number]['outcome'],
 ) {
@@ -1959,6 +2063,12 @@ export function OperatorConsole({
                   />
                   {chainSyncReport ? (
                     <div className={styles.stack}>
+                      {(() => {
+                        const chainSyncMirror = getChainSyncMirror(chainSyncReport);
+                        const chainSyncReplay = getChainSyncReplay(chainSyncReport);
+
+                        return (
+                          <>
                       <small>
                         {`${getChainSyncModeLabel(chainSyncReport.mode)} scan for ${chainSyncReport.job.title} (${chainSyncReport.job.jobId}) on escrow ${chainSyncReport.job.escrowId}.`}
                       </small>
@@ -1970,6 +2080,52 @@ export function OperatorConsole({
                           chainSyncReport.normalization.auditChanged,
                         )}.`}
                       </small>
+                      <small>
+                        {`Mirror: ${chainSyncMirror.eventCount} event(s) · replay source ${chainSyncMirror.replaySource.replaceAll('_', ' ')}${
+                          chainSyncMirror.correlationId
+                            ? ` · correlation ${chainSyncMirror.correlationId}`
+                            : ''
+                        }.`}
+                      </small>
+                      {chainSyncMirror.latestEvent ? (
+                        <small>
+                          {`Latest mirrored event: ${
+                            chainSyncMirror.latestEvent.eventName
+                          } at block ${chainSyncMirror.latestEvent.blockNumber} · ${
+                            getChainEventIngestionKindLabel(
+                              chainSyncMirror.latestEvent.ingestionKind,
+                            )
+                          } · mirrored ${
+                            chainSyncMirror.latestEvent.ingestedAt
+                              ? formatTimestamp(
+                                  chainSyncMirror.latestEvent.ingestedAt,
+                                )
+                              : 'at unknown time'
+                          } · status ${
+                            chainSyncMirror.latestEvent.mirrorStatus
+                          }${
+                            chainSyncMirror.latestEvent.persistedVia
+                              ? ` via ${chainSyncMirror.latestEvent.persistedVia}`
+                              : ''
+                          }.`}
+                        </small>
+                      ) : null}
+                      <small>
+                        {`Replay: ${getChainSyncReplayStatusLabel(
+                          chainSyncReplay.status,
+                        )} · ${getChainSyncDriftSourceLabel(
+                          chainSyncReplay.driftSource,
+                        )} · ${getChainSyncRetryPostureLabel(
+                          chainSyncReplay.retryPosture,
+                        )}${
+                          chainSyncReplay.failedCause
+                            ? ` · ${chainSyncReplay.failedCause}`
+                            : ''
+                        }.`}
+                      </small>
+                          </>
+                        );
+                      })()}
                       <small>
                         {`Local comparison: status ${chainSyncReport.localComparison.localStatus} -> ${chainSyncReport.localComparison.chainDerivedStatus} · funded ${formatReconciliationValue(
                           chainSyncReport.localComparison.localFundedAmount,

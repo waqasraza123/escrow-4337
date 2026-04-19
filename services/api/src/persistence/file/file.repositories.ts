@@ -139,6 +139,12 @@ function normalizeChainEventRecord(
     escrowId: String(event.escrowId),
     transactionHash: event.transactionHash.toLowerCase(),
     blockHash: event.blockHash.toLowerCase(),
+    source: event.source ?? 'rpc_log',
+    ingestionKind: event.ingestionKind ?? 'legacy_backfill',
+    ingestedAt: event.ingestedAt ?? null,
+    correlationId: event.correlationId ?? null,
+    mirrorStatus: event.mirrorStatus ?? 'persisted',
+    persistedVia: event.persistedVia ?? null,
   };
 }
 
