@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import styles from '../page.module.css';
+import styles from '../page.styles';
 import { useWebI18n } from '../../lib/i18n';
 import {
   webApi,

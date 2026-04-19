@@ -1,4 +1,4 @@
-import styles from '../page.module.css';
+import styles from '../page.styles';
 import { MarketplaceModerationConsole } from './moderation-console';
 
 export default function MarketplaceModerationPage() {

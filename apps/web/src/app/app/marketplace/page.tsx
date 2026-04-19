@@ -1,4 +1,4 @@
-import styles from '../../page.module.css';
+import styles from '../../page.styles';
 import { MarketplaceWorkspace } from '../../marketplace/workspace';
 
 export default function MarketplaceWorkspacePage() {

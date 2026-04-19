@@ -14,7 +14,7 @@ import {
   StatusNotice,
   type AsyncState,
 } from '@escrow4334/frontend-core';
-import styles from './page.module.css';
+import styles from './page.styles';
 import type {
   AuditBundle,
   ContractorJoinReadiness,

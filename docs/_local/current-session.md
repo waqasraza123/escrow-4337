@@ -71,3 +71,65 @@
 - Added README badges at the top (English + العربية + key stack badges).
 - Changed files:
   - `readme.md`
+
+## Update (2026-04-19)
+- Reviewed current implementation to identify the product's top three implemented feature pillars: marketplace hiring, escrow lifecycle/dispute handling, and ERC-4337-style wallet onboarding.
+- Conclusion:
+  - Core escrow lifecycle is the strongest completed slice.
+  - Marketplace publish/apply/hire-to-escrow is implemented and meaningfully covered, but still intentionally shallow in ranking/moderation depth.
+  - Wallet onboarding is implemented and tested, but still depends on mock-vs-relay infrastructure posture rather than proven hardened production wiring.
+- Verification run for this review:
+  - `cd packages/contracts && forge test`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts test/marketplace.controller.integration.spec.ts test/escrow.service.spec.ts test/escrow.controller.integration.spec.ts test/wallet.integration.spec.ts`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/policy.service.spec.ts`
+- Result:
+  - Passed: all targeted contract and API suites above
+- Build-focused next steps:
+  - deepen marketplace ranking/trust workflows
+  - reduce wallet/provisioning dependence on mock-mode assumptions
+  - polish multi-step contract UX around hire -> join -> deliver -> dispute -> resolve
+
+## Update (2026-04-19, Tailwind Migration)
+- Saved the approved Tailwind migration plan locally in `docs/_local/tailwind-production-plan.md`.
+- Implemented a Tailwind-first frontend foundation across both Next apps:
+  - added Tailwind v4 + PostCSS wiring in `apps/web` and `apps/admin`
+  - added shared style/config scaffolding with `components.json`
+  - added shared `cn()` and source-owned UI primitives in `packages/frontend-core`
+  - replaced frontend CSS Module imports with Tailwind-backed style maps
+  - removed `apps/web/src/app/page.module.css`
+  - removed `apps/web/src/app/marketing.module.css`
+  - removed `apps/admin/src/app/page.module.css`
+- Changed files:
+  - `package.json`
+  - `pnpm-lock.yaml`
+  - `apps/web/package.json`
+  - `apps/admin/package.json`
+  - `apps/web/postcss.config.mjs`
+  - `apps/admin/postcss.config.mjs`
+  - `apps/web/components.json`
+  - `apps/admin/components.json`
+  - `packages/frontend-core/components.json`
+  - `packages/frontend-core/package.json`
+  - `packages/frontend-core/src/index.ts`
+  - `packages/frontend-core/src/lib/utils.ts`
+  - `packages/frontend-core/src/lib/ui.tsx`
+  - `apps/web/src/app/globals.css`
+  - `apps/admin/src/app/globals.css`
+  - `apps/web/src/app/page.styles.ts`
+  - `apps/web/src/app/marketing.styles.ts`
+  - `apps/admin/src/app/page.styles.ts`
+  - frontend route/component files that now import `*.styles` instead of CSS modules
+- Verification run for the Tailwind migration:
+  - `pnpm --filter @escrow4334/frontend-core typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web build`
+  - `pnpm --filter admin build`
+  - `pnpm --filter web test`
+  - `pnpm --filter admin test`
+- Result:
+  - Passed: all commands above
+- Follow-up opportunities:
+  - replace style-map-heavy console surfaces with more granular shared primitives over time
+  - add more shadcn/Radix interactive primitives where current route UIs still rely on hand-rolled markup
+  - optionally normalize repeated Tailwind recipes into dedicated `frontend-core` layout and form components

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import styles from './marketing.module.css';
+import styles from './marketing.styles';
 import { LanguageSwitcher } from './language-switcher';
 import { useWebI18n } from '../lib/i18n';
 

@@ -1,4 +1,4 @@
-import styles from '../../page.module.css';
+import styles from '../../page.styles';
 import { OperatorConsole } from '../../operator-console';
 
 export default async function OperatorCasePage({

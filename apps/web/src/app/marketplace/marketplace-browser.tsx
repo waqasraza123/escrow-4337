@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import styles from '../marketing.module.css';
+import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
 import {
   webApi,

@@ -1,4 +1,4 @@
-import styles from '../../../page.module.css';
+import styles from '../../../page.styles';
 import { EscrowConsole } from '../../../web-console';
 
 export default async function ContractPage({

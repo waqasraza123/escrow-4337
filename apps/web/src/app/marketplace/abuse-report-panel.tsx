@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from '../page.module.css';
+import styles from '../page.styles';
 import type { MarketplaceAbuseReportReason, SessionTokens } from '../../lib/api';
 import { useWebI18n } from '../../lib/i18n';
 

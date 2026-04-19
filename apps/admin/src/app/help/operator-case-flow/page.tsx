@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import styles from '../../page.module.css';
+import styles from '../../page.styles';
 import { startOperatorWalkthrough } from '../../operator-walkthrough';
 
 export default function OperatorCaseFlowHelpPage() {
