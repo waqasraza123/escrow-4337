@@ -4,26 +4,29 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep tightening release-facing evidence so rollout and rollback review do not depend on reopening the full dossier.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep tightening canonical evidence artifacts so launch/release consumers read one normalized posture instead of re-deriving nested state.
 
 ## Last Completed Step
-- Added release-pointer launch-evidence posture fields:
-  - `release-pointer.json` now records launch evidence completeness, required/missing artifact counts, provider failure/warning counts, execution-trace coverage counts, and marketplace-origin proof posture
-  - `release-pointer` validation can now reject missing/incomplete marketplace-origin proof directly
-  - `release-pointer.md` and `--write-env` now expose the same posture for operators and workflows
+- Added a canonical launch-evidence posture artifact and wired it into the release dossier:
+  - `launch-candidate` now writes `launch-evidence-posture.json`
+  - `launch-evidence-posture.json` is now part of the required launch artifact contract
+  - `release-dossier` now copies and validates that posture artifact against `promotion-record.json` and `evidence-manifest.json`
   - pending commit for this slice
 
 ## Current Step
-- Commit and push the release-pointer evidence-contract hardening, then continue Workstream 0.7 by tightening release-facing summaries or workflow consumers around the same canonical launch posture.
+- Commit and push the canonical launch-evidence posture slice, then continue Workstream 0.7 by reconciling workflow consumers and review docs around that normalized artifact.
 
 ## Why This Step Exists
-- Phase 0 already proves chain authority, execution traces, and marketplace-origin flow shape, but the stable approved release pointer still only carried coarse canary counts. This step makes the pointer itself useful for operator review and automated rollout checks.
+- Phase 0 already proves chain authority, execution traces, and marketplace-origin flow shape, but release consumers were still reading those fields from different nested artifacts. This step creates one normalized launch posture document and ensures the release dossier validates it instead of trusting duplicated derivations.
 
 ## Changed Files
-- Release pointer evidence contract:
-  `scripts/release-pointer-lib.mjs`
-  `scripts/release-pointer.mjs`
-  `scripts/release-pointer-lib.test.mjs`
+- Canonical launch posture artifact:
+  `scripts/launch-candidate-lib.mjs`
+  `scripts/launch-candidate.mjs`
+  `scripts/launch-candidate-lib.test.mjs`
+  `scripts/release-dossier-lib.mjs`
+  `scripts/release-dossier.mjs`
+  `scripts/release-dossier-lib.test.mjs`
 - Docs:
   `docs/project-state.md`
   `docs/_local/current-session.md`
@@ -43,15 +46,15 @@
 ## Verification Status
 - Passed:
   - `git diff --check`
-- `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
   - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
   - real staged deployed marketplace canaries with the new marketplace-origin artifact contract
-  - real promotion/release workflows consuming the richer release-pointer fields in GitHub Actions
+  - real promotion/release workflows consuming the new canonical `launch-evidence-posture.json` artifact in GitHub Actions
 
 ## Next Likely Step
-- After committing this slice, continue Workstream 0.7 by reconciling workflow consumers and human-readable release docs around the richer `release-pointer` posture so staged promotion review and rollback drills use the same compact evidence contract.
+- After committing this slice, continue Workstream 0.7 by teaching promotion/release workflow consumers or runbooks to reference `launch-evidence-posture.json` directly so rollout, rollback, and audit drills all point at the same canonical posture artifact.
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.
@@ -96,6 +99,29 @@
   - both `seeded` and `exact` marketplace modes are not confirmed
   - marketplace-origin missing/failed modes are present
 - Extended `scripts/release-pointer.mjs` so `release-pointer.md` and `--write-env` expose the richer launch posture to operators and workflow consumers.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `pnpm build`
+- Result:
+  - Passed
+
+## Update (2026-04-19, Canonical Launch Evidence Posture)
+- Added `buildLaunchEvidencePosture(...)` to `scripts/launch-candidate-lib.mjs` and made `launch-candidate` publish:
+  - `launch-evidence-posture.json`
+- The posture artifact now normalizes:
+  - promotion-readiness status, blockers, and warnings
+  - authority/trace posture
+  - provider failure/warning counts
+  - evidence completeness and missing artifact counts
+  - marketplace-origin proof posture
+  - canary failure counts
+  - rollback posture
+  - daemon/alert-drill posture
+- `launch-evidence-posture.json` is now a required launch artifact and `release-dossier` now:
+  - copies it into the canonical evidence packet
+  - validates it against `promotion-record.json` and `evidence-manifest.json`
+  - carries it forward under `release-dossier.json.launchEvidence.posture`
 - Verification:
   - `git diff --check`
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`

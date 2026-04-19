@@ -4,6 +4,7 @@ import { relative, resolve } from 'node:path';
 export const launchCandidateRequiredArtifacts = [
   'deployment-validation.json',
   'provider-validation-summary.json',
+  'launch-evidence-posture.json',
   'chain-sync-daemon-health.json',
   'chain-sync-daemon-alert-dry-run.json',
   'runtime-profile.json',
@@ -435,6 +436,115 @@ export function evaluatePromotionReadiness({
     status: blockers.length === 0 ? 'ready' : 'blocked',
     blockers,
     warnings,
+  };
+}
+
+export function buildLaunchEvidencePosture({
+  generatedAt = new Date().toISOString(),
+  metadata,
+  summary,
+  evidenceManifest,
+  promotionReadiness,
+}) {
+  const requiredArtifacts = evidenceManifest?.requiredArtifacts ?? {};
+  const providerValidation = summary?.providerValidation ?? {};
+  const executionTraces = summary?.authorityEvidence?.executionTraces ?? null;
+  const marketplaceOrigin = summary?.marketplaceOrigin ?? null;
+  const daemon = summary?.daemonHealth ?? {};
+  const alertDrill = summary?.daemonAlertDrill ?? {};
+
+  return {
+    generatedAt,
+    environment: metadata?.environment ?? null,
+    repository: metadata?.repository ?? null,
+    candidateRunId: metadata?.candidateRunId ?? null,
+    launchRunId: metadata?.runId ?? null,
+    status: promotionReadiness?.status ?? 'blocked',
+    blockers: Array.isArray(promotionReadiness?.blockers) ? promotionReadiness.blockers : [],
+    warnings: Array.isArray(promotionReadiness?.warnings) ? promotionReadiness.warnings : [],
+    launchReady: summary?.launchReadiness?.ready === true,
+    authority: {
+      ok: summary?.authorityEvidence?.ok === true,
+      auditSource: summary?.authorityEvidence?.auditSource ?? null,
+      jobId: summary?.authorityEvidence?.jobId ?? null,
+    },
+    executionTraceCoverage: executionTraces
+      ? {
+          executionCount: executionTraces.executionCount ?? null,
+          traceCount: executionTraces.traceCount ?? null,
+          correlationTaggedExecutions: executionTraces.correlationTaggedExecutions ?? null,
+          requestTaggedExecutions: executionTraces.requestTaggedExecutions ?? null,
+          operationTaggedExecutions: executionTraces.operationTaggedExecutions ?? null,
+          confirmedWithoutCorrelation: executionTraces.confirmedWithoutCorrelation ?? null,
+          missingTxHashes: executionTraces.missingTxHashes ?? [],
+        }
+      : null,
+    providerValidation: {
+      ok: providerValidation.ok === true,
+      failedProviders: providerValidation.failedProviders ?? [],
+      warningProviders: providerValidation.warningProviders ?? [],
+      failureCount: Array.isArray(providerValidation.failedProviders)
+        ? providerValidation.failedProviders.length
+        : 0,
+      warningCount: Array.isArray(providerValidation.warningProviders)
+        ? providerValidation.warningProviders.length
+        : 0,
+    },
+    evidenceContract: {
+      requiredArtifactCount: requiredArtifacts.total ?? null,
+      presentArtifactCount: Array.isArray(requiredArtifacts.present)
+        ? requiredArtifacts.present.length
+        : null,
+      missingArtifactCount: Array.isArray(requiredArtifacts.missing)
+        ? requiredArtifacts.missing.length
+        : null,
+      complete: Array.isArray(requiredArtifacts.missing)
+        ? requiredArtifacts.missing.length === 0
+        : false,
+      missingArtifacts: requiredArtifacts.missing ?? [],
+    },
+    marketplaceOrigin: marketplaceOrigin
+      ? {
+          ok: marketplaceOrigin.ok === true,
+          confirmedModes: marketplaceOrigin.confirmedModes ?? [],
+          missingModes: marketplaceOrigin.missingModes ?? [],
+          failedModes: marketplaceOrigin.failedModes ?? [],
+          jobIds: marketplaceOrigin.jobIds ?? [],
+          opportunityIds: marketplaceOrigin.opportunityIds ?? [],
+          applicationIds: marketplaceOrigin.applicationIds ?? [],
+        }
+      : null,
+    canaries: {
+      smokeFailures: summary?.smoke?.failed ?? null,
+      seededCanaryFailures: summary?.seededCanary?.failed ?? null,
+      exactCanaryFailures: summary?.exactCanary?.failed ?? null,
+      marketplaceSeededCanaryFailures: summary?.marketplaceSeededCanary?.failed ?? null,
+      marketplaceExactCanaryFailures: summary?.marketplaceExactCanary?.failed ?? null,
+      walkthroughCanaryFailures: summary?.walkthroughCanary?.failed ?? null,
+    },
+    rollback: {
+      required: metadata?.environment === 'production',
+      ready:
+        metadata?.environment === 'production'
+          ? Boolean(metadata?.rollbackImageSha)
+          : true,
+      rollbackImageSha: metadata?.rollbackImageSha ?? null,
+      rollbackSource: metadata?.rollbackSource ?? null,
+      rollbackPointerRunId: metadata?.rollbackPointerRunId ?? null,
+      rollbackPointerArtifactName: metadata?.rollbackPointerArtifactName ?? null,
+      rollbackPointerSelectionSource: metadata?.rollbackPointerSelectionSource ?? null,
+      rollbackPointerArtifactId: metadata?.rollbackPointerArtifactId ?? null,
+      rollbackPointerSelectedCreatedAt: metadata?.rollbackPointerSelectedCreatedAt ?? null,
+    },
+    observability: {
+      daemonStatus: daemon.status ?? null,
+      daemonIssueCodes: daemon.issueCodes ?? [],
+      alertDrillConfigured: alertDrill.configured === true,
+      alertDrillAttempted: alertDrill.attempted === true,
+      alertDrillSent: alertDrill.sent === true,
+      alertDrillDryRun: alertDrill.dryRun === true,
+      alertDrillReason: alertDrill.reason ?? null,
+    },
   };
 }
 

@@ -51,6 +51,7 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.json'), '{}\n', 'utf8');
     writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.md'), '# smoke\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'launch-evidence-posture.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
@@ -71,7 +72,7 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     assert.ok(copied.copiedFiles.includes('evidence/api-image-manifest/manifest.json'));
 
     const files = listReleaseDossierFiles(resolve(outputDir, 'evidence'));
-    assert.equal(files.length, 14);
+    assert.equal(files.length, 15);
     assert.ok(files.every((entry) => entry.sha256.length === 64));
 
     const checksums = buildChecksumsText(files);
@@ -115,6 +116,7 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
       },
     },
     launchPromotionRecord: {
+      status: 'blocked',
       metadata: {
         runId: '301',
         rollbackImageSha: 'sha256:old',
@@ -134,10 +136,52 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
         rollbackPointerArtifactId: '41',
         rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
       },
+      launchCandidate: {
+        authorityAuditSource: 'chain_projection',
+        providerValidation: {
+          failedProviders: [],
+          warningProviders: ['paymaster'],
+        },
+        marketplaceOrigin: {
+          ok: true,
+          confirmedModes: ['seeded', 'exact'],
+          missingModes: ['seeded'],
+          failedModes: ['seeded'],
+        },
+        executionTraceCoverage: {
+          executionCount: 8,
+          correlationTaggedExecutions: 8,
+        },
+      },
     },
     launchEvidenceManifest: {
       requiredArtifacts: {
         missing: ['authority-evidence/summary.json'],
+      },
+    },
+    launchEvidencePosture: {
+      status: 'ready',
+      authority: {
+        auditSource: 'aggregate',
+      },
+      evidenceContract: {
+        complete: true,
+        requiredArtifactCount: 16,
+        missingArtifactCount: 0,
+      },
+      providerValidation: {
+        failureCount: 1,
+        warningCount: 2,
+      },
+      marketplaceOrigin: {
+        ok: false,
+        confirmedModes: ['seeded'],
+        missingModes: ['exact'],
+        failedModes: ['exact'],
+      },
+      executionTraceCoverage: {
+        executionCount: 7,
+        correlationTaggedExecutions: 6,
       },
     },
     promotionReview: {
@@ -172,6 +216,18 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
     'Release dossier deployed smoke review selection is missing artifact id for artifact-search selection.',
     'Release dossier deployed smoke review selection is missing selected timestamp for artifact-search selection.',
     'Release dossier launch evidence completeness disagrees with missing artifacts: authority-evidence/summary.json.',
+    'Launch evidence posture status ready does not match launch candidate promotion status blocked.',
+    'Launch evidence posture authority audit source aggregate does not match launch promotion authority audit source chain_projection.',
+    'Launch evidence posture completeness true does not match launch evidence completeness false.',
+    'Launch evidence posture missing artifact count 0 does not match launch evidence manifest missing artifact count 1.',
+    'Launch evidence posture provider failure count 1 does not match launch promotion provider failure count 0.',
+    'Launch evidence posture provider warning count 2 does not match launch promotion provider warning count 1.',
+    'Launch evidence posture marketplace origin proof false does not match launch promotion marketplace origin proof true.',
+    'Launch evidence posture confirmed marketplace origin modes seeded does not match launch promotion confirmed marketplace origin modes exact, seeded.',
+    'Launch evidence posture missing marketplace origin modes exact does not match launch promotion missing marketplace origin modes seeded.',
+    'Launch evidence posture failed marketplace origin modes exact does not match launch promotion failed marketplace origin modes seeded.',
+    'Launch evidence posture execution trace count 7 does not match launch promotion execution trace count 8.',
+    'Launch evidence posture correlation-tagged execution count 6 does not match launch promotion correlation-tagged execution count 8.',
   ]);
 });
 
@@ -262,6 +318,81 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         missing: [],
       },
     },
+    launchEvidencePosture: {
+      status: 'ready',
+      authority: {
+        ok: true,
+        auditSource: 'chain_projection',
+        jobId: 'job-123',
+      },
+      executionTraceCoverage: {
+        executionCount: 8,
+        traceCount: 8,
+        correlationTaggedExecutions: 8,
+        requestTaggedExecutions: 8,
+        operationTaggedExecutions: 8,
+        confirmedWithoutCorrelation: 0,
+        missingTxHashes: [],
+      },
+      providerValidation: {
+        ok: true,
+        failureCount: 0,
+        warningCount: 1,
+        failedProviders: [],
+        warningProviders: ['paymaster'],
+      },
+      evidenceContract: {
+        requiredArtifactCount: 16,
+        presentArtifactCount: 16,
+        missingArtifactCount: 0,
+        complete: true,
+        missingArtifacts: [],
+      },
+      marketplaceOrigin: {
+        ok: true,
+        confirmedModes: ['seeded', 'exact'],
+        missingModes: [],
+        failedModes: [],
+        jobIds: ['job-123'],
+        opportunityIds: ['opp-1'],
+        applicationIds: ['app-1'],
+      },
+      rollback: {
+        required: false,
+        ready: true,
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
+      },
+      observability: {
+        daemonStatus: 'ok',
+        daemonIssueCodes: [],
+        alertDrillConfigured: true,
+        alertDrillAttempted: true,
+        alertDrillSent: false,
+        alertDrillDryRun: true,
+        alertDrillReason: null,
+      },
+      canaries: {
+        smokeFailures: 0,
+        seededCanaryFailures: 0,
+        exactCanaryFailures: 0,
+        marketplaceSeededCanaryFailures: 0,
+        marketplaceExactCanaryFailures: 0,
+        walkthroughCanaryFailures: 0,
+      },
+      blockers: [],
+      warnings: [],
+      launchReady: true,
+      environment: 'staging',
+      repository: 'mc/escrow4337',
+      candidateRunId: '101',
+      launchRunId: '301',
+    },
     promotionReview: {
       status: 'ready',
       blockers: [],
@@ -307,6 +438,8 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.launchEvidence.rollbackPointerArtifactId, '41');
   assert.equal(record.launchEvidence.executionTraceCoverage.executionCount, 8);
   assert.equal(record.launchEvidence.marketplaceOrigin.ok, true);
+  assert.equal(record.launchEvidence.posture.status, 'ready');
+  assert.equal(record.launchEvidence.posture.providerValidation.warningCount, 1);
   assert.equal(record.workflows.deployedSmoke.selectionSource, 'artifact-search');
   assert.equal(record.workflows.deployedSmoke.artifactId, '22');
   assert.equal(record.workflows.launchCandidate.selectionSource, 'input');
@@ -325,4 +458,6 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.ok(markdown.includes('Selection selected at: 2026-04-13T01:00:00Z'));
   assert.ok(markdown.includes('Selection artifact ID: 12'));
   assert.ok(markdown.includes('Selection selected at: 2026-04-13T02:00:00Z'));
+  assert.ok(markdown.includes('Launch posture status: ready'));
+  assert.ok(markdown.includes('Launch provider warnings: 1'));
 });

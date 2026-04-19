@@ -6,6 +6,7 @@ import { config as loadDotenv } from 'dotenv';
 import { assertRequiredDeployedFlowEnv } from './deployed-flow-env.mjs';
 import {
   buildEvidenceManifest,
+  buildLaunchEvidencePosture,
   buildPromotionMarkdown,
   buildPromotionRecord,
   buildLaunchMetadata,
@@ -366,6 +367,17 @@ async function main() {
     evidenceManifest,
     launchBlockers: blockers,
   });
+  let launchEvidencePosture = buildLaunchEvidencePosture({
+    metadata: launchMetadata,
+    summary,
+    evidenceManifest,
+    promotionReadiness,
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'launch-evidence-posture.json'),
+    `${JSON.stringify(launchEvidencePosture, null, 2)}\n`,
+    'utf8',
+  );
   const promotionRecord = buildPromotionRecord({
     metadata: launchMetadata,
     runtimeProfile,
@@ -445,6 +457,17 @@ async function main() {
     },
     blockers,
   };
+  launchEvidencePosture = buildLaunchEvidencePosture({
+    metadata: launchMetadata,
+    summary,
+    evidenceManifest,
+    promotionReadiness,
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'launch-evidence-posture.json'),
+    `${JSON.stringify(launchEvidencePosture, null, 2)}\n`,
+    'utf8',
+  );
 
   writeFileSync(
     resolve(artifactsDir, 'summary.json'),

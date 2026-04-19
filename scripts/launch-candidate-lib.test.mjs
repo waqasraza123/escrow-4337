@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   buildEvidenceManifest,
+  buildLaunchEvidencePosture,
   buildPromotionRecord,
   buildLaunchMetadata,
   summarizeMarketplaceJourneyEvidence,
@@ -151,6 +152,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
   try {
     writeFileSync(resolve(root, 'deployment-validation.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'provider-validation-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'launch-evidence-posture.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'chain-sync-daemon-health.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'chain-sync-daemon-alert-dry-run.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'runtime-profile.json'), '{}\n', 'utf8');
@@ -190,7 +192,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     });
 
-    assert.equal(manifest.requiredArtifacts.total, 19);
+    assert.equal(manifest.requiredArtifacts.total, 20);
     assert.deepEqual(manifest.requiredArtifacts.missing, []);
     assert.deepEqual(manifest.incidents, [
       {
@@ -208,6 +210,98 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       force: true,
     });
   }
+});
+
+test('buildLaunchEvidencePosture produces a canonical launch posture summary', () => {
+  const posture = buildLaunchEvidencePosture({
+    metadata: {
+      environment: 'production',
+      repository: 'mc/escrow4337',
+      candidateRunId: '101',
+      runId: '202',
+      rollbackImageSha: 'sha256:old',
+      rollbackSource: 'release-pointer',
+      rollbackPointerRunId: '701',
+      rollbackPointerArtifactName: 'release-pointer-production',
+      rollbackPointerSelectionSource: 'artifact-search',
+      rollbackPointerArtifactId: '44',
+      rollbackPointerSelectedCreatedAt: '2026-04-19T00:00:00Z',
+    },
+    summary: {
+      launchReadiness: {
+        ready: true,
+      },
+      authorityEvidence: {
+        ok: true,
+        auditSource: 'chain_projection',
+        jobId: 'job-123',
+        executionTraces: {
+          executionCount: 8,
+          traceCount: 4,
+          correlationTaggedExecutions: 8,
+          requestTaggedExecutions: 8,
+          operationTaggedExecutions: 8,
+          confirmedWithoutCorrelation: 0,
+          missingTxHashes: [],
+        },
+      },
+      providerValidation: {
+        ok: true,
+        failedProviders: [],
+        warningProviders: ['paymaster'],
+      },
+      marketplaceOrigin: {
+        ok: true,
+        confirmedModes: ['seeded', 'exact'],
+        missingModes: [],
+        failedModes: [],
+        jobIds: ['job-123'],
+        opportunityIds: ['opp-1'],
+        applicationIds: ['app-1'],
+      },
+      smoke: { failed: 0 },
+      seededCanary: { failed: 0 },
+      exactCanary: { failed: 0 },
+      marketplaceSeededCanary: { failed: 0 },
+      marketplaceExactCanary: { failed: 0 },
+      walkthroughCanary: { failed: 0 },
+      daemonHealth: {
+        status: 'ok',
+        issueCodes: [],
+      },
+      daemonAlertDrill: {
+        configured: true,
+        attempted: true,
+        sent: false,
+        dryRun: true,
+        reason: null,
+      },
+    },
+    evidenceManifest: {
+      requiredArtifacts: {
+        total: 20,
+        present: Array.from({ length: 20 }, (_, index) => `artifact-${index}`),
+        missing: [],
+      },
+    },
+    promotionReadiness: {
+      status: 'ready',
+      blockers: [],
+      warnings: [],
+    },
+  });
+
+  assert.equal(posture.status, 'ready');
+  assert.equal(posture.authority.auditSource, 'chain_projection');
+  assert.equal(posture.providerValidation.failureCount, 0);
+  assert.equal(posture.providerValidation.warningCount, 1);
+  assert.equal(posture.evidenceContract.complete, true);
+  assert.equal(posture.evidenceContract.requiredArtifactCount, 20);
+  assert.equal(posture.executionTraceCoverage.executionCount, 8);
+  assert.equal(posture.marketplaceOrigin.ok, true);
+  assert.deepEqual(posture.marketplaceOrigin.confirmedModes, ['seeded', 'exact']);
+  assert.equal(posture.rollback.ready, true);
+  assert.equal(posture.observability.alertDrillConfigured, true);
 });
 
 test('summarizeProviderValidation classifies provider failures and warnings for launch evidence', () => {

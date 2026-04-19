@@ -19,6 +19,7 @@ export const releaseDossierSourceSpecs = [
     label: 'launch-candidate-review',
     requiredFiles: [
       'evidence-manifest.json',
+      'launch-evidence-posture.json',
       'marketplace-origin-summary.json',
       'marketplace-seeded-evidence.json',
       'marketplace-exact-evidence.json',
@@ -125,6 +126,7 @@ export function validateReleaseDossierInputs({
   deployedSmokeRecord,
   launchPromotionRecord,
   launchEvidenceManifest,
+  launchEvidencePosture,
   promotionReview,
   metadata,
 }) {
@@ -286,6 +288,112 @@ export function validateReleaseDossierInputs({
     );
   }
 
+  if (!launchEvidencePosture || typeof launchEvidencePosture !== 'object') {
+    issues.push('Release dossier is missing launch evidence posture JSON.');
+    return issues;
+  }
+
+  compareField({
+    issues,
+    leftLabel: 'Launch evidence posture status',
+    leftValue: launchEvidencePosture?.status,
+    rightLabel: 'launch candidate promotion status',
+    rightValue: launchPromotionRecord?.status,
+  });
+  compareField({
+    issues,
+    leftLabel: 'Launch evidence posture authority audit source',
+    leftValue: launchEvidencePosture?.authority?.auditSource,
+    rightLabel: 'launch promotion authority audit source',
+    rightValue: launchPromotionRecord?.launchCandidate?.authorityAuditSource,
+  });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Launch evidence posture completeness',
+    leftValue: launchEvidencePosture?.evidenceContract?.complete,
+    rightLabel: 'launch evidence completeness',
+    rightValue: Array.isArray(missingArtifacts) ? missingArtifacts.length === 0 : null,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture required artifact count',
+    leftValue: launchEvidencePosture?.evidenceContract?.requiredArtifactCount,
+    rightLabel: 'launch evidence manifest required artifact count',
+    rightValue: launchEvidenceManifest?.requiredArtifacts?.total,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture missing artifact count',
+    leftValue: launchEvidencePosture?.evidenceContract?.missingArtifactCount,
+    rightLabel: 'launch evidence manifest missing artifact count',
+    rightValue: Array.isArray(missingArtifacts) ? missingArtifacts.length : null,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture provider failure count',
+    leftValue: launchEvidencePosture?.providerValidation?.failureCount,
+    rightLabel: 'launch promotion provider failure count',
+    rightValue: Array.isArray(
+      launchPromotionRecord?.launchCandidate?.providerValidation?.failedProviders,
+    )
+      ? launchPromotionRecord.launchCandidate.providerValidation.failedProviders.length
+      : null,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture provider warning count',
+    leftValue: launchEvidencePosture?.providerValidation?.warningCount,
+    rightLabel: 'launch promotion provider warning count',
+    rightValue: Array.isArray(
+      launchPromotionRecord?.launchCandidate?.providerValidation?.warningProviders,
+    )
+      ? launchPromotionRecord.launchCandidate.providerValidation.warningProviders.length
+      : null,
+  });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Launch evidence posture marketplace origin proof',
+    leftValue: launchEvidencePosture?.marketplaceOrigin?.ok,
+    rightLabel: 'launch promotion marketplace origin proof',
+    rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.ok,
+  });
+  compareStringListField({
+    issues,
+    leftLabel: 'Launch evidence posture confirmed marketplace origin modes',
+    leftValue: launchEvidencePosture?.marketplaceOrigin?.confirmedModes,
+    rightLabel: 'launch promotion confirmed marketplace origin modes',
+    rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.confirmedModes,
+  });
+  compareStringListField({
+    issues,
+    leftLabel: 'Launch evidence posture missing marketplace origin modes',
+    leftValue: launchEvidencePosture?.marketplaceOrigin?.missingModes,
+    rightLabel: 'launch promotion missing marketplace origin modes',
+    rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.missingModes,
+  });
+  compareStringListField({
+    issues,
+    leftLabel: 'Launch evidence posture failed marketplace origin modes',
+    leftValue: launchEvidencePosture?.marketplaceOrigin?.failedModes,
+    rightLabel: 'launch promotion failed marketplace origin modes',
+    rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.failedModes,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture execution trace count',
+    leftValue: launchEvidencePosture?.executionTraceCoverage?.executionCount,
+    rightLabel: 'launch promotion execution trace count',
+    rightValue: launchPromotionRecord?.launchCandidate?.executionTraceCoverage?.executionCount,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Launch evidence posture correlation-tagged execution count',
+    leftValue: launchEvidencePosture?.executionTraceCoverage?.correlationTaggedExecutions,
+    rightLabel: 'launch promotion correlation-tagged execution count',
+    rightValue:
+      launchPromotionRecord?.launchCandidate?.executionTraceCoverage?.correlationTaggedExecutions,
+  });
+
   return issues;
 }
 
@@ -296,6 +404,7 @@ export function buildReleaseDossier({
   deployedSmokeRecord,
   launchPromotionRecord,
   launchEvidenceManifest,
+  launchEvidencePosture,
   promotionReview,
   evidenceFiles,
 }) {
@@ -363,6 +472,7 @@ export function buildReleaseDossier({
       },
     },
     launchEvidence: {
+      posture: launchEvidencePosture ?? null,
       requiredArtifactCount: launchEvidenceManifest?.requiredArtifacts?.total ?? null,
       missingArtifacts,
       authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
@@ -416,6 +526,10 @@ export function buildReleaseDossierMarkdown(record) {
 - Launch rollback pointer artifact ID: ${record.launchEvidence.rollbackPointerArtifactId ?? 'n/a'}
 - Launch rollback pointer selected at: ${record.launchEvidence.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Launch authority audit source: ${record.launchEvidence.authorityAuditSource ?? 'n/a'}
+- Launch posture status: ${record.launchEvidence.posture?.status ?? 'n/a'}
+- Launch evidence complete: ${formatBoolean(record.launchEvidence.posture?.evidenceContract?.complete)}
+- Launch provider failures: ${record.launchEvidence.posture?.providerValidation?.failureCount ?? 'n/a'}
+- Launch provider warnings: ${record.launchEvidence.posture?.providerValidation?.warningCount ?? 'n/a'}
 - Launch execution trace coverage: ${
     record.launchEvidence.executionTraceCoverage
       ? `${record.launchEvidence.executionTraceCoverage.correlationTaggedExecutions}/${record.launchEvidence.executionTraceCoverage.executionCount} correlated`
@@ -541,6 +655,24 @@ function compareBooleanField({ issues, leftLabel, leftValue, rightLabel, rightVa
   issues.push(`${leftLabel} ${leftValue} does not match ${rightLabel} ${rightValue}.`);
 }
 
+function compareNumberField({ issues, leftLabel, leftValue, rightLabel, rightValue }) {
+  if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue) || leftValue === rightValue) {
+    return;
+  }
+
+  issues.push(`${leftLabel} ${leftValue} does not match ${rightLabel} ${rightValue}.`);
+}
+
+function compareStringListField({ issues, leftLabel, leftValue, rightLabel, rightValue }) {
+  const normalizedLeft = normalizeStringList(leftValue);
+  const normalizedRight = normalizeStringList(rightValue);
+  if (!normalizedLeft || !normalizedRight || normalizedLeft === normalizedRight) {
+    return;
+  }
+
+  issues.push(`${leftLabel} ${normalizedLeft} does not match ${rightLabel} ${normalizedRight}.`);
+}
+
 function formatBoolean(value) {
   return typeof value === 'boolean' ? String(value) : 'n/a';
 }
@@ -598,4 +730,16 @@ function trimToNull(value) {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? null : trimmed;
+}
+
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value
+    .map((entry) => trimToNull(entry))
+    .filter(Boolean)
+    .sort()
+    .join(', ');
 }

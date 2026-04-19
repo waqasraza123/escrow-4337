@@ -53,6 +53,9 @@ try {
   const launchEvidenceManifest = readJson(
     resolve(outputDir, 'evidence', 'launch-candidate-review', 'evidence-manifest.json'),
   );
+  const launchEvidencePosture = readJson(
+    resolve(outputDir, 'evidence', 'launch-candidate-review', 'launch-evidence-posture.json'),
+  );
   const promotionReview = readJson(
     resolve(outputDir, 'evidence', 'promotion-review', 'promotion-review.json'),
   );
@@ -62,6 +65,7 @@ try {
     deployedSmokeRecord,
     launchPromotionRecord,
     launchEvidenceManifest,
+    launchEvidencePosture,
     promotionReview,
     metadata,
   });
@@ -78,6 +82,7 @@ try {
     deployedSmokeRecord,
     launchPromotionRecord,
     launchEvidenceManifest,
+    launchEvidencePosture,
     promotionReview,
     evidenceFiles,
   });
