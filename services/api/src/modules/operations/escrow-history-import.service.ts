@@ -1,12 +1,10 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { z } from 'zod';
-import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
 import type {
@@ -14,8 +12,7 @@ import type {
   EscrowExecutionRecord,
   EscrowJobRecord,
 } from '../escrow/escrow.types';
-import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
-import { UsersService } from '../users/users.service';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import type { EscrowJobHistoryImportReport } from './escrow-health.types';
 import { EscrowReconciliationService } from './escrow-reconciliation.service';
 
@@ -423,8 +420,7 @@ export class EscrowHistoryImportService {
   constructor(
     @Inject(ESCROW_REPOSITORY)
     private readonly escrowRepository: EscrowRepository,
-    private readonly usersService: UsersService,
-    private readonly escrowContractConfig: EscrowContractConfigService,
+    private readonly userCapabilities: UserCapabilitiesService,
     private readonly reconciliationService: EscrowReconciliationService,
   ) {}
 
@@ -496,17 +492,6 @@ export class EscrowHistoryImportService {
   }
 
   private async requireOperatorAccess(userId: string) {
-    const user = await this.usersService.getRequiredById(userId);
-    const arbitratorAddress = normalizeEvmAddress(
-      this.escrowContractConfig.arbitratorAddress,
-    );
-
-    if (!this.usersService.userHasWalletAddress(user, arbitratorAddress)) {
-      throw new ForbiddenException(
-        'Authenticated user must control the configured arbitrator wallet',
-      );
-    }
-
-    return user;
+    await this.userCapabilities.requireCapability(userId, 'jobHistoryImport');
   }
 }

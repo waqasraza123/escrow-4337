@@ -762,14 +762,24 @@ export function OperatorConsole({
     () => getRecentLookupSuggestions(lookupHistory, jobId),
     [jobId, lookupHistory],
   );
-  const linkedWalletAddresses = useMemo(
-    () => new Set(profile?.wallets.map((wallet) => wallet.address) ?? []),
-    [profile],
-  );
+  const operatorCapabilities = profile?.capabilities ?? null;
   const arbitratorAddress = runtimeProfile?.operator.arbitratorAddress ?? null;
-  const controlsArbitratorWallet = Boolean(
-    arbitratorAddress && linkedWalletAddresses.has(arbitratorAddress),
-  );
+  const canAccessOperations =
+    operatorCapabilities?.escrowOperations.allowed ?? false;
+  const operationsCapabilityReason =
+    operatorCapabilities?.escrowOperations.reason ?? null;
+  const canRunChainAuditSync =
+    operatorCapabilities?.chainAuditSync.allowed ?? false;
+  const chainAuditSyncCapabilityReason =
+    operatorCapabilities?.chainAuditSync.reason ?? null;
+  const canImportJobHistory =
+    operatorCapabilities?.jobHistoryImport.allowed ?? false;
+  const jobHistoryImportCapabilityReason =
+    operatorCapabilities?.jobHistoryImport.reason ?? null;
+  const canResolveDisputes =
+    operatorCapabilities?.escrowResolution.allowed ?? false;
+  const resolveDisputesCapabilityReason =
+    operatorCapabilities?.escrowResolution.reason ?? null;
   const runtimeAlignment = describeRuntimeAlignment(
     adminApi.baseUrl,
     runtimeProfile,
@@ -786,7 +796,7 @@ export function OperatorConsole({
   const walkthrough = useOperatorLaunchWalkthrough({
     view,
     accessToken,
-    controlsArbitratorWallet,
+    controlsArbitratorWallet: canResolveDisputes,
     hasDisputedMilestone: disputedMilestoneCards.length > 0,
     caseLoaded: Boolean(audit),
     currentJobId: audit?.bundle.job.id ?? initialJobId ?? null,
@@ -810,7 +820,7 @@ export function OperatorConsole({
       return;
     }
 
-    if (!controlsArbitratorWallet) {
+    if (!canAccessOperations) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
       setChainIngestionStatus(null);
@@ -830,7 +840,7 @@ export function OperatorConsole({
     void loadEscrowHealth(accessToken, healthReasonFilter);
     void loadChainIngestionStatus(accessToken);
     void loadChainSyncDaemonStatus(accessToken);
-  }, [accessToken, controlsArbitratorWallet, healthReasonFilter]);
+  }, [accessToken, canAccessOperations, healthReasonFilter]);
 
   useEffect(() => {
     if (!escrowHealth) {
@@ -1547,8 +1557,8 @@ export function OperatorConsole({
               <strong>{profile?.email || 'No operator session'}</strong>
             </article>
             <article>
-              <span className={styles.metaLabel}>Arbitrator control</span>
-              <strong>{controlsArbitratorWallet ? 'Ready' : 'Missing'}</strong>
+              <span className={styles.metaLabel}>Resolution capability</span>
+              <strong>{canResolveDisputes ? 'Ready' : 'Blocked'}</strong>
             </article>
           </div>
           <div className={styles.stack}>
@@ -1644,14 +1654,17 @@ export function OperatorConsole({
                 />
                 <article className={styles.boundaryCard}>
                   <strong>
-                    {controlsArbitratorWallet
-                      ? 'Authenticated operator controls the arbitrator wallet.'
-                      : 'Operator resolution remains blocked until the configured arbitrator wallet is linked.'}
+                    {canResolveDisputes
+                      ? 'Authenticated operator can resolve disputes.'
+                      : 'Operator resolution remains blocked until the required capability is granted.'}
                   </strong>
                   <p className={styles.stateText}>
                     Required wallet:{' '}
                     {arbitratorAddress || 'Unavailable from backend runtime profile.'}
                   </p>
+                  {!canResolveDisputes && resolveDisputesCapabilityReason ? (
+                    <small>{resolveDisputesCapabilityReason}</small>
+                  ) : null}
                 </article>
               </>
             ) : (
@@ -1675,7 +1688,7 @@ export function OperatorConsole({
               <p className={styles.panelEyebrow}>Operations</p>
               <h2>Escrow operations health</h2>
             </div>
-            {controlsArbitratorWallet ? (
+            {canAccessOperations ? (
               <button
                 type="button"
                 className={styles.secondaryButton}
@@ -1752,12 +1765,12 @@ export function OperatorConsole({
                   escrow health cannot be authorized yet.
                 </p>
               </article>
-            ) : !controlsArbitratorWallet ? (
+            ) : !canAccessOperations ? (
               <article className={styles.boundaryCard}>
-                <strong>Link the configured arbitrator wallet to unlock operations health</strong>
+                <strong>Operator capability required for operations health</strong>
                 <p className={styles.stateText}>
-                  The current operator session must control {arbitratorAddress} before the backend
-                  will expose cross-job attention items.
+                  {operationsCapabilityReason ??
+                    `The current operator session must control ${arbitratorAddress} before the backend will expose cross-job attention items.`}
                 </p>
               </article>
             ) : (
@@ -1796,16 +1809,21 @@ export function OperatorConsole({
                       value={reconciliationImportJson}
                       onChange={(event) => setReconciliationImportJson(event.target.value)}
                       placeholder="Paste a job-history JSON export to preview replay-backed reconciliation."
+                      disabled={!canImportJobHistory}
                     />
                   </label>
                   <div className={styles.inlineActions}>
                     <button
                       type="button"
+                      disabled={!canImportJobHistory}
                       onClick={() => void handleImportJobHistoryReconciliation()}
                     >
                       Preview job-history import
                     </button>
                   </div>
+                  {!canImportJobHistory && jobHistoryImportCapabilityReason ? (
+                    <small>{jobHistoryImportCapabilityReason}</small>
+                  ) : null}
                   <StatusNotice
                     message={reconciliationImportState.message}
                     messageClassName={styles.stateText}
@@ -1893,6 +1911,7 @@ export function OperatorConsole({
                         value={chainSyncJobId}
                         onChange={(event) => setChainSyncJobId(event.target.value)}
                         placeholder="Paste a persisted job UUID"
+                        disabled={!canRunChainAuditSync}
                       />
                     </label>
                     <label className={styles.field}>
@@ -1901,6 +1920,7 @@ export function OperatorConsole({
                         value={chainSyncFromBlock}
                         onChange={(event) => setChainSyncFromBlock(event.target.value)}
                         placeholder="Optional lower bound"
+                        disabled={!canRunChainAuditSync}
                       />
                     </label>
                     <label className={styles.field}>
@@ -1909,21 +1929,30 @@ export function OperatorConsole({
                         value={chainSyncToBlock}
                         onChange={(event) => setChainSyncToBlock(event.target.value)}
                         placeholder="Optional upper bound"
+                        disabled={!canRunChainAuditSync}
                       />
                     </label>
                   </div>
                   <div className={styles.inlineActions}>
-                    <button type="button" onClick={() => void handleChainAuditSync(false)}>
+                    <button
+                      type="button"
+                      disabled={!canRunChainAuditSync}
+                      onClick={() => void handleChainAuditSync(false)}
+                    >
                       Preview chain audit
                     </button>
                     <button
                       type="button"
                       className={styles.secondaryButton}
+                      disabled={!canRunChainAuditSync}
                       onClick={() => void handleChainAuditSync(true)}
                     >
                       Persist chain audit
                     </button>
                   </div>
+                  {!canRunChainAuditSync && chainAuditSyncCapabilityReason ? (
+                    <small>{chainAuditSyncCapabilityReason}</small>
+                  ) : null}
                   <StatusNotice
                     message={chainSyncState.message}
                     messageClassName={styles.stateText}
@@ -2256,7 +2285,7 @@ export function OperatorConsole({
                 </article>
               </>
             )}
-            {controlsArbitratorWallet && escrowHealth && escrowHealth.jobs.length > 0 ? (
+            {canAccessOperations && escrowHealth && escrowHealth.jobs.length > 0 ? (
               escrowHealth.jobs.map((job) =>
                 (() => {
                   const isStaleJob = job.reasons.includes('stale_job');
@@ -2619,7 +2648,7 @@ export function OperatorConsole({
                   );
                 })(),
               )
-            ) : controlsArbitratorWallet && escrowHealth ? (
+            ) : canAccessOperations && escrowHealth ? (
               <EmptyStateCard
                 title="No jobs currently need attention"
                 message={`The backend did not report any jobs for ${getOperationsReasonFilterLabel(
@@ -2644,7 +2673,7 @@ export function OperatorConsole({
             </div>
           </header>
           <div className={styles.stack}>
-            {controlsArbitratorWallet && escrowHealth ? (
+            {canAccessOperations && escrowHealth ? (
               escrowHealth.jobs.filter((job) => job.reasons.includes('open_dispute')).length > 0 ? (
                 escrowHealth.jobs
                   .filter((job) => job.reasons.includes('open_dispute'))
@@ -2679,8 +2708,11 @@ export function OperatorConsole({
               )
             ) : (
               <EmptyStateCard
-                title="Authenticate and link the arbitrator wallet"
-                message="The dispute queue is only available after the operator session controls the configured arbitrator wallet."
+                title="Operator capability required"
+                message={
+                  operationsCapabilityReason ??
+                  'The dispute queue is only available after the operator session is granted operations capability.'
+                }
                 className={styles.emptyCard}
                 messageClassName={styles.stateText}
               />
@@ -2985,13 +3017,13 @@ export function OperatorConsole({
                     className={styles.emptyCard}
                     messageClassName={styles.stateText}
                   />
-                ) : !controlsArbitratorWallet ? (
+                ) : !canResolveDisputes ? (
                   <>
                     <article className={styles.boundaryCard}>
-                      <strong>Blocked by wallet authority</strong>
+                      <strong>Blocked by dispute-resolution capability</strong>
                       <p className={styles.stateText}>
-                        The authenticated session does not currently control the configured
-                        arbitrator wallet {arbitratorAddress}.
+                        {resolveDisputesCapabilityReason ??
+                          `The authenticated session does not currently control the configured arbitrator wallet ${arbitratorAddress}.`}
                       </p>
                     </article>
                   </>

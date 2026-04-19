@@ -4,6 +4,7 @@ import type {
   EscrowHealthReport,
   RuntimeProfile,
   SessionTokens,
+  UserCapabilities,
   UserProfile,
   WalletLinkChallenge,
   UserWallet,
@@ -46,15 +47,73 @@ export function createEoaWallet(
   };
 }
 
+export function createUserCapabilities(
+  overrides: DeepPartial<UserCapabilities> = {},
+  options: {
+    controlsArbitratorWallet?: boolean;
+    requiredWalletAddress?: string | null;
+  } = {},
+): UserCapabilities {
+  const requiredWalletAddress =
+    options.requiredWalletAddress ?? createHexAddress('2');
+  const controlsArbitratorWallet = options.controlsArbitratorWallet ?? false;
+  const baseCapability = {
+    allowed: controlsArbitratorWallet,
+    reason: controlsArbitratorWallet
+      ? 'Authenticated user controls the configured arbitrator wallet'
+      : 'Authenticated user must control the configured arbitrator wallet',
+    grantedBy: controlsArbitratorWallet
+      ? ('linked_arbitrator_wallet' as const)
+      : ('none' as const),
+    requiredWalletAddress,
+  };
+  const base: UserCapabilities = {
+    escrowResolution: { ...baseCapability },
+    escrowOperations: { ...baseCapability },
+    chainAuditSync: { ...baseCapability },
+    jobHistoryImport: { ...baseCapability },
+    marketplaceModeration: { ...baseCapability },
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    escrowResolution: {
+      ...base.escrowResolution,
+      ...overrides.escrowResolution,
+    },
+    escrowOperations: {
+      ...base.escrowOperations,
+      ...overrides.escrowOperations,
+    },
+    chainAuditSync: {
+      ...base.chainAuditSync,
+      ...overrides.chainAuditSync,
+    },
+    jobHistoryImport: {
+      ...base.jobHistoryImport,
+      ...overrides.jobHistoryImport,
+    },
+    marketplaceModeration: {
+      ...base.marketplaceModeration,
+      ...overrides.marketplaceModeration,
+    },
+  };
+}
+
 export function createUserProfile(
   wallets: UserWallet[] = [],
 ): UserProfile {
+  const controlsArbitratorWallet = wallets.some(
+    (wallet) => wallet.address === createHexAddress('2'),
+  );
   return {
     id: 'operator-user-1',
     email: 'operator@example.com',
     shariahMode: false,
     defaultExecutionWalletAddress: null,
     wallets,
+    capabilities: createUserCapabilities({}, { controlsArbitratorWallet }),
   };
 }
 

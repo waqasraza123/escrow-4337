@@ -4,7 +4,7 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.2: preserve provider-specific validation posture in launch evidence, promotion review, and release packets so staging failures are actionable without reading raw deployment-validation output.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.5: replace implicit wallet-authority heuristics with explicit privileged capability checks and blocked-state explanations for operator/moderation surfaces.
 
 ## Last Completed Step
 - Added the immediate execution docs and repo framing:
@@ -14,26 +14,34 @@
   - committed docs snapshot as `d01c547`
 
 ## Current Step
-- Task complete. Launch-candidate evidence, promotion review context, and the release dossier now preserve provider-specific validation posture instead of collapsing everything into a generic deployment-validation failure.
+- Task complete. Privileged operator and moderator paths now depend on explicit backend capability evaluation instead of scattered wallet heuristics.
 
 ## Why This Step Exists
-- The phased plan still needed an actionable entry point. The Phase 0 backlog now turns the highest-risk hardening work into concrete workstreams, and the README now matches the product and roadmap the repo is actually following.
+- Phase 0 still needed an explicit authorization baseline before broader RBAC work. High-risk actions were only protected by authentication plus duplicated arbitrator-wallet checks, and the admin UI had no server-authoritative explanation for blocked operator paths.
 
 ## Changed Files
-- Launch/release scripts:
-  `scripts/launch-candidate.mjs`
-  `scripts/launch-candidate-lib.mjs`
-  `scripts/release-dossier-lib.mjs`
-- Script tests:
-  `scripts/launch-candidate-lib.test.mjs`
-  `scripts/release-dossier-lib.test.mjs`
-- Backend verification references:
-  `services/api/test/deployment-validation.service.spec.ts`
-  `services/api/test/launch-readiness.service.spec.ts`
-  `services/api/test/runtime-profile.service.spec.ts`
-- Docs/memory:
-  `docs/incident-playbook.json`
-  `docs/LAUNCH_READINESS.md`
+- Backend capabilities/auth:
+  `services/api/src/modules/users/user-capabilities.service.ts`
+  `services/api/src/modules/users/users.module.ts`
+  `services/api/src/modules/users/users.types.ts`
+  `services/api/src/modules/auth/auth.service.ts`
+- Backend privileged-path enforcement:
+  `services/api/src/modules/marketplace/marketplace.service.ts`
+  `services/api/src/modules/operations/escrow-health.service.ts`
+  `services/api/src/modules/operations/escrow-chain-sync.service.ts`
+  `services/api/src/modules/operations/escrow-history-import.service.ts`
+  `services/api/src/modules/escrow/escrow.service.ts`
+- Admin/web profile types and admin blocked states:
+  `apps/admin/src/lib/api.ts`
+  `apps/admin/src/app/operator-console.tsx`
+  `apps/admin/src/app/marketplace/moderation-console.tsx`
+  `apps/admin/src/test/fixtures.ts`
+  `apps/web/src/lib/api.ts`
+  `apps/web/src/test/fixtures.ts`
+- Tests/docs:
+  `services/api/test/auth.integration.spec.ts`
+  `apps/admin/src/app/page.spec.tsx`
+  `apps/admin/src/app/marketplace/marketplace-moderation.spec.tsx`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -46,21 +54,53 @@
 
 ## Verification Commands
 - `git diff --check`
-- `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/auth.integration.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts`
 - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+- `pnpm --filter admin typecheck`
+- `pnpm --filter web typecheck`
+- `pnpm build`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
-  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/auth.integration.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts`
   - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
   - real `Deployed Smoke` execution against staging with the new strict target contract
   - real `Launch Candidate` execution against staging with the new strict target contract
 
 ## Next Likely Step
-- Run the richer provider-evidence contract against the actual staging environment, then fix whichever provider credentials, route mappings, or chain-target mismatches it exposes before moving on to deeper Phase 0 chain/reconciliation hardening.
+- Move to Phase 0 Workstream 0.3 and formalize the chain-event mirror/reconciliation baseline so operator tooling can distinguish chain truth, API-owned workflow state, and replay drift without manual reconstruction.
+
+## Update (2026-04-19, Privileged Capability Baseline)
+- Added `UserCapabilitiesService` under `services/api/src/modules/users` and extended auth/user profiles with explicit capabilities for:
+  - `escrowResolution`
+  - `escrowOperations`
+  - `chainAuditSync`
+  - `jobHistoryImport`
+  - `marketplaceModeration`
+- Current capability grant model is intentionally minimal and explicit:
+  - granted when the authenticated session controls the configured arbitrator wallet
+  - denied otherwise with a server-provided reason and required wallet address
+- Replaced duplicated privileged wallet checks in marketplace moderation, escrow operations health, chain-audit sync, job-history import preview, and dispute resolution with the shared capability service.
+- Updated admin consoles so blocked states now use server-authoritative capability posture instead of deriving access only from locally linked wallets.
+- Updated admin/web `UserProfile` types and fixtures to carry capabilities.
+- Verification:
+  - `git diff --check`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/auth.integration.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm build`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Provider Validation Evidence Contract)
 - Extended the launch-candidate artifact contract so provider posture is preserved as a first-class artifact:

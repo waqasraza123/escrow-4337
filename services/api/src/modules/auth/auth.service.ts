@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import { UsersService } from '../users/users.service';
 import { toUserProfile } from '../users/users.types';
 import { RefreshDto, StartDto, VerifyDto } from './auth.dto';
@@ -13,6 +14,7 @@ export class AuthService {
     private readonly otp: OtpStore,
     private readonly emailer: EmailService,
     private readonly users: UsersService,
+    private readonly userCapabilities: UserCapabilitiesService,
     private readonly jwt: JwtService,
     private readonly sessions: SessionsService,
   ) {}
@@ -53,7 +55,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: toUserProfile(user),
+      user: toUserProfile(user, this.userCapabilities.buildCapabilities(user)),
     };
   }
 
@@ -99,7 +101,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    return toUserProfile(user);
+    return toUserProfile(user, this.userCapabilities.buildCapabilities(user));
   }
 
   async setShariah(userId: string, value: boolean) {
@@ -107,6 +109,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    return toUserProfile(user);
+    return toUserProfile(user, this.userCapabilities.buildCapabilities(user));
   }
 }

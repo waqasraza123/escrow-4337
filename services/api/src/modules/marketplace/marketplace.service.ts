@@ -17,9 +17,9 @@ import type {
   MarketplaceRepository,
 } from '../../persistence/persistence.types';
 import type { EscrowMilestoneRecord } from '../escrow/escrow.types';
-import { EscrowActorService } from '../escrow/escrow-actor.service';
 import { EscrowService } from '../escrow/escrow.service';
 import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import { UsersService } from '../users/users.service';
 import {
   isEoaWallet,
@@ -193,8 +193,8 @@ export class MarketplaceService {
     private readonly escrowRepository: EscrowRepository,
     private readonly usersService: UsersService,
     private readonly escrowService: EscrowService,
-    private readonly escrowActorService: EscrowActorService,
     private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
+    private readonly userCapabilities: UserCapabilitiesService,
   ) {}
 
   async getMyProfile(userId: string): Promise<MarketplaceProfileResponse> {
@@ -2288,7 +2288,10 @@ export class MarketplaceService {
   }
 
   private async requireModerationAccess(userId: string) {
-    await this.escrowActorService.resolveArbitrator(userId);
+    await this.userCapabilities.requireCapability(
+      userId,
+      'marketplaceModeration',
+    );
   }
 
   private assertReportClaimedByOperator(

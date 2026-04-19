@@ -5,16 +5,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
-import { UsersService } from '../users/users.service';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import type {
   EscrowFailureRemediationStatus,
   EscrowExecutionRecord,
   EscrowJobRecord,
 } from '../escrow/escrow.types';
-import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
 import { EscrowOnchainAuthorityService } from './escrow-onchain-authority.service';
 import type {
   EscrowAttentionReason,
@@ -412,8 +410,7 @@ export class EscrowHealthService {
   constructor(
     @Inject(ESCROW_REPOSITORY)
     private readonly escrowRepository: EscrowRepository,
-    private readonly usersService: UsersService,
-    private readonly escrowContractConfig: EscrowContractConfigService,
+    private readonly userCapabilities: UserCapabilitiesService,
     private readonly operationsConfig: OperationsConfigService,
     private readonly reconciliationService: EscrowReconciliationService,
     private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
@@ -902,18 +899,10 @@ export class EscrowHealthService {
   }
 
   private async requireOperatorAccess(userId: string) {
-    const user = await this.usersService.getRequiredById(userId);
-    const arbitratorAddress = normalizeEvmAddress(
-      this.escrowContractConfig.arbitratorAddress,
+    return this.userCapabilities.requireCapability(
+      userId,
+      'escrowOperations',
     );
-
-    if (!this.usersService.userHasWalletAddress(user, arbitratorAddress)) {
-      throw new ForbiddenException(
-        'Authenticated user must control the configured arbitrator wallet',
-      );
-    }
-
-    return user;
   }
 
   private requireFailedExecutionDiagnostics(job: EscrowJobRecord) {

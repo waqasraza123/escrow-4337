@@ -52,6 +52,7 @@ import type {
 } from './escrow.types';
 import { EmailService } from '../auth/email.service';
 import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import { UsersService } from '../users/users.service';
 import { buildEscrowExportDocument } from './escrow-export';
 
@@ -131,6 +132,7 @@ export class EscrowService {
     private readonly emailService: EmailService,
     private readonly usersService: UsersService,
     private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
+    private readonly userCapabilities: UserCapabilitiesService,
   ) {}
 
   async listJobsForUser(userId: string): Promise<EscrowJobsListResponse> {
@@ -835,8 +837,8 @@ export class EscrowService {
     dto: ResolveMilestoneDto,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
-    const actorAddress =
-      await this.escrowActorService.resolveArbitrator(userId);
+    await this.userCapabilities.requireCapability(userId, 'escrowResolution');
+    const actorAddress = await this.escrowActorService.resolveArbitrator(userId);
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
 
     if (milestone.status !== 'disputed') {

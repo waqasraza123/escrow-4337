@@ -3,6 +3,7 @@ import type {
   JobView,
   JobsListResponse,
   SessionTokens,
+  UserCapabilities,
   UserProfile,
   VerifyResponse,
   RuntimeProfile,
@@ -82,6 +83,49 @@ export function createWalletState(): WalletState {
   };
 }
 
+export function createUserCapabilities(
+  overrides: DeepPartial<UserCapabilities> = {},
+): UserCapabilities {
+  const baseCapability = {
+    allowed: false,
+    reason: null,
+    grantedBy: 'none' as const,
+    requiredWalletAddress: null,
+  };
+  const base: UserCapabilities = {
+    escrowResolution: { ...baseCapability },
+    escrowOperations: { ...baseCapability },
+    chainAuditSync: { ...baseCapability },
+    jobHistoryImport: { ...baseCapability },
+    marketplaceModeration: { ...baseCapability },
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    escrowResolution: {
+      ...base.escrowResolution,
+      ...overrides.escrowResolution,
+    },
+    escrowOperations: {
+      ...base.escrowOperations,
+      ...overrides.escrowOperations,
+    },
+    chainAuditSync: {
+      ...base.chainAuditSync,
+      ...overrides.chainAuditSync,
+    },
+    jobHistoryImport: {
+      ...base.jobHistoryImport,
+      ...overrides.jobHistoryImport,
+    },
+    marketplaceModeration: {
+      ...base.marketplaceModeration,
+      ...overrides.marketplaceModeration,
+    },
+  };
+}
+
 export function createUserProfile(): UserProfile {
   const walletState = createWalletState();
 
@@ -91,6 +135,7 @@ export function createUserProfile(): UserProfile {
     shariahMode: false,
     defaultExecutionWalletAddress: walletState.defaultExecutionWalletAddress,
     wallets: walletState.wallets,
+    capabilities: createUserCapabilities(),
   };
 }
 

@@ -98,6 +98,14 @@ describe('Auth integration', () => {
         shariahMode: false,
         defaultExecutionWalletAddress: null,
         wallets: [],
+        capabilities: expect.objectContaining({
+          escrowResolution: expect.objectContaining({
+            allowed: false,
+          }),
+          marketplaceModeration: expect.objectContaining({
+            allowed: false,
+          }),
+        }),
       }),
     );
     expect(verifyResult.accessToken).toEqual(expect.any(String));
@@ -110,6 +118,11 @@ describe('Auth integration', () => {
         shariahMode: false,
         defaultExecutionWalletAddress: null,
         wallets: [],
+        capabilities: expect.objectContaining({
+          escrowOperations: expect.objectContaining({
+            allowed: false,
+          }),
+        }),
       }),
     );
 
@@ -123,6 +136,11 @@ describe('Auth integration', () => {
         shariahMode: true,
         defaultExecutionWalletAddress: null,
         wallets: [],
+        capabilities: expect.objectContaining({
+          jobHistoryImport: expect.objectContaining({
+            allowed: false,
+          }),
+        }),
       }),
     );
 

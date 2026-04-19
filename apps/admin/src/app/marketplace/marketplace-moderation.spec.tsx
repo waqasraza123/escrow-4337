@@ -4,7 +4,7 @@ import {
   seedJsonStorage,
 } from '@escrow4334/frontend-core/testing';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sessionStorageKey = 'escrow4337.admin.session';
 
@@ -29,6 +29,10 @@ vi.mock('../../lib/api', () => ({
 import MarketplaceModerationPage from './page';
 
 describe('marketplace moderation page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders moderation summaries and rows from the operator session', async () => {
     const user = userEvent.setup();
     seedJsonStorage(sessionStorageKey, {
@@ -41,6 +45,38 @@ describe('marketplace moderation page', () => {
       shariahMode: false,
       defaultExecutionWalletAddress: null,
       wallets: [],
+      capabilities: {
+        escrowResolution: {
+          allowed: true,
+          reason: 'Authenticated user controls the configured arbitrator wallet',
+          grantedBy: 'linked_arbitrator_wallet',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        escrowOperations: {
+          allowed: true,
+          reason: 'Authenticated user controls the configured arbitrator wallet',
+          grantedBy: 'linked_arbitrator_wallet',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        chainAuditSync: {
+          allowed: true,
+          reason: 'Authenticated user controls the configured arbitrator wallet',
+          grantedBy: 'linked_arbitrator_wallet',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        jobHistoryImport: {
+          allowed: true,
+          reason: 'Authenticated user controls the configured arbitrator wallet',
+          grantedBy: 'linked_arbitrator_wallet',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        marketplaceModeration: {
+          allowed: true,
+          reason: 'Authenticated user controls the configured arbitrator wallet',
+          grantedBy: 'linked_arbitrator_wallet',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+      },
     });
     mockedAdminApi.getMarketplaceModerationDashboard.mockResolvedValue({
       generatedAt: new Date().toISOString(),
@@ -419,5 +455,73 @@ describe('marketplace moderation page', () => {
         'access-token-123',
       );
     });
+  });
+
+  it('explains when the operator session is authenticated but lacks moderation capability', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedAdminApi.me.mockResolvedValue({
+      id: 'operator-1',
+      email: 'operator@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {
+        escrowResolution: {
+          allowed: false,
+          reason: 'Authenticated user must control the configured arbitrator wallet',
+          grantedBy: 'none',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        escrowOperations: {
+          allowed: false,
+          reason: 'Authenticated user must control the configured arbitrator wallet',
+          grantedBy: 'none',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        chainAuditSync: {
+          allowed: false,
+          reason: 'Authenticated user must control the configured arbitrator wallet',
+          grantedBy: 'none',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        jobHistoryImport: {
+          allowed: false,
+          reason: 'Authenticated user must control the configured arbitrator wallet',
+          grantedBy: 'none',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+        marketplaceModeration: {
+          allowed: false,
+          reason: 'Authenticated user must control the configured arbitrator wallet',
+          grantedBy: 'none',
+          requiredWalletAddress: '0x2222222222222222222222222222222222222222',
+        },
+      },
+    });
+
+    renderApp(<MarketplaceModerationPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Marketplace moderation capability required'),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(
+        'Authenticated user must control the configured arbitrator wallet',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      mockedAdminApi.getMarketplaceModerationDashboard,
+    ).not.toHaveBeenCalled();
+    expect(mockedAdminApi.listMarketplaceModerationProfiles).not.toHaveBeenCalled();
+    expect(
+      mockedAdminApi.listMarketplaceModerationOpportunities,
+    ).not.toHaveBeenCalled();
+    expect(mockedAdminApi.listMarketplaceModerationReports).not.toHaveBeenCalled();
   });
 });

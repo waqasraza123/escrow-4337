@@ -33,12 +33,28 @@ export type UserWallet =
       provisionedAt: number;
     };
 
+export type UserCapability = {
+  allowed: boolean;
+  reason: string | null;
+  grantedBy: 'linked_arbitrator_wallet' | 'none';
+  requiredWalletAddress: string | null;
+};
+
+export type UserCapabilities = {
+  escrowResolution: UserCapability;
+  escrowOperations: UserCapability;
+  chainAuditSync: UserCapability;
+  jobHistoryImport: UserCapability;
+  marketplaceModeration: UserCapability;
+};
+
 export type UserProfile = {
   id: string;
   email: string;
   shariahMode: boolean;
   defaultExecutionWalletAddress: string | null;
   wallets: UserWallet[];
+  capabilities: UserCapabilities;
 };
 
 export type WalletState = {

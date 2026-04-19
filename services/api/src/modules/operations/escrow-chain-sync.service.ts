@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -25,7 +24,7 @@ import type {
   MilestoneStatus,
 } from '../escrow/escrow.types';
 import { EscrowContractConfigService } from '../escrow/onchain/escrow-contract.config';
-import { UsersService } from '../users/users.service';
+import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import {
   ESCROW_CHAIN_LOG_PROVIDER,
   type EscrowChainLog,
@@ -527,7 +526,7 @@ export class EscrowChainSyncService {
     private readonly escrowRepository: EscrowRepository,
     @Inject(ESCROW_CHAIN_LOG_PROVIDER)
     private readonly chainLogProvider: EscrowChainLogProvider,
-    private readonly usersService: UsersService,
+    private readonly userCapabilities: UserCapabilitiesService,
     private readonly operationsConfig: OperationsConfigService,
     private readonly escrowContractConfig: EscrowContractConfigService,
     private readonly escrowHealthService: EscrowHealthService,
@@ -1703,17 +1702,6 @@ export class EscrowChainSyncService {
   }
 
   private async requireOperatorAccess(userId: string) {
-    const user = await this.usersService.getRequiredById(userId);
-    const arbitratorAddress = normalizeEvmAddress(
-      this.escrowContractConfig.arbitratorAddress,
-    );
-
-    if (!this.usersService.userHasWalletAddress(user, arbitratorAddress)) {
-      throw new ForbiddenException(
-        'Authenticated user must control the configured arbitrator wallet',
-      );
-    }
-
-    return user;
+    await this.userCapabilities.requireCapability(userId, 'chainAuditSync');
   }
 }

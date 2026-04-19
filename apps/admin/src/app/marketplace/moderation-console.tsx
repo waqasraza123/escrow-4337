@@ -80,6 +80,9 @@ function writeSession(tokens: SessionTokens | null) {
 export function MarketplaceModerationConsole() {
   const [tokens, setTokens] = useState<SessionTokens | null>(null);
   const [operator, setOperator] = useState<UserProfile | null>(null);
+  const [capabilityBlockMessage, setCapabilityBlockMessage] = useState<
+    string | null
+  >(null);
   const [dashboard, setDashboard] = useState<MarketplaceModerationDashboard | null>(
     null,
   );
@@ -115,9 +118,11 @@ export function MarketplaceModerationConsole() {
     nextReportFilters = reportFilters,
   ) {
     setError(null);
+    setCapabilityBlockMessage(null);
 
     if (!nextTokens) {
       setOperator(null);
+      setCapabilityBlockMessage(null);
       setDashboard(null);
       setProfiles([]);
       setOpportunities([]);
@@ -126,25 +131,36 @@ export function MarketplaceModerationConsole() {
     }
 
     try {
+      const me = await adminApi.me(nextTokens.accessToken);
+      setOperator(me);
+
+      if (!me.capabilities.marketplaceModeration.allowed) {
+        setCapabilityBlockMessage(
+          me.capabilities.marketplaceModeration.reason ??
+            'Marketplace moderation capability is required for this surface.',
+        );
+        setDashboard(null);
+        setProfiles([]);
+        setOpportunities([]);
+        setReports([]);
+        return;
+      }
+
       const [
-        me,
         dashboardResponse,
         profilesResponse,
         opportunitiesResponse,
         reportsResponse,
-      ] =
-        await Promise.all([
-          adminApi.me(nextTokens.accessToken),
-          adminApi.getMarketplaceModerationDashboard(nextTokens.accessToken),
-          adminApi.listMarketplaceModerationProfiles(nextTokens.accessToken),
-          adminApi.listMarketplaceModerationOpportunities(nextTokens.accessToken),
-          adminApi.listMarketplaceModerationReports(
-            { ...nextReportFilters, limit: 50 },
-            nextTokens.accessToken,
-          ),
-        ]);
+      ] = await Promise.all([
+        adminApi.getMarketplaceModerationDashboard(nextTokens.accessToken),
+        adminApi.listMarketplaceModerationProfiles(nextTokens.accessToken),
+        adminApi.listMarketplaceModerationOpportunities(nextTokens.accessToken),
+        adminApi.listMarketplaceModerationReports(
+          { ...nextReportFilters, limit: 50 },
+          nextTokens.accessToken,
+        ),
+      ]);
 
-      setOperator(me);
       setDashboard(dashboardResponse);
       setProfiles(profilesResponse.profiles);
       setOpportunities(opportunitiesResponse.opportunities);
@@ -177,7 +193,11 @@ export function MarketplaceModerationConsole() {
     userId: string,
     moderationStatus: MarketplaceModerationStatus,
   ) {
-    if (!tokens) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
       return;
     }
 
@@ -194,7 +214,11 @@ export function MarketplaceModerationConsole() {
     opportunityId: string,
     moderationStatus: MarketplaceModerationStatus,
   ) {
-    if (!tokens) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
       return;
     }
 
@@ -212,7 +236,11 @@ export function MarketplaceModerationConsole() {
     status: MarketplaceAbuseReportStatus,
     subjectModerationStatus?: MarketplaceModerationStatus | null,
   ) {
-    if (!tokens) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
       return;
     }
 
@@ -298,7 +326,11 @@ export function MarketplaceModerationConsole() {
     report: MarketplaceAbuseReport,
     claimAction: 'claim' | 'release',
   ) {
-    if (!tokens) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
       return;
     }
 
@@ -323,7 +355,11 @@ export function MarketplaceModerationConsole() {
     report: MarketplaceAbuseReport,
     escalationReason: string | null,
   ) {
-    if (!tokens) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
       return;
     }
 
@@ -395,7 +431,16 @@ export function MarketplaceModerationConsole() {
         />
       ) : null}
 
-      {operator && dashboard ? (
+      {tokens && capabilityBlockMessage ? (
+        <EmptyStateCard
+          className={styles.panel}
+          title="Marketplace moderation capability required"
+          message={capabilityBlockMessage}
+          messageClassName={styles.stateText}
+        />
+      ) : null}
+
+      {operator && dashboard && !capabilityBlockMessage ? (
         <>
           <SectionCard
             className={styles.panel}

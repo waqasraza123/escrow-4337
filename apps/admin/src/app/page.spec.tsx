@@ -399,11 +399,11 @@ describe('admin page', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Link the configured arbitrator wallet to unlock operations health'),
+        screen.getByText('Operator capability required for operations health'),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Operator resolution remains blocked until the configured arbitrator wallet is linked.',
+          'Operator resolution remains blocked until the required capability is granted.',
         ),
       ).toBeInTheDocument();
     });

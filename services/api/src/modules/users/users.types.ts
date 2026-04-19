@@ -43,12 +43,31 @@ export type UserRecord = {
   updatedAt: number;
 };
 
+export type UserCapabilityName =
+  | 'escrowResolution'
+  | 'escrowOperations'
+  | 'chainAuditSync'
+  | 'jobHistoryImport'
+  | 'marketplaceModeration';
+
+export type UserCapabilityGrantSource = 'linked_arbitrator_wallet' | 'none';
+
+export type UserCapability = {
+  allowed: boolean;
+  reason: string | null;
+  grantedBy: UserCapabilityGrantSource;
+  requiredWalletAddress: string | null;
+};
+
+export type UserCapabilities = Record<UserCapabilityName, UserCapability>;
+
 export type UserProfile = {
   id: string;
   email: string;
   shariahMode: boolean;
   defaultExecutionWalletAddress: string | null;
   wallets: UserWalletRecord[];
+  capabilities: UserCapabilities;
 };
 
 export type LinkEoaWalletInput = {
@@ -78,13 +97,52 @@ export type LinkUserWalletInput =
   | LinkEoaWalletInput
   | LinkSmartAccountWalletInput;
 
-export function toUserProfile(user: UserRecord): UserProfile {
+export function createEmptyUserCapabilities(): UserCapabilities {
+  return {
+    escrowResolution: {
+      allowed: false,
+      reason: null,
+      grantedBy: 'none',
+      requiredWalletAddress: null,
+    },
+    escrowOperations: {
+      allowed: false,
+      reason: null,
+      grantedBy: 'none',
+      requiredWalletAddress: null,
+    },
+    chainAuditSync: {
+      allowed: false,
+      reason: null,
+      grantedBy: 'none',
+      requiredWalletAddress: null,
+    },
+    jobHistoryImport: {
+      allowed: false,
+      reason: null,
+      grantedBy: 'none',
+      requiredWalletAddress: null,
+    },
+    marketplaceModeration: {
+      allowed: false,
+      reason: null,
+      grantedBy: 'none',
+      requiredWalletAddress: null,
+    },
+  };
+}
+
+export function toUserProfile(
+  user: UserRecord,
+  capabilities: UserCapabilities = createEmptyUserCapabilities(),
+): UserProfile {
   return {
     id: user.id,
     email: user.email,
     shariahMode: user.shariahMode,
     defaultExecutionWalletAddress: user.defaultExecutionWalletAddress,
     wallets: structuredClone(user.wallets),
+    capabilities: structuredClone(capabilities),
   };
 }
 
