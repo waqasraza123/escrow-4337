@@ -10,9 +10,9 @@ import {
   PageTopBar,
   SectionCard,
   SectionHeading,
-  SurfaceCard,
   formatTimestamp,
 } from '@escrow4334/frontend-core';
+import { RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
 import { AbuseReportPanel } from '../../abuse-report-panel';
 import {
   webApi,
@@ -95,19 +95,19 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
 
         {opportunity ? (
           <>
-            <section className="grid items-start gap-7 rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
+            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[linear-gradient(145deg,rgba(10,22,38,0.96),rgba(4,10,19,0.98))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
               <SectionHeading
                 eyebrow={marketplaceMessages.opportunityDetail.briefEyebrow(
                   marketplaceMessages.labels.visibility[opportunity.visibility],
                 )}
                 title={opportunity.title}
-                titleClassName="max-w-[9.8ch] text-[clamp(2.9rem,6vw,5.5rem)] leading-[0.92]"
+                titleClassName="max-w-[9.8ch] text-[clamp(3rem,6vw,5.8rem)] leading-[0.9]"
                 description={opportunity.summary}
                 descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
               />
-              <SurfaceCard
-                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-6"
-                elevated
+              <SharedCard
+                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(11,24,42,0.92),rgba(7,16,30,0.96))] p-6"
+                layoutId={`marketplace-opportunity-${opportunity.id}`}
               >
                 <FactGrid className="md:grid-cols-1">
                   <FactItem
@@ -127,14 +127,14 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                     }
                   />
                 </FactGrid>
-              </SurfaceCard>
-            </section>
+              </SharedCard>
+            </RevealSection>
 
-            <section className="grid gap-5 xl:grid-cols-2">
+            <RevealSection className="fx-fade-up fx-fade-up-delay-1 grid gap-5 xl:grid-cols-2" delay={0.08}>
               <SectionCard
                 eyebrow={marketplaceMessages.opportunityDetail.scopeEyebrow}
                 title={marketplaceMessages.opportunityDetail.scopeTitle}
-                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
                 headerClassName="mb-5"
               >
                 <p className="text-sm leading-6 text-[var(--foreground-soft)]">
@@ -183,7 +183,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.opportunityDetail.hiringSpecEyebrow}
                 title={marketplaceMessages.opportunityDetail.fitRequirementsTitle}
-                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
                 headerClassName="mb-5"
               >
                 <div className="grid gap-4">
@@ -258,11 +258,11 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Button asChild>
+                    <SpotlightButton asChild>
                       <Link href="/app/marketplace">
                         {marketplaceMessages.actions.applyFromWorkspace}
                       </Link>
-                    </Button>
+                    </SpotlightButton>
                   </div>
                 </div>
               </SectionCard>
@@ -275,7 +275,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                   )
                 }
               />
-            </section>
+            </RevealSection>
           </>
         ) : null}
       </PageContainer>

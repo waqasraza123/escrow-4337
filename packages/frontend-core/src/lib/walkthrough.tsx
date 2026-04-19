@@ -29,28 +29,31 @@ const walkthroughBackdropStyle: CSSProperties = {
 const walkthroughShadeStyle: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(7, 12, 18, 0.28)',
+  background:
+    'radial-gradient(circle at top, rgba(147, 198, 255, 0.12), transparent 34%), rgba(4, 10, 18, 0.42)',
+  backdropFilter: 'blur(14px)',
 };
 
 const walkthroughCoachmarkStyle: CSSProperties = {
   position: 'fixed',
   zIndex: 91,
   width: 'min(380px, calc(100vw - 32px))',
-  borderRadius: '22px',
-  background: 'rgba(255, 255, 255, 0.98)',
-  color: '#1e1610',
-  padding: '18px 18px 16px',
-  boxShadow: '0 24px 60px rgba(15, 22, 32, 0.28)',
-  border: '1px solid rgba(74, 49, 27, 0.14)',
+  borderRadius: '26px',
+  background: 'linear-gradient(180deg, rgba(248, 252, 255, 0.94), rgba(233, 241, 250, 0.9))',
+  color: '#102034',
+  padding: '20px 20px 18px',
+  boxShadow: '0 28px 80px rgba(6, 15, 30, 0.28)',
+  border: '1px solid rgba(162, 184, 212, 0.34)',
+  backdropFilter: 'blur(22px)',
   pointerEvents: 'auto',
 };
 
 const walkthroughCoachmarkDarkStyle: CSSProperties = {
   ...walkthroughCoachmarkStyle,
-  background: 'rgba(12, 17, 24, 0.96)',
-  color: '#f2f5f8',
-  border: '1px solid rgba(145, 164, 189, 0.18)',
-  boxShadow: '0 24px 60px rgba(4, 10, 16, 0.4)',
+  background: 'linear-gradient(180deg, rgba(10, 18, 31, 0.92), rgba(13, 21, 36, 0.88))',
+  color: '#f3f7fb',
+  border: '1px solid rgba(145, 164, 189, 0.24)',
+  boxShadow: '0 28px 80px rgba(4, 10, 16, 0.46)',
 };
 
 const walkthroughButtonRowStyle: CSSProperties = {
@@ -61,21 +64,23 @@ const walkthroughButtonRowStyle: CSSProperties = {
 };
 
 const walkthroughPrimaryButtonStyle: CSSProperties = {
-  border: 'none',
+  border: '1px solid rgba(99, 215, 255, 0.24)',
   borderRadius: '999px',
-  padding: '10px 14px',
-  background: '#c86a1d',
-  color: '#fffaf5',
+  padding: '10px 15px',
+  background: 'linear-gradient(135deg, #8ddfff, #8d98ff, #b88fff)',
+  color: '#04101d',
   font: 'inherit',
   fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: '0 18px 40px rgba(84, 146, 255, 0.22)',
 };
 
 const walkthroughSecondaryButtonStyle: CSSProperties = {
   ...walkthroughPrimaryButtonStyle,
-  background: 'transparent',
+  background: 'rgba(255, 255, 255, 0.04)',
   color: 'inherit',
-  border: '1px solid rgba(127, 97, 65, 0.26)',
+  border: '1px solid rgba(145, 164, 189, 0.24)',
+  boxShadow: 'none',
 };
 
 function createDefaultWalkthroughState(): StoredWalkthroughState {
@@ -320,8 +325,8 @@ export function WalkthroughOverlay(props: {
             borderRadius: 22,
             boxShadow:
               tone === 'dark'
-                ? '0 0 0 3px rgba(148, 196, 255, 0.92), 0 0 0 9999px rgba(7, 12, 18, 0.28)'
-                : '0 0 0 3px rgba(200, 106, 29, 0.94), 0 0 0 9999px rgba(7, 12, 18, 0.28)',
+                ? '0 0 0 1px rgba(176, 212, 255, 0.92), 0 0 0 8px rgba(96, 172, 255, 0.18), 0 0 0 9999px rgba(7, 12, 18, 0.24)'
+                : '0 0 0 1px rgba(122, 196, 255, 0.88), 0 0 0 8px rgba(122, 196, 255, 0.16), 0 0 0 9999px rgba(7, 12, 18, 0.24)',
             pointerEvents: 'none',
           }}
         />

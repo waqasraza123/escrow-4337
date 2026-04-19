@@ -106,7 +106,7 @@ export function AbuseReportPanel({
     <SectionCard
       eyebrow={reportingMessages.eyebrow}
       title={reportingMessages.title}
-      className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7"
+      className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
       headerClassName="mb-5"
       contentClassName="gap-4"
     >

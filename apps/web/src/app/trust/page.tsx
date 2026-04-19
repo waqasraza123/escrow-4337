@@ -6,6 +6,7 @@ import {
   PageContainer,
   SectionHeading,
 } from '@escrow4334/frontend-core';
+import { GlassPanel, RevealSection, SharedCard } from '@escrow4334/frontend-core/spatial';
 import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
 import { useWebI18n } from '../../lib/i18n';
@@ -27,19 +28,37 @@ export default function TrustPage() {
           <LanguageSwitcher className={styles.languageSwitcher} theme="web" />
         </nav>
 
-        <section className={styles.section}>
-          <SectionHeading title={trustMessages.escrowTitle} />
-          <div className={styles.sectionBody}>
-            <p>{trustMessages.escrowIntro}</p>
-            <ul className={styles.list}>
-              {trustMessages.escrowList.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+        <RevealSection className={styles.section}>
+          <div className={styles.splitSection}>
+            <div className={styles.sectionBody}>
+              <SectionHeading title={trustMessages.escrowTitle} />
+              <p>{trustMessages.escrowIntro}</p>
+              <ul className={styles.list}>
+                {trustMessages.escrowList.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <GlassPanel as="aside" className={styles.railCard} tone="quiet">
+              <SectionHeading
+                title={trustMessages.implementedTitle}
+                titleClassName="text-[1.2rem]"
+              />
+              <div className={styles.railList}>
+                {trustMessages.proofCards.slice(0, 2).map((card) => (
+                  <div key={card.title} className={styles.railItem}>
+                    <strong className="mb-1 block text-[var(--foreground)]">
+                      {card.title}
+                    </strong>
+                    {card.body}
+                  </div>
+                ))}
+              </div>
+            </GlassPanel>
           </div>
-        </section>
+        </RevealSection>
 
-        <section className={styles.section}>
+        <RevealSection className={styles.section} delay={0.08}>
           <SectionHeading title={trustMessages.disputesTitle} />
           <div className={styles.sectionBody}>
             <p>{trustMessages.disputesIntro}</p>
@@ -49,21 +68,22 @@ export default function TrustPage() {
               ))}
             </ul>
           </div>
-        </section>
+        </RevealSection>
 
-        <section className={styles.section}>
+        <RevealSection className={styles.section} delay={0.12}>
           <SectionHeading title={trustMessages.implementedTitle} />
           <div className={styles.proofGrid}>
             {trustMessages.proofCards.map((card) => (
-              <FeatureCard
-                key={card.title}
-                body={card.body}
-                className={styles.proofCard}
-                title={card.title}
-              />
+              <SharedCard key={card.title} className={styles.proofCard} interactive>
+                <FeatureCard
+                  body={card.body}
+                  className="rounded-none border-0 bg-transparent p-0 shadow-none before:hidden"
+                  title={card.title}
+                />
+              </SharedCard>
             ))}
           </div>
-        </section>
+        </RevealSection>
       </PageContainer>
     </main>
   );

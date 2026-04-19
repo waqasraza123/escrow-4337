@@ -42,6 +42,12 @@ import {
   signMessageWithInjectedWallet,
   subscribeInjectedWallet,
 } from '../lib/injected-wallet';
+import {
+  MotionEmptyState,
+  RevealSection,
+  SharedCard,
+  SpotlightButton,
+} from '@escrow4334/frontend-core/spatial';
 import { useWebI18n } from '../lib/i18n';
 import {
   buildJobLifecycleCards,
@@ -1903,69 +1909,78 @@ export function EscrowConsole({
 
   return (
     <ConsolePage theme="web">
-      <PageTopBar
-        eyebrow={messages.console.topBarLabel}
-        description={messages.console.topBarMeta}
-        className={styles.topBar}
-        contentClassName={styles.topBarContent}
-        actions={
-          <>
-            {walkthrough.launcher}
-            <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
-              Read the manual
-            </Link>
-            <LanguageSwitcher
-              className={styles.languageSwitcher}
-              labelClassName={styles.languageSwitcherLabel}
-              optionClassName={styles.languageSwitcherOption}
-              optionActiveClassName={styles.languageSwitcherOptionActive}
-            />
-          </>
-        }
-      />
-      {walkthrough.notice ? (
-        <StatusNotice
-          message={walkthrough.notice}
-          messageClassName={styles.stateText}
+      <RevealSection>
+        <PageTopBar
+          eyebrow={messages.console.topBarLabel}
+          description={messages.console.topBarMeta}
+          className={styles.topBar}
+          contentClassName={styles.topBarContent}
+          actions={
+            <>
+              {walkthrough.launcher}
+              <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
+                Read the manual
+              </Link>
+              <LanguageSwitcher
+                className={styles.languageSwitcher}
+                labelClassName={styles.languageSwitcherLabel}
+                optionClassName={styles.languageSwitcherOption}
+                optionActiveClassName={styles.languageSwitcherOptionActive}
+              />
+            </>
+          }
         />
+      </RevealSection>
+      {walkthrough.notice ? (
+        <RevealSection as="div" delay={0.04}>
+          <SharedCard className="p-4">
+            <StatusNotice
+              message={walkthrough.notice}
+              messageClassName={styles.stateText}
+            />
+          </SharedCard>
+        </RevealSection>
       ) : null}
-      <HeroPanel
-        theme="web"
-        eyebrow={frame.eyebrow}
-        title={frame.title}
-        description={frame.copy}
-        summary={
-          <FactGrid className="md:grid-cols-2">
-            <FactItem
-              label={messages.console.runtime.apiBaseUrl}
-              value={webApi.baseUrl}
-              dir="ltr"
-            />
-            <FactItem
-              label={messages.console.runtime.backendProfile}
-              value={
-                runtimeProfile
-                  ? getRuntimeProfileText(runtimeProfile.profile, messages)
-                  : messages.common.loading
-              }
-            />
-            <FactItem
-              label={messages.console.runtime.session}
-              value={
-                accessToken
-                  ? messages.common.authenticated
-                  : messages.common.signedOut
-              }
-            />
-            <FactItem
-              label={messages.console.runtime.jobsInView}
-              value={jobsResponse.jobs.length}
-            />
-          </FactGrid>
-        }
-      />
+      <RevealSection delay={0.08}>
+        <HeroPanel
+          theme="web"
+          eyebrow={frame.eyebrow}
+          title={frame.title}
+          description={frame.copy}
+          summary={
+            <FactGrid className="md:grid-cols-2">
+              <FactItem
+                label={messages.console.runtime.apiBaseUrl}
+                value={webApi.baseUrl}
+                dir="ltr"
+              />
+              <FactItem
+                label={messages.console.runtime.backendProfile}
+                value={
+                  runtimeProfile
+                    ? getRuntimeProfileText(runtimeProfile.profile, messages)
+                    : messages.common.loading
+                }
+              />
+              <FactItem
+                label={messages.console.runtime.session}
+                value={
+                  accessToken
+                    ? messages.common.authenticated
+                    : messages.common.signedOut
+                }
+              />
+              <FactItem
+                label={messages.console.runtime.jobsInView}
+                value={jobsResponse.jobs.length}
+              />
+            </FactGrid>
+          }
+        />
+      </RevealSection>
 
       {showRuntime ? (
+      <RevealSection delay={0.12}>
       <SectionCard
         eyebrow="Runtime"
         title={messages.console.runtime.title}
@@ -2083,6 +2098,7 @@ export function EscrowConsole({
           ) : null}
         </div>
       </SectionCard>
+      </RevealSection>
       ) : null}
 
       {showAccess ? (
@@ -2751,12 +2767,14 @@ export function EscrowConsole({
           </header>
           <div className={styles.jobList}>
             {jobsResponse.jobs.length === 0 ? (
-              <EmptyStateCard
-                title={messages.console.portfolio.emptyTitle}
-                message={messages.console.portfolio.emptyMessage}
-                className={styles.timelineCard}
-                messageClassName={styles.muted}
-              />
+              <MotionEmptyState>
+                <EmptyStateCard
+                  title={messages.console.portfolio.emptyTitle}
+                  message={messages.console.portfolio.emptyMessage}
+                  className={styles.timelineCard}
+                  messageClassName={styles.muted}
+                />
+              </MotionEmptyState>
             ) : (
               jobsResponse.jobs.map((entry) => (
                 <button
@@ -2767,18 +2785,23 @@ export function EscrowConsole({
                   }`}
                   onClick={() => setSelectedJobId(entry.job.id)}
                   >
-                  <div>
-                    <strong>{entry.job.title}</strong>
-                    <p>{messages.console.composer.categories[entry.job.category as keyof typeof messages.console.composer.categories] ?? entry.job.category}</p>
-                  </div>
-                  <div>
-                    <span>{getJobStatusLabel(entry.job.status, messages)}</span>
-                    <small>
-                      {entry.participantRoles
-                        .map((role) => messages.console.labels.role[role])
-                        .join(', ')}
-                    </small>
-                  </div>
+                  <SharedCard
+                    className="w-full rounded-[1.35rem] border-0 bg-transparent p-0 shadow-none before:hidden"
+                    layoutId={`web-job-${entry.job.id}`}
+                  >
+                    <div>
+                      <strong>{entry.job.title}</strong>
+                      <p>{messages.console.composer.categories[entry.job.category as keyof typeof messages.console.composer.categories] ?? entry.job.category}</p>
+                    </div>
+                    <div>
+                      <span>{getJobStatusLabel(entry.job.status, messages)}</span>
+                      <small>
+                        {entry.participantRoles
+                          .map((role) => messages.console.labels.role[role])
+                          .join(', ')}
+                      </small>
+                    </div>
+                  </SharedCard>
                 </button>
               ))
             )}
@@ -2799,6 +2822,10 @@ export function EscrowConsole({
         {selectedJobView ? (
           <div className={styles.detailGrid}>
             <div className={styles.stack}>
+              <SharedCard
+                className="rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.44)] p-4 shadow-[var(--surface-shadow)]"
+                layoutId={`web-job-${selectedJobView.id}`}
+              >
               <div className={styles.summaryGrid}>
                 <article>
                   <span className={styles.metaLabel}>{messages.console.selectedJob.status}</span>
@@ -2819,6 +2846,7 @@ export function EscrowConsole({
                   <strong>{formatDate(selectedJobView.updatedAt)}</strong>
                 </article>
               </div>
+              </SharedCard>
               <div className={styles.summaryGrid}>
                 <article>
                   <span className={styles.metaLabel}>{messages.console.selectedJob.clientWallet}</span>

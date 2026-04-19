@@ -2,35 +2,61 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09111a;
+  --bg-layer-1: #06101a;
+  --bg-layer-2: #0a1522;
+  --bg-layer-3: #142033;
+  --bg-aurora-cyan: rgba(117, 193, 255, 0.14);
+  --bg-aurora-violet: rgba(120, 136, 255, 0.1);
+  --glass-base: rgba(8, 16, 28, 0.58);
+  --glass-strong: rgba(8, 16, 28, 0.78);
+  --glass-quiet: rgba(8, 16, 28, 0.5);
+  --glass-border: rgba(161, 185, 216, 0.15);
+  --glass-border-strong: rgba(188, 221, 255, 0.26);
+  --glass-border-soft: rgba(255, 255, 255, 0.08);
+  --depth-shadow-sm: 0 14px 32px rgba(4, 9, 16, 0.16);
+  --depth-shadow-md: 0 18px 44px rgba(4, 10, 18, 0.22);
+  --depth-shadow-lg: 0 28px 72px rgba(4, 10, 18, 0.32);
+  --panel-blur: 24px;
+  --panel-blur-strong: 30px;
+  --radius-xs: 0.95rem;
+  --radius-sm: 1.15rem;
+  --radius-md: 1.35rem;
+  --radius-lg: 1.8rem;
+  --motion-fast: 170ms cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-medium: 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-slow: 460ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --foreground: #eef5ff;
-  --muted-foreground: #9eb4cf;
-  --surface-card: rgba(10, 15, 22, 0.52);
-  --surface-card-strong: rgba(12, 17, 24, 0.84);
-  --surface-soft: rgba(10, 15, 22, 0.42);
-  --surface-border: rgba(145, 164, 189, 0.16);
-  --surface-border-strong: rgba(145, 164, 189, 0.24);
-  --surface-shadow: 0 18px 44px rgba(8, 14, 22, 0.22);
-  --surface-shadow-strong: 0 24px 60px rgba(8, 14, 22, 0.26);
-  --button-primary-bg: linear-gradient(135deg, #eaf4ff, #b7cbe4);
-  --button-primary-bg-hover: linear-gradient(135deg, #f2f8ff, #c9d8ea);
-  --button-primary-fg: #0c1620;
-  --button-primary-shadow: 0 12px 28px rgba(9, 15, 22, 0.18);
-  --button-secondary-bg: transparent;
+  --foreground-soft: #b2c4db;
+  --foreground-muted: #7f97b4;
+  --muted-foreground: #9bb0c9;
+  --background: var(--bg-layer-2);
+  --background-strong: var(--bg-layer-1);
+  --surface-card: linear-gradient(180deg, rgba(10, 18, 30, 0.7), rgba(10, 18, 30, 0.82));
+  --surface-card-strong: linear-gradient(180deg, rgba(12, 21, 36, 0.88), rgba(10, 18, 30, 0.94));
+  --surface-soft: var(--glass-quiet);
+  --surface-border: var(--glass-border);
+  --surface-border-strong: var(--glass-border-strong);
+  --surface-shadow: var(--depth-shadow-md);
+  --surface-shadow-strong: var(--depth-shadow-lg);
+  --button-primary-bg: linear-gradient(135deg, #f4f8ff, #d5e6fb);
+  --button-primary-bg-hover: linear-gradient(135deg, #ffffff, #e2eefc);
+  --button-primary-fg: #0b1621;
+  --button-primary-shadow: 0 14px 32px rgba(11, 24, 37, 0.2);
+  --button-secondary-bg: rgba(10, 18, 30, 0.54);
   --button-secondary-fg: #eef5ff;
-  --button-secondary-border: rgba(145, 164, 189, 0.24);
-  --button-secondary-border-strong: rgba(145, 164, 189, 0.36);
-  --button-secondary-shadow: inset 0 0 0 1px rgba(145, 164, 189, 0.18);
-  --badge-neutral-bg: rgba(145, 164, 189, 0.18);
-  --badge-neutral-fg: #d9e8fb;
-  --badge-success-bg: rgba(74, 156, 123, 0.2);
-  --badge-success-fg: #8af0c0;
-  --badge-warning-bg: rgba(206, 163, 60, 0.22);
-  --badge-warning-fg: #f7d783;
-  --badge-danger-bg: rgba(182, 84, 84, 0.24);
-  --badge-danger-fg: #ffb2b2;
-  --radius-card: 1.3rem;
-  --focus-ring: 0 0 0 4px rgba(178, 207, 240, 0.16);
+  --button-secondary-border: rgba(161, 185, 216, 0.2);
+  --button-secondary-border-strong: rgba(188, 221, 255, 0.34);
+  --button-secondary-shadow: 0 10px 28px rgba(4, 10, 18, 0.2);
+  --badge-neutral-bg: rgba(161, 185, 216, 0.14);
+  --badge-neutral-fg: #d9e7fb;
+  --badge-success-bg: rgba(110, 216, 176, 0.14);
+  --badge-success-fg: #a7f0d0;
+  --badge-warning-bg: rgba(219, 183, 95, 0.16);
+  --badge-warning-fg: #f7dfa4;
+  --badge-danger-bg: rgba(206, 118, 118, 0.16);
+  --badge-danger-fg: #ffc2c2;
+  --radius-card: var(--radius-md);
+  --focus-ring: 0 0 0 4px rgba(191, 224, 255, 0.18);
 }
 
 @layer base {
@@ -48,13 +74,27 @@
     min-height: 100vh;
     color: var(--foreground);
     background:
-      radial-gradient(circle at top left, rgba(49, 93, 154, 0.28), transparent 34%),
-      radial-gradient(circle at 86% 10%, rgba(39, 113, 104, 0.2), transparent 18%),
-      linear-gradient(180deg, #071018 0%, #0f1926 100%);
+      radial-gradient(circle at top left, var(--bg-aurora-cyan), transparent 30%),
+      radial-gradient(circle at 84% 8%, var(--bg-aurora-violet), transparent 24%),
+      linear-gradient(180deg, var(--bg-layer-1) 0%, var(--bg-layer-2) 52%, #0b1724 100%);
     font-family: var(--font-display), Georgia, serif;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(141, 186, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(141, 186, 255, 0.03) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(circle at center, black 54%, transparent 94%);
+    opacity: 0.38;
   }
 
   html[data-locale='ar'] body {
@@ -91,8 +131,27 @@
   }
 }
 
+@layer utilities {
+  .ltr-value {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: left;
+  }
+}
+
 [data-ltr='true'] {
   direction: ltr;
   unicode-bidi: isolate;
   text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

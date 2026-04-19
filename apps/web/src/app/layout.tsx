@@ -7,6 +7,7 @@ import {
   resolveSupportedLocale,
 } from "@escrow4334/frontend-core";
 import { WebI18nProvider } from "../lib/i18n";
+import { WebSpatialShell } from "./spatial-shell";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -50,7 +51,9 @@ export default async function RootLayout({
       <body
         className={`${display.variable} ${arabicDisplay.variable} ${mono.variable}`}
       >
-        <WebI18nProvider initialLocale={locale}>{children}</WebI18nProvider>
+        <WebI18nProvider initialLocale={locale}>
+          <WebSpatialShell>{children}</WebSpatialShell>
+        </WebI18nProvider>
       </body>
     </html>
   );

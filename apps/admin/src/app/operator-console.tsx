@@ -26,6 +26,11 @@ import {
   writeStoredStringList,
 } from '@escrow4334/frontend-core';
 import {
+  MotionEmptyState,
+  RevealSection,
+  SharedCard,
+} from '@escrow4334/frontend-core/spatial';
+import {
   adminApi,
   type AuditBundle,
   type CaseExportArtifact,
@@ -1336,66 +1341,75 @@ export function OperatorConsole({
 
   return (
     <ConsolePage theme="admin">
-      <PageTopBar
-        eyebrow={messages.topBar.label}
-        description={messages.topBar.meta}
-        className={styles.topBar}
-        contentClassName={styles.topBarContent}
-        actions={
-          <>
-            {walkthrough.launcher}
-            <Link href="/help/operator-case-flow" className={styles.secondaryButton}>
-              Read the manual
-            </Link>
-            <LanguageSwitcher
-              className={styles.languageSwitcher}
-              labelClassName={styles.languageSwitcherLabel}
-              optionClassName={styles.languageSwitcherOption}
-              optionActiveClassName={styles.languageSwitcherOptionActive}
-            />
-          </>
-        }
-      />
-      {walkthrough.notice ? (
-        <StatusNotice
-          message={walkthrough.notice}
-          messageClassName={styles.stateText}
+      <RevealSection>
+        <PageTopBar
+          eyebrow={messages.topBar.label}
+          description={messages.topBar.meta}
+          className={styles.topBar}
+          contentClassName={styles.topBarContent}
+          actions={
+            <>
+              {walkthrough.launcher}
+              <Link href="/help/operator-case-flow" className={styles.secondaryButton}>
+                Read the manual
+              </Link>
+              <LanguageSwitcher
+                className={styles.languageSwitcher}
+                labelClassName={styles.languageSwitcherLabel}
+                optionClassName={styles.languageSwitcherOption}
+                optionActiveClassName={styles.languageSwitcherOptionActive}
+              />
+            </>
+          }
         />
+      </RevealSection>
+      {walkthrough.notice ? (
+        <RevealSection as="div" delay={0.04}>
+          <SharedCard className="p-4">
+            <StatusNotice
+              message={walkthrough.notice}
+              messageClassName={styles.stateText}
+            />
+          </SharedCard>
+        </RevealSection>
       ) : null}
-      <HeroPanel
-        theme="admin"
-        eyebrow={frame.eyebrow}
-        title={frame.title}
-        description={frame.copy}
-        summary={
-          <FactGrid className="md:grid-cols-2">
-            <FactItem label="API base URL" value={adminApi.baseUrl} dir="ltr" />
-            <FactItem
-              label="Backend profile"
-              value={
-                runtimeProfile
-                  ? messages.labels.runtimeProfile[runtimeProfile.profile]
-                  : messages.common.loading
-              }
-            />
-            <FactItem
-              label="Loaded case"
-              value={audit?.bundle.job.id || messages.common.unavailable}
-              dir="ltr"
-            />
-            <FactItem
-              label="Pressure"
-              value={
-                caseBrief
-                  ? messages.labels.pressure[caseBrief.pressure]
-                  : messages.common.loading
-              }
-            />
-          </FactGrid>
-        }
-      />
+      <RevealSection delay={0.08}>
+        <HeroPanel
+          theme="admin"
+          eyebrow={frame.eyebrow}
+          title={frame.title}
+          description={frame.copy}
+          summary={
+            <FactGrid className="md:grid-cols-2">
+              <FactItem label="API base URL" value={adminApi.baseUrl} dir="ltr" />
+              <FactItem
+                label="Backend profile"
+                value={
+                  runtimeProfile
+                    ? messages.labels.runtimeProfile[runtimeProfile.profile]
+                    : messages.common.loading
+                }
+              />
+              <FactItem
+                label="Loaded case"
+                value={audit?.bundle.job.id || messages.common.unavailable}
+                dir="ltr"
+              />
+              <FactItem
+                label="Pressure"
+                value={
+                  caseBrief
+                    ? messages.labels.pressure[caseBrief.pressure]
+                    : messages.common.loading
+                }
+              />
+            </FactGrid>
+          }
+        />
+      </RevealSection>
 
       <div className={styles.grid}>
+        <RevealSection delay={0.12}>
         <SectionCard
           className={styles.panel}
           contentClassName={styles.stack}
@@ -1503,7 +1517,9 @@ export function OperatorConsole({
             ))}
           </div>
         </SectionCard>
+        </RevealSection>
 
+        <RevealSection delay={0.16}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -1649,8 +1665,10 @@ export function OperatorConsole({
             )}
           </div>
         </section>
+        </RevealSection>
 
         {view === 'dashboard' ? (
+        <RevealSection delay={0.2}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -2612,10 +2630,12 @@ export function OperatorConsole({
             ) : null}
           </div>
         </section>
+        </RevealSection>
         ) : null}
       </div>
 
       {view === 'dashboard' ? (
+        <RevealSection delay={0.24}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -2667,8 +2687,10 @@ export function OperatorConsole({
             )}
           </div>
         </section>
+        </RevealSection>
       ) : null}
 
+      <RevealSection delay={0.28}>
       <section className={styles.panel} data-walkthrough-id="operator-case-lookup">
         <header className={styles.panelHeader}>
           <div>
@@ -2711,9 +2733,11 @@ export function OperatorConsole({
         ) : null}
         <StatusNotice message={state.message} messageClassName={styles.stateText} />
       </section>
+      </RevealSection>
 
       {audit && caseBrief ? (
         <>
+          <RevealSection delay={0.32}>
           <section className={styles.panel} data-walkthrough-id="operator-case-brief">
             <header className={styles.panelHeader}>
               <div>
@@ -2823,8 +2847,9 @@ export function OperatorConsole({
               </article>
             </div>
           </section>
+          </RevealSection>
 
-          <div className={styles.grid}>
+          <RevealSection as="div" className={styles.grid} delay={0.36}>
             <section className={styles.panel} data-walkthrough-id="operator-resolution-panel">
               <header className={styles.panelHeader}>
                 <div>
@@ -2901,9 +2926,9 @@ export function OperatorConsole({
                 )}
               </div>
             </section>
-          </div>
+          </RevealSection>
 
-          <div className={styles.grid}>
+          <RevealSection as="div" className={styles.grid} delay={0.4}>
             <section className={styles.panel}>
               <header className={styles.panelHeader}>
                 <div>
@@ -3026,13 +3051,13 @@ export function OperatorConsole({
                         protected resolve endpoint can be used from this console.
                       </p>
                     </article>
-              </>
-            )}
-          </div>
-        </section>
-          </div>
+                  </>
+                )}
+              </div>
+            </section>
+          </RevealSection>
 
-          <div className={styles.grid}>
+          <RevealSection as="div" className={styles.grid} delay={0.4}>
             <section className={styles.panel}>
               <header className={styles.panelHeader}>
                 <div>
@@ -3097,8 +3122,9 @@ export function OperatorConsole({
                 </article>
               </div>
             </section>
-          </div>
+          </RevealSection>
 
+          <RevealSection delay={0.44}>
           <section className={styles.panel}>
             <header className={styles.panelHeader}>
               <div>
@@ -3122,8 +3148,10 @@ export function OperatorConsole({
               ))}
             </div>
           </section>
+          </RevealSection>
         </>
       ) : (
+        <RevealSection delay={0.32}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <div>
@@ -3158,6 +3186,7 @@ export function OperatorConsole({
             />
           </div>
         </section>
+        </RevealSection>
       )}
       {walkthrough.overlay}
     </ConsolePage>

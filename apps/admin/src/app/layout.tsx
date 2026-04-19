@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { IBM_Plex_Mono, Fraunces, Noto_Naskh_Arabic } from "next/font/google";
 import { getLocaleDefinition, resolveSupportedLocale } from "@escrow4334/frontend-core";
 import { AdminI18nProvider } from "../lib/i18n";
+import { AdminSpatialShell } from "./spatial-shell";
 import "./globals.css";
 
 const display = Fraunces({
@@ -47,7 +48,9 @@ export default async function RootLayout({
       <body
         className={`${display.variable} ${arabicDisplay.variable} ${mono.variable}`}
       >
-        <AdminI18nProvider initialLocale={locale}>{children}</AdminI18nProvider>
+        <AdminI18nProvider initialLocale={locale}>
+          <AdminSpatialShell>{children}</AdminSpatialShell>
+        </AdminI18nProvider>
       </body>
     </html>
   );

@@ -133,3 +133,186 @@
   - replace style-map-heavy console surfaces with more granular shared primitives over time
   - add more shadcn/Radix interactive primitives where current route UIs still rely on hand-rolled markup
   - optionally normalize repeated Tailwind recipes into dedicated `frontend-core` layout and form components
+
+## Update (2026-04-19, Production-Grade Shared UI Step)
+- Committed and pushed the Tailwind migration foundation to `origin/main` as `b07c565` (`Migrate frontend apps to Tailwind`).
+- Implemented the next production-grade frontend step by moving repeated public-page structure into shared `frontend-core` primitives instead of leaving those patterns in app-local style maps.
+- Added shared UI primitives and compatibility improvements in `packages/frontend-core/src/lib/ui.tsx`:
+  - `PageTopBar`
+  - `SectionCard`
+  - `FactGrid`
+  - `FactItem`
+  - shared `LocaleSwitcher` now preserves legacy class override hooks used by existing console surfaces
+  - `FactItem` now preserves `data-ltr="true"` for LTR-only technical values used in RTL routes
+- Updated app wrappers to use the shared locale switcher contract:
+  - `apps/web/src/app/language-switcher.tsx`
+  - `apps/admin/src/app/language-switcher.tsx`
+- Migrated public marketplace detail/reporting routes to the shared primitive layer:
+  - `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
+  - `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
+  - `apps/web/src/app/marketplace/abuse-report-panel.tsx`
+- Continued the earlier primitive rollout on public/help routes:
+  - `apps/web/src/app/page.tsx`
+  - `apps/web/src/app/trust/page.tsx`
+  - `apps/web/src/app/app/help/launch-flow/page.tsx`
+  - `apps/admin/src/app/help/operator-case-flow/page.tsx`
+- Verification for this step:
+  - `pnpm --filter @escrow4334/frontend-core typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web build`
+  - `pnpm --filter admin build`
+  - `pnpm --filter web test`
+  - `pnpm --filter admin test`
+- Result:
+  - Passed: all commands above
+  - During the pass, web marketplace RTL tests failed because the new shared fact primitive dropped `data-ltr`; fixed in `FactItem` and reran tests/build successfully
+- Next production-grade target:
+  - replace the repeated hero/panel/meta/action shells inside `apps/web/src/app/web-console.tsx`, `apps/admin/src/app/operator-console.tsx`, `apps/web/src/app/marketplace/workspace.tsx`, and `apps/admin/src/app/marketplace/moderation-console.tsx` with the same shared primitive set
+
+## Update (2026-04-19, Explicit Tailwind Config Files)
+- Added explicit Tailwind config files for discoverability and toolchain clarity:
+  - `apps/web/tailwind.config.mjs`
+  - `apps/admin/tailwind.config.mjs`
+- Wired both app CSS entrypoints to the explicit config with `@config`:
+  - `apps/web/src/app/globals.css`
+  - `apps/admin/src/app/globals.css`
+- Updated shadcn/Tailwind metadata to point at the real config files:
+  - `apps/web/components.json`
+  - `apps/admin/components.json`
+- Config scope:
+  - each app now explicitly scans its own `src/**/*` plus `../../packages/frontend-core/src/**/*`
+  - theme tokens still remain CSS-owned in app `globals.css`; the new config files exist for explicit governance/discoverability, not to move the design-token layer out of CSS
+- Verification:
+  - `pnpm --filter web build`
+  - `pnpm --filter admin build`
+- Result:
+  - Passed: both app production builds succeeded with the explicit `@config` wiring in place
+
+## Update (2026-04-19, Production-Grade Console Shell Extraction)
+- Committed and pushed the explicit Tailwind config step to `origin/main` as `6fd911b` (`Add explicit Tailwind app config files`).
+- Implemented the next production-grade frontend step by extracting recurring console/workspace shell structure into shared `frontend-core` primitives and migrating the largest route shells onto them.
+- Added shared primitives in `packages/frontend-core/src/lib/ui.tsx`:
+  - `ConsolePage`
+  - `HeroPanel`
+  - `SectionCard` now accepts standard `div` attributes so walkthrough ids and other data attributes can stay on shared cards
+- Reused existing shared primitives more aggressively in large surfaces:
+  - `PageTopBar`
+  - `FactGrid`
+  - `FactItem`
+- Migrated shell layers in:
+  - `apps/web/src/app/web-console.tsx`
+    - top bar
+    - hero summary
+    - runtime validation section
+  - `apps/admin/src/app/operator-console.tsx`
+    - top bar
+    - hero summary
+    - runtime validation section
+  - `apps/web/src/app/marketplace/workspace.tsx`
+    - top bar
+    - status/empty shell panels
+    - overview metrics panel
+  - `apps/admin/src/app/marketplace/moderation-console.tsx`
+    - top bar
+    - status/empty shell panels
+    - moderation overview metrics panel
+- Intentional scope boundary:
+  - left deeper form, queue, moderation, and lifecycle interaction bodies intact
+  - moved repeated frame/hero/metrics structure first so the next pass can replace inner panel bodies incrementally without re-solving page chrome
+- Verification:
+  - `pnpm --filter @escrow4334/frontend-core typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web test`
+  - `pnpm --filter admin test`
+  - `pnpm --filter web build`
+  - `pnpm --filter admin build`
+- Result:
+  - Passed:
+    - all typecheck commands
+    - `pnpm --filter web test`
+    - `pnpm --filter admin test` when run in isolation
+    - both app production builds
+  - Watchout:
+    - `pnpm --filter admin test` timed out once during a fully parallel test/build run on the long operator-resolution test, but it passed on immediate isolated rerun with no code changes
+- Next production-grade target:
+  - continue the same extraction pattern deeper inside `web-console`, `operator-console`, `marketplace/workspace`, and `marketplace/moderation-console` by converting the repeated access/operations/workspace panel bodies and action rows onto shared primitives instead of app-local recipes
+
+## Update (2026-04-19, Web Futurist Redesign Pass)
+- Reworked `apps/web` from the warm neutral launch aesthetic into a darker futurist visual system without changing backend contracts or route paths.
+- Web-only design-token and motion changes:
+  - replaced the `apps/web/src/app/globals.css` palette, shadows, surfaces, and focus treatment with graphite/electric tokens
+  - added staged `fx-fade-up*` motion utilities plus `prefers-reduced-motion` fallbacks
+- Shared `frontend-core` foundation updates for the web redesign:
+  - refreshed `Button`, `Badge`, `SurfaceCard`, `PageTopBar`, `HeroPanel`, `FactItem`, `FeatureCard`, and web `LocaleSwitcher` visuals in `packages/frontend-core/src/lib/ui.tsx`
+  - kept the change at the reusable foundation layer; high-expression page compositions remained app-local
+- Public/web route redesign work:
+  - rebuilt public marketing and trust compositions in `apps/web/src/app/page.tsx`, `apps/web/src/app/trust/page.tsx`, and `apps/web/src/app/marketing.styles.ts`
+  - redesigned marketplace browse/detail/reporting surfaces in:
+    - `apps/web/src/app/marketplace/marketplace-browser.tsx`
+    - `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
+    - `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
+    - `apps/web/src/app/marketplace/abuse-report-panel.tsx`
+  - shifted authenticated `/app` surfaces broadly by replacing the shared web console/workspace style map in `apps/web/src/app/page.styles.ts`
+  - raised the explicit timeout budget for the long guided-flow route test in `apps/web/src/app/page.spec.tsx` from `20_000` to `45_000` so the full suite remains stable under the heavier redesigned DOM
+- Verification:
+  - `pnpm --filter @escrow4334/frontend-core typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter web test`
+  - `pnpm --filter web build`
+- Result:
+  - Passed: all commands above
+
+## Update (2026-04-19, Spatial Motion Redesign Across Web And Admin)
+- Implemented the spatial redesign plan across both Next apps without changing business logic, routes, permissions, form behavior, or API contracts.
+- Shared architecture changes:
+  - added `motion` to `packages/frontend-core`
+  - introduced the client-only spatial export path `@escrow4334/frontend-core/spatial`
+  - added shared motion/spatial primitives in `packages/frontend-core/src/lib/spatial.tsx`:
+    - `SpatialShell`
+    - `AmbientBackdrop`
+    - `GlassPanel`
+    - `FloatingToolbar`
+    - `RevealSection`
+    - `SharedCard`
+    - `SpotlightButton`
+    - `StickyActionRail`
+    - `MotionEmptyState`
+    - `MotionTabs`
+  - restyled walkthrough overlays in `packages/frontend-core/src/lib/walkthrough.tsx` to match the glass/spatial language
+- App shell changes:
+  - added pathname-keyed client shells in:
+    - `apps/web/src/app/spatial-shell.tsx`
+    - `apps/admin/src/app/spatial-shell.tsx`
+  - wrapped both app layouts with the new spatial shell:
+    - `apps/web/src/app/layout.tsx`
+    - `apps/admin/src/app/layout.tsx`
+- Token and surface updates:
+  - replaced both app global token layers with shared spatial semantics and reduced-motion handling:
+    - `apps/web/src/app/globals.css`
+    - `apps/admin/src/app/globals.css`
+  - tuned admin route styling to a calmer spatial workspace in `apps/admin/src/app/page.styles.ts`
+- Route integration work:
+  - web marketing and public marketplace surfaces now use reveal/glass/shared-card layers:
+    - `apps/web/src/app/page.tsx`
+    - `apps/web/src/app/trust/page.tsx`
+    - `apps/web/src/app/marketplace/marketplace-browser.tsx`
+    - `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
+    - `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
+  - authenticated workspace/dashboard shells now use reveal/shared-card motion:
+    - `apps/web/src/app/web-console.tsx`
+    - `apps/web/src/app/marketplace/workspace.tsx`
+    - `apps/admin/src/app/operator-console.tsx`
+- Testing note:
+  - `RevealSection` now automatically falls back to non-viewport animation when `IntersectionObserver` is unavailable, which keeps Vitest/jsdom stable while preserving browser behavior.
+- Verification:
+  - `pnpm --filter @escrow4334/frontend-core typecheck`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web test`
+  - `pnpm --filter admin test`
+  - `pnpm --filter web build`
+  - `pnpm --filter admin build`
+- Result:
+  - Passed: all commands above

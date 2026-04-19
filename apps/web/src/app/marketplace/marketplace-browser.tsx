@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { SectionHeading } from '@escrow4334/frontend-core';
+import { GlassPanel, RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
 import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
 import {
@@ -70,18 +72,18 @@ export function MarketplaceBrowser() {
           />
         </nav>
 
-        <section className={styles.hero}>
-          <div>
+        <RevealSection className={styles.hero}>
+          <div className="fx-fade-up">
             <p className={styles.eyebrow}>{marketplaceMessages.heroEyebrow}</p>
             <h1>{marketplaceMessages.heroTitle}</h1>
             <p className={styles.lead}>{marketplaceMessages.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Link
+              <SpotlightButton
                 className={`${styles.ctaLink} ${styles.ctaPrimary}`}
-                href="/app/marketplace"
+                asChild
               >
-                {marketplaceMessages.openWorkspace}
-              </Link>
+                <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
+              </SpotlightButton>
               <Link
                 className={`${styles.ctaLink} ${styles.ctaSecondary}`}
                 href="/app/new-contract"
@@ -89,26 +91,52 @@ export function MarketplaceBrowser() {
                 {marketplaceMessages.directContractPath}
               </Link>
             </div>
+            <div className={styles.heroSignalGrid}>
+              <GlassPanel className={styles.heroSignal} tone="quiet">
+                <span className={styles.heroSignalLabel}>
+                  {marketplaceMessages.stats.visibleTalentTitle(profiles.length)}
+                </span>
+                <span className={styles.heroSignalValue}>
+                  {marketplaceMessages.stats.visibleTalentBody}
+                </span>
+              </GlassPanel>
+              <GlassPanel className={styles.heroSignal} tone="quiet">
+                <span className={styles.heroSignalLabel}>
+                  {marketplaceMessages.stats.openBriefsTitle(opportunities.length)}
+                </span>
+                <span className={styles.heroSignalValue}>
+                  {marketplaceMessages.stats.openBriefsBody}
+                </span>
+              </GlassPanel>
+              <GlassPanel className={styles.heroSignal} tone="quiet">
+                <span className={styles.heroSignalLabel}>
+                  {marketplaceMessages.stats.escrowCloseTitle}
+                </span>
+                <span className={styles.heroSignalValue}>
+                  {marketplaceMessages.stats.escrowCloseBody}
+                </span>
+              </GlassPanel>
+            </div>
           </div>
-          <div className={styles.cardStack}>
-            <article className={styles.statCard}>
+          <div className={`${styles.cardStack} fx-fade-up fx-fade-up-delay-1`}>
+            <SharedCard className={styles.statCard} interactive>
               <strong>
                 {marketplaceMessages.stats.visibleTalentTitle(profiles.length)}
               </strong>
               <p>{marketplaceMessages.stats.visibleTalentBody}</p>
-            </article>
-            <article className={styles.statCard}>
+            </SharedCard>
+            <SharedCard className={styles.statCard} interactive>
               <strong>
                 {marketplaceMessages.stats.openBriefsTitle(opportunities.length)}
               </strong>
               <p>{marketplaceMessages.stats.openBriefsBody}</p>
-            </article>
-            <article className={styles.statCard}>
+            </SharedCard>
+            <SharedCard className={styles.statCard} interactive>
               <strong>{marketplaceMessages.stats.escrowCloseTitle}</strong>
               <p>{marketplaceMessages.stats.escrowCloseBody}</p>
-            </article>
+            </SharedCard>
           </div>
-        </section>
+        </RevealSection>
 
         {error ? (
           <section className={styles.section}>
@@ -117,8 +145,13 @@ export function MarketplaceBrowser() {
           </section>
         ) : null}
 
-        <section className={styles.section}>
-          <h2>{marketplaceMessages.featuredTalentTitle}</h2>
+        <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-1`} delay={0.08}>
+          <div className={styles.sectionBody}>
+            <SectionHeading
+              title={marketplaceMessages.featuredTalentTitle}
+              description={marketplaceMessages.stats.visibleTalentBody}
+            />
+          </div>
           <div className={styles.steps}>
             {profiles.length === 0 ? (
               <article className={styles.stepCard}>
@@ -127,7 +160,12 @@ export function MarketplaceBrowser() {
               </article>
             ) : (
               profiles.map((profile) => (
-                <article key={profile.userId} className={styles.stepCard}>
+                <SharedCard
+                  key={profile.userId}
+                  className={styles.stepCard}
+                  interactive
+                  layoutId={`marketplace-profile-${profile.slug}`}
+                >
                   <strong>{profile.displayName}</strong>
                   <p>{profile.headline}</p>
                   <p>
@@ -143,14 +181,19 @@ export function MarketplaceBrowser() {
                   <Link className={styles.cardLink} href={`/marketplace/profiles/${profile.slug}`}>
                     {marketplaceMessages.actions.viewProfile}
                   </Link>
-                </article>
+                </SharedCard>
               ))
             )}
           </div>
-        </section>
+        </RevealSection>
 
-        <section className={styles.section}>
-          <h2>{marketplaceMessages.openOpportunitiesTitle}</h2>
+        <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-2`} delay={0.12}>
+          <div className={styles.sectionBody}>
+            <SectionHeading
+              title={marketplaceMessages.openOpportunitiesTitle}
+              description={marketplaceMessages.stats.openBriefsBody}
+            />
+          </div>
           <div className={styles.steps}>
             {opportunities.length === 0 ? (
               <article className={styles.stepCard}>
@@ -159,7 +202,12 @@ export function MarketplaceBrowser() {
               </article>
             ) : (
               opportunities.map((opportunity) => (
-                <article key={opportunity.id} className={styles.stepCard}>
+                <SharedCard
+                  key={opportunity.id}
+                  className={styles.stepCard}
+                  interactive
+                  layoutId={`marketplace-opportunity-${opportunity.id}`}
+                >
                   <strong>{opportunity.title}</strong>
                   <p>{opportunity.summary}</p>
                   <p>
@@ -174,23 +222,23 @@ export function MarketplaceBrowser() {
                   >
                     {marketplaceMessages.actions.viewBrief}
                   </Link>
-                </article>
+                </SharedCard>
               ))
             )}
           </div>
-        </section>
+        </RevealSection>
 
-        <section className={styles.section}>
-          <h2>{marketplaceMessages.expansionTitle}</h2>
+        <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-3`} delay={0.16}>
+          <SectionHeading title={marketplaceMessages.expansionTitle} />
           <div className={styles.objectionGrid}>
             {marketplaceMessages.expansionCards.map((card) => (
-              <article key={card.title} className={styles.objectionCard}>
+              <SharedCard key={card.title} className={styles.objectionCard} interactive>
                 <strong>{card.title}</strong>
                 <p>{card.body}</p>
-              </article>
+              </SharedCard>
             ))}
           </div>
-        </section>
+        </RevealSection>
       </div>
     </main>
   );

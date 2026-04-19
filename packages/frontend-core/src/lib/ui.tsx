@@ -13,16 +13,16 @@ import {
 } from './i18n';
 
 const buttonVariants = cva(
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-60',
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] transition duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-60',
   {
     variants: {
       variant: {
         primary:
-          'bg-[var(--button-primary-bg)] text-[var(--button-primary-fg)] shadow-[var(--button-primary-shadow)] hover:-translate-y-0.5 hover:bg-[var(--button-primary-bg-hover)]',
+          'border border-transparent bg-[var(--button-primary-bg)] text-[var(--button-primary-fg)] shadow-[var(--button-primary-shadow)] hover:-translate-y-0.5 hover:brightness-105',
         secondary:
-          'border border-[var(--button-secondary-border)] bg-[var(--button-secondary-bg)] text-[var(--button-secondary-fg)] shadow-[var(--button-secondary-shadow)] hover:-translate-y-0.5 hover:border-[var(--button-secondary-border-strong)]',
+          'border border-[var(--button-secondary-border)] bg-[var(--button-secondary-bg)] text-[var(--button-secondary-fg)] shadow-[var(--button-secondary-shadow)] backdrop-blur-xl hover:-translate-y-0.5 hover:border-[var(--button-secondary-border-strong)]',
         ghost:
-          'border border-transparent bg-transparent text-[var(--foreground)] hover:bg-[var(--surface-soft)]',
+          'border border-transparent bg-transparent text-[var(--foreground)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]',
       },
     },
     defaultVariants: {
@@ -32,14 +32,14 @@ const buttonVariants = cva(
 );
 
 const badgeVariants = cva(
-  'inline-flex items-center justify-center rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em]',
+  'inline-flex items-center justify-center rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em]',
   {
     variants: {
       tone: {
-        neutral: 'bg-[var(--badge-neutral-bg)] text-[var(--badge-neutral-fg)]',
-        success: 'bg-[var(--badge-success-bg)] text-[var(--badge-success-fg)]',
-        warning: 'bg-[var(--badge-warning-bg)] text-[var(--badge-warning-fg)]',
-        danger: 'bg-[var(--badge-danger-bg)] text-[var(--badge-danger-fg)]',
+        neutral: 'border-[rgba(135,160,255,0.18)] bg-[var(--badge-neutral-bg)] text-[var(--badge-neutral-fg)]',
+        success: 'border-[rgba(46,227,181,0.18)] bg-[var(--badge-success-bg)] text-[var(--badge-success-fg)]',
+        warning: 'border-[rgba(255,183,84,0.18)] bg-[var(--badge-warning-bg)] text-[var(--badge-warning-fg)]',
+        danger: 'border-[rgba(255,110,140,0.2)] bg-[var(--badge-danger-bg)] text-[var(--badge-danger-fg)]',
       },
     },
     defaultVariants: {
@@ -49,11 +49,11 @@ const badgeVariants = cva(
 );
 
 const localeSwitcherVariants = cva(
-  'inline-flex items-center gap-2 rounded-full px-3 py-2 [&_[role=group]]:inline-flex [&_[role=group]]:gap-1.5',
+  'inline-flex items-center gap-2 rounded-full px-3 py-2 backdrop-blur-xl [&_[role=group]]:inline-flex [&_[role=group]]:gap-1.5',
   {
     variants: {
       theme: {
-        web: 'bg-white/92 shadow-[inset_0_0_0_1px_rgba(92,67,46,0.1)]',
+        web: 'bg-[rgba(7,17,31,0.64)] shadow-[inset_0_0_0_1px_rgba(112,170,236,0.18),0_18px_44px_rgba(4,11,24,0.28)]',
         admin:
           'bg-[rgba(10,15,22,0.62)] shadow-[inset_0_0_0_1px_rgba(145,164,189,0.16)]',
       },
@@ -84,7 +84,7 @@ const localeSwitcherOptionVariants = cva(
   {
     variants: {
       theme: {
-        web: 'bg-transparent text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(92,67,46,0.08)]',
+        web: 'bg-transparent text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(112,170,236,0.15)]',
         admin:
           'bg-transparent text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(145,164,189,0.16)]',
       },
@@ -98,7 +98,7 @@ const localeSwitcherOptionVariants = cva(
         theme: 'web',
         active: true,
         className:
-          'bg-[linear-gradient(135deg,#2d1a11,#5d3620)] text-[#fffaf6] shadow-[0_10px_18px_rgba(48,29,17,0.16),inset_0_1px_0_rgba(255,255,255,0.08)]',
+          'bg-[linear-gradient(135deg,#6bf3ff,#8691ff,#c86dff)] text-[#04101d] shadow-[0_16px_34px_rgba(101,181,255,0.28)]',
       },
       {
         theme: 'admin',
@@ -117,7 +117,7 @@ const localeSwitcherOptionVariants = cva(
 const consolePageVariants = cva('mx-auto grid', {
   variants: {
     theme: {
-      web: 'w-[min(1480px,calc(100vw-40px))] gap-7 py-7 pb-22',
+      web: 'w-[min(1480px,calc(100vw-40px))] gap-7 py-8 pb-22 max-md:w-[min(100vw-24px,1480px)]',
       admin:
         'w-[min(1360px,calc(100vw-48px))] gap-6 py-12 pb-[4.5rem] max-md:w-[min(100vw-28px,1360px)] max-md:py-7 max-md:pb-12',
     },
@@ -128,12 +128,12 @@ const consolePageVariants = cva('mx-auto grid', {
 });
 
 const heroPanelVariants = cva(
-  'grid rounded-[1.9rem] border border-[var(--surface-border)] p-8 shadow-[var(--surface-shadow-strong)]',
+  'relative grid rounded-[1.9rem] border border-[var(--surface-border)] p-8 shadow-[var(--surface-shadow-strong)]',
   {
     variants: {
       theme: {
         web:
-          'items-start gap-7 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]',
+          'items-start gap-7 overflow-hidden bg-[var(--surface-card-strong)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.84),transparent)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]',
         admin:
           'items-end gap-6 bg-[linear-gradient(180deg,rgba(12,17,24,0.84),rgba(22,31,44,0.9))] xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]',
       },
@@ -150,7 +150,7 @@ const heroPanelAsideVariants = cva(
     variants: {
       theme: {
         web:
-          'bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] shadow-[var(--surface-shadow)]',
+          'bg-[linear-gradient(180deg,rgba(12,24,42,0.92),rgba(7,15,29,0.96))] shadow-[var(--surface-shadow)]',
         admin:
           'bg-[linear-gradient(180deg,rgba(12,17,24,0.84),rgba(22,31,44,0.9))] shadow-[var(--surface-shadow-strong)]',
       },
@@ -193,6 +193,7 @@ export function SurfaceCard(
       className={cn(
         'rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] p-5',
         elevated ? 'shadow-[var(--surface-shadow-strong)]' : 'shadow-[var(--surface-shadow)]',
+        'backdrop-blur-xl',
         className,
       )}
       {...rest}
@@ -251,6 +252,7 @@ export function PageTopBar(props: {
     <div
       className={cn(
         'flex flex-wrap items-start justify-between gap-4 rounded-[1.7rem] border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-4 shadow-[var(--surface-shadow)]',
+        'backdrop-blur-xl',
         className,
       )}
     >
@@ -329,7 +331,7 @@ export function Eyebrow(props: HTMLAttributes<HTMLParagraphElement>) {
   return (
     <p
       className={cn(
-        'text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[var(--foreground-muted)]',
+        'text-[0.72rem] font-bold uppercase tracking-[0.18em] text-[var(--foreground-muted)]',
         className,
       )}
       {...rest}
@@ -412,7 +414,7 @@ export function SectionHeading(props: {
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
         <h2
           className={cn(
-            'text-[clamp(1.7rem,3vw,2.3rem)] leading-[1.05]',
+            'text-[clamp(1.7rem,3vw,2.3rem)] leading-[1.02]',
             titleClassName,
           )}
         >
@@ -455,7 +457,12 @@ export function FactItem(props: {
   const { className, dir, label, labelClassName, value, valueClassName } = props;
 
   return (
-    <article className={cn('grid gap-2', className)}>
+    <article
+      className={cn(
+        'grid gap-2 rounded-[1.15rem] border border-[var(--surface-border)] bg-[rgba(8,18,33,0.52)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] backdrop-blur-xl',
+        className,
+      )}
+    >
       <span
         className={cn(
           'text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]',
@@ -486,7 +493,7 @@ export function FeatureCard(props: {
   return (
     <SurfaceCard
       className={cn(
-        'relative rounded-[1.4rem] bg-[var(--surface-card)] p-5.5 before:absolute before:left-0 before:top-0 before:h-[3px] before:w-full before:rounded-full before:bg-[linear-gradient(90deg,rgba(126,80,43,0.35),rgba(126,80,43,0))]',
+        'relative overflow-hidden rounded-[1.4rem] bg-[var(--surface-card)] p-5.5 before:absolute before:left-0 before:top-0 before:h-px before:w-full before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.86),transparent)]',
         className,
       )}
     >

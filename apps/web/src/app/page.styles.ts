@@ -1,81 +1,82 @@
 const styles = {
   page: 'min-h-screen',
-  console: 'mx-auto grid w-[min(1480px,calc(100vw-40px))] gap-7 py-7 pb-22',
+  console:
+    'mx-auto grid w-[min(1480px,calc(100vw-40px))] gap-7 py-8 pb-22 max-md:w-[min(100vw-24px,1480px)]',
   topBar:
-    'flex flex-wrap items-center justify-between gap-4 rounded-[1.9rem] border border-[var(--surface-border)] bg-[rgba(255,251,245,0.84)] px-4 py-4 backdrop-blur-xl shadow-[var(--surface-shadow)]',
-  topBarContent: 'grid max-w-3xl gap-1.5',
+    'relative overflow-hidden rounded-[1.8rem] border border-[var(--surface-border-strong)] bg-[rgba(6,15,28,0.72)] px-5 py-5 shadow-[var(--surface-shadow)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.88),transparent)]',
+  topBarContent: 'grid max-w-3xl gap-2',
   topBarLabel:
-    'text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[var(--foreground-muted)]',
+    'text-[0.72rem] font-bold uppercase tracking-[0.18em] text-[var(--foreground-muted)]',
   topBarMeta: 'text-sm leading-6 text-[var(--foreground-soft)]',
   hero:
-    'grid items-start gap-7 rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)] [&_h1]:max-w-[9.8ch] [&_h1]:text-[clamp(2.9rem,6vw,5.5rem)] [&_h1]:leading-[0.92] [&_h1]:text-[var(--foreground)]',
+    'relative overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[linear-gradient(145deg,rgba(10,22,38,0.96),rgba(5,11,21,0.98))] p-8 shadow-[var(--surface-shadow-strong)] before:absolute before:-right-24 before:top-[-7rem] before:h-56 before:w-56 before:rounded-full before:bg-[radial-gradient(circle,rgba(110,232,255,0.2),transparent_68%)] before:content-[\'\'] after:absolute after:bottom-[-8rem] after:left-[-5rem] after:h-64 after:w-64 after:rounded-full after:bg-[radial-gradient(circle,rgba(145,121,255,0.18),transparent_70%)] after:content-[\'\'] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)] [&_h1]:max-w-[10ch] [&_h1]:text-[clamp(3.1rem,6vw,5.8rem)] [&_h1]:leading-[0.9] [&_h1]:text-[var(--foreground)]',
   eyebrow:
-    'text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[var(--foreground-muted)]',
+    'text-[0.72rem] font-bold uppercase tracking-[0.18em] text-[#8adfff]',
   panelEyebrow:
-    'text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[var(--foreground-muted)]',
-  heroCopy: 'mt-4 max-w-[60ch] text-[1.04rem] leading-7 text-[var(--foreground-soft)]',
+    'text-[0.72rem] font-bold uppercase tracking-[0.18em] text-[#8adfff]',
+  heroCopy: 'mt-4 max-w-[60ch] text-[1.02rem] leading-7 text-[var(--foreground-soft)]',
   heroCard:
-    'grid content-start gap-4 rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-6 shadow-[var(--surface-shadow)]',
+    'relative grid content-start gap-4 overflow-hidden rounded-[1.7rem] border border-[var(--surface-border)] bg-[rgba(9,18,32,0.82)] p-6 shadow-[var(--surface-shadow)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.76),transparent)]',
   metaLabel:
-    'mb-2 block text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]',
+    'mb-2 block text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[var(--foreground-muted)]',
   grid: 'grid gap-5 xl:grid-cols-2',
   panel:
-    'rounded-[1.9rem] border border-[var(--surface-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] p-7 shadow-[var(--surface-shadow)]',
+    'relative overflow-hidden rounded-[1.75rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.78)] p-6 shadow-[var(--surface-shadow)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.72),transparent)]',
   panelHeader:
-    'mb-5 flex items-center justify-between gap-4 [&_h2]:mt-1.5 [&_h2]:text-[clamp(1.35rem,3vw,1.85rem)] [&_h2]:leading-[1.06]',
+    'mb-5 flex items-center justify-between gap-4 [&_h2]:mt-1 [&_h2]:text-[clamp(1.4rem,3vw,1.95rem)] [&_h2]:leading-[1.02]',
   stack: 'grid gap-4',
   field:
-    'grid gap-2 [&_span:first-child]:text-[0.78rem] [&_span:first-child]:font-semibold [&_span:first-child]:tracking-[0.01em] [&_span:first-child]:text-[var(--foreground-soft)] [&_input]:min-h-12 [&_input]:w-full [&_input]:rounded-[1rem] [&_input]:border [&_input]:border-[rgba(92,67,46,0.12)] [&_input]:bg-white/95 [&_input]:px-4 [&_input]:py-3.5 [&_input]:text-[var(--foreground)] [&_input]:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] [&_textarea]:min-h-[120px] [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-[1rem] [&_textarea]:border [&_textarea]:border-[rgba(92,67,46,0.12)] [&_textarea]:bg-white/95 [&_textarea]:px-4 [&_textarea]:py-3.5 [&_textarea]:text-[var(--foreground)] [&_textarea]:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] [&_select]:min-h-12 [&_select]:w-full [&_select]:rounded-[1rem] [&_select]:border [&_select]:border-[rgba(92,67,46,0.12)] [&_select]:bg-white/95 [&_select]:px-4 [&_select]:py-3.5 [&_select]:text-[var(--foreground)]',
+    'grid gap-2 [&_span:first-child]:text-[0.76rem] [&_span:first-child]:font-semibold [&_span:first-child]:uppercase [&_span:first-child]:tracking-[0.1em] [&_span:first-child]:text-[var(--foreground-muted)] [&_input]:min-h-12 [&_input]:w-full [&_input]:rounded-[1rem] [&_input]:border [&_input]:border-[rgba(115,170,232,0.18)] [&_input]:bg-[rgba(3,10,18,0.7)] [&_input]:px-4 [&_input]:py-3.5 [&_input]:text-[var(--foreground)] [&_input]:shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] [&_input]:backdrop-blur-xl [&_textarea]:min-h-[120px] [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-[1rem] [&_textarea]:border [&_textarea]:border-[rgba(115,170,232,0.18)] [&_textarea]:bg-[rgba(3,10,18,0.7)] [&_textarea]:px-4 [&_textarea]:py-3.5 [&_textarea]:text-[var(--foreground)] [&_textarea]:shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] [&_textarea]:backdrop-blur-xl [&_select]:min-h-12 [&_select]:w-full [&_select]:rounded-[1rem] [&_select]:border [&_select]:border-[rgba(115,170,232,0.18)] [&_select]:bg-[rgba(3,10,18,0.7)] [&_select]:px-4 [&_select]:py-3.5 [&_select]:text-[var(--foreground)] [&_select]:backdrop-blur-xl',
   ltrValue: 'ltr-value',
   inlineActions: 'flex flex-wrap items-center gap-3',
   actionLink:
-    'inline-flex min-h-12 items-center justify-center rounded-full border border-[rgba(92,67,46,0.12)] px-4 py-3 text-sm font-bold tracking-[-0.01em] transition duration-200 hover:-translate-y-0.5',
+    'inline-flex min-h-12 items-center justify-center rounded-full border px-4 py-3 text-sm font-bold tracking-[-0.01em] transition duration-200 ease-out hover:-translate-y-0.5',
   actionLinkPrimary:
-    'border-transparent bg-[linear-gradient(135deg,#2d1a11,#5d3620)] text-[#fffaf6] shadow-[0_16px_28px_rgba(48,29,17,0.16)] hover:bg-[linear-gradient(135deg,#27170f,#4c2d1d)]',
+    'border-transparent bg-[linear-gradient(135deg,#6bf3ff,#8792ff,#c86dff)] text-[#04101d] shadow-[0_20px_40px_rgba(101,181,255,0.24)]',
   actionLinkSecondary:
-    'bg-white/92 text-[var(--foreground)] shadow-[0_10px_18px_rgba(47,31,18,0.06)] hover:border-[rgba(92,67,46,0.18)] hover:bg-white/98',
+    'border-[rgba(112,170,236,0.24)] bg-[rgba(7,17,31,0.68)] text-[var(--foreground)] shadow-[0_16px_30px_rgba(4,11,24,0.24)] backdrop-blur-xl hover:border-[rgba(107,243,255,0.46)]',
   stateText: 'text-sm leading-6 text-[var(--foreground-soft)]',
   muted: 'text-sm leading-6 text-[var(--foreground-soft)]',
-  summaryGrid: 'grid gap-4 md:grid-cols-2',
+  summaryGrid: 'grid gap-4 md:grid-cols-2 xl:grid-cols-3',
   walletCard:
-    'rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.7)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   walletConnectionCard:
-    'rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.7)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   timelineCard:
-    'rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.7)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   actionPanel:
-    'grid gap-4 rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'grid gap-4 rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.7)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   walletList: 'grid gap-3.5',
   jobList: 'grid gap-3.5',
   auditPanel: 'grid gap-3.5',
   composerRail: 'grid gap-3.5 md:grid-cols-3',
   composerStep:
-    'grid gap-2 rounded-[1.4rem] bg-white/90 p-4 text-left text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(92,67,46,0.1)] [&_small]:text-sm [&_small]:leading-6 [&_small]:text-[var(--foreground-soft)] [&_span:first-child]:text-[0.72rem] [&_span:first-child]:font-bold [&_span:first-child]:uppercase [&_span:first-child]:tracking-[0.14em] [&_span:first-child]:text-[var(--foreground-muted)]',
+    'grid gap-2 rounded-[1.35rem] border border-[rgba(115,170,232,0.12)] bg-[rgba(7,16,30,0.68)] p-4 text-left text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(144,190,255,0.05)] backdrop-blur-xl [&_small]:text-sm [&_small]:leading-6 [&_small]:text-[var(--foreground-soft)] [&_span:first-child]:text-[0.72rem] [&_span:first-child]:font-bold [&_span:first-child]:uppercase [&_span:first-child]:tracking-[0.16em] [&_span:first-child]:text-[var(--foreground-muted)]',
   composerStepActive:
-    'bg-[rgba(255,245,233,0.98)] shadow-[inset_0_0_0_1px_rgba(164,105,61,0.28),0_12px_24px_rgba(93,54,32,0.08)]',
+    'border-[rgba(107,243,255,0.42)] bg-[linear-gradient(160deg,rgba(10,24,41,0.92),rgba(20,24,54,0.92))] shadow-[0_24px_48px_rgba(4,11,24,0.26),inset_0_1px_0_rgba(107,243,255,0.16)]',
   composerSection:
-    'grid gap-4 rounded-[1.4rem] bg-white/90 p-5 shadow-[inset_0_0_0_1px_rgba(92,67,46,0.1)]',
+    'grid gap-4 rounded-[1.35rem] border border-[rgba(115,170,232,0.14)] bg-[rgba(7,16,30,0.72)] p-5 shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] backdrop-blur-xl',
   composerSummaryCard:
-    'grid gap-4 rounded-[1.4rem] bg-white/90 p-5 shadow-[inset_0_0_0_1px_rgba(92,67,46,0.1)]',
+    'grid gap-4 rounded-[1.35rem] border border-[rgba(115,170,232,0.14)] bg-[rgba(7,16,30,0.72)] p-5 shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] backdrop-blur-xl',
   composerSplit: 'grid gap-4 md:grid-cols-2',
   checklist: 'grid gap-3',
   checklistItem:
-    'flex items-center justify-between gap-4 rounded-[1rem] bg-[rgba(249,241,231,0.86)] px-4 py-3.5 shadow-[inset_0_0_0_1px_rgba(92,67,46,0.08)] [&_strong:first-child]:min-w-16',
+    'flex items-center justify-between gap-4 rounded-[1rem] border border-[rgba(115,170,232,0.12)] bg-[rgba(7,16,30,0.7)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(144,190,255,0.05)] [&_strong:first-child]:min-w-16',
   roleBar: 'flex flex-wrap gap-2.5',
   statusBanner:
-    'grid gap-2.5 rounded-[1.4rem] bg-[rgba(255,247,237,0.96)] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(164,105,61,0.16),0_8px_18px_rgba(93,54,32,0.04)]',
+    'grid gap-2.5 rounded-[1.35rem] border border-[rgba(107,243,255,0.2)] bg-[linear-gradient(135deg,rgba(8,25,42,0.92),rgba(11,18,36,0.94))] px-4 py-4 shadow-[0_16px_34px_rgba(4,11,24,0.22)]',
   roleBadge:
-    'inline-flex items-center rounded-full bg-[rgba(243,227,210,0.96)] px-3 py-2 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[#744728]',
+    'inline-flex items-center rounded-full border border-[rgba(107,243,255,0.26)] bg-[rgba(107,243,255,0.12)] px-3 py-2 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[#8defff]',
   roleBadgeMuted:
-    'inline-flex items-center rounded-full bg-[rgba(117,99,83,0.1)] px-3 py-2 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[var(--foreground-soft)]',
+    'inline-flex items-center rounded-full border border-[rgba(115,170,232,0.12)] bg-[rgba(115,170,232,0.08)] px-3 py-2 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[var(--foreground-soft)]',
   workspaceStack: 'grid gap-3.5',
   milestoneRail: 'grid gap-3',
   milestonePickerEmpty:
-    'rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.7)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   milestoneTile:
-    'grid gap-3 rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 text-left shadow-[var(--surface-shadow)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)]',
+    'grid gap-3 rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.72)] p-4 text-left shadow-[var(--surface-shadow)] backdrop-blur-xl transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)]',
   milestoneTileActive:
-    'border-[rgba(164,105,61,0.28)] bg-[rgba(255,245,233,0.98)]',
+    'border-[rgba(107,243,255,0.42)] bg-[linear-gradient(160deg,rgba(10,24,41,0.92),rgba(20,24,54,0.92))]',
   milestoneBadge:
     'inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[0.74rem] font-bold uppercase tracking-[0.08em]',
   lifecycleState:
@@ -88,41 +89,43 @@ const styles = {
   lifecycleHead: 'flex items-start justify-between gap-3',
   selectedMilestoneHeader: 'flex items-start justify-between gap-3',
   lifecycleCard:
-    'grid gap-3.5 rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 shadow-[var(--surface-shadow)]',
+    'grid gap-3.5 rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.72)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
   lifecycleReady:
-    'shadow-[inset_0_0_0_1px_rgba(123,169,164,0.22)] [&_.lifecycle-state]:bg-[rgba(220,244,239,0.96)] [&_.lifecycle-state]:text-[#16605c]',
+    'border-[rgba(107,243,255,0.28)] [&_.lifecycle-state]:bg-[rgba(107,243,255,0.12)] [&_.lifecycle-state]:text-[#8defff]',
   lifecyclePending:
-    'bg-[rgba(255,248,224,0.94)] shadow-[inset_0_0_0_1px_rgba(184,142,39,0.24)] [&_.lifecycle-state]:bg-[rgba(255,242,200,0.96)] [&_.lifecycle-state]:text-[#946d14]',
+    'border-[rgba(255,183,84,0.28)] bg-[rgba(42,28,10,0.36)] [&_.lifecycle-state]:bg-[rgba(255,183,84,0.14)] [&_.lifecycle-state]:text-[#ffd38e]',
   lifecycleConfirmed:
-    'bg-[rgba(240,249,244,0.94)] shadow-[inset_0_0_0_1px_rgba(67,140,98,0.22)] [&_.lifecycle-state]:bg-[rgba(220,244,239,0.96)] [&_.lifecycle-state]:text-[#1b6d41]',
+    'border-[rgba(46,227,181,0.28)] bg-[rgba(8,37,29,0.36)] [&_.lifecycle-state]:bg-[rgba(46,227,181,0.14)] [&_.lifecycle-state]:text-[#82f4d5]',
   lifecycleFailed:
-    'bg-[rgba(255,240,236,0.94)] shadow-[inset_0_0_0_1px_rgba(195,84,52,0.22)] [&_.lifecycle-state]:bg-[rgba(255,228,220,0.96)] [&_.lifecycle-state]:text-[#a1482a]',
+    'border-[rgba(255,110,140,0.28)] bg-[rgba(44,12,22,0.42)] [&_.lifecycle-state]:bg-[rgba(255,110,140,0.14)] [&_.lifecycle-state]:text-[#ffafbf]',
   lifecycleBlocked:
-    'bg-[rgba(244,239,232,0.94)] shadow-[inset_0_0_0_1px_rgba(116,94,74,0.18)] [&_.lifecycle-state]:bg-[rgba(117,99,83,0.1)] [&_.lifecycle-state]:text-[var(--foreground-soft)]',
+    'border-[rgba(115,170,232,0.16)] bg-[rgba(12,20,34,0.5)] [&_.lifecycle-state]:bg-[rgba(115,170,232,0.08)] [&_.lifecycle-state]:text-[var(--foreground-soft)]',
   detailGrid: 'grid gap-5 2xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.9fr)]',
   taskBoard: 'grid gap-3',
-  taskCardContext: 'flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--foreground-muted)]',
+  taskCardContext:
+    'flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--foreground-muted)]',
   jobRow:
-    'grid gap-3 rounded-[1.4rem] border border-[var(--surface-border)] bg-white/92 p-4 text-left shadow-[var(--surface-shadow)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)]',
+    'grid gap-3 rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.72)] p-4 text-left shadow-[var(--surface-shadow)] backdrop-blur-xl transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)]',
   jobRowActive:
-    'border-[rgba(164,105,61,0.28)] bg-[rgba(255,245,233,0.98)] shadow-[0_14px_28px_rgba(93,54,32,0.08)]',
+    'border-[rgba(107,243,255,0.42)] bg-[linear-gradient(160deg,rgba(10,24,41,0.92),rgba(20,24,54,0.92))] shadow-[0_22px_44px_rgba(4,11,24,0.26)]',
   linkList: 'grid gap-2',
-  milestoneDelivered: 'bg-[rgba(220,244,239,0.96)] text-[#16605c]',
-  milestoneDisputed: 'bg-[rgba(255,228,220,0.96)] text-[#a1482a]',
-  milestoneEditor: 'grid gap-3 rounded-[1.25rem] border border-[var(--surface-border)] bg-[var(--surface-soft)] p-4',
-  milestonePending: 'bg-[rgba(255,242,200,0.96)] text-[#946d14]',
-  milestoneRefunded: 'bg-[rgba(255,228,220,0.96)] text-[#a1482a]',
-  milestoneReleased: 'bg-[rgba(220,244,239,0.96)] text-[#1b6d41]',
+  milestoneDelivered: 'bg-[rgba(107,243,255,0.14)] text-[#8defff]',
+  milestoneDisputed: 'bg-[rgba(255,110,140,0.14)] text-[#ffafbf]',
+  milestoneEditor:
+    'grid gap-3 rounded-[1.25rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.72)] p-4 backdrop-blur-xl',
+  milestonePending: 'bg-[rgba(255,183,84,0.14)] text-[#ffd38e]',
+  milestoneRefunded: 'bg-[rgba(255,110,140,0.14)] text-[#ffafbf]',
+  milestoneReleased: 'bg-[rgba(46,227,181,0.14)] text-[#82f4d5]',
   secondaryButton:
-    'inline-flex min-h-11 items-center justify-center rounded-full border border-[rgba(92,67,46,0.12)] bg-white/92 px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] text-[var(--foreground)] shadow-[0_10px_18px_rgba(47,31,18,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(92,67,46,0.18)] hover:bg-white/98',
+    'inline-flex min-h-11 items-center justify-center rounded-full border border-[rgba(112,170,236,0.24)] bg-[rgba(7,17,31,0.68)] px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] text-[var(--foreground)] shadow-[0_16px_30px_rgba(4,11,24,0.24)] backdrop-blur-xl transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[rgba(107,243,255,0.44)]',
   languageSwitcher:
-    'inline-flex items-center gap-2 rounded-full bg-white/92 px-3 py-2 shadow-[inset_0_0_0_1px_rgba(92,67,46,0.1)] [&_[role=group]]:inline-flex [&_[role=group]]:gap-1.5',
+    'inline-flex items-center gap-2 rounded-full bg-[rgba(7,17,31,0.68)] px-3 py-2 shadow-[inset_0_0_0_1px_rgba(112,170,236,0.18),0_16px_30px_rgba(4,11,24,0.24)] backdrop-blur-xl [&_[role=group]]:inline-flex [&_[role=group]]:gap-1.5',
   languageSwitcherLabel:
     'text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)]',
   languageSwitcherOption:
-    'min-h-10 rounded-full bg-transparent px-3.5 py-2.5 text-sm text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(92,67,46,0.08)]',
+    'min-h-10 rounded-full bg-transparent px-3.5 py-2.5 text-sm text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(112,170,236,0.15)]',
   languageSwitcherOptionActive:
-    'bg-[linear-gradient(135deg,#2d1a11,#5d3620)] text-[#fffaf6] shadow-[0_10px_18px_rgba(48,29,17,0.16),inset_0_1px_0_rgba(255,255,255,0.08)]',
+    'bg-[linear-gradient(135deg,#6bf3ff,#8792ff,#c86dff)] text-[#04101d] shadow-[0_16px_34px_rgba(101,181,255,0.28)]',
 } as const;
 
 export default styles;

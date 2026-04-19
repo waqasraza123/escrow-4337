@@ -2,38 +2,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f3ee;
-  --background-strong: #efe5d9;
-  --foreground: #1d1510;
-  --foreground-soft: #5d493a;
-  --foreground-muted: #88715e;
-  --muted-foreground: #6f5948;
-  --surface-card: rgba(255, 255, 255, 0.92);
-  --surface-card-strong: rgba(255, 255, 255, 0.97);
-  --surface-soft: rgba(255, 247, 237, 0.94);
-  --surface-border: rgba(92, 67, 46, 0.1);
-  --surface-border-strong: rgba(92, 67, 46, 0.18);
-  --surface-shadow: 0 10px 24px rgba(47, 31, 18, 0.06);
-  --surface-shadow-strong: 0 24px 72px rgba(38, 24, 14, 0.12);
-  --button-primary-bg: linear-gradient(135deg, #2d1a11, #5d3620);
-  --button-primary-bg-hover: linear-gradient(135deg, #27170f, #4c2d1d);
-  --button-primary-fg: #fffaf6;
-  --button-primary-shadow: 0 16px 28px rgba(48, 29, 17, 0.16);
-  --button-secondary-bg: rgba(255, 255, 255, 0.92);
-  --button-secondary-fg: #1d1510;
-  --button-secondary-border: rgba(92, 67, 46, 0.12);
-  --button-secondary-border-strong: rgba(92, 67, 46, 0.18);
-  --button-secondary-shadow: 0 10px 18px rgba(47, 31, 18, 0.06);
-  --badge-neutral-bg: rgba(243, 227, 210, 0.96);
-  --badge-neutral-fg: #744728;
-  --badge-success-bg: rgba(220, 244, 239, 0.96);
-  --badge-success-fg: #16605c;
-  --badge-warning-bg: rgba(255, 242, 200, 0.96);
-  --badge-warning-fg: #946d14;
-  --badge-danger-bg: rgba(255, 228, 220, 0.96);
-  --badge-danger-fg: #a1482a;
-  --radius-card: 1.4rem;
-  --focus-ring: 0 0 0 4px rgba(113, 69, 39, 0.16);
+  --bg-layer-1: #050916;
+  --bg-layer-2: #091224;
+  --bg-layer-3: #101a34;
+  --bg-aurora-cyan: rgba(111, 237, 255, 0.24);
+  --bg-aurora-violet: rgba(145, 150, 255, 0.18);
+  --bg-aurora-silver: rgba(255, 255, 255, 0.1);
+  --glass-base: rgba(8, 18, 34, 0.62);
+  --glass-strong: rgba(8, 18, 34, 0.82);
+  --glass-quiet: rgba(7, 15, 28, 0.54);
+  --glass-border: rgba(162, 198, 255, 0.18);
+  --glass-border-strong: rgba(179, 241, 255, 0.34);
+  --glass-border-soft: rgba(255, 255, 255, 0.1);
+  --depth-shadow-sm: 0 16px 36px rgba(3, 8, 18, 0.18);
+  --depth-shadow-md: 0 24px 60px rgba(2, 8, 19, 0.32);
+  --depth-shadow-lg: 0 40px 120px rgba(2, 8, 19, 0.46);
+  --panel-blur: 26px;
+  --panel-blur-strong: 34px;
+  --radius-xs: 1rem;
+  --radius-sm: 1.2rem;
+  --radius-md: 1.55rem;
+  --radius-lg: 2rem;
+  --motion-fast: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-medium: 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-slow: 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --foreground: #edf6ff;
+  --foreground-soft: #aec3de;
+  --foreground-muted: #7290b0;
+  --muted-foreground: #8ea5bf;
+  --background: var(--bg-layer-2);
+  --background-strong: var(--bg-layer-1);
+  --surface-card: linear-gradient(180deg, rgba(11, 22, 40, 0.76), rgba(8, 16, 30, 0.82));
+  --surface-card-strong: linear-gradient(180deg, rgba(13, 26, 47, 0.9), rgba(7, 15, 29, 0.96));
+  --surface-soft: var(--glass-quiet);
+  --surface-border: var(--glass-border);
+  --surface-border-strong: var(--glass-border-strong);
+  --surface-shadow: var(--depth-shadow-md);
+  --surface-shadow-strong: var(--depth-shadow-lg);
+  --button-primary-bg: linear-gradient(135deg, #f7fbff 0%, #d6ecff 26%, #a0dfff 58%, #c7cfff 100%);
+  --button-primary-bg-hover: linear-gradient(135deg, #ffffff 0%, #e7f4ff 26%, #b8e7ff 58%, #d6dbff 100%);
+  --button-primary-fg: #05101d;
+  --button-primary-shadow: 0 22px 48px rgba(111, 196, 255, 0.24);
+  --button-secondary-bg: rgba(8, 18, 34, 0.58);
+  --button-secondary-fg: var(--foreground);
+  --button-secondary-border: rgba(162, 198, 255, 0.22);
+  --button-secondary-border-strong: rgba(179, 241, 255, 0.42);
+  --button-secondary-shadow: 0 16px 34px rgba(4, 11, 24, 0.22);
+  --badge-neutral-bg: rgba(150, 164, 255, 0.14);
+  --badge-neutral-fg: #d6dcff;
+  --badge-success-bg: rgba(94, 230, 194, 0.14);
+  --badge-success-fg: #9ff6dc;
+  --badge-warning-bg: rgba(255, 198, 108, 0.14);
+  --badge-warning-fg: #ffd9a1;
+  --badge-danger-bg: rgba(255, 138, 166, 0.16);
+  --badge-danger-fg: #ffc2d1;
+  --radius-card: var(--radius-md);
+  --focus-ring: 0 0 0 4px rgba(157, 224, 255, 0.26);
+  --motion-enter: var(--motion-medium);
+  --motion-hover: var(--motion-fast);
 }
 
 @layer base {
@@ -51,13 +77,39 @@
     min-height: 100vh;
     color: var(--foreground);
     background:
-      radial-gradient(circle at 0% 8%, rgba(226, 176, 118, 0.22), transparent 34%),
-      radial-gradient(circle at 86% 0%, rgba(160, 182, 176, 0.18), transparent 22%),
-      linear-gradient(180deg, #faf7f2 0%, #f2e9dd 42%, #f6f2ed 100%);
+      radial-gradient(circle at 12% 18%, var(--bg-aurora-cyan), transparent 0 24%),
+      radial-gradient(circle at 84% 8%, var(--bg-aurora-violet), transparent 0 28%),
+      radial-gradient(circle at 72% 72%, rgba(104, 183, 255, 0.12), transparent 0 22%),
+      linear-gradient(160deg, var(--bg-layer-1) 0%, var(--bg-layer-2) 42%, #081220 68%, #040813 100%);
     font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(141, 186, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(141, 186, 255, 0.04) 1px, transparent 1px);
+    background-size: 58px 58px;
+    mask-image: radial-gradient(circle at center, black 48%, transparent 92%);
+    opacity: 0.42;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 36%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%);
+    opacity: 0.7;
   }
 
   html[data-locale='ar'] body {
@@ -94,7 +146,7 @@
   h4,
   .display-font {
     font-family: var(--font-display), "Avenir Next", "Segoe UI", sans-serif;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.05em;
   }
 
   html[data-locale='ar'] h1,
@@ -116,7 +168,8 @@
   }
 
   ::selection {
-    background: rgba(134, 89, 54, 0.18);
+    background: rgba(145, 222, 255, 0.28);
+    color: #eefcff;
   }
 }
 
@@ -126,10 +179,59 @@
     unicode-bidi: isolate;
     text-align: left;
   }
+
+  .fx-fade-up {
+    opacity: 0;
+    transform: translateY(18px);
+    animation: fade-up var(--motion-enter) forwards;
+  }
+
+  .fx-fade-up-delay-1 {
+    animation-delay: 90ms;
+  }
+
+  .fx-fade-up-delay-2 {
+    animation-delay: 160ms;
+  }
+
+  .fx-fade-up-delay-3 {
+    animation-delay: 230ms;
+  }
+
+  .spatial-vignette {
+    mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
+  }
+}
+
+@keyframes fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 [data-ltr='true'] {
   direction: ltr;
   unicode-bidi: isolate;
   text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .fx-fade-up,
+  .fx-fade-up-delay-1,
+  .fx-fade-up-delay-2,
+  .fx-fade-up-delay-3 {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }

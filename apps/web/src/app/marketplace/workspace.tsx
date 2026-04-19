@@ -13,6 +13,12 @@ import {
   StatusNotice,
   SurfaceCard,
 } from '@escrow4334/frontend-core';
+import {
+  MotionEmptyState,
+  RevealSection,
+  SharedCard,
+  SpotlightButton,
+} from '@escrow4334/frontend-core/spatial';
 import styles from '../page.styles';
 import { useWebI18n } from '../../lib/i18n';
 import {
@@ -613,62 +619,72 @@ export function MarketplaceWorkspace() {
 
   return (
     <ConsolePage theme="web">
-      <PageTopBar
-        eyebrow={workspaceMessages.topBarLabel}
-        description={workspaceMessages.topBarMeta}
-        className={styles.topBar}
-        contentClassName={styles.topBarContent}
-        actions={
-          <>
-            <Button asChild variant="secondary">
-              <Link href="/marketplace">{workspaceMessages.publicMarketplace}</Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/app/new-contract">{marketplaceMessages.directContractPath}</Link>
-            </Button>
-            {tokens ? (
-              <Button type="button" onClick={() => void handleSignOut()}>
-                {workspaceMessages.signOut}
+      <RevealSection>
+        <PageTopBar
+          eyebrow={workspaceMessages.topBarLabel}
+          description={workspaceMessages.topBarMeta}
+          className={styles.topBar}
+          contentClassName={styles.topBarContent}
+          actions={
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/marketplace">{workspaceMessages.publicMarketplace}</Link>
               </Button>
-            ) : (
-              <Button asChild>
-                <Link href="/app/sign-in">{messages.common.signIn}</Link>
+              <Button asChild variant="secondary">
+                <Link href="/app/new-contract">{marketplaceMessages.directContractPath}</Link>
               </Button>
-            )}
-          </>
-        }
-      />
+              {tokens ? (
+                <Button type="button" onClick={() => void handleSignOut()}>
+                  {workspaceMessages.signOut}
+                </Button>
+              ) : (
+                <SpotlightButton asChild>
+                  <Link href="/app/sign-in">{messages.common.signIn}</Link>
+                </SpotlightButton>
+              )}
+            </>
+          }
+        />
+      </RevealSection>
 
       {message ? (
-        <SurfaceCard className={styles.panel}>
-          <StatusNotice message={message} messageClassName={styles.stateText} />
-        </SurfaceCard>
+        <RevealSection as="div" delay={0.04}>
+          <SurfaceCard className={styles.panel}>
+            <StatusNotice message={message} messageClassName={styles.stateText} />
+          </SurfaceCard>
+        </RevealSection>
       ) : null}
 
       {error ? (
-        <SurfaceCard className={styles.panel}>
-          <StatusNotice message={error} messageClassName={styles.stateText} />
-        </SurfaceCard>
+        <RevealSection as="div" delay={0.04}>
+          <SurfaceCard className={styles.panel}>
+            <StatusNotice message={error} messageClassName={styles.stateText} />
+          </SurfaceCard>
+        </RevealSection>
       ) : null}
 
       {loading ? (
-        <EmptyStateCard
-          className={styles.panel}
-          title={workspaceMessages.loadingTitle}
-          message=""
-        />
+        <MotionEmptyState>
+          <EmptyStateCard
+            className={styles.panel}
+            title={workspaceMessages.loadingTitle}
+            message=""
+          />
+        </MotionEmptyState>
       ) : null}
 
       {!loading && !tokens ? (
-        <EmptyStateCard
-          className={styles.panel}
-          title={workspaceMessages.sessionRequiredTitle}
-          message={workspaceMessages.sessionRequiredBody}
-          messageClassName={styles.stateText}
-        />
+        <MotionEmptyState>
+          <EmptyStateCard
+            className={styles.panel}
+            title={workspaceMessages.sessionRequiredTitle}
+            message={workspaceMessages.sessionRequiredBody}
+            messageClassName={styles.stateText}
+          />
+        </MotionEmptyState>
       ) : null}
 
-      <section className={styles.grid}>
+      <RevealSection className={styles.grid} delay={0.08}>
         <SectionCard
           className={styles.panel}
           eyebrow={workspaceMessages.overviewEyebrow}
@@ -702,9 +718,9 @@ export function MarketplaceWorkspace() {
             />
           </FactGrid>
         </SectionCard>
-      </section>
+      </RevealSection>
 
-      <section className={styles.grid}>
+      <RevealSection className={styles.grid} delay={0.12}>
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1150,9 +1166,9 @@ export function MarketplaceWorkspace() {
             </div>
           </div>
         </article>
-      </section>
+      </RevealSection>
 
-      <section className={styles.grid}>
+      <RevealSection className={styles.grid} delay={0.16}>
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1165,10 +1181,12 @@ export function MarketplaceWorkspace() {
               <p className={styles.stateText}>{workspaceMessages.noOpportunities}</p>
             ) : (
               myOpportunities.map((opportunity) => (
-                <article
+                <SharedCard
                   key={opportunity.id}
                   className={styles.actionPanel}
                   data-testid={`marketplace-my-opportunity-${opportunity.id}`}
+                  interactive
+                  layoutId={`marketplace-opportunity-${opportunity.id}`}
                 >
                   <div className={styles.stack}>
                     <strong>{opportunity.title}</strong>
@@ -1315,7 +1333,7 @@ export function MarketplaceWorkspace() {
                       </div>
                     ) : null}
                   </div>
-                </article>
+                </SharedCard>
               ))
             )}
           </div>
@@ -1372,9 +1390,9 @@ export function MarketplaceWorkspace() {
             )}
           </div>
         </article>
-      </section>
+      </RevealSection>
 
-      <section className={styles.grid}>
+      <RevealSection className={styles.grid} delay={0.2}>
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1391,34 +1409,36 @@ export function MarketplaceWorkspace() {
                   applicationDrafts[opportunity.id] ??
                   createApplicationDraft(opportunity, profile);
                 return (
-                  <article
+                  <SharedCard
                     key={opportunity.id}
                     className={styles.actionPanel}
                     data-testid={`marketplace-open-brief-${opportunity.id}`}
+                    interactive
+                    layoutId={`marketplace-opportunity-${opportunity.id}`}
                   >
                     <div className={styles.stack}>
-                    <strong>{opportunity.title}</strong>
-                    <p className={styles.stateText}>{opportunity.summary}</p>
-                    <p className={styles.stateText}>
-                      {workspaceMessages.mustHaves}:{' '}
-                      {opportunity.mustHaveSkills.join(' • ') || workspaceMessages.noneListed}
-                    </p>
-                    <p className={styles.stateText}>
-                      {workspaceMessages.requiredCryptoReadiness}:{' '}
-                      {
-                        marketplaceMessages.labels.cryptoReadiness[
-                          opportunity.cryptoReadinessRequired
-                        ]
-                      }
-                    </p>
-                    <div className={styles.inlineActions}>
-                      <Link
-                        className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                        href={`/marketplace/opportunities/${opportunity.id}`}
-                      >
-                        {workspaceMessages.viewPublicBrief}
-                      </Link>
-                    </div>
+                      <strong>{opportunity.title}</strong>
+                      <p className={styles.stateText}>{opportunity.summary}</p>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.mustHaves}:{' '}
+                        {opportunity.mustHaveSkills.join(' • ') || workspaceMessages.noneListed}
+                      </p>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.requiredCryptoReadiness}:{' '}
+                        {
+                          marketplaceMessages.labels.cryptoReadiness[
+                            opportunity.cryptoReadinessRequired
+                          ]
+                        }
+                      </p>
+                      <div className={styles.inlineActions}>
+                        <Link
+                          className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                          href={`/marketplace/opportunities/${opportunity.id}`}
+                        >
+                          {workspaceMessages.viewPublicBrief}
+                        </Link>
+                      </div>
                       {tokens && user && user.id !== opportunity.owner.userId ? (
                         <div className={styles.stack}>
                           <label className={styles.field}>
@@ -1489,13 +1509,13 @@ export function MarketplaceWorkspace() {
                         </div>
                       ) : null}
                     </div>
-                  </article>
+                  </SharedCard>
                 );
               })
             )}
           </div>
         </article>
-      </section>
+      </RevealSection>
     </ConsolePage>
   );
 }

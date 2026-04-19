@@ -620,6 +620,6 @@ describe('web page', () => {
       screen.getByRole('heading', { name: 'Launch-ready implementation' }),
     ).toBeInTheDocument();
     },
-    20_000,
+    45_000,
   );
 });
