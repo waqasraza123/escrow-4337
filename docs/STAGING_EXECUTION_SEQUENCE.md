@@ -22,6 +22,7 @@ Required environment contract:
 1. Confirm the staging secret contract is complete in GitHub Environment `staging`.
    Required minimum groups: core runtime, email relay, smart-account relay, escrow relay, operations, and deployed smoke URLs.
    Block here if any of `DATABASE_URL`, `JWT_SECRET`, `NEST_API_TRUST_PROXY`, `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, `ESCROW_RELAY_BASE_URL`, `WALLET_SMART_ACCOUNT_BUNDLER_URL`, `WALLET_SMART_ACCOUNT_RELAY_BASE_URL`, `OPERATIONS_ESCROW_RPC_URL`, `PLAYWRIGHT_DEPLOYED_WEB_BASE_URL`, `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`, or `PLAYWRIGHT_DEPLOYED_API_BASE_URL` are missing.
+   Set `DEPLOYMENT_TARGET_ENVIRONMENT=staging` for deployment validation and ensure `NEST_API_CORS_ORIGINS` includes the origins from the staging web/admin URLs.
 
 2. Confirm the frontend and API targets all point at the same staging candidate.
    `PLAYWRIGHT_DEPLOYED_WEB_BASE_URL`, `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`, and `PLAYWRIGHT_DEPLOYED_API_BASE_URL` must resolve to the staging deployment you are validating.

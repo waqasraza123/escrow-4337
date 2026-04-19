@@ -15,6 +15,15 @@ import type {
   DeploymentCheck,
   DeploymentValidationReport,
 } from './deployment-validation.types';
+import {
+  isLoopbackUrl,
+  isStrictDeploymentValidationEnvironment,
+  readBooleanFlag,
+  readDeploymentTargetEnvironment,
+  readRequiredDeployedBrowserTargets,
+  toOrigin,
+} from './deployment-target';
+import { readCorsOrigins } from '../../common/http/cors';
 
 type JsonRpcSuccess = {
   result?: string;
@@ -46,6 +55,7 @@ export class DeploymentValidationService {
   }
 
   async runValidation(): Promise<DeploymentValidationReport> {
+    const targetEnvironment = readDeploymentTargetEnvironment();
     const checks = this.collectConfigurationChecks();
 
     checks.push(
@@ -109,6 +119,8 @@ export class DeploymentValidationService {
       ok: !checks.some((check) => check.status === 'failed'),
       environment: {
         nodeEnv: process.env.NODE_ENV || 'development',
+        targetEnvironment,
+        strictValidation: isStrictDeploymentValidationEnvironment(),
         persistenceDriver: this.persistenceConfig.driver,
         trustProxyRaw: process.env.NEST_API_TRUST_PROXY?.trim() || null,
         trustProxyParsed:
@@ -211,6 +223,24 @@ export class DeploymentValidationService {
 
   private collectConfigurationChecks() {
     const checks: DeploymentCheck[] = [];
+    const targetEnvironment = readDeploymentTargetEnvironment();
+
+    checks.push(
+      {
+        id: 'deployment-target',
+        status: 'ok',
+        summary: targetEnvironment
+          ? `Deployment validation is enforcing the ${targetEnvironment} target contract.`
+          : 'Deployment validation is running without an explicit staging/production target contract.',
+        details: targetEnvironment
+          ? undefined
+          : 'Set DEPLOYMENT_TARGET_ENVIRONMENT, LAUNCH_CANDIDATE_ENVIRONMENT, or DEPLOYED_SMOKE_ENVIRONMENT to enforce deployed browser target and CORS alignment checks.',
+        metadata: {
+          targetEnvironment,
+          strictValidation: isStrictDeploymentValidationEnvironment(),
+        },
+      },
+    );
 
     checks.push(
       this.captureCheck(
@@ -252,7 +282,7 @@ export class DeploymentValidationService {
           : 'Persistence is configured for file storage',
         () => {
           if (
-            this.isStrictDeploymentEnvironment() &&
+            isStrictDeploymentValidationEnvironment() &&
             this.persistenceConfig.driver !== 'postgres'
           ) {
             throw new Error(
@@ -280,7 +310,7 @@ export class DeploymentValidationService {
           void this.emailConfig.otpTtlMinutes;
 
           if (
-            this.isStrictDeploymentEnvironment() &&
+            isStrictDeploymentValidationEnvironment() &&
             this.emailConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -306,7 +336,7 @@ export class DeploymentValidationService {
           void this.smartAccountConfig.sponsorshipMode;
 
           if (
-            this.isStrictDeploymentEnvironment() &&
+            isStrictDeploymentValidationEnvironment() &&
             this.smartAccountConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -337,7 +367,7 @@ export class DeploymentValidationService {
           void this.escrowConfig.chainId;
 
           if (
-            this.isStrictDeploymentEnvironment() &&
+            isStrictDeploymentValidationEnvironment() &&
             this.escrowConfig.mode === 'mock'
           ) {
             throw new Error(
@@ -382,7 +412,9 @@ export class DeploymentValidationService {
     checks.push({
       id: 'trust-proxy',
       status:
-        this.isStrictDeploymentEnvironment() && !trustProxy ? 'warning' : 'ok',
+        isStrictDeploymentValidationEnvironment() && !trustProxy
+          ? 'warning'
+          : 'ok',
       summary: trustProxy
         ? 'Trusted proxy configuration is set'
         : 'Trusted proxy configuration is not set',
@@ -394,6 +426,9 @@ export class DeploymentValidationService {
         parsed: parsedTrustProxy ?? null,
       },
     });
+
+    checks.push(this.checkDeployedBrowserTargets(targetEnvironment));
+    checks.push(this.checkDeployedBrowserCorsAlignment(targetEnvironment));
 
     checks.push(this.checkChainSyncDaemonConfiguration());
 
@@ -487,6 +522,11 @@ export class DeploymentValidationService {
       process.env.AUTH_EMAIL_RELAY_HEALTHCHECK_URL?.trim() ||
         `${this.emailConfig.relayBaseUrl}/health`,
       'Auth email relay is reachable',
+      this.emailConfig.relayApiKey
+        ? {
+            'x-api-key': this.emailConfig.relayApiKey,
+          }
+        : undefined,
     );
   }
 
@@ -505,6 +545,11 @@ export class DeploymentValidationService {
       process.env.WALLET_SMART_ACCOUNT_RELAY_HEALTHCHECK_URL?.trim() ||
         `${this.smartAccountConfig.relayBaseUrl}/health`,
       'Smart-account relay is reachable',
+      this.smartAccountConfig.relayApiKey
+        ? {
+            'x-api-key': this.smartAccountConfig.relayApiKey,
+          }
+        : undefined,
     );
   }
 
@@ -522,6 +567,11 @@ export class DeploymentValidationService {
       process.env.ESCROW_RELAY_HEALTHCHECK_URL?.trim() ||
         `${this.escrowConfig.relayBaseUrl}/health`,
       'Escrow relay is reachable',
+      this.escrowConfig.relayApiKey
+        ? {
+            'x-api-key': this.escrowConfig.relayApiKey,
+          }
+        : undefined,
     );
   }
 
@@ -570,10 +620,13 @@ export class DeploymentValidationService {
     id: string,
     url: string,
     summary: string,
+    extraHeaders?: Record<string, string>,
   ): Promise<DeploymentCheck> {
     try {
+      const headers = new Headers(extraHeaders);
       const response = await fetch(url, {
         method: 'GET',
+        headers,
         signal: AbortSignal.timeout(this.timeoutMs),
       });
 
@@ -735,7 +788,81 @@ export class DeploymentValidationService {
     );
   }
 
-  private isStrictDeploymentEnvironment() {
-    return process.env.NODE_ENV === 'production';
+  private checkDeployedBrowserTargets(
+    targetEnvironment: ReturnType<typeof readDeploymentTargetEnvironment>,
+  ): DeploymentCheck {
+    if (!targetEnvironment) {
+      return {
+        id: 'deployed-browser-targets',
+        status: 'skipped',
+        summary:
+          'Deployed browser target checks skipped because no deployment target environment is set',
+      };
+    }
+
+    return this.captureCheck(
+      'deployed-browser-targets',
+      `Deployed browser targets are configured for ${targetEnvironment}`,
+      () => {
+        const targets = readRequiredDeployedBrowserTargets();
+        const allowInsecureHttp = readBooleanFlag(
+          process.env.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP,
+        );
+        const allowLocalhost = readBooleanFlag(
+          process.env.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST,
+        );
+
+        for (const [label, value] of Object.entries(targets)) {
+          const parsed = new URL(value);
+
+          if (parsed.protocol !== 'https:' && !allowInsecureHttp) {
+            throw new Error(
+              `${label} must use HTTPS unless PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP=true`,
+            );
+          }
+
+          if (isLoopbackUrl(value) && !allowLocalhost) {
+            throw new Error(
+              `${label} must not point at localhost unless PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST=true`,
+            );
+          }
+        }
+      },
+    );
+  }
+
+  private checkDeployedBrowserCorsAlignment(
+    targetEnvironment: ReturnType<typeof readDeploymentTargetEnvironment>,
+  ): DeploymentCheck {
+    if (!targetEnvironment) {
+      return {
+        id: 'deployed-browser-cors',
+        status: 'skipped',
+        summary:
+          'Deployed browser CORS alignment skipped because no deployment target environment is set',
+      };
+    }
+
+    return this.captureCheck(
+      'deployed-browser-cors',
+      `Backend CORS allowlist covers deployed browser targets for ${targetEnvironment}`,
+      () => {
+        const corsOrigins = readCorsOrigins(process.env.NEST_API_CORS_ORIGINS);
+        const targets = readRequiredDeployedBrowserTargets();
+        const requiredOrigins = [
+          toOrigin(targets.webBaseUrl),
+          toOrigin(targets.adminBaseUrl),
+        ];
+        const missingOrigins = requiredOrigins.filter(
+          (origin) => !corsOrigins.includes(origin),
+        );
+
+        if (missingOrigins.length > 0) {
+          throw new Error(
+            `NEST_API_CORS_ORIGINS must include deployed browser origins: ${missingOrigins.join(', ')}`,
+          );
+        }
+      },
+    );
   }
 }

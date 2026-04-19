@@ -14,6 +14,8 @@ export type LaunchReadinessCheck = {
     | 'email-provider'
     | 'smart-account-provider'
     | 'escrow-provider'
+    | 'deployed-browser-targets'
+    | 'deployed-browser-cors'
     | 'cors-origins'
     | 'trust-proxy'
     | 'operator-authority'

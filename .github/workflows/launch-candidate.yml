@@ -27,6 +27,7 @@ jobs:
       actions: read
       contents: read
     env:
+      DEPLOYMENT_TARGET_ENVIRONMENT: ${{ inputs.environment }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}

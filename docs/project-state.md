@@ -212,6 +212,7 @@
 - Manual chain-audit sync in non-test environments now expects `OPERATIONS_ESCROW_RPC_URL`; missing config will fail the operator sync path.
 - Non-test smart-account provisioning now expects wallet relay, bundler, entry-point, factory, and optionally paymaster configuration; missing config will fail the provisioning path.
 - Deployment validation now depends on relay health or reachability behavior and bundler JSON-RPC `eth_chainId`; providers that do not expose those conventions may require the new per-target healthcheck URL overrides.
+- Deployment validation now also treats explicit staging/production target environments as strict release contracts: when `DEPLOYMENT_TARGET_ENVIRONMENT` or the launch/deployed-smoke environment is set, validation must enforce deployed browser target URLs plus `NEST_API_CORS_ORIGINS` coverage for the web/admin origins, and relay reachability probes now forward configured relay API keys.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
 - Root verification now includes a real local Playwright smoke lane against built web, admin, and API processes on top of local Postgres, but it still does not validate a real deployed frontend/backend target, live relay infrastructure, deployed ingress, or non-mock smart-account and escrow execution by default.

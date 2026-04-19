@@ -4,29 +4,38 @@
 - 2026-04-19
 
 ## Current Objective
-- Break Marketplace Phase 0 into a concrete immediate backlog, upgrade the README to match the new marketplace direction, and commit the planning/doc direction so the repo has a clear documented execution baseline.
+- Implement the first production-grade Phase 0 slice by tightening the staging deployment contract and real provider validation: enforce strict staging/production deployment validation, verify deployed browser target/CORS alignment, and carry that contract through workflows and docs.
 
 ## Last Completed Step
-- Added the phased implementation set:
-  - `docs/MARKETPLACE_IMPLEMENTATION_V1.md`
-  - `docs/MARKETPLACE_DESIGN_GUIDE_V1.md`
-  - `docs/MARKETPLACE_PHASE_0_V1.md` through `docs/MARKETPLACE_PHASE_8_V1.md`
+- Added the immediate execution docs and repo framing:
+  - Phase docs plus design guide and implementation index
+  - `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`
+  - rewritten `readme.md`
+  - committed docs snapshot as `d01c547`
 
 ## Current Step
-- Task complete. Added the immediate backlog in `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`, rewrote `readme.md` around the escrow-first marketplace direction, and prepared the planning/doc set for commit.
+- Task complete. Tightened `deployment:validate`, launch-readiness, workflows, and staging docs so the repo now enforces the staged browser-target/CORS/provider contract instead of only documenting it.
 
 ## Why This Step Exists
 - The phased plan still needed an actionable entry point. The Phase 0 backlog now turns the highest-risk hardening work into concrete workstreams, and the README now matches the product and roadmap the repo is actually following.
 
 ## Changed Files
-- Immediate backlog:
-  `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`
-- Updated planning links:
-  `docs/MARKETPLACE_IMPLEMENTATION_V1.md`
-  `docs/MARKETPLACE_PHASE_0_V1.md`
-- Repo framing:
-  `readme.md`
-- Durable/local memory:
+- Backend validation/readiness:
+  `services/api/src/modules/operations/deployment-target.ts`
+  `services/api/src/modules/operations/deployment-validation.service.ts`
+  `services/api/src/modules/operations/deployment-validation.types.ts`
+  `services/api/src/modules/operations/launch-readiness.service.ts`
+  `services/api/src/modules/operations/launch-readiness.types.ts`
+- Tests:
+  `services/api/test/deployment-validation.service.spec.ts`
+  `services/api/test/launch-readiness.service.spec.ts`
+- Workflow/runtime contract:
+  `.github/workflows/deployed-smoke.yml`
+  `.github/workflows/launch-candidate.yml`
+- Docs/memory:
+  `docs/ENVIRONMENT_MATRIX.md`
+  `docs/DEPLOYMENT_RUNBOOK.md`
+  `docs/STAGING_EXECUTION_SEQUENCE.md`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -39,16 +48,40 @@
 
 ## Verification Commands
 - `git diff --check`
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
 - Blocked or not run:
-  - code or product verification beyond `git diff --check`; this task only changed docs and planning state
-  - real staged validation remains pending and is now part of `docs/MARKETPLACE_PLAN_V1.md` Phase 0
+  - real staged deployment validation against live staging secrets and URLs
+  - real `Deployed Smoke` execution against staging with the new strict target contract
+  - real `Launch Candidate` execution against staging with the new strict target contract
 
 ## Next Likely Step
-- Execute the first real Phase 0 implementation slice from `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`, with `P0-02` and `P0-03` as the highest-value technical follow-ups after the README/doc framing work.
+- Run the new strict deployment validation contract against the actual staging environment, then fix any real secret/runtime/CORS mismatches it exposes before moving on to deeper Phase 0 evidence and chain/reconciliation hardening.
+
+## Update (2026-04-19, Strict Staging Validation Contract)
+- Added `services/api/src/modules/operations/deployment-target.ts` so deployment/readiness logic can recognize explicit `staging`/`production` targets separately from generic local/prod `NODE_ENV` behavior.
+- Tightened `deployment:validate` so explicit deployment targets now enforce:
+  - strict provider posture for staging as well as production
+  - required deployed browser targets (`PLAYWRIGHT_DEPLOYED_WEB_BASE_URL`, `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`, `PLAYWRIGHT_DEPLOYED_API_BASE_URL`)
+  - HTTPS/localhost restrictions for deployed browser targets unless explicitly overridden
+  - `NEST_API_CORS_ORIGINS` coverage for deployed web/admin origins
+  - relay reachability probes that forward configured relay API keys
+- Tightened launch-readiness to block when the staged browser-target contract is incomplete or when backend CORS does not cover the staged web/admin origins.
+- Wired `DEPLOYMENT_TARGET_ENVIRONMENT` into `Deployed Smoke` and `Launch Candidate` workflows so strict staging/production validation actually runs in CI.
+- Updated staging/deployment docs and durable memory to treat deployed browser target URLs plus CORS alignment as part of the enforced staging contract.
+- Verification:
+  - `git diff --check`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- Result:
+  - Passed
+  - live staging execution still pending
 
 ## Update (2026-04-19, Phase 0 Backlog And README Direction)
 - Added `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md` to break Phase 0 into concrete workstreams and ticket-sized tasks.

@@ -24,6 +24,7 @@ Run the same image with different commands:
 1. Promote or deploy the target API image.
 2. Run the migration command once against the target database.
 3. Run `pnpm --filter escrow4334-api deployment:validate` with the deployed environment config.
+   In staging/production, set `DEPLOYMENT_TARGET_ENVIRONMENT` so validation also enforces deployed browser target URLs and backend CORS alignment.
 4. Deploy the API service with `node dist/main`.
 5. Deploy the recurring worker separately if `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED=true`.
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
@@ -51,6 +52,13 @@ Staging is the first required live-environment checkpoint:
 - `pnpm --filter escrow4334-api deployment:validate`
 - `pnpm smoke:deployed`
 - `pnpm e2e:canary:deployed`
+
+The deployment validation gate is now expected to fail when:
+
+- `PLAYWRIGHT_DEPLOYED_WEB_BASE_URL`, `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`, or `PLAYWRIGHT_DEPLOYED_API_BASE_URL` are missing or invalid
+- deployed browser targets point at non-HTTPS URLs without explicit override
+- deployed browser targets point at loopback/localhost without explicit override
+- `NEST_API_CORS_ORIGINS` does not include the deployed web/admin origins
 
 Required launch-candidate evidence for the narrowed launch flow:
 

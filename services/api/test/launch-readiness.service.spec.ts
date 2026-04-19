@@ -86,6 +86,16 @@ describe('LaunchReadinessService', () => {
     };
   }
 
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
   function createIngestionStatus(
     overrides: Partial<EscrowChainIngestionStatus> = {},
   ): EscrowChainIngestionStatus {
@@ -293,5 +303,36 @@ describe('LaunchReadinessService', () => {
     expect(report.warnings).toContain(
       'Escrow chain ingestion is lagging behind finalized chain head.',
     );
+  });
+
+  it('blocks readiness when staging browser targets are missing from backend CORS policy', async () => {
+    process.env.DEPLOYMENT_TARGET_ENVIRONMENT = 'staging';
+    process.env.PLAYWRIGHT_DEPLOYED_WEB_BASE_URL = 'https://web.example.com';
+    process.env.PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL =
+      'https://admin.example.com';
+    process.env.PLAYWRIGHT_DEPLOYED_API_BASE_URL = 'https://api.example.com';
+
+    const runtimeProfile = createRuntimeProfile({
+      environment: {
+        nodeEnv: 'production',
+        persistenceDriver: 'postgres',
+        trustProxyRaw: 'loopback',
+        corsOrigins: ['https://web.example.com'],
+      },
+    });
+
+    const report = await createService(runtimeProfile).getReport();
+
+    expect(report.ready).toBe(false);
+    expect(report.blockers).toContain(
+      'Backend CORS allowlist does not cover all deployed browser targets.',
+    );
+    expect(
+      report.checks.find((check) => check.id === 'deployed-browser-cors'),
+    ).toMatchObject({
+      status: 'failed',
+      blocker: true,
+      details: 'Missing origins: https://admin.example.com',
+    });
   });
 });

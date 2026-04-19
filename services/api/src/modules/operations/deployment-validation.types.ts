@@ -13,6 +13,8 @@ export type DeploymentValidationReport = {
   ok: boolean;
   environment: {
     nodeEnv: string;
+    targetEnvironment: 'staging' | 'production' | null;
+    strictValidation: boolean;
     persistenceDriver: string;
     trustProxyRaw: string | null;
     trustProxyParsed: boolean | number | string | null;

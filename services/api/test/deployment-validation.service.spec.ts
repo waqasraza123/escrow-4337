@@ -44,6 +44,12 @@ describe('DeploymentValidationService', () => {
       '0x2222222222222222222222222222222222222222';
     process.env.ESCROW_RELAY_BASE_URL = 'https://escrow.example.com';
     process.env.NEST_API_TRUST_PROXY = 'loopback';
+    process.env.NEST_API_CORS_ORIGINS =
+      'https://web.example.com,https://admin.example.com';
+    process.env.PLAYWRIGHT_DEPLOYED_WEB_BASE_URL = 'https://web.example.com';
+    process.env.PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL =
+      'https://admin.example.com';
+    process.env.PLAYWRIGHT_DEPLOYED_API_BASE_URL = 'https://api.example.com';
     global.fetch = jest.fn();
   });
 
@@ -209,6 +215,47 @@ describe('DeploymentValidationService', () => {
     const service = createService(allMigrationsAppliedQuery());
 
     expect(() => service.assertRuntimeConfiguration()).not.toThrow();
+  });
+
+  it('enforces staging browser target and CORS alignment when a staging deployment target is set', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.DEPLOYMENT_TARGET_ENVIRONMENT = 'staging';
+    delete process.env.NEST_API_CORS_ORIGINS;
+
+    const fetchMock = jest.mocked(global.fetch);
+    fetchMock.mockImplementation((input) => {
+      const url = resolveFetchInput(input);
+      if (url === 'https://bundler.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      if (url === 'https://paymaster.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(false);
+    expect(report.environment.targetEnvironment).toBe('staging');
+    expect(report.environment.strictValidation).toBe(true);
+    expect(
+      report.checks.find((check) => check.id === 'deployed-browser-targets'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+    expect(
+      report.checks.find((check) => check.id === 'deployed-browser-cors'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        details:
+          'NEST_API_CORS_ORIGINS must include deployed browser origins: https://web.example.com, https://admin.example.com',
+      }),
+    );
   });
 
   function createService(

@@ -35,6 +35,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+    env:
+      DEPLOYMENT_TARGET_ENVIRONMENT: staging
     steps:
       - name: Download API image manifest
         uses: actions/download-artifact@v4
@@ -326,6 +328,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+    env:
+      DEPLOYMENT_TARGET_ENVIRONMENT: ${{ inputs.environment }}
     steps:
       - name: Download API image manifest
         uses: actions/download-artifact@v4

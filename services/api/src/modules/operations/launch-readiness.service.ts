@@ -7,6 +7,13 @@ import type {
   LaunchReadinessReport,
 } from './launch-readiness.types';
 import { RuntimeProfileService } from './runtime-profile.service';
+import {
+  isLoopbackUrl,
+  readBooleanFlag,
+  readDeploymentTargetEnvironment,
+  readRequiredDeployedBrowserTargets,
+  toOrigin,
+} from './deployment-target';
 
 @Injectable()
 export class LaunchReadinessService {
@@ -59,6 +66,7 @@ export class LaunchReadinessService {
     >,
   ): LaunchReadinessCheck[] {
     const daemonPosture = profile.operations.chainSyncDaemon;
+    const targetEnvironment = readDeploymentTargetEnvironment();
     const checks: LaunchReadinessCheck[] = [
       {
         id: 'backend-profile',
@@ -109,6 +117,8 @@ export class LaunchReadinessService {
         'Escrow execution is relay-backed.',
         'Escrow execution is still using mock mode.',
       ),
+      this.createDeployedBrowserTargetCheck(targetEnvironment),
+      this.createDeployedBrowserCorsCheck(profile, targetEnvironment),
       {
         id: 'cors-origins',
         owner: 'frontend',
@@ -193,6 +203,139 @@ export class LaunchReadinessService {
     ];
 
     return checks;
+  }
+
+  private createDeployedBrowserTargetCheck(
+    targetEnvironment: ReturnType<typeof readDeploymentTargetEnvironment>,
+  ): LaunchReadinessCheck {
+    if (!targetEnvironment) {
+      return {
+        id: 'deployed-browser-targets',
+        owner: 'deployment',
+        status: 'ok',
+        summary:
+          'No explicit deployment target environment is set, so deployed browser target enforcement is inactive.',
+        blocker: false,
+      };
+    }
+
+    try {
+      const targets = readRequiredDeployedBrowserTargets();
+      const allowInsecureHttp = readBooleanFlag(
+        process.env.PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP,
+      );
+      const allowLocalhost = readBooleanFlag(
+        process.env.PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST,
+      );
+
+      for (const [label, value] of Object.entries(targets)) {
+        const parsed = new URL(value);
+
+        if (parsed.protocol !== 'https:' && !allowInsecureHttp) {
+          return {
+            id: 'deployed-browser-targets',
+            owner: 'deployment',
+            status: 'failed',
+            summary: `Deployed browser target ${label} is not HTTPS.`,
+            details:
+              'Set PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP=true only for explicitly trusted non-production environments.',
+            blocker: true,
+          };
+        }
+
+        if (isLoopbackUrl(value) && !allowLocalhost) {
+          return {
+            id: 'deployed-browser-targets',
+            owner: 'deployment',
+            status: 'failed',
+            summary: `Deployed browser target ${label} points at localhost.`,
+            details:
+              'Set PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST=true only for explicitly trusted local verification flows.',
+            blocker: true,
+          };
+        }
+      }
+
+      return {
+        id: 'deployed-browser-targets',
+        owner: 'deployment',
+        status: 'ok',
+        summary: `Deployed browser targets are configured for ${targetEnvironment}.`,
+        blocker: false,
+      };
+    } catch (error) {
+      return {
+        id: 'deployed-browser-targets',
+        owner: 'deployment',
+        status: 'failed',
+        summary: `Deployed browser target configuration is incomplete for ${targetEnvironment}.`,
+        details:
+          error instanceof Error
+            ? error.message
+            : 'Unknown deployed browser target configuration failure.',
+        blocker: true,
+      };
+    }
+  }
+
+  private createDeployedBrowserCorsCheck(
+    profile: Awaited<ReturnType<RuntimeProfileService['getProfile']>>,
+    targetEnvironment: ReturnType<typeof readDeploymentTargetEnvironment>,
+  ): LaunchReadinessCheck {
+    if (!targetEnvironment) {
+      return {
+        id: 'deployed-browser-cors',
+        owner: 'frontend',
+        status: 'ok',
+        summary:
+          'No explicit deployment target environment is set, so deployed browser CORS alignment enforcement is inactive.',
+        blocker: false,
+      };
+    }
+
+    try {
+      const targets = readRequiredDeployedBrowserTargets();
+      const requiredOrigins = [
+        toOrigin(targets.webBaseUrl),
+        toOrigin(targets.adminBaseUrl),
+      ];
+      const missingOrigins = requiredOrigins.filter(
+        (origin) => !profile.environment.corsOrigins.includes(origin),
+      );
+
+      if (missingOrigins.length > 0) {
+        return {
+          id: 'deployed-browser-cors',
+          owner: 'frontend',
+          status: 'failed',
+          summary:
+            'Backend CORS allowlist does not cover all deployed browser targets.',
+          details: `Missing origins: ${missingOrigins.join(', ')}`,
+          blocker: true,
+        };
+      }
+
+      return {
+        id: 'deployed-browser-cors',
+        owner: 'frontend',
+        status: 'ok',
+        summary: `Backend CORS allowlist covers deployed browser targets for ${targetEnvironment}.`,
+        blocker: false,
+      };
+    } catch (error) {
+      return {
+        id: 'deployed-browser-cors',
+        owner: 'frontend',
+        status: 'failed',
+        summary:
+          'Backend CORS alignment could not be verified because deployed browser target configuration is incomplete.',
+        details:
+          error instanceof Error
+            ? error.message
+            : 'Unknown deployed browser target configuration failure.',
+        blocker: true,
+      };
+    }
   }
 
   private async readDaemonHealth(): Promise<LaunchReadinessChainSyncHealthSnapshot> {

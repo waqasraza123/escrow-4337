@@ -27,6 +27,7 @@ This matrix is the Phase 7 source of truth for local, staging, and production ex
 - Staging is the first environment where `pnpm --filter escrow4334-api deployment:validate` and `pnpm smoke:deployed` must pass against live URLs.
 - Staging should use GitHub Environment `staging`.
 - Staging smoke is read-only and must not mutate remote state beyond deployment-validation probes.
+- Deployment validation should run with `DEPLOYMENT_TARGET_ENVIRONMENT=staging` so the repo enforces deployed browser target URLs plus backend CORS alignment instead of only checking provider config.
 
 ## Production
 
@@ -40,6 +41,7 @@ This matrix is the Phase 7 source of truth for local, staging, and production ex
 - Production should use GitHub Environment `production`.
 - Production promotion is manual.
 - Production smoke stays read-only and should use a known-safe public audit job id when export checks are required.
+- Deployment validation should run with `DEPLOYMENT_TARGET_ENVIRONMENT=production` so the same deployed browser target and CORS contract is enforced before promotion.
 
 ## GitHub Environment Secret Contract
 
@@ -53,6 +55,13 @@ Minimum required secret groups:
 - Escrow relay: `ESCROW_CONTRACT_MODE`, `ESCROW_CHAIN_ID`, `ESCROW_CONTRACT_ADDRESS`, `ESCROW_ARBITRATOR_ADDRESS`, `ESCROW_RELAY_BASE_URL`, `ESCROW_RELAY_API_KEY`
 - Operations: `OPERATIONS_ESCROW_RPC_URL`, `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED`, `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_ALERT_WEBHOOK_URL`
 - Deployed smoke: `PLAYWRIGHT_DEPLOYED_WEB_BASE_URL`, `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`, `PLAYWRIGHT_DEPLOYED_API_BASE_URL`, `PLAYWRIGHT_DEPLOYED_EXPECT_PROFILE`, `PLAYWRIGHT_DEPLOYED_AUDIT_JOB_ID`, `PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP`, `PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST`
+
+Required non-secret runtime contract for deployed validation:
+
+- `DEPLOYMENT_TARGET_ENVIRONMENT=staging` or `production`
+- `NEST_API_CORS_ORIGINS` must include the origins from `PLAYWRIGHT_DEPLOYED_WEB_BASE_URL` and `PLAYWRIGHT_DEPLOYED_ADMIN_BASE_URL`
+- deployed browser target URLs must use HTTPS unless `PLAYWRIGHT_DEPLOYED_ALLOW_INSECURE_HTTP=true`
+- deployed browser target URLs must not point at loopback/localhost unless `PLAYWRIGHT_DEPLOYED_ALLOW_LOCALHOST=true`
 
 ## Deployment Contract
 
