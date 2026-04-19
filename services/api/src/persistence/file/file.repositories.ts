@@ -8,6 +8,7 @@ import type {
   EscrowChainEventRecord,
   EscrowChainSyncRecord,
   EscrowContractorParticipationRecord,
+  EscrowExecutionRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
@@ -63,6 +64,13 @@ function normalizeEscrowJobRecord(
 ): EscrowJobRecord {
   return {
     ...job,
+    executions: (job.executions ?? []).map((execution) => ({
+      ...execution,
+      requestId: execution.requestId ?? undefined,
+      correlationId: execution.correlationId ?? undefined,
+      idempotencyKey: execution.idempotencyKey ?? undefined,
+      operationKey: execution.operationKey ?? undefined,
+    })),
     contractorParticipation: job.contractorParticipation
       ? {
           contractorEmail: normalizeEmail(
@@ -416,6 +424,34 @@ export class FileEscrowRepository implements EscrowRepository {
     return this.store.read((data) => {
       const job = data.escrowJobs[jobId];
       return job ? cloneValue(normalizeEscrowJobRecord(job)) : null;
+    });
+  }
+
+  async findExecutionByIdempotencyKey(input: {
+    idempotencyKey: string;
+    jobId?: string;
+  }) {
+    return this.store.read((data) => {
+      const jobs = input.jobId
+        ? [data.escrowJobs[input.jobId]].filter(
+            (job): job is EscrowJobRecord => Boolean(job),
+          )
+        : Object.values(data.escrowJobs);
+
+      for (const candidate of jobs) {
+        const job = normalizeEscrowJobRecord(candidate);
+        const execution = job.executions.find(
+          (entry) => entry.idempotencyKey === input.idempotencyKey,
+        );
+        if (execution) {
+          return {
+            job: cloneValue(job),
+            execution: cloneValue(execution),
+          };
+        }
+      }
+
+      return null;
     });
   }
 

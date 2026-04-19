@@ -5,6 +5,7 @@ import type {
 } from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type {
+  EscrowExecutionRecord,
   EscrowChainCursorRecord,
   EscrowChainEventRecord,
   EscrowOnchainProjectionRecord,
@@ -54,6 +55,13 @@ export interface SessionsRepository {
 export interface EscrowRepository {
   create(job: EscrowJobRecord): Promise<void>;
   getById(jobId: string): Promise<EscrowJobRecord | null>;
+  findExecutionByIdempotencyKey(input: {
+    idempotencyKey: string;
+    jobId?: string;
+  }): Promise<{
+    job: EscrowJobRecord;
+    execution: EscrowExecutionRecord;
+  } | null>;
   listAll(): Promise<EscrowJobRecord[]>;
   listByParticipantAddresses(addresses: string[]): Promise<EscrowJobRecord[]>;
   save(job: EscrowJobRecord): Promise<void>;
@@ -121,7 +129,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 18;
+  version: 19;
   users: Record<string, UserRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;

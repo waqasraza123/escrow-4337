@@ -29,23 +29,33 @@ export type EscrowContractGatewayErrorContext = {
   submittedAt?: number;
 };
 
+export type EscrowContractRequestContext = {
+  requestId: string;
+  correlationId: string;
+  operationKey: string;
+  idempotencyKey?: string | null;
+};
+
 export type CreateJobContractInput = {
   actorAddress: string;
   workerAddress: string;
   currencyAddress: string;
   jobHash: string;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type FundJobContractInput = {
   actorAddress: string;
   escrowId: string;
   amountMinorUnits: string;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type SetMilestonesContractInput = {
   actorAddress: string;
   escrowId: string;
   amountsMinorUnits: string[];
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type DeliverMilestoneContractInput = {
@@ -53,12 +63,14 @@ export type DeliverMilestoneContractInput = {
   escrowId: string;
   milestoneIndex: number;
   deliverableHash: string;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type ReleaseMilestoneContractInput = {
   actorAddress: string;
   escrowId: string;
   milestoneIndex: number;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type OpenDisputeContractInput = {
@@ -66,6 +78,7 @@ export type OpenDisputeContractInput = {
   escrowId: string;
   milestoneIndex: number;
   reasonHash: string;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export type ResolveDisputeContractInput = {
@@ -73,6 +86,7 @@ export type ResolveDisputeContractInput = {
   escrowId: string;
   milestoneIndex: number;
   splitBpsClient: number;
+  requestContext?: EscrowContractRequestContext;
 };
 
 export interface EscrowContractGateway {

@@ -205,8 +205,12 @@ export type AuditBundle = {
       id: string;
       action: string;
       actorAddress: string;
-      chainId: number;
-      contractAddress: string;
+      chainId?: number;
+      contractAddress?: string;
+      requestId?: string;
+      correlationId?: string;
+      idempotencyKey?: string;
+      operationKey?: string;
       txHash?: string;
       status: 'confirmed' | 'failed';
       blockNumber?: number;

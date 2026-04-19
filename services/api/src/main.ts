@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { NextFunction, Request, Response } from 'express';
 import { isCorsOriginAllowed, readCorsOrigins } from './common/http/cors';
 import { readApiPort } from './common/http/port';
+import { readRequestExecutionContext } from './common/http/request-context';
 import { readTrustProxyValue } from './common/http/trust-proxy';
 import { AppModule } from './app.module';
 
@@ -13,6 +15,18 @@ async function bootstrap() {
   if (trustProxy !== undefined) {
     app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
   }
+
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const context = readRequestExecutionContext(request);
+    (
+      request as Request & { requestId?: string; idempotencyKey?: string | null }
+    ).requestId = context.requestId;
+    (
+      request as Request & { requestId?: string; idempotencyKey?: string | null }
+    ).idempotencyKey = context.idempotencyKey;
+    response.setHeader('x-request-id', context.requestId);
+    next();
+  });
 
   const corsOrigins = readCorsOrigins(process.env.NEST_API_CORS_ORIGINS);
   if (corsOrigins.length > 0) {

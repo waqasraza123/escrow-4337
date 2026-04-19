@@ -2502,6 +2502,14 @@ export function OperatorConsole({
                             job.latestFailedExecution.failureMessage
                               ? `: ${job.latestFailedExecution.failureMessage}`
                               : ''
+                          }${
+                            job.latestFailedExecution.correlationId
+                              ? ` · correlation ${job.latestFailedExecution.correlationId}`
+                              : ''
+                          }${
+                            job.latestFailedExecution.idempotencyKey
+                              ? ` · idempotency ${job.latestFailedExecution.idempotencyKey}`
+                              : ''
                           }`}
                         </code>
                       ) : null}
@@ -2731,7 +2739,15 @@ export function OperatorConsole({
                                     : ''
                                 }${failure.failureCode ? ` · ${failure.failureCode}` : ''}${
                                   failure.failureMessage ? ` · ${failure.failureMessage}` : ''
-                                }${failure.txHash ? ` · ${previewHash(failure.txHash)}` : ''}`}
+                                }${failure.txHash ? ` · ${previewHash(failure.txHash)}` : ''}${
+                                  failure.correlationId
+                                    ? ` · correlation ${failure.correlationId}`
+                                    : ''
+                                }${
+                                  failure.idempotencyKey
+                                    ? ` · idempotency ${failure.idempotencyKey}`
+                                    : ''
+                                }`}
                               </code>
                             ))}
                           </div>

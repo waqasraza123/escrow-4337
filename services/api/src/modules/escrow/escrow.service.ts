@@ -10,6 +10,10 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { isCorsOriginAllowed, readCorsOrigins } from '../../common/http/cors';
+import {
+  createRequestId,
+  type RequestExecutionContext,
+} from '../../common/http/request-context';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
@@ -28,6 +32,7 @@ import { EscrowContractGatewayError } from './onchain/escrow-contract.errors';
 import { ESCROW_CONTRACT_GATEWAY } from './onchain/escrow-contract.tokens';
 import type {
   EscrowContractGateway,
+  EscrowContractRequestContext,
   EscrowContractReceipt,
 } from './onchain/escrow-contract.types';
 import { EscrowActorService } from './escrow-actor.service';
@@ -121,6 +126,32 @@ function createInviteToken() {
   return randomBytes(24).toString('hex');
 }
 
+function buildExecutionOperationKey(action: string, payload: unknown) {
+  return `${action}_${createHash('sha256')
+    .update(stableSerialize(payload))
+    .digest('hex')
+    .slice(0, 24)}`;
+}
+
+function buildExecutionCorrelationId(input: {
+  requestId: string;
+  action: string;
+  operationKey: string;
+  idempotencyKey: string | null;
+}) {
+  return `exec_${createHash('sha256')
+    .update(
+      stableSerialize({
+        requestId: input.requestId,
+        action: input.action,
+        operationKey: input.operationKey,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    )
+    .digest('hex')
+    .slice(0, 24)}`;
+}
+
 @Injectable()
 export class EscrowService {
   constructor(
@@ -181,6 +212,7 @@ export class EscrowService {
   async createJob(
     userId: string,
     dto: CreateJobDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<CreateJobResponse> {
     const now = Date.now();
     const jobId = randomUUID();
@@ -189,11 +221,49 @@ export class EscrowService {
       await this.escrowActorService.resolveClientForCreate(userId);
     const workerAddress = normalizeEvmAddress(dto.workerAddress);
     const currencyAddress = normalizeEvmAddress(dto.currencyAddress);
+    const executionContext = this.createExecutionContext(
+      'create_job',
+      {
+        actorAddress,
+        workerAddress,
+        currencyAddress,
+        jobHash,
+        contractorEmail: dto.contractorEmail,
+        category: dto.category.trim().toLowerCase(),
+      },
+      requestContext,
+    );
+    const replayedCreate = executionContext.idempotencyKey
+      ? await this.escrowRepository.findExecutionByIdempotencyKey({
+          idempotencyKey: executionContext.idempotencyKey,
+        })
+      : null;
+
+    if (replayedCreate) {
+      this.assertIdempotentExecutionMatches(
+        replayedCreate.execution,
+        'create_job',
+        executionContext.operationKey,
+      );
+      if (replayedCreate.execution.status === 'confirmed') {
+        return {
+          jobId: replayedCreate.job.id,
+          jobHash: replayedCreate.job.jobHash,
+          status: replayedCreate.job.status,
+          escrowId: this.requireEscrowId(replayedCreate.job),
+          txHash: this.requireExecutionTxHash(replayedCreate.execution),
+        };
+      }
+
+      throw this.mapPersistedExecutionError(replayedCreate.execution);
+    }
+
     const createdJob = await this.escrowContractGateway.createJob({
       actorAddress,
       workerAddress,
       currencyAddress,
       jobHash,
+      requestContext: executionContext,
     });
 
     const job: EscrowJobRecord = {
@@ -256,9 +326,15 @@ export class EscrowService {
     });
     this.appendExecution(
       job,
-      this.createConfirmedExecution('create_job', actorAddress, createdJob, {
-        escrowId: createdJob.escrowId,
-      }),
+      this.createConfirmedExecution(
+        'create_job',
+        actorAddress,
+        createdJob,
+        executionContext,
+        {
+          escrowId: createdJob.escrowId,
+        },
+      ),
     );
 
     await this.escrowRepository.create(job);
@@ -473,18 +549,37 @@ export class EscrowService {
     userId: string,
     jobId: string,
     dto: FundJobDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<FundJobResponse> {
     const job = await this.getJobOrThrow(jobId);
     const actorAddress = await this.escrowActorService.resolveClientForJob(
       userId,
       job,
     );
+    const fundedAmount = normalizeAmount(dto.amount);
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'fund_job',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        amount: fundedAmount,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        fundedAmount: job.fundedAmount,
+        status: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (job.fundedAmount !== null) {
       throw new ConflictException('Job has already been funded');
     }
 
-    const fundedAmount = normalizeAmount(dto.amount);
     const fundedAmountMinorUnits = parseAmountToMinorUnits(
       dto.amount,
     ).toString();
@@ -492,11 +587,17 @@ export class EscrowService {
       job,
       action: 'fund_job',
       actorAddress,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        amount: fundedAmount,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.fundJob({
           actorAddress,
           escrowId: this.requireEscrowId(job),
           amountMinorUnits: fundedAmountMinorUnits,
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         job.fundedAmount = fundedAmount;
@@ -592,12 +693,31 @@ export class EscrowService {
     userId: string,
     jobId: string,
     dto: SetMilestonesDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<SetMilestonesResponse> {
     const job = await this.getJobOrThrow(jobId);
     const actorAddress = await this.escrowActorService.resolveClientForJob(
       userId,
       job,
     );
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'set_milestones',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestones: dto.milestones,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        milestoneCount: job.milestones.length,
+        status: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (job.fundedAmount === null) {
       throw new ConflictException(
@@ -623,13 +743,19 @@ export class EscrowService {
       job,
       action: 'set_milestones',
       actorAddress,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestones: dto.milestones,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.setMilestones({
           actorAddress,
           escrowId: this.requireEscrowId(job),
           amountsMinorUnits: dto.milestones.map((milestone) =>
             parseAmountToMinorUnits(milestone.amount).toString(),
           ),
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         job.milestones = dto.milestones.map((milestone) => ({
@@ -665,6 +791,7 @@ export class EscrowService {
     jobId: string,
     milestoneIndex: number,
     dto: DeliverMilestoneDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
     const actorAddress = await this.escrowActorService.resolveWorkerForJob(
@@ -672,6 +799,27 @@ export class EscrowService {
       job,
     );
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'deliver_milestone',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        note: dto.note,
+        evidenceUrls: dto.evidenceUrls,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        milestoneIndex,
+        milestoneStatus: milestone.status,
+        jobStatus: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (milestone.status !== 'pending') {
       throw new ConflictException('Only pending milestones can be delivered');
@@ -682,7 +830,14 @@ export class EscrowService {
       action: 'deliver_milestone',
       actorAddress,
       milestoneIndex,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        note: dto.note,
+        evidenceUrls: dto.evidenceUrls,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.deliverMilestone({
           actorAddress,
           escrowId: this.requireEscrowId(job),
@@ -691,6 +846,7 @@ export class EscrowService {
             note: dto.note,
             evidenceUrls: dto.evidenceUrls,
           }),
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         const now = Date.now();
@@ -724,6 +880,7 @@ export class EscrowService {
     userId: string,
     jobId: string,
     milestoneIndex: number,
+    requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
     const actorAddress = await this.escrowActorService.resolveClientForJob(
@@ -731,6 +888,25 @@ export class EscrowService {
       job,
     );
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'release_milestone',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        milestoneIndex,
+        milestoneStatus: milestone.status,
+        jobStatus: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (milestone.status !== 'delivered') {
       throw new ConflictException('Only delivered milestones can be released');
@@ -741,11 +917,17 @@ export class EscrowService {
       action: 'release_milestone',
       actorAddress,
       milestoneIndex,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.releaseMilestone({
           actorAddress,
           escrowId: this.requireEscrowId(job),
           milestoneIndex,
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         const now = Date.now();
@@ -778,6 +960,7 @@ export class EscrowService {
     jobId: string,
     milestoneIndex: number,
     dto: DisputeMilestoneDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
     const actorAddress = await this.escrowActorService.resolveClientForJob(
@@ -785,6 +968,27 @@ export class EscrowService {
       job,
     );
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'open_dispute',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        reason: dto.reason,
+        evidenceUrls: dto.evidenceUrls,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        milestoneIndex,
+        milestoneStatus: milestone.status,
+        jobStatus: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (milestone.status !== 'delivered') {
       throw new ConflictException('Only delivered milestones can be disputed');
@@ -795,12 +999,20 @@ export class EscrowService {
       action: 'open_dispute',
       actorAddress,
       milestoneIndex,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        reason: dto.reason,
+        evidenceUrls: dto.evidenceUrls,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.openDispute({
           actorAddress,
           escrowId: this.requireEscrowId(job),
           milestoneIndex,
           reasonHash: hashToBytes32(dto.reason),
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         const now = Date.now();
@@ -835,11 +1047,33 @@ export class EscrowService {
     jobId: string,
     milestoneIndex: number,
     dto: ResolveMilestoneDto,
+    requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
     await this.userCapabilities.requireCapability(userId, 'escrowResolution');
     const actorAddress = await this.escrowActorService.resolveArbitrator(userId);
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    const replayed = await this.maybeReplayJobMutation({
+      job,
+      action: 'resolve_dispute',
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        action: dto.action,
+        note: dto.note,
+      },
+      buildResponse: (execution) => ({
+        jobId: job.id,
+        milestoneIndex,
+        milestoneStatus: milestone.status,
+        jobStatus: job.status,
+        txHash: this.requireExecutionTxHash(execution),
+      }),
+    });
+    if (replayed) {
+      return replayed;
+    }
 
     if (milestone.status !== 'disputed') {
       throw new ConflictException('Only disputed milestones can be resolved');
@@ -851,12 +1085,20 @@ export class EscrowService {
       action: 'resolve_dispute',
       actorAddress,
       milestoneIndex,
-      operation: () =>
+      requestContext,
+      operationKeyPayload: {
+        jobId: job.id,
+        milestoneIndex,
+        action: dto.action,
+        note: dto.note,
+      },
+      operation: (gatewayRequestContext) =>
         this.escrowContractGateway.resolveDispute({
           actorAddress,
           escrowId: this.requireEscrowId(job),
           milestoneIndex,
           splitBpsClient,
+          requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
         const now = Date.now();
@@ -1016,11 +1258,40 @@ export class EscrowService {
     action: EscrowExecutionRecord['action'];
     actorAddress: string;
     milestoneIndex?: number;
-    operation: () => Promise<EscrowContractReceipt>;
+    requestContext?: RequestExecutionContext;
+    operationKeyPayload: unknown;
+    operation: (
+      requestContext: EscrowContractRequestContext,
+    ) => Promise<EscrowContractReceipt>;
     onConfirmed: () => void;
   }) {
+    const executionContext = this.createExecutionContext(
+      input.action,
+      input.operationKeyPayload,
+      input.requestContext,
+    );
+    const replayedExecution = executionContext.idempotencyKey
+      ? await this.escrowRepository.findExecutionByIdempotencyKey({
+          jobId: input.job.id,
+          idempotencyKey: executionContext.idempotencyKey,
+        })
+      : null;
+
+    if (replayedExecution) {
+      this.assertIdempotentExecutionMatches(
+        replayedExecution.execution,
+        input.action,
+        executionContext.operationKey,
+      );
+      if (replayedExecution.execution.status === 'confirmed') {
+        return this.toExecutionReceipt(replayedExecution.execution);
+      }
+
+      throw this.mapPersistedExecutionError(replayedExecution.execution);
+    }
+
     try {
-      const receipt = await input.operation();
+      const receipt = await input.operation(executionContext);
       input.onConfirmed();
       input.job.updatedAt = receipt.confirmedAt;
       this.appendExecution(
@@ -1029,6 +1300,7 @@ export class EscrowService {
           input.action,
           input.actorAddress,
           receipt,
+          executionContext,
           {
             milestoneIndex: input.milestoneIndex,
             escrowId: input.job.onchain.escrowId ?? undefined,
@@ -1046,12 +1318,132 @@ export class EscrowService {
           input.actorAddress,
           input.job,
           error,
+          executionContext,
           input.milestoneIndex,
         ),
       );
       await this.escrowRepository.save(input.job);
       throw this.mapGatewayError(error);
     }
+  }
+
+  private createExecutionContext(
+    action: EscrowExecutionRecord['action'],
+    operationKeyPayload: unknown,
+    requestContext?: RequestExecutionContext,
+  ): EscrowContractRequestContext {
+    const requestId = requestContext?.requestId ?? createRequestId('svc');
+    const idempotencyKey = requestContext?.idempotencyKey ?? null;
+    const operationKey = buildExecutionOperationKey(
+      action,
+      operationKeyPayload,
+    );
+
+    return {
+      requestId,
+      idempotencyKey,
+      operationKey,
+      correlationId: buildExecutionCorrelationId({
+        requestId,
+        action,
+        operationKey,
+        idempotencyKey,
+      }),
+    };
+  }
+
+  private async maybeReplayJobMutation<T>(input: {
+    job: EscrowJobRecord;
+    action: EscrowExecutionRecord['action'];
+    operationKeyPayload: unknown;
+    requestContext?: RequestExecutionContext;
+    buildResponse: (execution: EscrowExecutionRecord) => T;
+  }): Promise<T | null> {
+    const idempotencyKey = input.requestContext?.idempotencyKey ?? null;
+    if (!idempotencyKey) {
+      return null;
+    }
+
+    const operationKey = buildExecutionOperationKey(
+      input.action,
+      input.operationKeyPayload,
+    );
+    const replayedExecution =
+      await this.escrowRepository.findExecutionByIdempotencyKey({
+        jobId: input.job.id,
+        idempotencyKey,
+      });
+
+    if (!replayedExecution) {
+      return null;
+    }
+
+    this.assertIdempotentExecutionMatches(
+      replayedExecution.execution,
+      input.action,
+      operationKey,
+    );
+    if (replayedExecution.execution.status === 'confirmed') {
+      return input.buildResponse(replayedExecution.execution);
+    }
+
+    throw this.mapPersistedExecutionError(replayedExecution.execution);
+  }
+
+  private assertIdempotentExecutionMatches(
+    execution: EscrowExecutionRecord,
+    action: EscrowExecutionRecord['action'],
+    operationKey: string,
+  ) {
+    if (
+      execution.action !== action ||
+      (execution.operationKey ?? null) !== operationKey
+    ) {
+      throw new ConflictException(
+        'Idempotency key has already been used for a different escrow mutation',
+      );
+    }
+  }
+
+  private toExecutionReceipt(
+    execution: EscrowExecutionRecord,
+  ): EscrowContractReceipt {
+    if (
+      !execution.txHash ||
+      execution.blockNumber === undefined ||
+      execution.confirmedAt === undefined
+    ) {
+      throw new ConflictException(
+        'Persisted confirmed execution is missing receipt metadata',
+      );
+    }
+
+    return {
+      chainId: execution.chainId,
+      contractAddress: execution.contractAddress,
+      txHash: execution.txHash,
+      blockNumber: execution.blockNumber,
+      submittedAt: execution.submittedAt,
+      confirmedAt: execution.confirmedAt,
+    };
+  }
+
+  private requireExecutionTxHash(execution: EscrowExecutionRecord) {
+    if (!execution.txHash) {
+      throw new ConflictException('Persisted execution is missing tx hash');
+    }
+
+    return execution.txHash;
+  }
+
+  private mapPersistedExecutionError(execution: EscrowExecutionRecord) {
+    const message =
+      execution.failureMessage ?? 'Escrow execution failed previously';
+    if (execution.failureCode === 'relay_unavailable') {
+      return new ServiceUnavailableException(message);
+    }
+
+    return new BadGatewayException(message);
   }
 
   private async getJobOrThrow(jobId: string) {
@@ -1232,6 +1624,7 @@ export class EscrowService {
     action: EscrowExecutionRecord['action'],
     actorAddress: string,
     receipt: EscrowContractReceipt,
+    requestContext: EscrowContractRequestContext,
     extra: {
       milestoneIndex?: number;
       escrowId?: string;
@@ -1243,6 +1636,10 @@ export class EscrowService {
       actorAddress,
       chainId: receipt.chainId,
       contractAddress: receipt.contractAddress,
+      requestId: requestContext.requestId,
+      correlationId: requestContext.correlationId,
+      idempotencyKey: requestContext.idempotencyKey ?? undefined,
+      operationKey: requestContext.operationKey,
       txHash: receipt.txHash,
       status: 'confirmed',
       blockNumber: receipt.blockNumber,
@@ -1258,6 +1655,7 @@ export class EscrowService {
     actorAddress: string,
     job: EscrowJobRecord,
     error: unknown,
+    requestContext: EscrowContractRequestContext,
     milestoneIndex?: number,
   ): EscrowExecutionRecord {
     if (error instanceof EscrowContractGatewayError) {
@@ -1267,6 +1665,10 @@ export class EscrowService {
         actorAddress,
         chainId: error.chainId,
         contractAddress: error.contractAddress,
+        requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId,
+        idempotencyKey: requestContext.idempotencyKey ?? undefined,
+        operationKey: requestContext.operationKey,
         txHash: error.txHash,
         status: 'failed',
         submittedAt: error.submittedAt ?? Date.now(),
@@ -1283,6 +1685,10 @@ export class EscrowService {
       actorAddress,
       chainId: job.onchain.chainId,
       contractAddress: job.onchain.contractAddress,
+      requestId: requestContext.requestId,
+      correlationId: requestContext.correlationId,
+      idempotencyKey: requestContext.idempotencyKey ?? undefined,
+      operationKey: requestContext.operationKey,
       status: 'failed',
       submittedAt: Date.now(),
       milestoneIndex,

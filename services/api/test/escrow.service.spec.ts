@@ -472,6 +472,18 @@ describe('EscrowService', () => {
     await expect(
       escrowService.fundJob(clientUserId, createdJob.jobId, {
         amount: '20',
+      }, {
+        requestId: 'req_failed_fund',
+        idempotencyKey: 'fund-failure-1',
+      }),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+
+    await expect(
+      escrowService.fundJob(clientUserId, createdJob.jobId, {
+        amount: '20',
+      }, {
+        requestId: 'req_failed_fund_retry',
+        idempotencyKey: 'fund-failure-1',
       }),
     ).rejects.toBeInstanceOf(BadGatewayException);
 
@@ -482,7 +494,121 @@ describe('EscrowService', () => {
       expect.objectContaining({
         action: 'fund_job',
         status: 'failed',
+        requestId: 'req_failed_fund',
+        idempotencyKey: 'fund-failure-1',
+        operationKey: expect.stringMatching(/^fund_job_/),
+        correlationId: expect.stringMatching(/^exec_/),
         failureCode: 'relay_rejected',
+      }),
+    );
+  });
+
+  it('replays create-job success for the same idempotency key without creating duplicates', async () => {
+    const requestContext = {
+      requestId: 'req_create_job',
+      idempotencyKey: 'create-job-1',
+    };
+
+    const first = await escrowService.createJob(
+      clientUserId,
+      {
+        contractorEmail,
+        workerAddress,
+        currencyAddress,
+        title: 'Idempotent create',
+        description: 'Create should not duplicate on retries.',
+        category: 'design',
+        termsJSON: {
+          currency: 'USDC',
+        },
+      },
+      requestContext,
+    );
+    const replayed = await escrowService.createJob(
+      clientUserId,
+      {
+        contractorEmail,
+        workerAddress,
+        currencyAddress,
+        title: 'Idempotent create',
+        description: 'Create should not duplicate on retries.',
+        category: 'design',
+        termsJSON: {
+          currency: 'USDC',
+        },
+      },
+      {
+        requestId: 'req_create_job_retry',
+        idempotencyKey: 'create-job-1',
+      },
+    );
+
+    expect(replayed).toEqual(first);
+
+    const jobs = await escrowService.listJobsForUser(clientUserId);
+    expect(jobs.jobs).toHaveLength(1);
+    const auditBundle = await escrowService.getAuditBundle(first.jobId);
+    expect(auditBundle.bundle.executions).toHaveLength(1);
+    expect(auditBundle.bundle.executions[0]).toEqual(
+      expect.objectContaining({
+        action: 'create_job',
+        requestId: 'req_create_job',
+        idempotencyKey: 'create-job-1',
+        operationKey: expect.stringMatching(/^create_job_/),
+        correlationId: expect.stringMatching(/^exec_/),
+      }),
+    );
+  });
+
+  it('replays confirmed funding for the same idempotency key without duplicating execution history', async () => {
+    const createdJob = await escrowService.createJob(clientUserId, {
+      contractorEmail,
+      workerAddress,
+      currencyAddress,
+      title: 'Idempotent funding',
+      description: 'Funding retries should reuse the first confirmed result.',
+      category: 'design',
+      termsJSON: {
+        currency: 'USDC',
+      },
+    });
+
+    const firstFunding = await escrowService.fundJob(
+      clientUserId,
+      createdJob.jobId,
+      {
+        amount: '25',
+      },
+      {
+        requestId: 'req_fund_job',
+        idempotencyKey: 'fund-job-1',
+      },
+    );
+    const replayedFunding = await escrowService.fundJob(
+      clientUserId,
+      createdJob.jobId,
+      {
+        amount: '25',
+      },
+      {
+        requestId: 'req_fund_job_retry',
+        idempotencyKey: 'fund-job-1',
+      },
+    );
+
+    expect(replayedFunding).toEqual(firstFunding);
+
+    const auditBundle = await escrowService.getAuditBundle(createdJob.jobId);
+    const fundExecutions = auditBundle.bundle.executions.filter(
+      (execution) => execution.action === 'fund_job',
+    );
+    expect(fundExecutions).toHaveLength(1);
+    expect(fundExecutions[0]).toEqual(
+      expect.objectContaining({
+        requestId: 'req_fund_job',
+        idempotencyKey: 'fund-job-1',
+        operationKey: expect.stringMatching(/^fund_job_/),
+        correlationId: expect.stringMatching(/^exec_/),
       }),
     );
   });

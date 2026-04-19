@@ -112,6 +112,10 @@ function buildTimeline(bundle: EscrowAuditBundle['bundle']) {
       detail: {
         chainId: execution.chainId,
         contractAddress: execution.contractAddress,
+        requestId: execution.requestId ?? null,
+        correlationId: execution.correlationId ?? null,
+        idempotencyKey: execution.idempotencyKey ?? null,
+        operationKey: execution.operationKey ?? null,
         blockNumber: execution.blockNumber ?? null,
         submittedAt: execution.submittedAt,
         confirmedAt: execution.confirmedAt ?? null,

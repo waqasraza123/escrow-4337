@@ -173,6 +173,10 @@ export type EscrowExecutionRecord = {
   actorAddress: string;
   chainId: number;
   contractAddress: string;
+  requestId?: string;
+  correlationId?: string;
+  idempotencyKey?: string;
+  operationKey?: string;
   txHash?: string;
   status: EscrowExecutionStatus;
   blockNumber?: number;

@@ -165,6 +165,10 @@ type ExecutionRow = QueryResultRow & {
   actor_address: string;
   chain_id: number;
   contract_address: string;
+  request_id: string | null;
+  correlation_id: string | null;
+  idempotency_key: string | null;
+  operation_key: string | null;
   tx_hash: string | null;
   status: EscrowExecutionRecord['status'];
   block_number: string | null;
@@ -457,6 +461,10 @@ function mapExecution(row: ExecutionRow): EscrowExecutionRecord {
     actorAddress: row.actor_address,
     chainId: row.chain_id,
     contractAddress: row.contract_address,
+    requestId: row.request_id ?? undefined,
+    correlationId: row.correlation_id ?? undefined,
+    idempotencyKey: row.idempotency_key ?? undefined,
+    operationKey: row.operation_key ?? undefined,
     txHash: row.tx_hash ?? undefined,
     status: row.status,
     blockNumber: asNumber(row.block_number),
@@ -719,6 +727,10 @@ async function replaceEscrowAggregate(
           actor_address,
           chain_id,
           contract_address,
+          request_id,
+          correlation_id,
+          idempotency_key,
+          operation_key,
           tx_hash,
           status,
           block_number,
@@ -744,7 +756,11 @@ async function replaceEscrowAggregate(
           $12,
           $13,
           $14,
-          $15
+          $15,
+          $16,
+          $17,
+          $18,
+          $19
         )
       `,
       [
@@ -754,6 +770,10 @@ async function replaceEscrowAggregate(
         execution.actorAddress,
         execution.chainId,
         execution.contractAddress,
+        execution.requestId ?? null,
+        execution.correlationId ?? null,
+        execution.idempotencyKey ?? null,
+        execution.operationKey ?? null,
         execution.txHash ?? null,
         execution.status,
         execution.blockNumber === undefined
@@ -1399,6 +1419,10 @@ export class PostgresEscrowRepository implements EscrowRepository {
             actor_address,
             chain_id,
             contract_address,
+            request_id,
+            correlation_id,
+            idempotency_key,
+            operation_key,
             tx_hash,
             status,
             block_number,
@@ -1434,6 +1458,46 @@ export class PostgresEscrowRepository implements EscrowRepository {
         executions: executionResult.rows.map(mapExecution),
       } satisfies EscrowJobRecord;
     });
+  }
+
+  async findExecutionByIdempotencyKey(input: {
+    idempotencyKey: string;
+    jobId?: string;
+  }) {
+    const result = await this.db.query<{
+      job_id: string;
+      execution_id: string;
+    }>(
+      `
+        SELECT job_id, execution_id
+        FROM escrow_executions
+        WHERE idempotency_key = $1
+          AND ($2::uuid IS NULL OR job_id = $2::uuid)
+        ORDER BY submitted_at_ms DESC, execution_id DESC
+        LIMIT 1
+      `,
+      [input.idempotencyKey, input.jobId ?? null],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    const job = await this.getById(row.job_id);
+    if (!job) {
+      return null;
+    }
+    const execution = job.executions.find(
+      (candidate) => candidate.id === row.execution_id,
+    );
+    if (!execution) {
+      return null;
+    }
+
+    return {
+      job,
+      execution,
+    };
   }
 
   async listAll() {
@@ -1509,6 +1573,10 @@ export class PostgresEscrowRepository implements EscrowRepository {
                   actor_address,
                   chain_id,
                   contract_address,
+                  request_id,
+                  correlation_id,
+                  idempotency_key,
+                  operation_key,
                   tx_hash,
                   status,
                   block_number,
@@ -1630,6 +1698,10 @@ export class PostgresEscrowRepository implements EscrowRepository {
                   actor_address,
                   chain_id,
                   contract_address,
+                  request_id,
+                  correlation_id,
+                  idempotency_key,
+                  operation_key,
                   tx_hash,
                   status,
                   block_number,

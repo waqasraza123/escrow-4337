@@ -7,8 +7,13 @@ export type ReqUser = {
 export type AuthenticatedRequest = {
   headers: {
     authorization?: string | string[] | undefined;
+    'x-request-id'?: string | string[] | undefined;
+    'idempotency-key'?: string | string[] | undefined;
+    'x-idempotency-key'?: string | string[] | undefined;
   };
   user?: ReqUser;
+  requestId?: string;
+  idempotencyKey?: string | null;
 };
 
 export function isAuthenticatedRequest(

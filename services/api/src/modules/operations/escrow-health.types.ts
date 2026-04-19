@@ -20,6 +20,10 @@ export type EscrowFailedExecutionSummary = {
   action: EscrowContractAction;
   submittedAt: number;
   txHash: string | null;
+  requestId: string | null;
+  correlationId: string | null;
+  idempotencyKey: string | null;
+  operationKey: string | null;
   failureCode: string | null;
   failureMessage: string | null;
   milestoneIndex: number | null;

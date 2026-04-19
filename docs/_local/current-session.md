@@ -508,3 +508,36 @@
   - `git diff --check`
 - Next production-grade target:
   - continue Phase 0 by hardening reconciliation and execution correlation around the mirrored chain stream, especially explicit event correlation IDs across API, queue, and execution attempts
+## Update (2026-04-19, Phase 0 Execution Correlation And Idempotency Baseline)
+- Implemented the next production-grade Phase 0 step from `MARKETPLACE_PHASE_0_BACKLOG_V1.md`: Workstream `0.4` execution correlation and idempotency.
+- HTTP/execution context changes:
+  - added request-context normalization under `services/api/src/common/http/request-context.ts`
+  - API now attaches `x-request-id` on inbound HTTP requests and preserves any valid incoming request/idempotency key headers
+  - escrow controllers now pass request execution context into onchain mutation paths without changing direct controller-test call sites
+- Escrow mutation changes:
+  - escrow execution records now persist `requestId`, `correlationId`, `idempotencyKey`, and `operationKey`
+  - relay-backed escrow execution now forwards:
+    - `x-request-id`
+    - `x-correlation-id`
+    - `x-escrow-operation-key`
+    - `idempotency-key`
+  - job-scoped onchain mutations now replay confirmed or failed attempts when the same idempotency key is retried for the same operation payload instead of creating ambiguous duplicate history
+  - confirmed `create_job` requests now also replay safely on the same idempotency key after persistence
+- Persistence changes:
+  - added Postgres migration `016_escrow_execution_trace_metadata.sql`
+  - added file-store normalization/version bump for legacy execution rows without trace fields
+  - added repository lookup by execution idempotency key so retries can be resolved from persisted state
+- Operator/evidence changes:
+  - failed execution summaries now surface request/correlation/idempotency/operation metadata
+  - operator console failure cards now show correlation/idempotency identifiers
+  - job-history exports now include execution trace metadata in execution timeline detail payloads
+- Verification:
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow.service.spec.ts test/escrow-health.service.spec.ts test/escrow-export.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin typecheck`
+  - `pnpm --filter web typecheck`
+  - `git diff --check`
+  - `pnpm build`
+- Next production-grade target:
+  - continue Phase 0 by pushing the same correlation thread into reconciliation/launch evidence so failed execution diagnostics, exports, and release artifacts can be joined on one operator-visible trace without reading raw logs

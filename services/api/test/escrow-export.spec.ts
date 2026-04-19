@@ -156,6 +156,17 @@ describe('Escrow export support', () => {
         'resolve_dispute',
       ]),
     );
+    const resolveExecution = jobHistoryBody.timeline.find(
+      (entry) => entry.source === 'execution' && entry.label === 'resolve_dispute',
+    );
+    expect(resolveExecution?.detail).toEqual(
+      expect.objectContaining({
+        requestId: expect.stringMatching(/^svc_/),
+        correlationId: expect.stringMatching(/^exec_/),
+        idempotencyKey: null,
+        operationKey: expect.stringMatching(/^resolve_dispute_/),
+      }),
+    );
 
     const disputeCase = await escrowService.getExportDocument(
       createResponse.jobId,

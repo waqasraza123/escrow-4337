@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { RequestContext } from '../../common/decorators/request-context.decorator';
 import { User, type ReqUser } from '../../common/decorators/user.decorator';
+import type { RequestExecutionContext } from '../../common/http/request-context';
 import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import * as escrowDto from './escrow.dto';
@@ -45,8 +47,9 @@ export class EscrowController {
     @User() user: ReqUser,
     @Body(new ZodValidationPipe(escrowDto.createJobSchema))
     dto: escrowDto.CreateJobDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<CreateJobResponse> {
-    return this.escrowService.createJob(user.id, dto);
+    return this.escrowService.createJob(user.id, dto, requestContext);
   }
 
   @UseGuards(AuthGuard)
@@ -56,8 +59,9 @@ export class EscrowController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(escrowDto.fundJobSchema))
     dto: escrowDto.FundJobDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<FundJobResponse> {
-    return this.escrowService.fundJob(user.id, id, dto);
+    return this.escrowService.fundJob(user.id, id, dto, requestContext);
   }
 
   @UseGuards(AuthGuard)
@@ -115,8 +119,9 @@ export class EscrowController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(escrowDto.setMilestonesSchema))
     dto: escrowDto.SetMilestonesDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<SetMilestonesResponse> {
-    return this.escrowService.setMilestones(user.id, id, dto);
+    return this.escrowService.setMilestones(user.id, id, dto, requestContext);
   }
 
   @UseGuards(AuthGuard)
@@ -127,12 +132,14 @@ export class EscrowController {
     @Param('m', ParseIntPipe) milestoneIndex: number,
     @Body(new ZodValidationPipe(escrowDto.deliverMilestoneSchema))
     dto: escrowDto.DeliverMilestoneDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     return this.escrowService.deliverMilestone(
       user.id,
       id,
       milestoneIndex,
       dto,
+      requestContext,
     );
   }
 
@@ -144,9 +151,15 @@ export class EscrowController {
     @Param('m', ParseIntPipe) milestoneIndex: number,
     @Body(new ZodValidationPipe(escrowDto.releaseMilestoneSchema))
     dto: escrowDto.ReleaseMilestoneDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     void dto;
-    return this.escrowService.releaseMilestone(user.id, id, milestoneIndex);
+    return this.escrowService.releaseMilestone(
+      user.id,
+      id,
+      milestoneIndex,
+      requestContext,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -157,12 +170,14 @@ export class EscrowController {
     @Param('m', ParseIntPipe) milestoneIndex: number,
     @Body(new ZodValidationPipe(escrowDto.disputeMilestoneSchema))
     dto: escrowDto.DisputeMilestoneDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     return this.escrowService.disputeMilestone(
       user.id,
       id,
       milestoneIndex,
       dto,
+      requestContext,
     );
   }
 
@@ -174,12 +189,14 @@ export class EscrowController {
     @Param('m', ParseIntPipe) milestoneIndex: number,
     @Body(new ZodValidationPipe(escrowDto.resolveMilestoneSchema))
     dto: escrowDto.ResolveMilestoneDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
   ): Promise<MilestoneMutationResponse> {
     return this.escrowService.resolveMilestone(
       user.id,
       id,
       milestoneIndex,
       dto,
+      requestContext,
     );
   }
 

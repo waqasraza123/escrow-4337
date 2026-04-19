@@ -58,6 +58,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         jobHash: input.jobHash,
       },
       createJobReceiptSchema,
+      input.requestContext,
     );
   }
 
@@ -70,6 +71,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         amountMinorUnits: input.amountMinorUnits,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -84,6 +86,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         amountsMinorUnits: input.amountsMinorUnits,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -99,6 +102,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         deliverableHash: input.deliverableHash,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -113,6 +117,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         milestoneIndex: input.milestoneIndex,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -128,6 +133,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         reasonHash: input.reasonHash,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -143,6 +149,7 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
         splitBpsClient: input.splitBpsClient,
       },
       receiptSchema,
+      input.requestContext,
     );
   }
 
@@ -151,6 +158,12 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
     actorAddress: string,
     payload: Record<string, unknown>,
     schema: z.ZodSchema<T>,
+    requestContext?: {
+      requestId: string;
+      correlationId: string;
+      operationKey: string;
+      idempotencyKey?: string | null;
+    },
   ) {
     const url = `${this.config.relayBaseUrl}/escrow/execute`;
     const headers = new Headers({
@@ -159,6 +172,14 @@ export class RelayEscrowContractGateway implements EscrowContractGateway {
 
     if (this.config.relayApiKey) {
       headers.set('x-api-key', this.config.relayApiKey);
+    }
+    if (requestContext) {
+      headers.set('x-request-id', requestContext.requestId);
+      headers.set('x-correlation-id', requestContext.correlationId);
+      headers.set('x-escrow-operation-key', requestContext.operationKey);
+      if (requestContext.idempotencyKey) {
+        headers.set('idempotency-key', requestContext.idempotencyKey);
+      }
     }
 
     let response: Response;
