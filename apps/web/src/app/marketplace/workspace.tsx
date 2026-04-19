@@ -2,6 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import {
+  Button,
+  ConsolePage,
+  EmptyStateCard,
+  FactGrid,
+  FactItem,
+  PageTopBar,
+  SectionCard,
+  StatusNotice,
+  SurfaceCard,
+} from '@escrow4334/frontend-core';
 import styles from '../page.styles';
 import { useWebI18n } from '../../lib/i18n';
 import {
@@ -601,114 +612,96 @@ export function MarketplaceWorkspace() {
   }
 
   return (
-    <div className={styles.console}>
-        <div className={styles.topBar}>
-        <div className={styles.topBarContent}>
-          <span className={styles.topBarLabel}>{workspaceMessages.topBarLabel}</span>
-          <p className={styles.topBarMeta}>{workspaceMessages.topBarMeta}</p>
-        </div>
-        <div className={styles.inlineActions}>
-          <Link
-            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-            href="/marketplace"
-          >
-            {workspaceMessages.publicMarketplace}
-          </Link>
-          <Link
-            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-            href="/app/new-contract"
-          >
-            {marketplaceMessages.directContractPath}
-          </Link>
-          {tokens ? (
-            <button type="button" onClick={() => void handleSignOut()}>
-              {workspaceMessages.signOut}
-            </button>
-          ) : (
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
-              href="/app/sign-in"
-            >
-              {messages.common.signIn}
-            </Link>
-          )}
-        </div>
-      </div>
+    <ConsolePage theme="web">
+      <PageTopBar
+        eyebrow={workspaceMessages.topBarLabel}
+        description={workspaceMessages.topBarMeta}
+        className={styles.topBar}
+        contentClassName={styles.topBarContent}
+        actions={
+          <>
+            <Button asChild variant="secondary">
+              <Link href="/marketplace">{workspaceMessages.publicMarketplace}</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/app/new-contract">{marketplaceMessages.directContractPath}</Link>
+            </Button>
+            {tokens ? (
+              <Button type="button" onClick={() => void handleSignOut()}>
+                {workspaceMessages.signOut}
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link href="/app/sign-in">{messages.common.signIn}</Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {message ? (
-        <section className={styles.panel}>
-          <p className={styles.stateText}>{message}</p>
-        </section>
+        <SurfaceCard className={styles.panel}>
+          <StatusNotice message={message} messageClassName={styles.stateText} />
+        </SurfaceCard>
       ) : null}
 
       {error ? (
-        <section className={styles.panel}>
-          <p className={styles.stateText}>{error}</p>
-        </section>
+        <SurfaceCard className={styles.panel}>
+          <StatusNotice message={error} messageClassName={styles.stateText} />
+        </SurfaceCard>
       ) : null}
 
       {loading ? (
-        <section className={styles.panel}>
-          <h2>{workspaceMessages.loadingTitle}</h2>
-        </section>
+        <EmptyStateCard
+          className={styles.panel}
+          title={workspaceMessages.loadingTitle}
+          message=""
+        />
       ) : null}
 
       {!loading && !tokens ? (
-        <section className={styles.panel}>
-          <h2>{workspaceMessages.sessionRequiredTitle}</h2>
-          <p className={styles.stateText}>{workspaceMessages.sessionRequiredBody}</p>
-        </section>
+        <EmptyStateCard
+          className={styles.panel}
+          title={workspaceMessages.sessionRequiredTitle}
+          message={workspaceMessages.sessionRequiredBody}
+          messageClassName={styles.stateText}
+        />
       ) : null}
 
       <section className={styles.grid}>
-        <article className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.panelEyebrow}>{workspaceMessages.overviewEyebrow}</span>
-              <h2>{workspaceMessages.pipelineTitle}</h2>
-            </div>
-          </div>
-          <section className={styles.summaryGrid}>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.publishedBriefs}
-              </span>
-              <strong>
-                {myOpportunities.filter((opportunity) => opportunity.status === 'published').length}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.applicationsToReview}
-              </span>
-              <strong>{reviewableApplications}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.strongMatchesLoaded}
-              </span>
-              <strong>{strongMatches}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.hiresToEscrow}
-              </span>
-              <strong>{hiredOpportunities.length}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.activeContracts}
-              </span>
-              <strong>{activeContracts.length}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>
-                {workspaceMessages.pipelineStats.myActiveApplications}
-              </span>
-              <strong>{activeApplications.length}</strong>
-            </article>
-          </section>
-        </article>
+        <SectionCard
+          className={styles.panel}
+          eyebrow={workspaceMessages.overviewEyebrow}
+          headerClassName={styles.panelHeader}
+          title={workspaceMessages.pipelineTitle}
+        >
+          <FactGrid className={styles.summaryGrid}>
+            <FactItem
+              label={workspaceMessages.pipelineStats.publishedBriefs}
+              value={myOpportunities.filter((opportunity) => opportunity.status === 'published').length}
+            />
+            <FactItem
+              label={workspaceMessages.pipelineStats.applicationsToReview}
+              value={reviewableApplications}
+            />
+            <FactItem
+              label={workspaceMessages.pipelineStats.strongMatchesLoaded}
+              value={strongMatches}
+            />
+            <FactItem
+              label={workspaceMessages.pipelineStats.hiresToEscrow}
+              value={hiredOpportunities.length}
+            />
+            <FactItem
+              label={workspaceMessages.pipelineStats.activeContracts}
+              value={activeContracts.length}
+            />
+            <FactItem
+              label={workspaceMessages.pipelineStats.myActiveApplications}
+              value={activeApplications.length}
+            />
+          </FactGrid>
+        </SectionCard>
       </section>
 
       <section className={styles.grid}>
@@ -1503,6 +1496,6 @@ export function MarketplaceWorkspace() {
           </div>
         </article>
       </section>
-    </div>
+    </ConsolePage>
   );
 }

@@ -2,6 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import {
+  Button,
+  ConsolePage,
+  EmptyStateCard,
+  FactGrid,
+  FactItem,
+  PageTopBar,
+  SectionCard,
+  StatusNotice,
+  SurfaceCard,
+} from '@escrow4334/frontend-core';
 import styles from '../page.styles';
 import {
   adminApi,
@@ -339,127 +350,87 @@ export function MarketplaceModerationConsole() {
   }
 
   return (
-    <div className={styles.console}>
-      <div className={styles.topBar}>
-        <div className={styles.topBarContent}>
-          <span className={styles.topBarLabel}>Marketplace moderation</span>
-          <p className={styles.topBarMeta}>
-            Hide, unhide, or suspend marketplace actors and briefs from the operator surface.
-          </p>
-        </div>
-        <div className={styles.inlineActions}>
-          <Link href="/">Operator home</Link>
-          {tokens ? (
-            <button type="button" onClick={() => void handleSignOut()}>
-              Sign out
-            </button>
-          ) : (
-            <Link href="/">Restore session</Link>
-          )}
-        </div>
-      </div>
+    <ConsolePage theme="admin">
+      <PageTopBar
+        eyebrow="Marketplace moderation"
+        description="Hide, unhide, or suspend marketplace actors and briefs from the operator surface."
+        className={styles.topBar}
+        contentClassName={styles.topBarContent}
+        actions={
+          <>
+            <Button asChild variant="secondary">
+              <Link href="/">Operator home</Link>
+            </Button>
+            {tokens ? (
+              <Button type="button" onClick={() => void handleSignOut()}>
+                Sign out
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link href="/">Restore session</Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {message ? (
-        <section className={styles.panel}>
-          <p className={styles.stateText}>{message}</p>
-        </section>
+        <SurfaceCard className={styles.panel}>
+          <StatusNotice message={message} messageClassName={styles.stateText} />
+        </SurfaceCard>
       ) : null}
 
       {error ? (
-        <section className={styles.panel}>
-          <p className={styles.stateText}>{error}</p>
-        </section>
+        <SurfaceCard className={styles.panel}>
+          <StatusNotice message={error} messageClassName={styles.stateText} />
+        </SurfaceCard>
       ) : null}
 
       {!tokens ? (
-        <section className={styles.panel}>
-          <h2>Operator session required</h2>
-          <p className={styles.stateText}>
-            This page uses the existing operator session from the admin console.
-          </p>
-        </section>
+        <EmptyStateCard
+          className={styles.panel}
+          title="Operator session required"
+          message="This page uses the existing operator session from the admin console."
+          messageClassName={styles.stateText}
+        />
       ) : null}
 
       {operator && dashboard ? (
         <>
-          <section className={styles.summaryGrid}>
-            <article>
-              <span className={styles.metaLabel}>Operator</span>
-              <strong>{operator.email}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Profiles</span>
-              <strong>{dashboard.summary.totalProfiles}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Visible profiles</span>
-              <strong>{dashboard.summary.visibleProfiles}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Suspended profiles</span>
-              <strong>{dashboard.summary.suspendedProfiles}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Published briefs</span>
-              <strong>{dashboard.summary.publishedOpportunities}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Hired briefs</span>
-              <strong>{dashboard.summary.hiredOpportunities}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Applications</span>
-              <strong>{dashboard.summary.totalApplications}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Hire conversion</span>
-              <strong>{dashboard.summary.hireConversionPercent}%</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Aging no-hire briefs</span>
-              <strong>{dashboard.summary.agingOpportunityCount}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Abuse reports</span>
-              <strong>{dashboard.summary.totalAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Open reports</span>
-              <strong>{dashboard.summary.openAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Reviewing reports</span>
-              <strong>{dashboard.summary.reviewingAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Claimed reports</span>
-              <strong>{dashboard.summary.claimedAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Unclaimed reports</span>
-              <strong>{dashboard.summary.unclaimedAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Escalated reports</span>
-              <strong>{dashboard.summary.escalatedAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Aging reports</span>
-              <strong>{dashboard.summary.agingAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Stale reports</span>
-              <strong>{dashboard.summary.staleAbuseReports}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Oldest active report</span>
-              <strong>
-                {dashboard.summary.oldestActiveAbuseReportHours === null
-                  ? 'None'
-                  : `${dashboard.summary.oldestActiveAbuseReportHours}h`}
-              </strong>
-            </article>
-          </section>
+          <SectionCard
+            className={styles.panel}
+            eyebrow="Overview"
+            headerClassName={styles.panelHeader}
+            title="Marketplace moderation posture"
+          >
+            <FactGrid className={styles.summaryGrid}>
+              <FactItem label="Operator" value={operator.email} />
+              <FactItem label="Profiles" value={dashboard.summary.totalProfiles} />
+              <FactItem label="Visible profiles" value={dashboard.summary.visibleProfiles} />
+              <FactItem label="Suspended profiles" value={dashboard.summary.suspendedProfiles} />
+              <FactItem label="Published briefs" value={dashboard.summary.publishedOpportunities} />
+              <FactItem label="Hired briefs" value={dashboard.summary.hiredOpportunities} />
+              <FactItem label="Applications" value={dashboard.summary.totalApplications} />
+              <FactItem label="Hire conversion" value={`${dashboard.summary.hireConversionPercent}%`} />
+              <FactItem label="Aging no-hire briefs" value={dashboard.summary.agingOpportunityCount} />
+              <FactItem label="Abuse reports" value={dashboard.summary.totalAbuseReports} />
+              <FactItem label="Open reports" value={dashboard.summary.openAbuseReports} />
+              <FactItem label="Reviewing reports" value={dashboard.summary.reviewingAbuseReports} />
+              <FactItem label="Claimed reports" value={dashboard.summary.claimedAbuseReports} />
+              <FactItem label="Unclaimed reports" value={dashboard.summary.unclaimedAbuseReports} />
+              <FactItem label="Escalated reports" value={dashboard.summary.escalatedAbuseReports} />
+              <FactItem label="Aging reports" value={dashboard.summary.agingAbuseReports} />
+              <FactItem label="Stale reports" value={dashboard.summary.staleAbuseReports} />
+              <FactItem
+                label="Oldest active report"
+                value={
+                  dashboard.summary.oldestActiveAbuseReportHours === null
+                    ? 'None'
+                    : `${dashboard.summary.oldestActiveAbuseReportHours}h`
+                }
+              />
+            </FactGrid>
+          </SectionCard>
 
           <section className={styles.grid}>
             <article className={styles.panel}>
@@ -955,6 +926,6 @@ export function MarketplaceModerationConsole() {
           </section>
         </>
       ) : null}
-    </div>
+    </ConsolePage>
   );
 }

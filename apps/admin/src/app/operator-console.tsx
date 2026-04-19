@@ -4,17 +4,23 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './page.styles';
 import {
+  ConsolePage,
   createErrorState,
   createIdleState,
   createSuccessState,
   createWorkingState,
   describeRuntimeAlignment,
   EmptyStateCard,
+  FactGrid,
+  FactItem,
   formatTimestamp,
+  HeroPanel,
+  PageTopBar,
   previewHash,
   pushStoredStringList,
   readStoredStringList,
   saveDownloadedDocument,
+  SectionCard,
   StatusNotice,
   type AsyncState,
   writeStoredStringList,
@@ -1329,162 +1335,142 @@ export function OperatorConsole({
   }
 
   return (
-    <div className={styles.console}>
-      <div className={styles.topBar}>
-        <div className={styles.topBarContent}>
-          <span className={styles.topBarLabel}>{messages.topBar.label}</span>
-          <p className={styles.topBarMeta}>{messages.topBar.meta}</p>
-        </div>
-        <div className={styles.inlineActions}>
-          {walkthrough.launcher}
-          <Link href="/help/operator-case-flow" className={styles.secondaryButton}>
-            Read the manual
-          </Link>
-        </div>
-        <LanguageSwitcher
-          className={styles.languageSwitcher}
-          labelClassName={styles.languageSwitcherLabel}
-          optionClassName={styles.languageSwitcherOption}
-          optionActiveClassName={styles.languageSwitcherOptionActive}
-        />
-      </div>
+    <ConsolePage theme="admin">
+      <PageTopBar
+        eyebrow={messages.topBar.label}
+        description={messages.topBar.meta}
+        className={styles.topBar}
+        contentClassName={styles.topBarContent}
+        actions={
+          <>
+            {walkthrough.launcher}
+            <Link href="/help/operator-case-flow" className={styles.secondaryButton}>
+              Read the manual
+            </Link>
+            <LanguageSwitcher
+              className={styles.languageSwitcher}
+              labelClassName={styles.languageSwitcherLabel}
+              optionClassName={styles.languageSwitcherOption}
+              optionActiveClassName={styles.languageSwitcherOptionActive}
+            />
+          </>
+        }
+      />
       {walkthrough.notice ? (
         <StatusNotice
           message={walkthrough.notice}
           messageClassName={styles.stateText}
         />
       ) : null}
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>{frame.eyebrow}</p>
-          <h1>{frame.title}</h1>
-          <p className={styles.heroCopy}>{frame.copy}</p>
-        </div>
-        <div className={styles.heroCard}>
-          <div>
-            <span className={styles.metaLabel}>API base URL</span>
-            <strong className={styles.ltrValue} data-ltr="true">{adminApi.baseUrl}</strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>Backend profile</span>
-            <strong>
-              {runtimeProfile
-                ? messages.labels.runtimeProfile[runtimeProfile.profile]
-                : messages.common.loading}
-            </strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>Loaded case</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {audit?.bundle.job.id || messages.common.unavailable}
-            </strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>Pressure</span>
-            <strong>
-              {caseBrief
-                ? messages.labels.pressure[caseBrief.pressure]
-                : messages.common.loading}
-            </strong>
-          </div>
-        </div>
-      </section>
+      <HeroPanel
+        theme="admin"
+        eyebrow={frame.eyebrow}
+        title={frame.title}
+        description={frame.copy}
+        summary={
+          <FactGrid className="md:grid-cols-2">
+            <FactItem label="API base URL" value={adminApi.baseUrl} dir="ltr" />
+            <FactItem
+              label="Backend profile"
+              value={
+                runtimeProfile
+                  ? messages.labels.runtimeProfile[runtimeProfile.profile]
+                  : messages.common.loading
+              }
+            />
+            <FactItem
+              label="Loaded case"
+              value={audit?.bundle.job.id || messages.common.unavailable}
+              dir="ltr"
+            />
+            <FactItem
+              label="Pressure"
+              value={
+                caseBrief
+                  ? messages.labels.pressure[caseBrief.pressure]
+                  : messages.common.loading
+              }
+            />
+          </FactGrid>
+        }
+      />
 
       <div className={styles.grid}>
-        <section className={styles.panel} data-walkthrough-id="operator-session-panel">
-          <header className={styles.panelHeader}>
-            <div>
-              <p className={styles.panelEyebrow}>Runtime</p>
-              <h2>Backend profile validation</h2>
-            </div>
-          </header>
-          <div className={styles.summaryGrid}>
-            <article>
-              <span className={styles.metaLabel}>Profile</span>
-              <strong>
-                {runtimeProfile
+        <SectionCard
+          className={styles.panel}
+          contentClassName={styles.stack}
+          data-walkthrough-id="operator-session-panel"
+          eyebrow="Runtime"
+          headerClassName={styles.panelHeader}
+          title="Backend profile validation"
+        >
+          <FactGrid className={styles.summaryGrid}>
+            <FactItem
+              label="Profile"
+              value={
+                runtimeProfile
                   ? messages.labels.runtimeProfile[runtimeProfile.profile]
-                  : messages.common.unavailable}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Providers</span>
-              <strong>
-                {runtimeProfile
+                  : messages.common.unavailable
+              }
+            />
+            <FactItem
+              label="Providers"
+              value={
+                runtimeProfile
                   ? `${runtimeProfile.providers.emailMode}/${runtimeProfile.providers.smartAccountMode}/${runtimeProfile.providers.escrowMode}`
-                  : 'Unknown'}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Arbitrator wallet</span>
-              <strong>{previewHash(arbitratorAddress ?? undefined)}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Frontend origin</span>
-              <strong>{runtimeAlignment.currentOrigin}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>CORS readiness</span>
-              <strong>{runtimeAlignment.corsLabel}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>API transport</span>
-              <strong>{runtimeAlignment.transportLabel}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Persistence</span>
-              <strong>{runtimeAlignment.persistenceLabel}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Trust proxy</span>
-              <strong>{runtimeAlignment.trustProxyLabel}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Allowed origins</span>
-              <strong>{runtimeAlignment.corsOriginsLabel}</strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Export support</span>
-              <strong>
-                {runtimeProfile?.operator.exportSupport ? 'Available' : 'Unavailable'}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Chain ingestion</span>
-              <strong>
-                {runtimeChainIngestion
+                  : 'Unknown'
+              }
+            />
+            <FactItem
+              label="Arbitrator wallet"
+              value={previewHash(arbitratorAddress ?? undefined)}
+            />
+            <FactItem label="Frontend origin" value={runtimeAlignment.currentOrigin} />
+            <FactItem label="CORS readiness" value={runtimeAlignment.corsLabel} />
+            <FactItem label="API transport" value={runtimeAlignment.transportLabel} />
+            <FactItem label="Persistence" value={runtimeAlignment.persistenceLabel} />
+            <FactItem label="Trust proxy" value={runtimeAlignment.trustProxyLabel} />
+            <FactItem label="Allowed origins" value={runtimeAlignment.corsOriginsLabel} />
+            <FactItem
+              label="Export support"
+              value={runtimeProfile?.operator.exportSupport ? 'Available' : 'Unavailable'}
+            />
+            <FactItem
+              label="Chain ingestion"
+              value={
+                runtimeChainIngestion
                   ? getChainIngestionStatusLabel(runtimeChainIngestion.status)
-                  : 'Unavailable'}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Authority reads</span>
-              <strong>
-                {runtimeChainIngestion
+                  : 'Unavailable'
+              }
+            />
+            <FactItem
+              label="Authority reads"
+              value={
+                runtimeChainIngestion
                   ? runtimeChainIngestion.authorityReadsEnabled
                     ? 'Enabled'
                     : 'Disabled'
-                  : 'Unavailable'}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Ingestion lag</span>
-              <strong>
-                {runtimeChainIngestion?.lagBlocks !== null &&
+                  : 'Unavailable'
+              }
+            />
+            <FactItem
+              label="Ingestion lag"
+              value={
+                runtimeChainIngestion?.lagBlocks !== null &&
                 runtimeChainIngestion?.lagBlocks !== undefined
                   ? `${runtimeChainIngestion.lagBlocks} blocks`
-                  : 'Unavailable'}
-              </strong>
-            </article>
-            <article>
-              <span className={styles.metaLabel}>Healthy projections</span>
-              <strong>
-                {runtimeChainIngestion
+                  : 'Unavailable'
+              }
+            />
+            <FactItem
+              label="Healthy projections"
+              value={
+                runtimeChainIngestion
                   ? `${runtimeChainIngestion.projections.healthyJobs}/${runtimeChainIngestion.projections.totalJobs}`
-                  : 'Unavailable'}
-              </strong>
-            </article>
-          </div>
+                  : 'Unavailable'
+              }
+            />
+          </FactGrid>
           <div className={styles.stack}>
             <StatusNotice
               message={runtimeProfile?.summary || runtimeState.message}
@@ -1516,7 +1502,7 @@ export function OperatorConsole({
               </article>
             ))}
           </div>
-        </section>
+        </SectionCard>
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -3174,6 +3160,6 @@ export function OperatorConsole({
         </section>
       )}
       {walkthrough.overlay}
-    </div>
+    </ConsolePage>
   );
 }

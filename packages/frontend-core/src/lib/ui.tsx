@@ -114,6 +114,53 @@ const localeSwitcherOptionVariants = cva(
   },
 );
 
+const consolePageVariants = cva('mx-auto grid', {
+  variants: {
+    theme: {
+      web: 'w-[min(1480px,calc(100vw-40px))] gap-7 py-7 pb-22',
+      admin:
+        'w-[min(1360px,calc(100vw-48px))] gap-6 py-12 pb-[4.5rem] max-md:w-[min(100vw-28px,1360px)] max-md:py-7 max-md:pb-12',
+    },
+  },
+  defaultVariants: {
+    theme: 'web',
+  },
+});
+
+const heroPanelVariants = cva(
+  'grid rounded-[1.9rem] border border-[var(--surface-border)] p-8 shadow-[var(--surface-shadow-strong)]',
+  {
+    variants: {
+      theme: {
+        web:
+          'items-start gap-7 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]',
+        admin:
+          'items-end gap-6 bg-[linear-gradient(180deg,rgba(12,17,24,0.84),rgba(22,31,44,0.9))] xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]',
+      },
+    },
+    defaultVariants: {
+      theme: 'web',
+    },
+  },
+);
+
+const heroPanelAsideVariants = cva(
+  'grid content-start gap-4 rounded-[1.9rem] border border-[var(--surface-border)] p-6',
+  {
+    variants: {
+      theme: {
+        web:
+          'bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,249,242,0.96))] shadow-[var(--surface-shadow)]',
+        admin:
+          'bg-[linear-gradient(180deg,rgba(12,17,24,0.84),rgba(22,31,44,0.9))] shadow-[var(--surface-shadow-strong)]',
+      },
+    },
+    defaultVariants: {
+      theme: 'web',
+    },
+  },
+);
+
 export function Button(
   props: ButtonHTMLAttributes<HTMLButtonElement> &
     VariantProps<typeof buttonVariants> & {
@@ -171,6 +218,18 @@ export function PageContainer(props: HTMLAttributes<HTMLDivElement>) {
   );
 }
 
+export function ConsolePage(
+  props: HTMLAttributes<HTMLDivElement> & VariantProps<typeof consolePageVariants>,
+) {
+  const { children, className, theme, ...rest } = props;
+
+  return (
+    <div className={cn(consolePageVariants({ theme }), className)} {...rest}>
+      {children}
+    </div>
+  );
+}
+
 export function PageTopBar(props: {
   eyebrow: ReactNode;
   title?: ReactNode;
@@ -209,6 +268,61 @@ export function PageTopBar(props: {
   );
 }
 
+export function HeroPanel(
+  props: VariantProps<typeof heroPanelVariants> & {
+    eyebrow?: ReactNode;
+    title: ReactNode;
+    description?: ReactNode;
+    summary?: ReactNode;
+    className?: string;
+    headingClassName?: string;
+    titleClassName?: string;
+    descriptionClassName?: string;
+    summaryClassName?: string;
+  },
+) {
+  const {
+    className,
+    description,
+    descriptionClassName,
+    eyebrow,
+    headingClassName,
+    summary,
+    summaryClassName,
+    theme,
+    title,
+    titleClassName,
+  } = props;
+
+  return (
+    <section className={cn(heroPanelVariants({ theme }), className)}>
+      <SectionHeading
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
+        className={headingClassName}
+        titleClassName={cn(
+          theme === 'admin'
+            ? 'max-w-[11ch] text-[clamp(2.8rem,5vw,5rem)] leading-[0.95]'
+            : 'max-w-[9.8ch] text-[clamp(2.9rem,6vw,5.5rem)] leading-[0.92]',
+          titleClassName,
+        )}
+        descriptionClassName={cn(
+          theme === 'admin'
+            ? 'text-sm leading-7 text-[var(--muted-foreground)]'
+            : 'text-[1.04rem] leading-7 text-[var(--foreground-soft)]',
+          descriptionClassName,
+        )}
+      />
+      {summary ? (
+        <div className={cn(heroPanelAsideVariants({ theme }), summaryClassName)}>
+          {summary}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function Eyebrow(props: HTMLAttributes<HTMLParagraphElement>) {
   const { children, className, ...rest } = props;
 
@@ -225,19 +339,19 @@ export function Eyebrow(props: HTMLAttributes<HTMLParagraphElement>) {
   );
 }
 
-export function SectionCard(props: {
-  title: ReactNode;
-  children?: ReactNode;
-  eyebrow?: ReactNode;
-  description?: ReactNode;
-  actions?: ReactNode;
-  className?: string;
-  contentClassName?: string;
-  headerClassName?: string;
-  titleClassName?: string;
-  descriptionClassName?: string;
-  elevated?: boolean;
-}) {
+export function SectionCard(
+  props: HTMLAttributes<HTMLDivElement> & {
+    title: ReactNode;
+    eyebrow?: ReactNode;
+    description?: ReactNode;
+    actions?: ReactNode;
+    contentClassName?: string;
+    headerClassName?: string;
+    titleClassName?: string;
+    descriptionClassName?: string;
+    elevated?: boolean;
+  },
+) {
   const {
     actions,
     children,
@@ -250,12 +364,14 @@ export function SectionCard(props: {
     headerClassName,
     title,
     titleClassName,
+    ...rest
   } = props;
 
   return (
     <SurfaceCard
       className={cn('rounded-[1.75rem] p-6', className)}
       elevated={elevated}
+      {...rest}
     >
       <SectionHeading
         actions={actions}

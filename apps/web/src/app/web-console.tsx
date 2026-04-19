@@ -3,14 +3,20 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ConsolePage,
   createErrorState,
   createIdleState,
   createSuccessState,
   createWorkingState,
   describeRuntimeAlignment,
   EmptyStateCard,
+  FactGrid,
+  FactItem,
   formatTimestamp,
+  HeroPanel,
+  PageTopBar,
   previewHash,
+  SectionCard,
   StatusNotice,
   type AsyncState,
 } from '@escrow4334/frontend-core';
@@ -1896,162 +1902,161 @@ export function EscrowConsole({
   });
 
   return (
-    <div className={styles.console}>
-      <div className={styles.topBar}>
-        <div className={styles.topBarContent}>
-          <span className={styles.topBarLabel}>{messages.console.topBarLabel}</span>
-          <p className={styles.topBarMeta}>{messages.console.topBarMeta}</p>
-        </div>
-        <div className={styles.inlineActions}>
-          {walkthrough.launcher}
-          <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
-            Read the manual
-          </Link>
-        </div>
-        <LanguageSwitcher
-          className={styles.languageSwitcher}
-          labelClassName={styles.languageSwitcherLabel}
-          optionClassName={styles.languageSwitcherOption}
-          optionActiveClassName={styles.languageSwitcherOptionActive}
-        />
-      </div>
+    <ConsolePage theme="web">
+      <PageTopBar
+        eyebrow={messages.console.topBarLabel}
+        description={messages.console.topBarMeta}
+        className={styles.topBar}
+        contentClassName={styles.topBarContent}
+        actions={
+          <>
+            {walkthrough.launcher}
+            <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
+              Read the manual
+            </Link>
+            <LanguageSwitcher
+              className={styles.languageSwitcher}
+              labelClassName={styles.languageSwitcherLabel}
+              optionClassName={styles.languageSwitcherOption}
+              optionActiveClassName={styles.languageSwitcherOptionActive}
+            />
+          </>
+        }
+      />
       {walkthrough.notice ? (
         <StatusNotice
           message={walkthrough.notice}
           messageClassName={styles.stateText}
         />
       ) : null}
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>{frame.eyebrow}</p>
-          <h1>{frame.title}</h1>
-          <p className={styles.heroCopy}>{frame.copy}</p>
-        </div>
-        <div className={styles.heroCard}>
-          <div>
-            <span className={styles.metaLabel}>{messages.console.runtime.apiBaseUrl}</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {webApi.baseUrl}
-            </strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>{messages.console.runtime.backendProfile}</span>
-            <strong>
-              {runtimeProfile
-                ? getRuntimeProfileText(runtimeProfile.profile, messages)
-                : messages.common.loading}
-            </strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>{messages.console.runtime.session}</span>
-            <strong>
-              {accessToken
-                ? messages.common.authenticated
-                : messages.common.signedOut}
-            </strong>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>{messages.console.runtime.jobsInView}</span>
-            <strong>{jobsResponse.jobs.length}</strong>
-          </div>
-        </div>
-      </section>
+      <HeroPanel
+        theme="web"
+        eyebrow={frame.eyebrow}
+        title={frame.title}
+        description={frame.copy}
+        summary={
+          <FactGrid className="md:grid-cols-2">
+            <FactItem
+              label={messages.console.runtime.apiBaseUrl}
+              value={webApi.baseUrl}
+              dir="ltr"
+            />
+            <FactItem
+              label={messages.console.runtime.backendProfile}
+              value={
+                runtimeProfile
+                  ? getRuntimeProfileText(runtimeProfile.profile, messages)
+                  : messages.common.loading
+              }
+            />
+            <FactItem
+              label={messages.console.runtime.session}
+              value={
+                accessToken
+                  ? messages.common.authenticated
+                  : messages.common.signedOut
+              }
+            />
+            <FactItem
+              label={messages.console.runtime.jobsInView}
+              value={jobsResponse.jobs.length}
+            />
+          </FactGrid>
+        }
+      />
 
       {showRuntime ? (
-      <section className={styles.panel}>
-        <header className={styles.panelHeader}>
-          <div>
-            <p className={styles.panelEyebrow}>Runtime</p>
-            <h2>{messages.console.runtime.title}</h2>
-          </div>
-        </header>
-        <div className={styles.summaryGrid}>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.profile}</span>
-            <strong>
-              {runtimeProfile
+      <SectionCard
+        eyebrow="Runtime"
+        title={messages.console.runtime.title}
+        className={styles.panel}
+        headerClassName={styles.panelHeader}
+      >
+        <FactGrid className={styles.summaryGrid}>
+          <FactItem
+            label={messages.console.runtime.profile}
+            value={
+              runtimeProfile
                 ? getRuntimeProfileText(runtimeProfile.profile, messages)
-                : messages.common.unavailable}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.providers}</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {runtimeProfile
+                : messages.common.unavailable
+            }
+          />
+          <FactItem
+            label={messages.console.runtime.providers}
+            value={
+              runtimeProfile
                 ? `${runtimeProfile.providers.emailMode}/${runtimeProfile.providers.smartAccountMode}/${runtimeProfile.providers.escrowMode}`
-                : messages.common.unknown}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.arbitratorWallet}</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {previewHash(runtimeProfile?.operator.arbitratorAddress ?? undefined)}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.frontendOrigin}</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {runtimeAlignment.currentOrigin}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.corsReadiness}</span>
-            <strong>{runtimeAlignment.corsLabel}</strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.apiTransport}</span>
-            <strong>{runtimeAlignment.transportLabel}</strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.persistence}</span>
-            <strong>{runtimeAlignment.persistenceLabel}</strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.trustProxy}</span>
-            <strong>{runtimeAlignment.trustProxyLabel}</strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>{messages.console.runtime.allowedOrigins}</span>
-            <strong className={styles.ltrValue} data-ltr="true">
-              {runtimeAlignment.corsOriginsLabel}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>Chain ingestion</span>
-            <strong>
-              {runtimeChainIngestion
+                : messages.common.unknown
+            }
+            dir="ltr"
+          />
+          <FactItem
+            label={messages.console.runtime.arbitratorWallet}
+            value={previewHash(runtimeProfile?.operator.arbitratorAddress ?? undefined)}
+            dir="ltr"
+          />
+          <FactItem
+            label={messages.console.runtime.frontendOrigin}
+            value={runtimeAlignment.currentOrigin}
+            dir="ltr"
+          />
+          <FactItem
+            label={messages.console.runtime.corsReadiness}
+            value={runtimeAlignment.corsLabel}
+          />
+          <FactItem
+            label={messages.console.runtime.apiTransport}
+            value={runtimeAlignment.transportLabel}
+          />
+          <FactItem
+            label={messages.console.runtime.persistence}
+            value={runtimeAlignment.persistenceLabel}
+          />
+          <FactItem
+            label={messages.console.runtime.trustProxy}
+            value={runtimeAlignment.trustProxyLabel}
+          />
+          <FactItem
+            label={messages.console.runtime.allowedOrigins}
+            value={runtimeAlignment.corsOriginsLabel}
+            dir="ltr"
+          />
+          <FactItem
+            label="Chain ingestion"
+            value={
+              runtimeChainIngestion
                 ? getChainIngestionStatusLabel(runtimeChainIngestion.status)
-                : messages.common.unavailable}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>Authority reads</span>
-            <strong>
-              {runtimeChainIngestion
+                : messages.common.unavailable
+            }
+          />
+          <FactItem
+            label="Authority reads"
+            value={
+              runtimeChainIngestion
                 ? runtimeChainIngestion.authorityReadsEnabled
                   ? messages.common.enabled
                   : messages.common.disabled
-                : messages.common.unavailable}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>Ingestion lag</span>
-            <strong>
-              {runtimeChainIngestion?.lagBlocks !== null &&
+                : messages.common.unavailable
+            }
+          />
+          <FactItem
+            label="Ingestion lag"
+            value={
+              runtimeChainIngestion?.lagBlocks !== null &&
               runtimeChainIngestion?.lagBlocks !== undefined
                 ? `${runtimeChainIngestion.lagBlocks} blocks`
-                : messages.common.unavailable}
-            </strong>
-          </article>
-          <article>
-            <span className={styles.metaLabel}>Healthy projections</span>
-            <strong>
-              {runtimeChainIngestion
+                : messages.common.unavailable
+            }
+          />
+          <FactItem
+            label="Healthy projections"
+            value={
+              runtimeChainIngestion
                 ? `${runtimeChainIngestion.projections.healthyJobs}/${runtimeChainIngestion.projections.totalJobs}`
-                : messages.common.unavailable}
-            </strong>
-          </article>
-        </div>
+                : messages.common.unavailable
+            }
+          />
+        </FactGrid>
         <div className={styles.stack}>
           <StatusNotice
             message={runtimeProfile?.summary || runtimeState.message}
@@ -2077,7 +2082,7 @@ export function EscrowConsole({
             </article>
           ) : null}
         </div>
-      </section>
+      </SectionCard>
       ) : null}
 
       {showAccess ? (
@@ -3782,6 +3787,6 @@ export function EscrowConsole({
       </section>
       ) : null}
       {walkthrough.overlay}
-    </div>
+    </ConsolePage>
   );
 }
