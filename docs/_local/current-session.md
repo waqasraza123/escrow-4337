@@ -7,24 +7,29 @@
 - Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep pushing all release consumers onto the canonical launch posture artifact instead of mixed nested summaries.
 
 ## Last Completed Step
-- Moved `release-pointer` onto the canonical launch posture path:
-  - `buildReleasePointer(...)` now prefers `release-dossier.launchEvidence.posture`
-  - `release-pointer` now carries launch status, launch ready, blocker/warning counts, and the rest of the normalized posture fields from that canonical source
-  - older dossiers still fall back to the previous nested fields
-  - pending commit for this slice
+- Wired GitHub promotion consumers onto the canonical launch posture artifact:
+  - `Launch Candidate` review artifacts now upload `launch-evidence-posture.json`
+  - `Promotion Review` now requires `--launch-evidence-posture` and validates it against `promotion-record.json` plus `evidence-manifest.json`
+  - promotion review markdown now surfaces canonical posture status, blocker/warning counts, artifact counts, and provider counts
+  - launch/readiness runbooks now name `launch-evidence-posture.json` as the canonical compact operator artifact
 
 ## Current Step
-- Commit and push the `release-pointer` posture integration, then continue Workstream 0.7 by updating workflow consumers and runbooks to read the same canonical artifact directly.
+- Commit and push the workflow-consumer posture integration, then continue Workstream 0.7 by driving the same canonical posture into any remaining release tooling or operator drill paths.
 
 ## Why This Step Exists
 - Phase 0 already has a canonical launch posture artifact and the release dossier validates it, but the stable release pointer was still partially rebuilding that state from mixed nested fields. This step removes that drift by making the pointer prefer the canonical posture directly.
 
 ## Changed Files
-- Release pointer posture integration:
-  `scripts/release-pointer-lib.mjs`
-  `scripts/release-pointer.mjs`
-  `scripts/release-pointer-lib.test.mjs`
+- Workflow and promotion review posture integration:
+  `.github/workflows/launch-candidate.yml`
+  `.github/workflows/promotion-review.yml`
+  `scripts/promotion-review.mjs`
+  `scripts/promotion-review-lib.mjs`
+  `scripts/promotion-review-lib.test.mjs`
 - Docs:
+  `docs/LAUNCH_READINESS.md`
+  `docs/DEPLOYMENT_RUNBOOK.md`
+  `docs/STAGING_EXECUTION_SEQUENCE.md`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -51,7 +56,7 @@
   - real promotion/release workflows consuming the new canonical `launch-evidence-posture.json` artifact in GitHub Actions
 
 ## Next Likely Step
-- After committing this slice, continue Workstream 0.7 by updating GitHub workflow consumers and runbooks to reference `launch-evidence-posture.json` directly instead of only relying on propagated pointer env fields.
+- Continue Workstream 0.7 by pushing the canonical posture into any remaining release-drill or operator-facing tooling, especially places still reconstructing launch posture from nested dossier fields instead of consuming `launch-evidence-posture.json` directly.
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.

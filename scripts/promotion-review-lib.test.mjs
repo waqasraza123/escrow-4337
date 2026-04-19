@@ -4,6 +4,7 @@ import {
   buildDeployedSmokeMetadata,
   buildDeployedSmokeRecord,
   buildPromotionReview,
+  buildPromotionReviewMarkdown,
   validateDeployedSmokeMetadata,
   validateDeployedSmokeRecord,
 } from './promotion-review-lib.mjs';
@@ -200,6 +201,33 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
     launchEvidenceManifest: {
       requiredArtifacts: {
         missing: ['authority-evidence/summary.json'],
+        total: 20,
+      },
+    },
+    launchEvidencePosture: {
+      status: 'ready',
+      launchReady: true,
+      authority: {
+        auditSource: 'aggregate',
+      },
+      providerValidation: {
+        failureCount: 1,
+        warningCount: 0,
+      },
+      evidenceContract: {
+        complete: false,
+        requiredArtifactCount: 21,
+        missingArtifactCount: 1,
+      },
+      executionTraceCoverage: {
+        executionCount: 2,
+        correlationTaggedExecutions: 1,
+      },
+      marketplaceOrigin: {
+        ok: false,
+        confirmedModes: ['exact'],
+        missingModes: [],
+        failedModes: ['seeded'],
       },
     },
   });
@@ -255,6 +283,21 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch candidate promotion record is missing marketplace evidence modes: seeded.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture status ready does not match launch candidate promotion status blocked.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture required artifact count 21 does not match launch candidate evidence manifest required artifact count 20.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture failed marketplace origin modes ["seeded"] does not match launch candidate promotion failed marketplace origin modes ["exact"].',
     ),
   );
 });
@@ -353,6 +396,35 @@ test('buildPromotionReview requires artifact-search selections to include artifa
     launchEvidenceManifest: {
       requiredArtifacts: {
         missing: [],
+        total: 20,
+      },
+    },
+    launchEvidencePosture: {
+      status: 'ready',
+      launchReady: true,
+      blockers: [],
+      warnings: ['Rollback image SHA is not yet recorded for this candidate.'],
+      authority: {
+        auditSource: 'chain_projection',
+      },
+      providerValidation: {
+        failureCount: 0,
+        warningCount: 0,
+      },
+      evidenceContract: {
+        complete: true,
+        requiredArtifactCount: 20,
+        missingArtifactCount: 0,
+      },
+      executionTraceCoverage: {
+        executionCount: 8,
+        correlationTaggedExecutions: 8,
+      },
+      marketplaceOrigin: {
+        ok: true,
+        confirmedModes: ['seeded', 'exact'],
+        missingModes: [],
+        failedModes: [],
       },
     },
   });
@@ -504,6 +576,35 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
     launchEvidenceManifest: {
       requiredArtifacts: {
         missing: [],
+        total: 20,
+      },
+    },
+    launchEvidencePosture: {
+      status: 'ready',
+      launchReady: true,
+      blockers: [],
+      warnings: ['Rollback image SHA is not yet recorded for this candidate.'],
+      authority: {
+        auditSource: 'chain_projection',
+      },
+      providerValidation: {
+        failureCount: 0,
+        warningCount: 0,
+      },
+      evidenceContract: {
+        complete: true,
+        requiredArtifactCount: 20,
+        missingArtifactCount: 0,
+      },
+      executionTraceCoverage: {
+        executionCount: 8,
+        correlationTaggedExecutions: 8,
+      },
+      marketplaceOrigin: {
+        ok: true,
+        confirmedModes: ['seeded', 'exact'],
+        missingModes: [],
+        failedModes: [],
       },
     },
   });
@@ -520,7 +621,78 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
   assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
+  assert.equal(review.reviews.launchCandidate.postureStatus, 'ready');
+  assert.equal(review.reviews.launchCandidate.providerFailureCount, 0);
+  assert.equal(review.reviews.launchCandidate.requiredArtifactCount, 20);
   assert.equal(review.reviews.launchCandidate.executionTraceCoverage.executionCount, 8);
   assert.equal(review.reviews.launchCandidate.marketplaceOrigin.ok, true);
   assert.deepEqual(review.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
+});
+
+test('buildPromotionReviewMarkdown surfaces canonical launch posture details', () => {
+  const markdown = buildPromotionReviewMarkdown({
+    generatedAt: '2026-04-13T04:00:00.000Z',
+    status: 'ready',
+    environment: 'staging',
+    candidate: {
+      repository: 'mc/escrow4337',
+      runId: '101',
+      runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+      commitSha: 'abc123',
+      imageDigest: 'sha256:deadbeef',
+      imageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+    },
+    reviews: {
+      deployedSmoke: {
+        runId: '201',
+        status: 'ready',
+        selectionSource: 'artifact-search',
+        artifactName: 'deployed-smoke-review-staging-candidate-101',
+        artifactId: '22',
+        selectedCreatedAt: '2026-04-13T01:00:00Z',
+        seededCanaryPassed: true,
+        marketplaceSeededCanaryPassed: true,
+      },
+      launchCandidate: {
+        runId: '301',
+        status: 'ready',
+        postureStatus: 'ready',
+        selectionSource: 'artifact-search',
+        artifactName: 'launch-candidate-review-staging-candidate-101',
+        artifactId: '12',
+        selectedCreatedAt: '2026-04-13T02:00:00Z',
+        postureLaunchReady: true,
+        postureBlockerCount: 0,
+        postureWarningCount: 1,
+        evidenceComplete: true,
+        requiredArtifactCount: 20,
+        missingArtifactCount: 0,
+        rollbackImageSha: 'sha256:old',
+        rollbackSource: 'release-pointer',
+        rollbackPointerRunId: '701',
+        rollbackPointerArtifactName: 'release-pointer-staging',
+        rollbackPointerSelectionSource: 'artifact-search',
+        rollbackPointerArtifactId: '41',
+        rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
+        marketplaceSeededCanaryPassed: true,
+        marketplaceExactCanaryPassed: true,
+        authorityAuditSource: 'chain_projection',
+        providerFailureCount: 0,
+        providerWarningCount: 1,
+        executionTraceCoverage: {
+          correlationTaggedExecutions: 8,
+          executionCount: 8,
+        },
+        marketplaceOrigin: {
+          ok: true,
+        },
+      },
+    },
+    blockers: [],
+    warnings: [],
+  });
+
+  assert.match(markdown, /Launch posture status: ready/);
+  assert.match(markdown, /Launch provider warning count: 1/);
+  assert.match(markdown, /Launch required artifact count: 20/);
 });

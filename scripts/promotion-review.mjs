@@ -90,6 +90,10 @@ function runPromotionReview(argv) {
     repoRoot,
     readRequiredFlag(argv, '--launch-evidence-manifest'),
   );
+  const launchEvidencePosturePath = resolve(
+    repoRoot,
+    readRequiredFlag(argv, '--launch-evidence-posture'),
+  );
   const outputDir = readOptionalFlag(argv, '--output-dir')
     ? resolve(repoRoot, readOptionalFlag(argv, '--output-dir'))
     : resolve(repoRoot, 'artifacts', 'promotion-review');
@@ -102,6 +106,7 @@ function runPromotionReview(argv) {
     deployedSmokeRecord: readJson(deployedSmokeRecordPath),
     launchPromotionRecord: readJson(launchPromotionRecordPath),
     launchEvidenceManifest: readJson(launchEvidenceManifestPath),
+    launchEvidencePosture: readJson(launchEvidencePosturePath),
     deployedSmokeSelection: {
       source: readOptionalFlag(argv, '--deployed-smoke-selection-source'),
       artifactId: readOptionalFlag(argv, '--deployed-smoke-artifact-id'),
@@ -163,7 +168,7 @@ function readOptionalFlag(argv, flag) {
 function printHelp() {
   console.log(`Usage:
   node ./scripts/promotion-review.mjs smoke-record [--output-dir <path>]
-  node ./scripts/promotion-review.mjs review --image-manifest <path> --deployed-smoke-record <path> --launch-promotion-record <path> --launch-evidence-manifest <path> [--output-dir <path>] [--expected-environment <env>] [--expected-repository <repo>] [--expected-candidate-run-id <id>] [--expected-smoke-run-id <id>] [--expected-launch-run-id <id>] [--deployed-smoke-selection-source <source>] [--deployed-smoke-artifact-id <id>] [--deployed-smoke-artifact-name <name>] [--deployed-smoke-created-at <timestamp>] [--launch-candidate-selection-source <source>] [--launch-candidate-artifact-id <id>] [--launch-candidate-artifact-name <name>] [--launch-candidate-created-at <timestamp>]
+  node ./scripts/promotion-review.mjs review --image-manifest <path> --deployed-smoke-record <path> --launch-promotion-record <path> --launch-evidence-manifest <path> --launch-evidence-posture <path> [--output-dir <path>] [--expected-environment <env>] [--expected-repository <repo>] [--expected-candidate-run-id <id>] [--expected-smoke-run-id <id>] [--expected-launch-run-id <id>] [--deployed-smoke-selection-source <source>] [--deployed-smoke-artifact-id <id>] [--deployed-smoke-artifact-name <name>] [--deployed-smoke-created-at <timestamp>] [--launch-candidate-selection-source <source>] [--launch-candidate-artifact-id <id>] [--launch-candidate-artifact-name <name>] [--launch-candidate-created-at <timestamp>]
 
 smoke-record: writes deployed-smoke-record.json and .md for a completed deployed smoke workflow run.
 review: reconciles the CI image manifest, deployed smoke review, and launch-candidate review into promotion-review.json and .md.`);

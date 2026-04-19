@@ -234,6 +234,7 @@ jobs:
           name: launch-candidate-review-${{ inputs.environment }}-candidate-${{ inputs.candidate_run_id }}
           path: |
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/evidence-manifest.json
+            ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/launch-evidence-posture.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/promotion-record.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/promotion-record.md
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/summary.md

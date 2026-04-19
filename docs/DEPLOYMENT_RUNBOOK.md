@@ -36,6 +36,7 @@ Run the same image with different commands:
 9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id.
    By default it now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that environment and candidate.
    Supply explicit smoke or launch run ids only when you need to override that auto-selection.
+   The launch review artifact now includes `launch-evidence-posture.json`, and promotion review treats that file as the canonical launch posture contract instead of reconstructing posture from mixed nested fields.
 10. Review the uploaded `release-dossier` artifact before any production promotion decision.
 11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`.
 12. Treat the uploaded `release-pointer-<environment>` artifact as the latest approved release pointer for that environment.
@@ -84,6 +85,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - run `pnpm launch:candidate`
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
 - run `Promotion Review` for the staged candidate; let it auto-discover the newest matching smoke and launch review artifacts unless you need explicit override run ids
+- review `launch-evidence-posture.json` inside the launch review artifact when triaging blockers or warnings; it is the compact canonical launch posture consumed by promotion review
 - preserve the uploaded `release-dossier` artifact, which now includes copied evidence under `evidence/` plus `release-dossier-checksums.txt`
 - preserve the uploaded `release-pointer-staging` artifact so the reviewed candidate can be referenced without reopening the full dossier
 - review the generated release dossier plus daemon alert dry-run artifact alongside the underlying evidence manifest before promotion

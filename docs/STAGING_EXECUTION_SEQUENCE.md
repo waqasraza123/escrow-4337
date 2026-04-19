@@ -70,6 +70,7 @@ Required environment contract:
     Canonical GitHub path: run workflow `Promotion Review` with inputs `environment=staging` and the CI candidate run id.
     It now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that candidate and environment.
     Provide explicit smoke or launch run ids only when you need to override the auto-selected review artifacts.
+    The launch review artifact now includes `launch-evidence-posture.json`; use that file as the compact canonical launch posture when reviewing staged blockers, provider posture, evidence completeness, and marketplace-origin proof.
     Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
     Preserve the uploaded `release-dossier` artifact from that workflow; it now copies the source evidence into one canonical folder and includes `release-dossier-checksums.txt`.
     Preserve the uploaded `release-pointer-staging` artifact too; it is the stable reviewed pointer for the latest ready staging candidate.

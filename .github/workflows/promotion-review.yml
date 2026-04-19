@@ -107,6 +107,7 @@ jobs:
             --deployed-smoke-record "${{ runner.temp }}/deployed-smoke-review/deployed-smoke-record.json" \
             --launch-promotion-record "${{ runner.temp }}/launch-candidate-review/promotion-record.json" \
             --launch-evidence-manifest "${{ runner.temp }}/launch-candidate-review/evidence-manifest.json" \
+            --launch-evidence-posture "${{ runner.temp }}/launch-candidate-review/launch-evidence-posture.json" \
             --output-dir artifacts/promotion-review \
             --expected-environment "${{ inputs.environment }}" \
             --expected-repository "${{ github.repository }}" \

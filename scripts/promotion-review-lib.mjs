@@ -184,6 +184,7 @@ export function buildPromotionReview({
   deployedSmokeRecord,
   launchPromotionRecord,
   launchEvidenceManifest,
+  launchEvidencePosture,
   deployedSmokeSelection = {},
   launchCandidateSelection = {},
   expectedEnvironment = null,
@@ -212,6 +213,7 @@ export function buildPromotionReview({
     ...validateLaunchPromotionReview({
       record: launchPromotionRecord,
       evidenceManifest: launchEvidenceManifest,
+      evidencePosture: launchEvidencePosture,
       expectedEnvironment,
       expectedRepository,
       expectedCandidateRunId,
@@ -225,6 +227,7 @@ export function buildPromotionReview({
   const missingLaunchArtifacts = Array.isArray(launchEvidenceManifest?.requiredArtifacts?.missing)
     ? launchEvidenceManifest.requiredArtifacts.missing
     : [];
+  const launchPosture = launchEvidencePosture ?? null;
 
   blockers.push(
     ...validateSelection({
@@ -366,9 +369,19 @@ export function buildPromotionReview({
         artifactId: trimToNull(launchCandidateSelection.artifactId),
         artifactName: trimToNull(launchCandidateSelection.artifactName),
         selectedCreatedAt: trimToNull(launchCandidateSelection.createdAt),
+        postureStatus: launchPosture?.status ?? null,
+        postureLaunchReady: launchPosture?.launchReady === true,
+        postureBlockerCount: Array.isArray(launchPosture?.blockers)
+          ? launchPosture.blockers.length
+          : 0,
+        postureWarningCount: Array.isArray(launchPosture?.warnings)
+          ? launchPosture.warnings.length
+          : 0,
         launchReady: launchPromotionRecord?.launchCandidate?.launchReady === true,
         evidenceComplete: missingLaunchArtifacts.length === 0,
         missingArtifacts: missingLaunchArtifacts,
+        requiredArtifactCount: launchPosture?.evidenceContract?.requiredArtifactCount ?? null,
+        missingArtifactCount: launchPosture?.evidenceContract?.missingArtifactCount ?? null,
         rollbackImageSha: launchPromotionRecord?.rollback?.rollbackImageSha ?? null,
         rollbackSource: launchPromotionRecord?.rollback?.rollbackSource ?? null,
         rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
@@ -385,6 +398,8 @@ export function buildPromotionReview({
         marketplaceExactCanaryPassed:
           (launchPromotionRecord?.launchCandidate?.marketplaceExactCanaryFailures ?? 0) === 0,
         authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
+        providerFailureCount: launchPosture?.providerValidation?.failureCount ?? null,
+        providerWarningCount: launchPosture?.providerValidation?.warningCount ?? null,
         executionTraceCoverage:
           launchPromotionRecord?.launchCandidate?.executionTraceCoverage ?? null,
         marketplaceOrigin: launchPromotionRecord?.launchCandidate?.marketplaceOrigin ?? null,
@@ -416,10 +431,16 @@ export function buildPromotionReviewMarkdown(review) {
 - Deployed smoke marketplace seeded canary passed: ${review.reviews.deployedSmoke.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch candidate run ID: ${review.reviews.launchCandidate.runId ?? 'n/a'}
 - Launch candidate status: ${review.reviews.launchCandidate.status}
+- Launch posture status: ${review.reviews.launchCandidate.postureStatus ?? 'n/a'}
 - Launch candidate selection: ${review.reviews.launchCandidate.selectionSource ?? 'n/a'} ${review.reviews.launchCandidate.artifactName ?? 'n/a'}
 - Launch candidate selection artifact ID: ${review.reviews.launchCandidate.artifactId ?? 'n/a'}
 - Launch candidate selection selected at: ${review.reviews.launchCandidate.selectedCreatedAt ?? 'n/a'}
+- Launch posture launch ready: ${review.reviews.launchCandidate.postureLaunchReady ? 'true' : 'false'}
+- Launch posture blocker count: ${review.reviews.launchCandidate.postureBlockerCount}
+- Launch posture warning count: ${review.reviews.launchCandidate.postureWarningCount}
 - Launch evidence complete: ${review.reviews.launchCandidate.evidenceComplete ? 'true' : 'false'}
+- Launch required artifact count: ${review.reviews.launchCandidate.requiredArtifactCount ?? 'n/a'}
+- Launch missing artifact count: ${review.reviews.launchCandidate.missingArtifactCount ?? 'n/a'}
 - Launch rollback image SHA: ${review.reviews.launchCandidate.rollbackImageSha ?? 'n/a'}
 - Launch rollback source: ${review.reviews.launchCandidate.rollbackSource ?? 'n/a'}
 - Launch rollback pointer run ID: ${review.reviews.launchCandidate.rollbackPointerRunId ?? 'n/a'}
@@ -430,6 +451,8 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch marketplace seeded canary passed: ${review.reviews.launchCandidate.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch marketplace exact canary passed: ${review.reviews.launchCandidate.marketplaceExactCanaryPassed ? 'true' : 'false'}
 - Launch authority audit source: ${review.reviews.launchCandidate.authorityAuditSource ?? 'n/a'}
+- Launch provider failure count: ${review.reviews.launchCandidate.providerFailureCount ?? 'n/a'}
+- Launch provider warning count: ${review.reviews.launchCandidate.providerWarningCount ?? 'n/a'}
 - Launch execution trace coverage: ${
     review.reviews.launchCandidate.executionTraceCoverage
       ? `${review.reviews.launchCandidate.executionTraceCoverage.correlationTaggedExecutions}/${review.reviews.launchCandidate.executionTraceCoverage.executionCount} correlated`
@@ -463,6 +486,7 @@ export function writeGitHubStepSummary(markdown, env = process.env) {
 function validateLaunchPromotionReview({
   record,
   evidenceManifest,
+  evidencePosture,
   expectedEnvironment,
   expectedRepository,
   expectedCandidateRunId,
@@ -671,6 +695,114 @@ function validateLaunchPromotionReview({
     );
   }
 
+  if (!evidencePosture || typeof evidencePosture !== 'object') {
+    issues.push('Launch candidate evidence posture is missing or invalid JSON.');
+    return issues;
+  }
+
+  compareField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture status',
+    leftValue: evidencePosture.status,
+    rightLabel: 'launch candidate promotion status',
+    rightValue: record?.status,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture readiness',
+    leftValue: evidencePosture.launchReady,
+    rightLabel: 'launch candidate promotion readiness',
+    rightValue: record?.launchCandidate?.launchReady,
+  });
+  compareField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture authority audit source',
+    leftValue: evidencePosture?.authority?.auditSource,
+    rightLabel: 'launch candidate promotion authority audit source',
+    rightValue: record?.launchCandidate?.authorityAuditSource,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture completeness',
+    leftValue: evidencePosture?.evidenceContract?.complete,
+    rightLabel: 'launch candidate evidence completeness',
+    rightValue: Array.isArray(missingArtifacts) ? missingArtifacts.length === 0 : null,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture required artifact count',
+    leftValue: evidencePosture?.evidenceContract?.requiredArtifactCount,
+    rightLabel: 'launch candidate evidence manifest required artifact count',
+    rightValue: evidenceManifest?.requiredArtifacts?.total,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture missing artifact count',
+    leftValue: evidencePosture?.evidenceContract?.missingArtifactCount,
+    rightLabel: 'launch candidate evidence manifest missing artifact count',
+    rightValue: Array.isArray(missingArtifacts) ? missingArtifacts.length : null,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture provider failure count',
+    leftValue: evidencePosture?.providerValidation?.failureCount,
+    rightLabel: 'launch candidate promotion provider failure count',
+    rightValue: Array.isArray(record?.launchCandidate?.providerValidation?.failedProviders)
+      ? record.launchCandidate.providerValidation.failedProviders.length
+      : null,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture provider warning count',
+    leftValue: evidencePosture?.providerValidation?.warningCount,
+    rightLabel: 'launch candidate promotion provider warning count',
+    rightValue: Array.isArray(record?.launchCandidate?.providerValidation?.warningProviders)
+      ? record.launchCandidate.providerValidation.warningProviders.length
+      : null,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture marketplace origin proof',
+    leftValue: evidencePosture?.marketplaceOrigin?.ok,
+    rightLabel: 'launch candidate promotion marketplace origin proof',
+    rightValue: record?.launchCandidate?.marketplaceOrigin?.ok,
+  });
+  compareStringListField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture confirmed marketplace origin modes',
+    leftValue: evidencePosture?.marketplaceOrigin?.confirmedModes,
+    rightLabel: 'launch candidate promotion confirmed marketplace origin modes',
+    rightValue: record?.launchCandidate?.marketplaceOrigin?.confirmedModes,
+  });
+  compareStringListField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture missing marketplace origin modes',
+    leftValue: evidencePosture?.marketplaceOrigin?.missingModes,
+    rightLabel: 'launch candidate promotion missing marketplace origin modes',
+    rightValue: record?.launchCandidate?.marketplaceOrigin?.missingModes,
+  });
+  compareStringListField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture failed marketplace origin modes',
+    leftValue: evidencePosture?.marketplaceOrigin?.failedModes,
+    rightLabel: 'launch candidate promotion failed marketplace origin modes',
+    rightValue: record?.launchCandidate?.marketplaceOrigin?.failedModes,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture execution trace count',
+    leftValue: evidencePosture?.executionTraceCoverage?.executionCount,
+    rightLabel: 'launch candidate promotion execution trace count',
+    rightValue: record?.launchCandidate?.executionTraceCoverage?.executionCount,
+  });
+  compareNumberField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture correlation-tagged execution count',
+    leftValue: evidencePosture?.executionTraceCoverage?.correlationTaggedExecutions,
+    rightLabel: 'launch candidate promotion correlation-tagged execution count',
+    rightValue: record?.launchCandidate?.executionTraceCoverage?.correlationTaggedExecutions,
+  });
+
   return issues;
 }
 
@@ -697,6 +829,50 @@ function compareField({
   }
 
   blockers.push(message);
+}
+
+function compareBooleanField({
+  blockers,
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+}) {
+  if (typeof leftValue !== 'boolean' || typeof rightValue !== 'boolean' || leftValue === rightValue) {
+    return;
+  }
+
+  blockers.push(`${leftLabel} ${leftValue} does not match ${rightLabel} ${rightValue}.`);
+}
+
+function compareNumberField({
+  blockers,
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+}) {
+  if (typeof leftValue !== 'number' || typeof rightValue !== 'number' || leftValue === rightValue) {
+    return;
+  }
+
+  blockers.push(`${leftLabel} ${leftValue} does not match ${rightLabel} ${rightValue}.`);
+}
+
+function compareStringListField({
+  blockers,
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+}) {
+  const normalizedLeft = normalizeStringList(leftValue);
+  const normalizedRight = normalizeStringList(rightValue);
+  if (!normalizedLeft || !normalizedRight || normalizedLeft === normalizedRight) {
+    return;
+  }
+
+  blockers.push(`${leftLabel} ${normalizedLeft} does not match ${rightLabel} ${normalizedRight}.`);
 }
 
 function validateSelection({ label, selection }) {
@@ -732,4 +908,12 @@ function trimToNull(value) {
 
 function uniqueMessages(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return JSON.stringify(value.map((entry) => trimToNull(entry)).filter(Boolean).sort());
 }
