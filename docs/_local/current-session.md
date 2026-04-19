@@ -4,7 +4,7 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice by hardening real provider validation: distinguish host reachability from usable authenticated provider routes for email relay, smart-account relay, and escrow relay, then carry that contract through docs and env examples.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.2: preserve provider-specific validation posture in launch evidence, promotion review, and release packets so staging failures are actionable without reading raw deployment-validation output.
 
 ## Last Completed Step
 - Added the immediate execution docs and repo framing:
@@ -14,34 +14,26 @@
   - committed docs snapshot as `d01c547`
 
 ## Current Step
-- Task complete. Authenticated provider validation now distinguishes reachable providers from usable protected routes, and the docs/env contract now matches the code path.
+- Task complete. Launch-candidate evidence, promotion review context, and the release dossier now preserve provider-specific validation posture instead of collapsing everything into a generic deployment-validation failure.
 
 ## Why This Step Exists
 - The phased plan still needed an actionable entry point. The Phase 0 backlog now turns the highest-risk hardening work into concrete workstreams, and the README now matches the product and roadmap the repo is actually following.
 
 ## Changed Files
-- Repo framing:
-  `readme.md`
-- Backend validation/readiness:
-  `services/api/src/modules/operations/deployment-target.ts`
-  `services/api/src/modules/operations/deployment-validation.service.ts`
-  `services/api/src/modules/operations/deployment-validation.types.ts`
-  `services/api/src/modules/operations/launch-readiness.service.ts`
-  `services/api/src/modules/operations/launch-readiness.types.ts`
-- API env/runtime docs:
-  `services/api/.env.example`
-  `services/api/README.md`
-- Tests:
+- Launch/release scripts:
+  `scripts/launch-candidate.mjs`
+  `scripts/launch-candidate-lib.mjs`
+  `scripts/release-dossier-lib.mjs`
+- Script tests:
+  `scripts/launch-candidate-lib.test.mjs`
+  `scripts/release-dossier-lib.test.mjs`
+- Backend verification references:
   `services/api/test/deployment-validation.service.spec.ts`
   `services/api/test/launch-readiness.service.spec.ts`
-- Workflow/runtime contract:
-  `.github/workflows/deployed-smoke.yml`
-  `.github/workflows/launch-candidate.yml`
+  `services/api/test/runtime-profile.service.spec.ts`
 - Docs/memory:
-  `docs/ENVIRONMENT_MATRIX.md`
-  `docs/DEPLOYMENT_RUNBOOK.md`
+  `docs/incident-playbook.json`
   `docs/LAUNCH_READINESS.md`
-  `docs/STAGING_EXECUTION_SEQUENCE.md`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -68,7 +60,35 @@
   - real `Launch Candidate` execution against staging with the new strict target contract
 
 ## Next Likely Step
-- Run the stronger provider validation contract against the actual staging environment, then fix whatever credential, route, or ingress mismatches it exposes before moving on to deeper Phase 0 chain/reconciliation hardening.
+- Run the richer provider-evidence contract against the actual staging environment, then fix whichever provider credentials, route mappings, or chain-target mismatches it exposes before moving on to deeper Phase 0 chain/reconciliation hardening.
+
+## Update (2026-04-19, Provider Validation Evidence Contract)
+- Extended the launch-candidate artifact contract so provider posture is preserved as a first-class artifact:
+  - `provider-validation-summary.json`
+- The launch-candidate summary and promotion record now surface provider-specific status for:
+  - email relay
+  - smart-account relay
+  - bundler
+  - paymaster
+  - escrow relay
+- Provider failure and warning modes are now classified into reviewable categories such as:
+  - `missing_config`
+  - `credentials_rejected`
+  - `validation_route_missing`
+  - `invalid_chain_target`
+  - `provider_unhealthy`
+  - `unreachable`
+  - `degraded_readability`
+  - `unsafe_validation_route`
+- Launch blockers now include provider-specific messages in addition to the generic deployment-validation blocker.
+- The release dossier now copies `provider-validation-summary.json`, and the incident playbook now treats it as part of the relay/chain-assumption evidence contract.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Authenticated Provider Validation)
 - Tightened `services/api/src/modules/operations/deployment-validation.service.ts` so relay-backed provider checks now run in two layers:

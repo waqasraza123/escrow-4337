@@ -48,7 +48,7 @@
       "owner": "deployment",
       "summary": "Deployment validation, launch readiness, or documented chain assumptions no longer match the candidate environment.",
       "rollback": "Block promotion until deployment config, chain assumptions, and relay posture are corrected and re-validated.",
-      "evidence": ["deployment-validation.json", "runtime-profile.json", "launch-readiness.json"]
+      "evidence": ["deployment-validation.json", "provider-validation-summary.json", "runtime-profile.json", "launch-readiness.json"]
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   buildEvidenceManifest,
   buildPromotionRecord,
   buildLaunchMetadata,
+  summarizeProviderValidation,
   evaluatePromotionReadiness,
   validateIncidentPlaybook,
   validateLaunchMetadata,
@@ -148,6 +149,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
 
   try {
     writeFileSync(resolve(root, 'deployment-validation.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'provider-validation-summary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'chain-sync-daemon-health.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'chain-sync-daemon-alert-dry-run.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'runtime-profile.json'), '{}\n', 'utf8');
@@ -184,7 +186,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     });
 
-    assert.equal(manifest.requiredArtifacts.total, 15);
+    assert.equal(manifest.requiredArtifacts.total, 16);
     assert.deepEqual(manifest.requiredArtifacts.missing, []);
     assert.deepEqual(manifest.incidents, [
       {
@@ -202,6 +204,140 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       force: true,
     });
   }
+});
+
+test('summarizeProviderValidation classifies provider failures and warnings for launch evidence', () => {
+  const summary = summarizeProviderValidation({
+    ok: false,
+    environment: {
+      targetEnvironment: 'staging',
+      strictValidation: true,
+    },
+    checks: [
+      {
+        id: 'email-config',
+        status: 'ok',
+        summary: 'email configured',
+      },
+      {
+        id: 'email-relay',
+        status: 'ok',
+        summary: 'email relay reachable',
+      },
+      {
+        id: 'email-relay-auth',
+        status: 'failed',
+        summary: 'email relay authenticated route reachable',
+        details: 'Authenticated route rejected credentials with 401',
+      },
+      {
+        id: 'smart-account-config',
+        status: 'ok',
+        summary: 'smart-account configured',
+      },
+      {
+        id: 'smart-account-relay',
+        status: 'ok',
+        summary: 'smart-account relay reachable',
+      },
+      {
+        id: 'smart-account-relay-auth',
+        status: 'warning',
+        summary: 'smart-account relay authenticated route reachable',
+        details:
+          'Authenticated route accepted the probe payload with 200; verify that the validation endpoint cannot create side effects',
+      },
+      {
+        id: 'bundler',
+        status: 'failed',
+        summary: 'bundler chain id does not match application configuration',
+        details: 'Expected chain 84532, received 8453',
+      },
+      {
+        id: 'paymaster',
+        status: 'warning',
+        summary: 'paymaster is reachable but did not answer eth_chainId',
+        details: 'Method not found',
+      },
+      {
+        id: 'escrow-config',
+        status: 'ok',
+        summary: 'escrow configured',
+      },
+      {
+        id: 'escrow-relay',
+        status: 'failed',
+        summary: 'escrow relay is reachable',
+        details: 'fetch failed',
+      },
+      {
+        id: 'escrow-relay-auth',
+        status: 'skipped',
+        summary: 'skipped',
+      },
+      {
+        id: 'deployment-target',
+        status: 'failed',
+        summary: 'target invalid',
+        details: 'missing env',
+      },
+    ],
+  });
+
+  assert.deepEqual(summary.failedProviders, ['emailRelay', 'bundler', 'escrowRelay']);
+  assert.deepEqual(summary.warningProviders, ['smartAccountRelay', 'paymaster']);
+  assert.deepEqual(summary.nonProviderFailures, [
+    {
+      id: 'deployment-target',
+      summary: 'target invalid',
+      details: 'missing env',
+    },
+  ]);
+  assert.deepEqual(summary.providers.find((provider) => provider.id === 'emailRelay'), {
+    id: 'emailRelay',
+    label: 'Email relay',
+    status: 'failed',
+    blocking: true,
+    failureModes: ['credentials_rejected'],
+    blockingDetails: ['email-relay-auth: Authenticated route rejected credentials with 401'],
+    warningDetails: [],
+    checks: [
+      {
+        id: 'email-config',
+        status: 'ok',
+        summary: 'email configured',
+        details: null,
+      },
+      {
+        id: 'email-relay',
+        status: 'ok',
+        summary: 'email relay reachable',
+        details: null,
+      },
+      {
+        id: 'email-relay-auth',
+        status: 'failed',
+        summary: 'email relay authenticated route reachable',
+        details: 'Authenticated route rejected credentials with 401',
+      },
+    ],
+  });
+  assert.deepEqual(
+    summary.providers.find((provider) => provider.id === 'smartAccountRelay')?.failureModes,
+    ['unsafe_validation_route'],
+  );
+  assert.deepEqual(
+    summary.providers.find((provider) => provider.id === 'bundler')?.failureModes,
+    ['invalid_chain_target'],
+  );
+  assert.deepEqual(
+    summary.providers.find((provider) => provider.id === 'paymaster')?.failureModes,
+    ['degraded_readability'],
+  );
+  assert.deepEqual(
+    summary.providers.find((provider) => provider.id === 'escrowRelay')?.failureModes,
+    ['unreachable'],
+  );
 });
 
 test('evaluatePromotionReadiness requires rollback metadata for production and alert posture for required daemon', () => {
@@ -285,8 +421,8 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
     },
     evidenceManifest: {
       requiredArtifacts: {
-        total: 15,
-        present: Array.from({ length: 15 }, (_, index) => `artifact-${index}`),
+        total: 16,
+        present: Array.from({ length: 16 }, (_, index) => `artifact-${index}`),
         missing: [],
       },
       incidents: [],
@@ -319,6 +455,28 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
         ok: true,
         auditSource: 'chain_projection',
       },
+      providerValidation: {
+        failedProviders: ['emailRelay'],
+        warningProviders: ['paymaster'],
+        providers: [
+          {
+            id: 'emailRelay',
+            label: 'Email relay',
+            status: 'failed',
+            failureModes: ['credentials_rejected'],
+            blockingDetails: ['email-relay-auth: Authenticated route rejected credentials with 401'],
+            warningDetails: [],
+          },
+          {
+            id: 'paymaster',
+            label: 'Paymaster',
+            status: 'warning',
+            failureModes: ['degraded_readability'],
+            blockingDetails: [],
+            warningDetails: ['paymaster: Method not found'],
+          },
+        ],
+      },
     },
     promotionReadiness: {
       status: 'ready',
@@ -332,6 +490,7 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
   assert.equal(record.rollback.rollbackSource, null);
   assert.equal(record.rollback.rollbackPointerSelectionSource, null);
   assert.equal(record.observability.alertDrill.configured, true);
-  assert.equal(record.evidence.presentArtifactCount, 15);
+  assert.equal(record.evidence.presentArtifactCount, 16);
+  assert.deepEqual(record.launchCandidate.providerValidation.failedProviders, ['emailRelay']);
   assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

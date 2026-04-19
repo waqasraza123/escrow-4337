@@ -17,7 +17,13 @@ export const releaseDossierSourceSpecs = [
   {
     key: 'launchCandidateReview',
     label: 'launch-candidate-review',
-    requiredFiles: ['evidence-manifest.json', 'promotion-record.json', 'promotion-record.md', 'summary.md'],
+    requiredFiles: [
+      'evidence-manifest.json',
+      'promotion-record.json',
+      'promotion-record.md',
+      'provider-validation-summary.json',
+      'summary.md',
+    ],
   },
   {
     key: 'promotionReview',

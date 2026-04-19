@@ -11,6 +11,7 @@ import {
   buildLaunchMetadata,
   buildSummaryMarkdown,
   evaluatePromotionReadiness,
+  summarizeProviderValidation,
   validateIncidentPlaybook,
   validateLaunchMetadata,
   writeGitHubStepSummary,
@@ -94,6 +95,12 @@ async function main() {
     ],
     resolve(artifactsDir, 'deployment-validation.raw.log'),
     resolve(artifactsDir, 'deployment-validation.json'),
+  );
+  const providerValidation = summarizeProviderValidation(deploymentValidation);
+  writeFileSync(
+    resolve(artifactsDir, 'provider-validation-summary.json'),
+    `${JSON.stringify(providerValidation, null, 2)}\n`,
+    'utf8',
   );
 
   const daemonHealth = await runJsonCommand(
@@ -232,6 +239,7 @@ async function main() {
   });
   let blockers = collectBlockers({
     deploymentValidation,
+    providerValidation,
     daemonHealth,
     daemonAlertDryRun,
     runtimeProfile,
@@ -265,6 +273,7 @@ async function main() {
         .filter((check) => check.status === 'warning')
         .map((check) => check.id),
     },
+    providerValidation,
     daemonHealth: {
       status: daemonHealth.status,
       summary: daemonHealth.summary,
@@ -362,6 +371,7 @@ async function main() {
   });
   blockers = collectBlockers({
     deploymentValidation,
+    providerValidation,
     daemonHealth,
     daemonAlertDryRun,
     runtimeProfile,
@@ -568,6 +578,7 @@ async function fetchJsonArtifact(url, outputPath) {
 
 function collectBlockers({
   deploymentValidation,
+  providerValidation,
   daemonHealth,
   daemonAlertDryRun,
   runtimeProfile,
@@ -587,6 +598,26 @@ function collectBlockers({
 
   if (deploymentValidation.ok !== true) {
     blockers.push('Deployment validation reported failed checks.');
+  }
+  for (const provider of providerValidation?.providers ?? []) {
+    if (provider.status !== 'failed') {
+      continue;
+    }
+    const detail = provider.blockingDetails[0] ?? null;
+    const failureModes =
+      provider.failureModes.length === 0 ? 'failed' : provider.failureModes.join(', ');
+    blockers.push(
+      `Provider validation blocker (${provider.label}): ${failureModes}${
+        detail ? ` | ${detail}` : ''
+      }`,
+    );
+  }
+  if ((providerValidation?.nonProviderFailures ?? []).length > 0) {
+    blockers.push(
+      `Deployment validation also reported non-provider failures: ${providerValidation.nonProviderFailures
+        .map((failure) => failure.id)
+        .join(', ')}`,
+    );
   }
 
   if (daemonHealth.status === 'failed') {

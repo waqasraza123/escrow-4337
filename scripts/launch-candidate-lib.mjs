@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 
 export const launchCandidateRequiredArtifacts = [
   'deployment-validation.json',
+  'provider-validation-summary.json',
   'chain-sync-daemon-health.json',
   'chain-sync-daemon-alert-dry-run.json',
   'runtime-profile.json',
@@ -17,6 +18,34 @@ export const launchCandidateRequiredArtifacts = [
   'authority-evidence/summary.json',
   'promotion-record.json',
   'promotion-record.md',
+];
+
+const providerValidationGroups = [
+  {
+    id: 'emailRelay',
+    label: 'Email relay',
+    checkIds: ['email-config', 'email-relay', 'email-relay-auth'],
+  },
+  {
+    id: 'smartAccountRelay',
+    label: 'Smart-account relay',
+    checkIds: ['smart-account-config', 'smart-account-relay', 'smart-account-relay-auth'],
+  },
+  {
+    id: 'bundler',
+    label: 'Bundler',
+    checkIds: ['smart-account-config', 'bundler'],
+  },
+  {
+    id: 'paymaster',
+    label: 'Paymaster',
+    checkIds: ['smart-account-config', 'paymaster'],
+  },
+  {
+    id: 'escrowRelay',
+    label: 'Escrow relay',
+    checkIds: ['escrow-config', 'escrow-relay', 'escrow-relay-auth'],
+  },
 ];
 
 export function validateIncidentPlaybook(playbook) {
@@ -262,6 +291,59 @@ export function buildEvidenceManifest({
   };
 }
 
+export function summarizeProviderValidation(
+  report,
+  { generatedAt = new Date().toISOString() } = {},
+) {
+  const checks = Array.isArray(report?.checks) ? report.checks : [];
+  const checksById = new Map(checks.map((check) => [check.id, check]));
+  const providerCheckIds = new Set(providerValidationGroups.flatMap((group) => group.checkIds));
+  const providers = providerValidationGroups.map((group) => {
+    const groupChecks = group.checkIds
+      .map((checkId) => checksById.get(checkId))
+      .filter(Boolean);
+    const blockingChecks = groupChecks.filter((check) => check.status === 'failed');
+    const warningChecks = groupChecks.filter((check) => check.status === 'warning');
+
+    return {
+      id: group.id,
+      label: group.label,
+      status: summarizeProviderStatus(groupChecks),
+      blocking: blockingChecks.length > 0,
+      failureModes: uniqueStrings(groupChecks.flatMap((check) => inferProviderFailureModes(check))),
+      blockingDetails: blockingChecks.map((check) => formatValidationCheck(check)),
+      warningDetails: warningChecks.map((check) => formatValidationCheck(check)),
+      checks: groupChecks.map((check) => ({
+        id: check.id,
+        status: check.status,
+        summary: check.summary,
+        details: check.details ?? null,
+      })),
+    };
+  });
+
+  return {
+    generatedAt,
+    ok: report?.ok === true,
+    targetEnvironment: report?.environment?.targetEnvironment ?? null,
+    strictValidation: report?.environment?.strictValidation === true,
+    failedProviders: providers.filter((provider) => provider.status === 'failed').map((p) => p.id),
+    warningProviders: providers
+      .filter((provider) => provider.status === 'warning')
+      .map((p) => p.id),
+    failedChecks: checks.filter((check) => check.status === 'failed').map((check) => check.id),
+    warningChecks: checks.filter((check) => check.status === 'warning').map((check) => check.id),
+    nonProviderFailures: checks
+      .filter((check) => check.status === 'failed' && !providerCheckIds.has(check.id))
+      .map((check) => ({
+        id: check.id,
+        summary: check.summary,
+        details: check.details ?? null,
+      })),
+    providers,
+  };
+}
+
 export function evaluatePromotionReadiness({
   metadata,
   runtimeProfile,
@@ -339,6 +421,18 @@ export function buildPromotionRecord({
       walkthroughCanaryFailures: summary.walkthroughCanary.failed,
       authorityEvidenceOk: summary.authorityEvidence.ok,
       authorityAuditSource: summary.authorityEvidence.auditSource,
+      providerValidation: {
+        failedProviders: summary.providerValidation?.failedProviders ?? [],
+        warningProviders: summary.providerValidation?.warningProviders ?? [],
+        providers: (summary.providerValidation?.providers ?? []).map((provider) => ({
+          id: provider.id,
+          label: provider.label,
+          status: provider.status,
+          failureModes: provider.failureModes ?? [],
+          blockingDetails: provider.blockingDetails ?? [],
+          warningDetails: provider.warningDetails ?? [],
+        })),
+      },
     },
     rollback: {
       deployedImageSha: metadata.deployedImageSha,
@@ -396,6 +490,16 @@ export function buildPromotionMarkdown(record) {
 - Authority audit source: ${record.launchCandidate.authorityAuditSource}
 - Marketplace seeded canary failures: ${record.launchCandidate.marketplaceSeededCanaryFailures}
 - Marketplace exact canary failures: ${record.launchCandidate.marketplaceExactCanaryFailures}
+- Provider validation failures: ${
+    record.launchCandidate.providerValidation.failedProviders.length === 0
+      ? 'none'
+      : record.launchCandidate.providerValidation.failedProviders.join(', ')
+  }
+- Provider validation warnings: ${
+    record.launchCandidate.providerValidation.warningProviders.length === 0
+      ? 'none'
+      : record.launchCandidate.providerValidation.warningProviders.join(', ')
+  }
 - Daemon health: ${record.observability.daemonHealthStatus}
 - Alert drill configured: ${record.observability.alertDrill.configured ? 'true' : 'false'}
 - Alert drill reason: ${record.observability.alertDrill.reason ?? 'n/a'}
@@ -408,6 +512,24 @@ ${record.blockers.length === 0 ? '- none' : record.blockers.map((blocker) => `- 
 ## Warnings
 
 ${record.warnings.length === 0 ? '- none' : record.warnings.map((warning) => `- ${warning}`).join('\n')}
+
+## Provider Validation
+
+${record.launchCandidate.providerValidation.providers.length === 0
+    ? '- none'
+    : record.launchCandidate.providerValidation.providers
+        .map((provider) => {
+          const posture = [
+            provider.label,
+            provider.status,
+            provider.failureModes.length === 0 ? null : provider.failureModes.join(', '),
+          ]
+            .filter(Boolean)
+            .join(' | ');
+          const details = provider.blockingDetails[0] ?? provider.warningDetails[0] ?? null;
+          return `- ${posture}${details ? ` | ${details}` : ''}`;
+        })
+        .join('\n')}
 
 ## Incident Coverage
 
@@ -477,6 +599,16 @@ export function buildSummaryMarkdown(summary) {
 - Alert drill configured: ${promotion.alertDrillConfigured ? 'true' : 'false'}
 - Alert drill reason: ${promotion.alertDrillReason ?? 'n/a'}
 - Rollback ready: ${promotion.rollbackReady ? 'true' : 'false'}
+- Provider validation failures: ${
+    summary.providerValidation?.failedProviders?.length
+      ? summary.providerValidation.failedProviders.join(', ')
+      : 'none'
+  }
+- Provider validation warnings: ${
+    summary.providerValidation?.warningProviders?.length
+      ? summary.providerValidation.warningProviders.join(', ')
+      : 'none'
+  }
 
 ## Evidence Contract
 
@@ -495,6 +627,24 @@ ${summary.blockers.length === 0 ? '- none' : summary.blockers.map((blocker) => `
 ## Launch Readiness Warnings
 
 ${summary.launchReadiness.warnings.length === 0 ? '- none' : summary.launchReadiness.warnings.map((warning) => `- ${warning}`).join('\n')}
+
+## Provider Validation
+
+${summary.providerValidation?.providers?.length
+    ? summary.providerValidation.providers
+        .map((provider) => {
+          const posture = [
+            provider.label,
+            provider.status,
+            provider.failureModes.length === 0 ? null : provider.failureModes.join(', '),
+          ]
+            .filter(Boolean)
+            .join(' | ');
+          const details = provider.blockingDetails[0] ?? provider.warningDetails[0] ?? null;
+          return `- ${posture}${details ? ` | ${details}` : ''}`;
+        })
+        .join('\n')
+    : '- none'}
 
 ## Incident Evidence
 
@@ -587,4 +737,80 @@ function summarizeNotification(daemonAlertDrill) {
     reason: notification.reason ?? null,
     webhookResponseStatus: notification.webhookResponseStatus ?? null,
   };
+}
+
+function summarizeProviderStatus(checks) {
+  if (checks.some((check) => check.status === 'failed')) {
+    return 'failed';
+  }
+  if (checks.some((check) => check.status === 'warning')) {
+    return 'warning';
+  }
+  if (checks.some((check) => check.status === 'ok')) {
+    return 'ok';
+  }
+  if (checks.length === 0 || checks.every((check) => check.status === 'skipped')) {
+    return 'skipped';
+  }
+  return 'unknown';
+}
+
+function inferProviderFailureModes(check) {
+  const summary = String(check?.summary ?? '').toLowerCase();
+  const details = String(check?.details ?? '').toLowerCase();
+  const combined = `${summary}\n${details}`;
+  const modes = [];
+
+  if (check?.status === 'warning' && combined.includes('did not answer eth_chainid')) {
+    modes.push('degraded_readability');
+  }
+  if (check?.status === 'warning' && combined.includes('accepted the probe payload')) {
+    modes.push('unsafe_validation_route');
+  }
+  if (combined.includes('must be set') || combined.includes('configuration is invalid')) {
+    modes.push('missing_config');
+  }
+  if (combined.includes('rejected credentials')) {
+    modes.push('credentials_rejected');
+  }
+  if (combined.includes('was not found')) {
+    modes.push('validation_route_missing');
+  }
+  if (
+    combined.includes('expected chain ') ||
+    combined.includes('invalid eth_chainid response') ||
+    combined.includes('chain id does not match')
+  ) {
+    modes.push('invalid_chain_target');
+  }
+  if (
+    combined.includes('received 5') ||
+    combined.includes('returned 5') ||
+    combined.includes('json-rpc error')
+  ) {
+    modes.push('provider_unhealthy');
+  }
+  if (
+    combined.includes('network failure') ||
+    combined.includes('fetch failed') ||
+    combined.includes('timed out') ||
+    combined.includes('abort') ||
+    combined.includes('econn')
+  ) {
+    modes.push('unreachable');
+  }
+
+  if (modes.length === 0 && (check?.status === 'failed' || check?.status === 'warning')) {
+    modes.push('unknown');
+  }
+
+  return uniqueStrings(modes);
+}
+
+function formatValidationCheck(check) {
+  return check.details ? `${check.id}: ${check.details}` : `${check.id}: ${check.summary}`;
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter(Boolean)));
 }

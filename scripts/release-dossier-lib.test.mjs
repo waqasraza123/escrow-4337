@@ -53,6 +53,7 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'provider-validation-summary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'summary.md'), '# summary\n', 'utf8');
     writeFileSync(resolve(promotionReviewDir, 'promotion-review.json'), '{}\n', 'utf8');
     writeFileSync(resolve(promotionReviewDir, 'promotion-review.md'), '# promotion\n', 'utf8');
@@ -67,7 +68,7 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     assert.ok(copied.copiedFiles.includes('evidence/api-image-manifest/manifest.json'));
 
     const files = listReleaseDossierFiles(resolve(outputDir, 'evidence'));
-    assert.equal(files.length, 10);
+    assert.equal(files.length, 11);
     assert.ok(files.every((entry) => entry.sha256.length === 64));
 
     const checksums = buildChecksumsText(files);
@@ -239,7 +240,7 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
     },
     launchEvidenceManifest: {
       requiredArtifacts: {
-        total: 15,
+        total: 16,
         missing: [],
       },
     },
