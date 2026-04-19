@@ -14,12 +14,14 @@
   - committed docs snapshot as `d01c547`
 
 ## Current Step
-- Task complete. Tightened `deployment:validate`, launch-readiness, workflows, and staging docs so the repo now enforces the staged browser-target/CORS/provider contract instead of only documenting it.
+- Task complete. Added a second README pass so the repo front page now reads as a clear product/program document: status-at-a-glance, launch scope, current execution stack, and immediate Phase 0 emphasis are all explicit.
 
 ## Why This Step Exists
 - The phased plan still needed an actionable entry point. The Phase 0 backlog now turns the highest-risk hardening work into concrete workstreams, and the README now matches the product and roadmap the repo is actually following.
 
 ## Changed Files
+- Repo framing:
+  `readme.md`
 - Backend validation/readiness:
   `services/api/src/modules/operations/deployment-target.ts`
   `services/api/src/modules/operations/deployment-validation.service.ts`
@@ -82,6 +84,18 @@
 - Result:
   - Passed
   - live staging execution still pending
+
+## Update (2026-04-19, README Program Framing Pass)
+- Refined `readme.md` again after the roadmap/Phase 0 work so the front page now emphasizes:
+  - status at a glance
+  - narrow launch scope
+  - the active execution stack
+  - who the repo is for right now
+- Intent:
+  - make the repo understandable in under two minutes for product, engineering, or operator readers
+  - keep the README aligned with the actual marketplace program instead of the older escrow-foundation framing
+- Verification:
+  - `git diff --check`
 
 ## Update (2026-04-19, Phase 0 Backlog And README Direction)
 - Added `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md` to break Phase 0 into concrete workstreams and ticket-sized tasks.

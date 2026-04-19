@@ -15,6 +15,15 @@ Escrow4337 is an escrow-first hiring marketplace on Base. The target product is 
 
 This repo is not a blank-slate marketplace build. It already has meaningful escrow, onboarding, marketplace, moderation, and operator foundations. The current program is to turn those slices into a production-grade Upwork-style blockchain marketplace without throwing away the strongest existing primitives.
 
+## Status At A Glance
+
+- Product direction: escrow-first blockchain marketplace
+- Current roadmap: `v1`
+- Active execution lane: `Phase 0`
+- Strongest completed slice: escrow lifecycle plus crypto-native onboarding
+- Strongest marketplace slice: publish/apply/hire-to-escrow foundation
+- Main risk area now: production hardening and real staged proof
+
 ## Screenshots
 
 ![Web screenshot 1](.github/screenshots/image2.jpg)
@@ -33,6 +42,10 @@ The active implementation set is:
 
 The immediate focus is Phase 0: production hardening, staging proof, relay/provider validation, chain/reconciliation confidence, and release-gating around a real marketplace-origin flow.
 
+In practical terms, the repo is currently optimizing for one question:
+
+- can the existing marketplace-origin hire flow be treated as production-grade under real staging infrastructure?
+
 ## What Exists Today
 
 The strongest implemented slices today are:
@@ -46,6 +59,26 @@ The strongest implemented slices today are:
 - abuse reporting, moderation, operator dispute tooling, exports, and operations-health surfaces
 
 This repo is already beyond “contract demo” stage. The current gaps are mostly production hardening, deeper ranking/trust systems, broader RBAC, richer hiring pipeline workflows, and real staged proof.
+
+## Launch Scope
+
+The intended initial product is deliberately narrow:
+
+- Base-first
+- USDC-first
+- fixed-price
+- milestone-first
+- one client organization
+- one freelancer or one agency seat acting as worker
+- operator-resolved disputes
+
+Explicit non-goals for the early launch:
+
+- hourly contracts
+- multi-chain support
+- tokenized platform incentives
+- DAO governance
+- broad white-label platformization
 
 ## Product Thesis
 
@@ -73,6 +106,27 @@ The narrow launch scope is intentional:
 - Onchain milestone funding, release, dispute, resolution, and remainder handling.
 - A persisted orchestration layer that bridges marketplace hiring to escrow settlement safely.
 - Operator/admin surfaces for trust, moderation, reconciliation, and dispute handling.
+
+## Current Execution Program
+
+The repo is no longer being driven by one broad implementation guide alone. The active execution stack is:
+
+- product thesis and scope in [Marketplace Plan V1](./docs/MARKETPLACE_PLAN_V1.md)
+- implementation sequencing in [Marketplace Implementation V1](./docs/MARKETPLACE_IMPLEMENTATION_V1.md)
+- UI/UX rules in [Marketplace Design Guide V1](./docs/MARKETPLACE_DESIGN_GUIDE_V1.md)
+- immediate work in [Marketplace Phase 0 Backlog V1](./docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md)
+
+This is the current order of work:
+
+1. production hardening and staged proof
+2. identity/workspace/RBAC normalization
+3. search/read-model layer
+4. hiring pipeline depth
+5. proposal-to-contract conversion
+6. project room and execution workflow
+7. trust/reviews/reputation
+8. fees/treasury/support
+9. optimization and marketplace intelligence
 
 ## Current Architecture
 
@@ -119,6 +173,14 @@ The repo still needs:
 - fee/treasury/support workflows
 
 That sequence is now documented in the phase docs rather than one broad aspirational roadmap.
+
+## Who This Repo Is For Right Now
+
+- engineers implementing the marketplace and escrow stack
+- operators validating staging and release posture
+- product/technical collaborators who need one clear source of truth for the current roadmap
+
+If you are looking for a finished marketplace product, this repo is not there yet. If you are looking for a serious implementation program with meaningful foundations already in place, that is what this repo now represents.
 
 ## Docs Map
 
