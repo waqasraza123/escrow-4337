@@ -1,128 +1,141 @@
-![README: English](https://img.shields.io/badge/README-English-0B7285)
-![README: العربية](https://img.shields.io/badge/README-%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-1C7ED6)
-![Network: Base](https://img.shields.io/badge/network-Base-0052FF)
-![ERC-4337](https://img.shields.io/badge/ERC--4337-enabled-111827)
-![Token: USDC](https://img.shields.io/badge/token-USDC-2775CA)
+![Product](https://img.shields.io/badge/product-escrow--first%20marketplace-0B7285)
+![Roadmap](https://img.shields.io/badge/roadmap-v1-1C7ED6)
+![Execution](https://img.shields.io/badge/execution-phase%200%20active-F08C00)
+![Network](https://img.shields.io/badge/network-Base-0052FF)
+![Settlement](https://img.shields.io/badge/settlement-USDC-2775CA)
+![Smart Accounts](https://img.shields.io/badge/ERC--4337-enabled-111827)
 ![Node.js](https://img.shields.io/badge/node-20.x-339933)
 ![pnpm](https://img.shields.io/badge/pnpm-9.7.0-F69220)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.x-363636)
 
-# Milestone Escrow
+# Escrow4337
 
-Production-oriented foundation for a Base-native milestone escrow product with smart-account onboarding, programmable milestone release, dispute handling, and compliance-aware workflows.
+Escrow4337 is an escrow-first hiring marketplace on Base. The target product is a fixed-price, milestone-first, crypto-native alternative to traditional freelance marketplaces: discover talent, post structured work, hire through milestone escrow, manage delivery inside the platform, and resolve release/dispute flows with auditable onchain settlement.
 
-This repository is being hardened as a serious engineering repo, not presented as a finished product. The contract layer is the most mature slice today. The API, frontends, indexing, and operations layers are still in progress.
+This repo is not a blank-slate marketplace build. It already has meaningful escrow, onboarding, marketplace, moderation, and operator foundations. The current program is to turn those slices into a production-grade Upwork-style blockchain marketplace without throwing away the strongest existing primitives.
 
 ## Screenshots
 
-![alt text](.github/screenshots/image2.jpg)
-![alt text](.github/screenshots/image1.jpg)
-![alt text](.github/screenshots/image3.jpg)
+![Web screenshot 1](.github/screenshots/image2.jpg)
+![Web screenshot 2](.github/screenshots/image1.jpg)
+![Web screenshot 3](.github/screenshots/image3.jpg)
 
-## What This Product Is
+## Active Direction
 
-Milestone Escrow is designed for client-and-contractor work that needs:
+The active roadmap is [Marketplace Plan V1](./docs/MARKETPLACE_PLAN_V1.md).
 
-- milestone-based funding and release
-- transparent dispute resolution
-- crypto-native settlement on Base
-- gasless or low-friction onboarding
-- auditability and compliance-aware workflows
+The active implementation set is:
 
-The target experience is closer to a crypto-native Upwork escrow than a generic wallet demo.
+- [Marketplace Implementation V1](./docs/MARKETPLACE_IMPLEMENTATION_V1.md)
+- [Marketplace Design Guide V1](./docs/MARKETPLACE_DESIGN_GUIDE_V1.md)
+- [Marketplace Phase 0 Backlog V1](./docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md)
 
-## Who It Is For
+The immediate focus is Phase 0: production hardening, staging proof, relay/provider validation, chain/reconciliation confidence, and release-gating around a real marketplace-origin flow.
 
-- clients funding milestone-based work and wanting funds locked until delivery
-- contractors who need transparent release and dispute mechanics
-- operators or arbitrators resolving disputes with an auditable record
-- teams that need a programmable escrow foundation with future compliance controls
+## What Exists Today
 
-## Problem It Solves
+The strongest implemented slices today are:
 
-Traditional freelance and milestone payment flows are hard to audit, expensive to operate, and difficult to adapt for onchain settlement. Pure wallet-to-wallet payments also do not provide structured milestone release, formal dispute handling, or product-grade operational controls.
+- onchain milestone escrow through `WorkstreamEscrow`
+- OTP + SIWE + smart-account onboarding
+- guided contract authoring and contractor join workflow
+- off-chain marketplace primitives for talent, opportunities, and applications
+- shortlist/reject/hire flows and hire-to-escrow conversion
+- dossier scoring and escrow-derived reputation signals
+- abuse reporting, moderation, operator dispute tooling, exports, and operations-health surfaces
 
-This project aims to close that gap with:
+This repo is already beyond “contract demo” stage. The current gaps are mostly production hardening, deeper ranking/trust systems, broader RBAC, richer hiring pipeline workflows, and real staged proof.
 
-- an onchain escrow contract for milestone state transitions
-- an API layer for auth, policy, orchestration, and future admin operations
-- product surfaces for users and operators
-- a repo structure that can evolve into a production system rather than a one-off demo
+## Product Thesis
 
-## Core Capabilities
+Escrow4337 is being built as:
 
-Target capabilities:
+- a Base-first hiring marketplace
+- a fixed-price, milestone-first product
+- a USDC-first settlement model
+- a crypto-native onboarding experience with wallet authority
+- a hybrid architecture where money movement is onchain and marketplace workflows remain off-chain
 
-- email-first onboarding with ERC-4337-style smart-account support
-- milestone creation, funding, delivery, release, refund, and dispute flows
-- compliance-aware category controls, including optional Shariah mode
-- admin or arbitrator resolution workflows
-- auditable event history and exportable records
+The narrow launch scope is intentional:
 
-Current implemented slices:
+- one client organization
+- one hired freelancer or one agency seat acting as worker
+- milestone-based contracts
+- operator-resolved disputes
+- no hourly tracker
+- no multi-chain support
 
-- `WorkstreamEscrow` Solidity contract with milestone release, dispute, resolution, and remainder refund behavior
-- contract tests for the main happy-path and refund scenarios
-- NestJS auth API with OTP/JWT/session flow, Shariah preference toggle, and repository-backed persistence boundaries
-- provider-backed OTP email delivery with relay-mode production wiring and rollback-safe invalidation when delivery fails
-- rotating refresh-token sessions with replay-triggered session revocation
-- validated auth runtime configuration for JWT secrets plus JWT, session, and OTP timing and rate-limit controls
-- persistence-backed IP-aware OTP request throttling plus trust-proxy-aware API bootstrap for deployments behind ingress
-- wallet API flow with SIWE-backed ownership proof, deterministic smart-account provisioning, explicit sponsorship policy, and default execution-wallet management
-- escrow API orchestration that now submits lifecycle actions through a contract gateway, waits for confirmed receipts, and persists execution history for job creation, funding, milestones, delivery, release, dispute, resolution, and audit retrieval
-- Postgres persistence driver and SQL migrations for users, OTP/session state, and escrow records, plus a file-backed adapter used in tests
-- compliance package with a concrete prohibited-category policy list
+## Core Differentiators
 
-Current missing or incomplete slices:
+- Email-first onboarding with wallet authority instead of wallet-first friction.
+- ERC-4337-style smart-account provisioning and execution posture.
+- Onchain milestone funding, release, dispute, resolution, and remainder handling.
+- A persisted orchestration layer that bridges marketplace hiring to escrow settlement safely.
+- Operator/admin surfaces for trust, moderation, reconciliation, and dispute handling.
 
-- live validation of the configured email relay infrastructure
-- live validation of the configured smart-account relay, bundler, and paymaster infrastructure
-- live validation of the configured escrow execution relay infrastructure
-- indexer, subgraph, shared UI package, and deployment infrastructure described in the original repo vision
+## Current Architecture
 
-## High-Level Architecture
+High-level repo layout:
 
-Current repo architecture:
+- `packages/contracts`
+  Foundry workspace containing `WorkstreamEscrow.sol` and contract tests.
+- `services/api`
+  NestJS API for auth, wallet, escrow, marketplace, moderation, deployment validation, runtime profile, and operations tooling.
+- `apps/web`
+  Next.js product surface for public marketplace routes plus authenticated client/talent flows.
+- `apps/admin`
+  Next.js operator surface for moderation, dispute review, exports, chain sync posture, and operations health.
+- `packages/frontend-core`
+  Shared frontend primitives, async-state helpers, locale support, walkthrough/spatial subpaths, and UI building blocks.
+- `packages/compliance`
+  Compliance policy package used by the API.
 
-- `packages/contracts`: Foundry contract workspace and contract tests
-- `services/api`: NestJS API for auth, wallet, escrow, and policy modules
-- `packages/compliance`: reusable compliance policy package consumed by the API
-- `apps/web`: user-facing Next.js app
-- `apps/admin`: admin and operations Next.js app
+Durable architecture context lives in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-Target production architecture:
+## Implemented Capabilities
 
-- contracts own escrow state transitions and dispute resolution primitives
-- API owns auth, orchestration, policy enforcement, admin workflows, and future persistence
-- frontend apps own onboarding, job flow, and operator workflow UX
-- future indexing and export layers own audit history, reporting, and operations visibility
+- `WorkstreamEscrow` supports job creation, funding, milestone delivery/release, disputes, resolution, and remainder refunds.
+- The API persists auth, wallet, escrow, and marketplace state through repository-backed persistence with Postgres and file-backed test adapters.
+- OTP/email delivery is provider-backed and rollback-safe.
+- Auth runtime policy is environment-driven and includes IP-aware OTP throttling.
+- Wallet linking uses SIWE proof, and smart-account provisioning persists execution metadata and sponsorship posture.
+- Marketplace records now include structured `TalentProfile`, `Opportunity`, and `Application` entities with public browse/detail routes and authenticated CRUD.
+- Marketplace hiring already supports shortlist/reject/withdraw/hire transitions and a bridge into the existing escrow job model.
+- Public marketplace detail pages surface structured opportunity/profile data plus escrow-derived reputation signals.
+- Admin/operator surfaces support dispute review, export downloads, operations health, chain-sync preview/persist, and moderation workflows.
 
-See [docs/ARCHITECTURE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md) for the current-versus-target architecture view.
+## What Is Still Missing
 
-## Repo Structure
+The repo still needs:
 
-```text
-apps/
-  admin/                 Next.js admin surface
-  web/                   Next.js user-facing surface
-services/
-  api/                   NestJS API
-packages/
-  compliance/            Compliance policy package
-  contracts/             Foundry contracts and tests
-  sdk/                   Incomplete SDK source, not yet a real workspace package
-  abi/                   Present but currently empty
-docs/
-  project-state.md       Durable committed project memory
-  ARCHITECTURE.md        Current and target architecture
-  EXECUTION_GUIDE.md     Sequenced implementation roadmap
-AGENTS.md                Durable instructions for future Codex sessions
-CLAUDE.md                AI-assisted development guide
-COLLABORATION.md         Human and AI workflow guide
-CONTRIBUTING.md          Contributor expectations
-SECURITY.md              Responsible disclosure guidance
-```
+- real staged proof for email relay, smart-account relay, bundler/paymaster, and escrow execution relay
+- a stronger role and organization model
+- search/read models and better ranking
+- proposal revisions, interviews, and offers
+- proposal-to-contract draft pipeline
+- a true post-hire project room
+- public reviews and fuller reputation systems
+- fee/treasury/support workflows
+
+That sequence is now documented in the phase docs rather than one broad aspirational roadmap.
+
+## Docs Map
+
+- [Marketplace Plan V1](./docs/MARKETPLACE_PLAN_V1.md)
+  Product thesis and target architecture.
+- [Marketplace Implementation V1](./docs/MARKETPLACE_IMPLEMENTATION_V1.md)
+  Phase index and execution order.
+- [Marketplace Design Guide V1](./docs/MARKETPLACE_DESIGN_GUIDE_V1.md)
+  Shared marketplace UI/UX direction.
+- [Marketplace Phase 0 V1](./docs/MARKETPLACE_PHASE_0_V1.md)
+  Production hardening and release-proof phase.
+- [Marketplace Phase 0 Backlog V1](./docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md)
+  Concrete immediate backlog for the current execution slice.
+- [docs/project-state.md](./docs/project-state.md)
+  Durable repo memory and current truths.
+- [docs/_local/current-session.md](./docs/_local/current-session.md)
+  Local working memory for the active slice when present.
 
 ## Local Setup
 
@@ -130,13 +143,8 @@ SECURITY.md              Responsible disclosure guidance
 
 - Node 20+
 - `pnpm`
-- Foundry for contract work
-
-Optional but expected later:
-
-- Postgres, with a zero-cost local Docker Compose stack now provided in `infra/postgres`
-- Base Sepolia RPC access
-- relay, bundler, and paymaster credentials for smart-account work
+- Foundry
+- Docker or a native Postgres 16+ install for the local API path
 
 ### Install
 
@@ -144,16 +152,7 @@ Optional but expected later:
 pnpm install
 ```
 
-### Environment
-
-Current repo environment handling is split by purpose:
-
-- local zero-cost API development: `services/api/.env.local.example`
-- production-like relay-backed API configuration: `services/api/.env.example`
-- local Postgres container overrides: `infra/postgres/.env.example`
-- frontend API targets: `apps/web/.env.example` and `apps/admin/.env.example`
-
-For a zero-cost local API stack, the repo provides Docker Compose for Postgres:
+### Local Postgres/API Flow
 
 ```bash
 cp infra/postgres/.env.example infra/postgres/.env
@@ -163,84 +162,55 @@ pnpm --filter escrow4334-api db:migrate
 pnpm --filter escrow4334-api start:dev
 ```
 
-This repo is not using Supabase. The current persistence path is NestJS plus direct Postgres access through the workspace code in `services/api/src/persistence/postgres`.
+If you change the local API port from `4100`, mirror that in `NEXT_PUBLIC_API_PORT` for `apps/web` and `apps/admin`.
 
-Docker is recommended for reproducibility, but it is not required. A native Postgres 16+ instance is also valid if `services/api/.env.local` points `DATABASE_URL` at it.
+### Frontend Environment
 
-The local API default remains `4100`. If that port is already occupied on your machine, choose another port deliberately with `NEST_API_PORT` and update `NEXT_PUBLIC_API_PORT` in `apps/web` and `apps/admin` to match. The API dev command now preflights the port and fails early with that guidance.
+- `apps/web/.env.example`
+- `apps/admin/.env.example`
 
-Current example variables:
+### Production-Like API Environment
 
-```bash
-cp .env.example .env
-```
+- `services/api/.env.example`
 
-Do not commit real secrets. Use environment-scoped secrets in CI and deployment.
+Do not commit real secrets.
 
-## Development Workflow
+## Verification
 
-1. Read [AGENTS.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/AGENTS.md).
-2. Read [docs/project-state.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/project-state.md).
-3. Read `docs/_local/current-session.md` if it exists in your local checkout.
-4. Make one cohesive, meaningful change at a time.
-5. Run the smallest relevant checks first, then broader repo checks.
-6. Update durable or local context files when the task changes long-term state or active working context.
-
-Additional workflow guidance lives in:
-
-- [CONTRIBUTING.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CONTRIBUTING.md)
-- [COLLABORATION.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/COLLABORATION.md)
-- [CLAUDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CLAUDE.md)
-
-## Quality Standards
-
-Current meaningful verification commands:
+Useful repo entrypoints:
 
 ```bash
-pnpm typecheck
+pnpm verify:ci
+pnpm launch:candidate
+pnpm verify:authority:deployed
+pnpm test
 pnpm lint
-pnpm --filter @escrow4334/compliance build
-pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit
+pnpm typecheck
 cd packages/contracts && forge test
 ```
 
 Important repo truths:
 
-- `pnpm verify:ci` is the canonical non-mutating local and CI verification entrypoint.
+- `pnpm verify:ci` is the canonical non-mutating local/CI gate.
 - `pnpm launch:candidate` is the canonical deployed release-candidate gate.
-- `pnpm typecheck` is meaningful and currently green.
-- `pnpm lint` is meaningful and currently green.
-- `pnpm test` is meaningful and currently backend-heavy rather than product-complete.
-- Do not claim repo health beyond the checks you actually ran.
+- `pnpm verify:authority:deployed` is the staged authority proof runner.
+- You should not claim readiness beyond the checks you actually ran.
 
-## Production Readiness Direction
+## Development Workflow
 
-The next serious milestones are:
+1. Read [AGENTS.md](./AGENTS.md).
+2. Read [docs/project-state.md](./docs/project-state.md).
+3. Read `docs/_local/current-session.md` if it exists locally.
+4. Follow the active roadmap and phase docs instead of stale historical plan threads.
+5. Make one cohesive change at a time and update repo memory when long-term direction or the current slice changes.
 
-1. deploy and operationalize the new persistence layer in real environments
-2. validate the configured smart-account and escrow relay infrastructure plus deployed proxy or ingress behavior in real environments, and replace remaining placeholder backend integrations
-3. build real web and admin surfaces
-4. add indexing, audit exports, and operations visibility
-5. harden CI, deployment, observability, and security posture
+Additional contributor guidance:
 
-The implementation sequence is documented in [docs/EXECUTION_GUIDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md).
-
-## Project Docs
-
-- [docs/project-state.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/project-state.md): durable project memory
-- [docs/ARCHITECTURE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ARCHITECTURE.md): system boundaries and target direction
-- [docs/EXECUTION_GUIDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/EXECUTION_GUIDE.md): step-by-step completion roadmap
-- [docs/ENVIRONMENT_MATRIX.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/ENVIRONMENT_MATRIX.md): local, staging, and production deployment expectations
-- [docs/DEPLOYMENT_RUNBOOK.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/DEPLOYMENT_RUNBOOK.md): rollout, smoke, and rollback contract
-- [docs/LAUNCH_READINESS.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/LAUNCH_READINESS.md): launch scope, ownership, and launch-candidate evidence contract
-- [docs/INCIDENT_PLAYBOOK.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/INCIDENT_PLAYBOOK.md): launch-scoped incident ownership and rollback evidence expectations
-- [docs/SECURITY_REVIEW.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/SECURITY_REVIEW.md): focused Phase 7 security review
-- [docs/FRONTEND_PLAN.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/FRONTEND_PLAN.md): detailed frontend sequencing for `apps/web` and `apps/admin`
-- [CLAUDE.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CLAUDE.md): AI assistant working guide
-- [CONTRIBUTING.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/CONTRIBUTING.md): contribution expectations
-- [COLLABORATION.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/COLLABORATION.md): working agreements
-- [SECURITY.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/SECURITY.md): responsible disclosure guidance
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [COLLABORATION.md](./COLLABORATION.md)
+- [CLAUDE.md](./CLAUDE.md)
+- [SECURITY.md](./SECURITY.md)
 
 ## License
 
-MIT. See [LICENSE](/Users/mc/development/blockchain/ethereum/base/Escrow4337/LICENSE).
+MIT. See [LICENSE](./LICENSE).

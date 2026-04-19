@@ -1,5 +1,7 @@
 # Frontend Plan
 
+> Status (2026-04-19): closed as an active plan and superseded by [Marketplace Plan V1](./MARKETPLACE_PLAN_V1.md). This document remains as historical detail for the frontend-specific work completed through Step 7.
+
 This document turns Phase 5 of the execution guide into the current frontend source of truth for `apps/web` and `apps/admin`.
 
 ## Current Reality

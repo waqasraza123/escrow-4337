@@ -4,6 +4,9 @@
 
 - Intended product: escrow-first hiring marketplace on Base with ERC-4337-style onboarding, USDC milestone funding, contractor discovery or application workflows, and escrow-backed release/refund/dispute flows with optional Shariah mode.
 - Current reality: prototype-stage monorepo. The contract is still the strongest completed slice, but the repo now also includes a first off-chain marketplace layer that can feed hires into the existing single-contractor escrow flow.
+- Active roadmap: `docs/MARKETPLACE_PLAN_V1.md` (`v1`, adopted `2026-04-19`). It reframes the repo as an escrow-first marketplace expanding toward a fixed-price, milestone-first, Base/USDC-first Upwork-style product, and it supersedes the prior frontend-only and promotion-artifact-focused planning threads as the active source of truth.
+- Active implementation set: `docs/MARKETPLACE_IMPLEMENTATION_V1.md`, `docs/MARKETPLACE_DESIGN_GUIDE_V1.md`, and `docs/MARKETPLACE_PHASE_{0..8}_V1.md`. These phase docs are the repo-specific execution plan for the roadmap and each phase includes implementation and design guidance.
+- Active immediate backlog: `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`. It breaks Phase 0 into concrete workstreams around staging proof, provider validation, chain-event/reconciliation hardening, privileged capability baseline, marketplace-origin canary evidence, and repo/README alignment.
 
 ## Current Architecture
 
@@ -113,7 +116,7 @@
 
 - This repo should be treated as a contract-first prototype, not a production-ready product.
 - `docs/project-state.md` is the committed memory file for durable repo facts and decisions.
-- `docs/FRONTEND_PLAN.md` owns the detailed sequencing for `apps/web` and `apps/admin`; `docs/EXECUTION_GUIDE.md` remains the higher-level repo roadmap.
+- `docs/MARKETPLACE_IMPLEMENTATION_V1.md` plus the phase docs now own the detailed marketplace sequencing; `docs/EXECUTION_GUIDE.md` remains the higher-level repo roadmap.
 - `docs/_local/current-session.md` is the ignored restart/handoff file for the current working slice.
 - The current active backend direction is to consume compliance rules through the workspace package instead of importing repo-relative source paths.
 - The API TypeScript config resolves `@escrow4334/compliance` through the built declaration surface in `packages/compliance/dist`.
