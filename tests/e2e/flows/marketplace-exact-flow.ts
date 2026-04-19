@@ -7,8 +7,8 @@ import {
   resolveDisputedMilestone,
 } from './launch-candidate-flow';
 import {
+  downloadExportDocument,
   type ExportProbe,
-  expectExportDownload,
 } from './operator-export-flow';
 
 type MarketplaceProfileInput = {
@@ -283,6 +283,13 @@ export async function runAuthenticatedMarketplaceExactFlow(
   });
 
   const exportProbes = exportProbeFactory?.(jobId) ?? [];
+  const downloadedExports: Array<{
+    artifact: 'job-history' | 'dispute-case';
+    format: 'json' | 'csv';
+    suggestedFilename: string;
+    content: string;
+    json: Record<string, unknown> | null;
+  }> = [];
   if (exportProbes.length) {
     await expect(
       operatorPage.getByRole('button', { name: 'Export job history JSON' }),
@@ -290,7 +297,14 @@ export async function runAuthenticatedMarketplaceExactFlow(
     await expect(operatorPage.getByText('Audit source:', { exact: false }).first()).toBeVisible();
 
     for (const probe of exportProbes) {
-      await expectExportDownload(operatorPage, probe);
+      const exported = await downloadExportDocument(operatorPage, probe);
+      downloadedExports.push({
+        artifact: probe.artifact,
+        format: probe.format,
+        suggestedFilename: exported.suggestedFilename,
+        content: exported.content,
+        json: exported.json,
+      });
     }
   }
 
@@ -305,5 +319,14 @@ export async function runAuthenticatedMarketplaceExactFlow(
   return {
     jobId,
     opportunityId,
+    contractPath: clientContractPath,
+    exportedJobHistoryJson:
+      downloadedExports.find(
+        (entry) => entry.artifact === 'job-history' && entry.format === 'json',
+      )?.json ?? null,
+    exportedDisputeCaseJson:
+      downloadedExports.find(
+        (entry) => entry.artifact === 'dispute-case' && entry.format === 'json',
+      )?.json ?? null,
   };
 }

@@ -15,8 +15,9 @@ import {
 } from '../../../flows/launch-candidate-flow';
 import {
   buildEscrowExportProbes,
-  expectExportDownload,
+  downloadExportDocument,
 } from '../../../flows/operator-export-flow';
+import { writeMarketplaceJourneyEvidence } from '../../../fixtures/marketplace-evidence';
 
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
@@ -220,8 +221,31 @@ test('[@seeded] deployed environment can exercise the seeded marketplace hire-to
   ).toBeVisible();
   await expect(operatorPage.getByText('Audit source:', { exact: false }).first()).toBeVisible();
 
+  let jobHistoryExport = null;
+  let disputeCaseExport = null;
   for (const probe of buildEscrowExportProbes(jobId)) {
-    await expectExportDownload(operatorPage, probe);
+    const exported = await downloadExportDocument(operatorPage, probe);
+    if (probe.artifact === 'job-history' && probe.format === 'json') {
+      jobHistoryExport = exported.json;
+    }
+    if (probe.artifact === 'dispute-case' && probe.format === 'json') {
+      disputeCaseExport = exported.json;
+    }
+    if (probe.format !== 'json') {
+      await expect(operatorPage.getByText(probe.successMessage, { exact: true })).toBeVisible();
+    }
+  }
+
+  if (jobHistoryExport && disputeCaseExport) {
+    await writeMarketplaceJourneyEvidence({
+      mode: 'seeded',
+      opportunityId,
+      jobId,
+      contractPath: clientContractPath,
+      opportunityTitle,
+      jobHistoryExport: jobHistoryExport as Record<string, unknown>,
+      disputeCaseExport: disputeCaseExport as Record<string, unknown>,
+    });
   }
 
   await clientPage.goto(`${deployed.webBaseUrl}${clientContractPath}`);

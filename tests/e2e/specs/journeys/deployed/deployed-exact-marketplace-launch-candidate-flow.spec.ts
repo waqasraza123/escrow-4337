@@ -11,6 +11,7 @@ import {
 } from '../../../flows/launch-candidate-flow';
 import { runAuthenticatedMarketplaceExactFlow } from '../../../flows/marketplace-exact-flow';
 import { buildEscrowExportProbes } from '../../../flows/operator-export-flow';
+import { writeMarketplaceJourneyEvidence } from '../../../fixtures/marketplace-evidence';
 
 const deployed = readDeployedProfileConfig();
 const deployedFlow = readDeployedLaunchCandidateFlowConfig();
@@ -104,7 +105,7 @@ test('[@exact] deployed environment can exercise the exact marketplace publish-t
 
   const opportunityTitle = `Exact Deployed Marketplace Engineer ${runId}`;
   const opportunitySummary = `Browser-origin marketplace escrow proof ${runId}`;
-  await runAuthenticatedMarketplaceExactFlow({
+  const result = await runAuthenticatedMarketplaceExactFlow({
     clientPage,
     contractorPage,
     operatorPage,
@@ -148,6 +149,18 @@ test('[@exact] deployed environment can exercise the exact marketplace publish-t
     resolutionNote: `Exact deployed marketplace operator release ${runId}`,
     exportProbeFactory: buildEscrowExportProbes,
   });
+
+  if (result.exportedJobHistoryJson && result.exportedDisputeCaseJson) {
+    await writeMarketplaceJourneyEvidence({
+      mode: 'exact',
+      opportunityId: result.opportunityId,
+      jobId: result.jobId,
+      contractPath: result.contractPath,
+      opportunityTitle,
+      jobHistoryExport: result.exportedJobHistoryJson,
+      disputeCaseExport: result.exportedDisputeCaseJson,
+    });
+  }
 
   await Promise.all([
     clientContext.close(),

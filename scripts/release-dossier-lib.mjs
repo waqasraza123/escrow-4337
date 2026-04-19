@@ -19,6 +19,9 @@ export const releaseDossierSourceSpecs = [
     label: 'launch-candidate-review',
     requiredFiles: [
       'evidence-manifest.json',
+      'marketplace-origin-summary.json',
+      'marketplace-seeded-evidence.json',
+      'marketplace-exact-evidence.json',
       'promotion-record.json',
       'promotion-record.md',
       'provider-validation-summary.json',
@@ -365,6 +368,8 @@ export function buildReleaseDossier({
       authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
       executionTraceCoverage:
         launchPromotionRecord?.launchCandidate?.executionTraceCoverage ?? null,
+      marketplaceOrigin:
+        launchPromotionRecord?.launchCandidate?.marketplaceOrigin ?? null,
       rollbackImageSha: launchPromotionRecord?.rollback?.rollbackImageSha ?? null,
       rollbackSource: launchPromotionRecord?.rollback?.rollbackSource ?? null,
       rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
@@ -414,6 +419,11 @@ export function buildReleaseDossierMarkdown(record) {
 - Launch execution trace coverage: ${
     record.launchEvidence.executionTraceCoverage
       ? `${record.launchEvidence.executionTraceCoverage.correlationTaggedExecutions}/${record.launchEvidence.executionTraceCoverage.executionCount} correlated`
+      : 'n/a'
+  }
+- Launch marketplace origin proof: ${
+    record.launchEvidence.marketplaceOrigin
+      ? `${record.launchEvidence.marketplaceOrigin.ok ? 'confirmed' : 'blocked'}`
       : 'n/a'
   }
 - Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}

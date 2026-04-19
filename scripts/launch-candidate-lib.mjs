@@ -13,6 +13,9 @@ export const launchCandidateRequiredArtifacts = [
   'deployed-exact-canary.json',
   'deployed-marketplace-seeded-canary.json',
   'deployed-marketplace-exact-canary.json',
+  'marketplace-seeded-evidence.json',
+  'marketplace-exact-evidence.json',
+  'marketplace-origin-summary.json',
   'deployed-walkthrough.json',
   'deployed-authority-evidence.json',
   'authority-evidence/summary.json',
@@ -344,6 +347,46 @@ export function summarizeProviderValidation(
   };
 }
 
+export function summarizeMarketplaceJourneyEvidence(
+  {
+    seededEvidence = null,
+    exactEvidence = null,
+  },
+  { generatedAt = new Date().toISOString() } = {},
+) {
+  const seeded = normalizeMarketplaceJourneyEvidence('seeded', seededEvidence);
+  const exact = normalizeMarketplaceJourneyEvidence('exact', exactEvidence);
+  const journeys = {
+    seeded,
+    exact,
+  };
+  const confirmedModes = Object.values(journeys)
+    .filter((journey) => journey.present && journey.originConfirmed)
+    .map((journey) => journey.mode);
+  const missingModes = Object.values(journeys)
+    .filter((journey) => !journey.present)
+    .map((journey) => journey.mode);
+  const failedModes = Object.values(journeys)
+    .filter((journey) => journey.present && !journey.originConfirmed)
+    .map((journey) => journey.mode);
+
+  return {
+    generatedAt,
+    ok: missingModes.length === 0 && failedModes.length === 0,
+    confirmedModes,
+    missingModes,
+    failedModes,
+    jobIds: uniqueStrings(Object.values(journeys).map((journey) => journey.jobId)),
+    opportunityIds: uniqueStrings(
+      Object.values(journeys).map((journey) => journey.opportunityId),
+    ),
+    applicationIds: uniqueStrings(
+      Object.values(journeys).map((journey) => journey.applicationId),
+    ),
+    journeys,
+  };
+}
+
 export function evaluatePromotionReadiness({
   metadata,
   runtimeProfile,
@@ -448,6 +491,16 @@ export function buildPromotionRecord({
           warningDetails: provider.warningDetails ?? [],
         })),
       },
+      marketplaceOrigin: summary.marketplaceOrigin
+        ? {
+            ok: summary.marketplaceOrigin.ok === true,
+            confirmedModes: summary.marketplaceOrigin.confirmedModes ?? [],
+            missingModes: summary.marketplaceOrigin.missingModes ?? [],
+            failedModes: summary.marketplaceOrigin.failedModes ?? [],
+            jobIds: summary.marketplaceOrigin.jobIds ?? [],
+            opportunityIds: summary.marketplaceOrigin.opportunityIds ?? [],
+          }
+        : null,
     },
     rollback: {
       deployedImageSha: metadata.deployedImageSha,
@@ -510,6 +563,11 @@ export function buildPromotionMarkdown(record) {
   }
 - Marketplace seeded canary failures: ${record.launchCandidate.marketplaceSeededCanaryFailures}
 - Marketplace exact canary failures: ${record.launchCandidate.marketplaceExactCanaryFailures}
+- Marketplace origin proof: ${
+    record.launchCandidate.marketplaceOrigin
+      ? `${record.launchCandidate.marketplaceOrigin.ok ? 'confirmed' : 'blocked'} · confirmed ${record.launchCandidate.marketplaceOrigin.confirmedModes.join(', ') || 'none'}`
+      : 'n/a'
+  }
 - Provider validation failures: ${
     record.launchCandidate.providerValidation.failedProviders.length === 0
       ? 'none'
@@ -634,6 +692,11 @@ export function buildSummaryMarkdown(summary) {
       ? summary.providerValidation.warningProviders.join(', ')
       : 'none'
   }
+- Marketplace origin proof: ${
+    summary.marketplaceOrigin
+      ? `${summary.marketplaceOrigin.ok ? 'confirmed' : 'blocked'} · confirmed ${summary.marketplaceOrigin.confirmedModes.join(', ') || 'none'}`
+      : 'n/a'
+  }
 
 ## Evidence Contract
 
@@ -667,6 +730,30 @@ ${summary.providerValidation?.providers?.length
             .join(' | ');
           const details = provider.blockingDetails[0] ?? provider.warningDetails[0] ?? null;
           return `- ${posture}${details ? ` | ${details}` : ''}`;
+        })
+        .join('\n')
+    : '- none'}
+
+## Marketplace Origin
+
+${summary.marketplaceOrigin
+    ? Object.values(summary.marketplaceOrigin.journeys)
+        .map((journey) => {
+          const posture = journey.present
+            ? journey.originConfirmed
+              ? 'confirmed'
+              : 'blocked'
+            : 'missing';
+          const details = [
+            journey.jobId ? `job ${journey.jobId}` : null,
+            journey.opportunityId ? `opportunity ${journey.opportunityId}` : null,
+            journey.applicationId ? `application ${journey.applicationId}` : null,
+            journey.fitScore !== null ? `fit ${journey.fitScore}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          const issueText = journey.issues.length === 0 ? 'ok' : journey.issues.join(' | ');
+          return `- ${journey.mode}: ${posture}${details ? ` · ${details}` : ''} · ${issueText}`;
         })
         .join('\n')
     : '- none'}
@@ -739,6 +826,68 @@ function normalizeArtifactPath(value) {
   }
 
   return normalized;
+}
+
+function normalizeMarketplaceJourneyEvidence(mode, evidence) {
+  if (!evidence || typeof evidence !== 'object') {
+    return {
+      mode,
+      present: false,
+      originConfirmed: false,
+      issues: ['evidence artifact missing'],
+      jobId: null,
+      opportunityId: null,
+      applicationId: null,
+      visibility: null,
+      fitScore: null,
+      riskFlags: [],
+      authority: {
+        jobHistory: null,
+        disputeCase: null,
+      },
+      executionTraces: null,
+    };
+  }
+
+  return {
+    mode,
+    present: true,
+    originConfirmed: evidence.originConfirmed === true,
+    issues: Array.isArray(evidence.issues)
+      ? evidence.issues.filter((issue) => typeof issue === 'string' && issue.length > 0)
+      : [],
+    jobId: trimToNull(evidence.jobId),
+    opportunityId: trimToNull(evidence.opportunityId),
+    applicationId: trimToNull(evidence.marketplaceTerms?.applicationId),
+    visibility: trimToNull(evidence.marketplaceTerms?.visibility),
+    fitScore:
+      Number.isFinite(evidence.marketplaceTerms?.fitScore) ? evidence.marketplaceTerms.fitScore : null,
+    riskFlags: Array.isArray(evidence.marketplaceTerms?.riskFlags)
+      ? evidence.marketplaceTerms.riskFlags.filter(
+          (flag) => typeof flag === 'string' && flag.length > 0,
+        )
+      : [],
+    authority: {
+      jobHistory: trimToNull(evidence.authority?.jobHistory),
+      disputeCase: trimToNull(evidence.authority?.disputeCase),
+    },
+    executionTraces: evidence.executionTraces
+      ? {
+          executionCount:
+            Number.isInteger(evidence.executionTraces.executionCount)
+              ? evidence.executionTraces.executionCount
+              : null,
+          traceCount:
+            Number.isInteger(evidence.executionTraces.traceCount)
+              ? evidence.executionTraces.traceCount
+              : null,
+          correlationTaggedExecutions:
+            Number.isInteger(evidence.executionTraces.correlationTaggedExecutions)
+              ? evidence.executionTraces.correlationTaggedExecutions
+              : null,
+        }
+      : null,
+  };
 }
 
 function trimToNull(value) {

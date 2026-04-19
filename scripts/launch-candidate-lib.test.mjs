@@ -7,6 +7,7 @@ import {
   buildEvidenceManifest,
   buildPromotionRecord,
   buildLaunchMetadata,
+  summarizeMarketplaceJourneyEvidence,
   summarizeProviderValidation,
   evaluatePromotionReadiness,
   validateIncidentPlaybook,
@@ -159,6 +160,9 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
     writeFileSync(resolve(root, 'deployed-exact-canary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-marketplace-seeded-canary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-marketplace-exact-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-walkthrough.json'), '{}\n', 'utf8');
     writeFileSync(resolve(root, 'deployed-authority-evidence.json'), '{}\n', 'utf8');
     mkdirSync(resolve(root, 'authority-evidence'), {
@@ -186,7 +190,7 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     });
 
-    assert.equal(manifest.requiredArtifacts.total, 16);
+    assert.equal(manifest.requiredArtifacts.total, 19);
     assert.deepEqual(manifest.requiredArtifacts.missing, []);
     assert.deepEqual(manifest.incidents, [
       {
@@ -340,6 +344,58 @@ test('summarizeProviderValidation classifies provider failures and warnings for 
   );
 });
 
+test('summarizeMarketplaceJourneyEvidence confirms seeded and exact marketplace-origin proofs', () => {
+  const summary = summarizeMarketplaceJourneyEvidence({
+    seededEvidence: {
+      originConfirmed: true,
+      jobId: 'job-seeded',
+      opportunityId: 'opp-seeded',
+      marketplaceTerms: {
+        applicationId: 'app-seeded',
+        fitScore: 88,
+        riskFlags: [],
+      },
+      authority: {
+        jobHistory: 'chain_projection',
+        disputeCase: 'chain_projection',
+      },
+      executionTraces: {
+        executionCount: 6,
+        traceCount: 6,
+        correlationTaggedExecutions: 6,
+      },
+      issues: [],
+    },
+    exactEvidence: {
+      originConfirmed: false,
+      jobId: 'job-exact',
+      opportunityId: 'opp-exact',
+      marketplaceTerms: {
+        applicationId: 'app-exact',
+        fitScore: 92,
+        riskFlags: ['new_wallet'],
+      },
+      authority: {
+        jobHistory: 'local_fallback',
+        disputeCase: 'chain_projection',
+      },
+      executionTraces: {
+        executionCount: 7,
+        traceCount: 7,
+        correlationTaggedExecutions: 7,
+      },
+      issues: ['job-history authority source must be chain_projection but was local_fallback.'],
+    },
+  });
+
+  assert.equal(summary.ok, false);
+  assert.deepEqual(summary.confirmedModes, ['seeded']);
+  assert.deepEqual(summary.failedModes, ['exact']);
+  assert.deepEqual(summary.jobIds, ['job-seeded', 'job-exact']);
+  assert.equal(summary.journeys.seeded.originConfirmed, true);
+  assert.equal(summary.journeys.exact.originConfirmed, false);
+});
+
 test('evaluatePromotionReadiness requires rollback metadata for production and alert posture for required daemon', () => {
   const readiness = evaluatePromotionReadiness({
     metadata: {
@@ -477,6 +533,14 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
           },
         ],
       },
+      marketplaceOrigin: {
+        ok: true,
+        confirmedModes: ['seeded', 'exact'],
+        missingModes: [],
+        failedModes: [],
+        jobIds: ['job-seeded', 'job-exact'],
+        opportunityIds: ['opp-seeded', 'opp-exact'],
+      },
     },
     promotionReadiness: {
       status: 'ready',
@@ -492,5 +556,6 @@ test('buildPromotionRecord summarizes launch, rollback, and observability postur
   assert.equal(record.observability.alertDrill.configured, true);
   assert.equal(record.evidence.presentArtifactCount, 16);
   assert.deepEqual(record.launchCandidate.providerValidation.failedProviders, ['emailRelay']);
+  assert.equal(record.launchCandidate.marketplaceOrigin.ok, true);
   assert.deepEqual(record.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

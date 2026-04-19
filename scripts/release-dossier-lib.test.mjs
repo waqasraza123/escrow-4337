@@ -51,6 +51,9 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.json'), '{}\n', 'utf8');
     writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.md'), '# smoke\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'provider-validation-summary.json'), '{}\n', 'utf8');
@@ -68,7 +71,7 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
     assert.ok(copied.copiedFiles.includes('evidence/api-image-manifest/manifest.json'));
 
     const files = listReleaseDossierFiles(resolve(outputDir, 'evidence'));
-    assert.equal(files.length, 11);
+    assert.equal(files.length, 14);
     assert.ok(files.every((entry) => entry.sha256.length === 64));
 
     const checksums = buildChecksumsText(files);
@@ -234,6 +237,12 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
           confirmedWithoutCorrelation: 0,
           missingTxHashes: [],
         },
+        marketplaceOrigin: {
+          ok: true,
+          confirmedModes: ['seeded', 'exact'],
+          missingModes: [],
+          failedModes: [],
+        },
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
       },
@@ -297,6 +306,7 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.launchEvidence.rollbackPointerSelectionSource, 'artifact-search');
   assert.equal(record.launchEvidence.rollbackPointerArtifactId, '41');
   assert.equal(record.launchEvidence.executionTraceCoverage.executionCount, 8);
+  assert.equal(record.launchEvidence.marketplaceOrigin.ok, true);
   assert.equal(record.workflows.deployedSmoke.selectionSource, 'artifact-search');
   assert.equal(record.workflows.deployedSmoke.artifactId, '22');
   assert.equal(record.workflows.launchCandidate.selectionSource, 'input');

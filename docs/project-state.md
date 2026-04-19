@@ -218,6 +218,11 @@
 - Deployment validation now also probes authenticated provider routes for relay-backed email delivery, smart-account provisioning, and escrow execution. A green health endpoint is no longer enough; staging/production validation fails when configured credentials are rejected or the expected protected route is missing, and each provider can override that route with a dedicated `*_VALIDATION_URL`.
 - Launch-candidate evidence now also derives `provider-validation-summary.json` from `deployment-validation.json` so release review can see provider-specific failures or warnings such as credentials rejected, invalid chain target, degraded paymaster readability, missing protected routes, or upstream reachability issues without reconstructing them from raw checks.
 - Escrow exports now include canonical execution-trace summaries grouped by correlation id, request id, idempotency key, and operation key, and deployed authority evidence plus launch/promotion/release artifacts now treat trace coverage as part of the promotion proof contract.
+- Launch-candidate evidence now also includes explicit marketplace-origin proof artifacts for both seeded and exact marketplace canaries:
+  - `marketplace-seeded-evidence.json`
+  - `marketplace-exact-evidence.json`
+  - `marketplace-origin-summary.json`
+  Promotion review and release dossier validation now require both marketplace modes to confirm that the reviewed escrow jobs originated from the marketplace pipeline and preserved chain-projection authority plus execution-trace coverage.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
 - Root verification now includes a real local Playwright smoke lane against built web, admin, and API processes on top of local Postgres, but it still does not validate a real deployed frontend/backend target, live relay infrastructure, deployed ingress, or non-mock smart-account and escrow execution by default.

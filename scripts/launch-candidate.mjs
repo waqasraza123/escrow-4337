@@ -11,6 +11,7 @@ import {
   buildLaunchMetadata,
   buildSummaryMarkdown,
   evaluatePromotionReadiness,
+  summarizeMarketplaceJourneyEvidence,
   summarizeProviderValidation,
   validateIncidentPlaybook,
   validateLaunchMetadata,
@@ -185,6 +186,10 @@ async function main() {
     {
       PLAYWRIGHT_REPORTER: 'json',
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+      PLAYWRIGHT_MARKETPLACE_SEEDED_EVIDENCE_PATH: resolve(
+        artifactsDir,
+        'marketplace-seeded-evidence.json',
+      ),
     },
   );
   const marketplaceExactCanaryReport = await runJsonCommand(
@@ -195,6 +200,10 @@ async function main() {
     {
       PLAYWRIGHT_REPORTER: 'json',
       PLAYWRIGHT_DEPLOYED_EXPECT_LAUNCH_READY: expectLaunchReady ? 'true' : 'false',
+      PLAYWRIGHT_MARKETPLACE_EXACT_EVIDENCE_PATH: resolve(
+        artifactsDir,
+        'marketplace-exact-evidence.json',
+      ),
     },
   );
   const walkthroughCanaryReport = await runJsonCommand(
@@ -224,6 +233,15 @@ async function main() {
   const exactCanarySummary = summarizePlaywrightReport(exactCanaryReport);
   const marketplaceSeededCanarySummary = summarizePlaywrightReport(marketplaceSeededCanaryReport);
   const marketplaceExactCanarySummary = summarizePlaywrightReport(marketplaceExactCanaryReport);
+  const marketplaceOrigin = summarizeMarketplaceJourneyEvidence({
+    seededEvidence: readOptionalJsonFile(resolve(artifactsDir, 'marketplace-seeded-evidence.json')),
+    exactEvidence: readOptionalJsonFile(resolve(artifactsDir, 'marketplace-exact-evidence.json')),
+  });
+  writeFileSync(
+    resolve(artifactsDir, 'marketplace-origin-summary.json'),
+    `${JSON.stringify(marketplaceOrigin, null, 2)}\n`,
+    'utf8',
+  );
   const walkthroughCanarySummary = summarizePlaywrightReport(walkthroughCanaryReport);
   writeFileSync(
     resolve(artifactsDir, 'promotion-record.json'),
@@ -250,6 +268,7 @@ async function main() {
     exactCanarySummary,
     marketplaceSeededCanarySummary,
     marketplaceExactCanarySummary,
+    marketplaceOrigin,
     walkthroughCanarySummary,
     authorityEvidence,
     evidenceManifest,
@@ -302,6 +321,7 @@ async function main() {
     exactCanary: exactCanarySummary,
     marketplaceSeededCanary: marketplaceSeededCanarySummary,
     marketplaceExactCanary: marketplaceExactCanarySummary,
+    marketplaceOrigin,
     walkthroughCanary: walkthroughCanarySummary,
     authorityEvidence: {
       ok: authorityEvidence.ok,
@@ -397,6 +417,7 @@ async function main() {
     exactCanarySummary,
     marketplaceSeededCanarySummary,
     marketplaceExactCanarySummary,
+    marketplaceOrigin,
     walkthroughCanarySummary,
     authorityEvidence,
     evidenceManifest,
@@ -489,6 +510,14 @@ function readRequiredEnv(key) {
 
 function readIncidentPlaybook() {
   const filePath = resolve(repoRoot, 'docs', 'incident-playbook.json');
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+function readOptionalJsonFile(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
   return JSON.parse(readFileSync(filePath, 'utf8'));
 }
 
@@ -604,6 +633,7 @@ function collectBlockers({
   exactCanarySummary,
   marketplaceSeededCanarySummary,
   marketplaceExactCanarySummary,
+  marketplaceOrigin,
   walkthroughCanarySummary,
   authorityEvidence,
   evidenceManifest,
@@ -695,6 +725,26 @@ function collectBlockers({
     blockers.push(
       'Exact deployed marketplace canary did not execute its required browser-auth marketplace path.',
     );
+  }
+  if (!marketplaceOrigin) {
+    blockers.push('Marketplace origin evidence summary was not generated.');
+  } else {
+    if (marketplaceOrigin.ok !== true) {
+      blockers.push(
+        `Marketplace origin evidence is incomplete: missing ${marketplaceOrigin.missingModes.join(', ') || 'none'}; failed ${marketplaceOrigin.failedModes.join(', ') || 'none'}.`,
+      );
+    }
+    for (const journey of Object.values(marketplaceOrigin.journeys ?? {})) {
+      if (journey.present !== true) {
+        blockers.push(`Marketplace ${journey.mode} evidence artifact is missing.`);
+        continue;
+      }
+      if (journey.originConfirmed !== true) {
+        blockers.push(
+          `Marketplace ${journey.mode} evidence did not confirm marketplace-origin escrow provenance: ${journey.issues.join(' | ') || 'unknown issue'}.`,
+        );
+      }
+    }
   }
   if (walkthroughCanarySummary.failed > 0) {
     blockers.push('Deployed walkthrough canary reported failures.');

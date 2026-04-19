@@ -11,6 +11,13 @@ export type ExportProbe = {
   requiredText: string;
 };
 
+export type DownloadedExportDocument = {
+  probe: ExportProbe;
+  suggestedFilename: string;
+  content: string;
+  json: Record<string, unknown> | null;
+};
+
 export function buildEscrowExportProbes(jobId: string): ExportProbe[] {
   return [
     {
@@ -58,7 +65,10 @@ async function readDownloadText(download: Download) {
   return readFile(filePath, 'utf8');
 }
 
-export async function expectExportDownload(page: Page, probe: ExportProbe) {
+export async function downloadExportDocument(
+  page: Page,
+  probe: ExportProbe,
+): Promise<DownloadedExportDocument> {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: probe.buttonName }).click(),
@@ -75,8 +85,29 @@ export async function expectExportDownload(page: Page, probe: ExportProbe) {
 
   if (probe.format === 'json') {
     expect(content).toContain(`"artifact":"${probe.artifact}"`);
-    return;
+    return {
+      probe,
+      suggestedFilename,
+      content,
+      json: JSON.parse(content) as Record<string, unknown>,
+    };
   }
 
   expect(content).toContain('job_id,job_title,artifact');
+  return {
+    probe,
+    suggestedFilename,
+    content,
+    json: null,
+  };
+}
+
+export async function expectExportDownload(page: Page, probe: ExportProbe) {
+  const exported = await downloadExportDocument(page, probe);
+  if (probe.format === 'json') {
+    expect(exported.json).not.toBeNull();
+    return;
+  }
+
+  expect(exported.content).toContain('job_id,job_title,artifact');
 }

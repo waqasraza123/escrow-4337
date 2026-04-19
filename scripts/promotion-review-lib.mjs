@@ -387,6 +387,7 @@ export function buildPromotionReview({
         authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
         executionTraceCoverage:
           launchPromotionRecord?.launchCandidate?.executionTraceCoverage ?? null,
+        marketplaceOrigin: launchPromotionRecord?.launchCandidate?.marketplaceOrigin ?? null,
       },
     },
     blockers: uniqueMessages(blockers),
@@ -432,6 +433,11 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch execution trace coverage: ${
     review.reviews.launchCandidate.executionTraceCoverage
       ? `${review.reviews.launchCandidate.executionTraceCoverage.correlationTaggedExecutions}/${review.reviews.launchCandidate.executionTraceCoverage.executionCount} correlated`
+      : 'n/a'
+  }
+- Launch marketplace origin proof: ${
+    review.reviews.launchCandidate.marketplaceOrigin
+      ? `${review.reviews.launchCandidate.marketplaceOrigin.ok ? 'confirmed' : 'blocked'}`
       : 'n/a'
   }
 
@@ -632,6 +638,24 @@ function validateLaunchPromotionReview({
     if (Array.isArray(executionTraceCoverage.missingTxHashes) && executionTraceCoverage.missingTxHashes.length > 0) {
       issues.push(
         `Launch candidate promotion record is missing traced tx hashes: ${executionTraceCoverage.missingTxHashes.join(', ')}.`,
+      );
+    }
+  }
+  const marketplaceOrigin = record?.launchCandidate?.marketplaceOrigin ?? null;
+  if (!marketplaceOrigin) {
+    issues.push('Launch candidate promotion record is missing marketplace origin evidence.');
+  } else {
+    if (marketplaceOrigin.ok !== true) {
+      issues.push('Launch candidate promotion record does not confirm marketplace origin evidence.');
+    }
+    if (Array.isArray(marketplaceOrigin.missingModes) && marketplaceOrigin.missingModes.length > 0) {
+      issues.push(
+        `Launch candidate promotion record is missing marketplace evidence modes: ${marketplaceOrigin.missingModes.join(', ')}.`,
+      );
+    }
+    if (Array.isArray(marketplaceOrigin.failedModes) && marketplaceOrigin.failedModes.length > 0) {
+      issues.push(
+        `Launch candidate promotion record reports failed marketplace evidence modes: ${marketplaceOrigin.failedModes.join(', ')}.`,
       );
     }
   }

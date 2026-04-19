@@ -4,44 +4,36 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.4: carry execution correlation into exports, failure diagnostics, and launch evidence.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.7: tighten the observability and evidence contract around marketplace-origin launch proof.
 
 ## Last Completed Step
-- Added the execution-correlation baseline:
-  - request-context propagation and relay header forwarding
-  - persisted `requestId`, `correlationId`, `idempotencyKey`, and `operationKey`
-  - idempotent replay for escrow mutations
-  - committed as `3032ded`
+- Added explicit marketplace-origin launch proof artifacts and gating:
+  - seeded and exact deployed marketplace canaries now persist dedicated marketplace-evidence JSON
+  - launch-candidate builds `marketplace-origin-summary.json`
+  - promotion review and release dossier now fail if marketplace-origin proof is missing or incomplete
+  - pending commit for this slice
 
 ## Current Step
-- Task complete. Execution traces now have a canonical summary in exports, operator failure diagnostics, deployed authority evidence, and launch/release review artifacts.
+- Commit and push the marketplace-origin proof slice, then move into Workstream 0.7 so release/evidence artifacts carry a more consistent operator-facing contract.
 
 ## Why This Step Exists
-- Phase 0 already persisted request and correlation metadata on escrow executions, but operators still had to reconstruct retry chains manually from raw execution lists. Promotion evidence also proved chain projection without proving trace completeness. This step closes that gap.
+- Phase 0 now proves chain authority, execution traces, and marketplace-origin flow shape, but the launch/release evidence contract is still spread across multiple artifacts and summaries. The next step is to make that evidence easier to review and harder to misread or partially publish.
 
 ## Changed Files
-- Backend trace summary and export surfaces:
-  `services/api/src/modules/escrow/escrow-execution-traces.ts`
-  `services/api/src/modules/escrow/escrow-export.ts`
-  `services/api/src/modules/escrow/escrow.types.ts`
-- Backend failure diagnostics:
-  `services/api/src/modules/operations/escrow-health.service.ts`
-  `services/api/src/modules/operations/escrow-health.types.ts`
-- Launch/release evidence:
-  `scripts/deployed-authority-evidence.mjs`
+- Launch/release marketplace-origin evidence:
+  `tests/e2e/fixtures/marketplace-evidence.ts`
+  `tests/e2e/flows/operator-export-flow.ts`
+  `tests/e2e/flows/marketplace-exact-flow.ts`
+  `tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts`
+  `tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts`
   `scripts/launch-candidate.mjs`
   `scripts/launch-candidate-lib.mjs`
   `scripts/promotion-review-lib.mjs`
   `scripts/release-dossier-lib.mjs`
-- Admin operator UI:
-  `apps/admin/src/lib/api.ts`
-  `apps/admin/src/app/operator-console.tsx`
 - Tests/docs:
-  `services/api/test/escrow-export.spec.ts`
-  `services/api/test/escrow-health.service.spec.ts`
+  `scripts/launch-candidate-lib.test.mjs`
   `scripts/promotion-review-lib.test.mjs`
   `scripts/release-dossier-lib.test.mjs`
-  `apps/admin/src/app/page.spec.tsx`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -54,30 +46,52 @@
 
 ## Verification Commands
 - `git diff --check`
-- `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/escrow-health.service.spec.ts`
 - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
-- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter admin test src/app/page.spec.tsx`
-- `pnpm --filter admin typecheck`
 - `pnpm build`
+- `export PLAYWRIGHT_PROFILE=deployed; pnpm exec playwright test tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts --project=deployed-seeded --project=deployed-exact --list`
+- `pnpm exec tsc --noEmit --module nodenext --moduleResolution nodenext --target es2022 tests/e2e/fixtures/marketplace-evidence.ts tests/e2e/flows/operator-export-flow.ts tests/e2e/flows/marketplace-exact-flow.ts tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
-  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/escrow-health.service.spec.ts`
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
-  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter admin test src/app/page.spec.tsx`
-  - `pnpm --filter admin typecheck`
   - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
-  - real staged `verify:authority:deployed` execution with the new trace-coverage contract
-  - real `Deployed Smoke` execution against staging with the new strict target contract
-  - real `Launch Candidate` execution against staging with the new strict target contract
+  - real staged deployed marketplace canaries with the new marketplace-origin artifact contract
+  - `export PLAYWRIGHT_PROFILE=deployed; pnpm exec playwright test ... --list`
+    blocked by missing deployed base URLs in local env
+  - direct `pnpm exec tsc` over the changed e2e files surfaces existing harness/module-resolution gaps in unrelated deployed e2e dependencies (`ethers`, package path aliases, Playwright type surface), so it is not currently a clean targeted compile signal for only the changed files
 
 ## Next Likely Step
-- Run the trace-aware authority evidence flow against real staging, then fix any missing request/correlation/operation coverage or staged tx-hash mismatches it exposes before moving deeper into marketplace-origin canary proof.
+- After committing this slice, tighten the Phase 0 Workstream 0.7 evidence contract so release pointer and release-facing summaries also carry marketplace-origin proof posture instead of forcing reviewers to inspect only the nested dossier payloads.
+
+## Update (2026-04-19, Marketplace-Origin Launch Proof)
+- Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.
+- Seeded and exact deployed marketplace canaries now both persist marketplace-origin proof with:
+  - expected opportunity id and job id
+  - contract path
+  - marketplace terms (`opportunityId`, `applicationId`, visibility, fit score, risk flags)
+  - chain-projection authority posture
+  - execution-trace coverage posture
+  - hiring-spec and proposal completeness summary
+  - dispute or resolution outcome summary
+- `scripts/launch-candidate.mjs` and `scripts/launch-candidate-lib.mjs` now require:
+  - `marketplace-seeded-evidence.json`
+  - `marketplace-exact-evidence.json`
+  - `marketplace-origin-summary.json`
+- Launch blockers now fail when:
+  - either marketplace lane did not produce evidence
+  - either lane failed marketplace-origin confirmation
+  - the marketplace-origin summary is missing or incomplete
+- Promotion review and release dossier validation now consume the marketplace-origin summary instead of treating marketplace proof as implicit in raw Playwright pass/fail counts.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+  - `pnpm build`
+- Result:
+  - Passed
+  - local deployed-profile Playwright list still requires explicit staged base URLs
 
 ## Update (2026-04-19, Execution Trace Evidence Contract)
 - Added `services/api/src/modules/escrow/escrow-execution-traces.ts` as the canonical trace summarizer for persisted escrow executions.

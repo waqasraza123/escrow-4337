@@ -180,6 +180,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: false,
         authorityAuditSource: 'aggregate',
+        marketplaceOrigin: {
+          ok: false,
+          missingModes: ['seeded'],
+          failedModes: ['exact'],
+        },
       },
       rollback: {
         rollbackImageSha: 'sha256:old',
@@ -240,6 +245,16 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch candidate promotion record reports marketplace exact canary failures.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate promotion record does not confirm marketplace origin evidence.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch candidate promotion record is missing marketplace evidence modes: seeded.',
     ),
   );
 });
@@ -324,6 +339,12 @@ test('buildPromotionReview requires artifact-search selections to include artifa
           operationTaggedExecutions: 8,
           confirmedWithoutCorrelation: 0,
           missingTxHashes: [],
+        },
+        marketplaceOrigin: {
+          ok: true,
+          confirmedModes: ['seeded', 'exact'],
+          missingModes: [],
+          failedModes: [],
         },
       },
       rollback: {},
@@ -462,6 +483,12 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
           confirmedWithoutCorrelation: 0,
           missingTxHashes: [],
         },
+        marketplaceOrigin: {
+          ok: true,
+          confirmedModes: ['seeded', 'exact'],
+          missingModes: [],
+          failedModes: [],
+        },
       },
       rollback: {
         rollbackImageSha: 'sha256:old',
@@ -494,5 +521,6 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.executionTraceCoverage.executionCount, 8);
+  assert.equal(review.reviews.launchCandidate.marketplaceOrigin.ok, true);
   assert.deepEqual(review.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });
