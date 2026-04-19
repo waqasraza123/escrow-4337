@@ -60,8 +60,23 @@ describe('DeploymentValidationService', () => {
 
   it('reports a green deployment validation result when configuration and probes pass', async () => {
     const fetchMock = jest.mocked(global.fetch);
-    fetchMock.mockImplementation((input) => {
+    fetchMock.mockImplementation((input, init) => {
       const url = resolveFetchInput(input);
+      if (url === 'https://email.example.com/email/send') {
+        expect(init?.method).toBe('POST');
+        expect(readHeader(init?.headers, 'x-api-key')).toBeNull();
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
+      if (url === 'https://relay.example.com/wallets/smart-accounts/provision') {
+        expect(init?.method).toBe('POST');
+        expect(readHeader(init?.headers, 'x-api-key')).toBeNull();
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
+      if (url === 'https://escrow.example.com/escrow/execute') {
+        expect(init?.method).toBe('POST');
+        expect(readHeader(init?.headers, 'x-api-key')).toBeNull();
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
       if (url === 'https://bundler.example.com') {
         return Promise.resolve(jsonResponse({ result: '0x14a34' }));
       }
@@ -85,9 +100,100 @@ describe('DeploymentValidationService', () => {
         status: 'ok',
       }),
     );
+    expect(
+      report.checks.find((check) => check.id === 'email-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+    expect(
+      report.checks.find((check) => check.id === 'smart-account-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
+    expect(
+      report.checks.find((check) => check.id === 'escrow-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
     expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
       expect.objectContaining({
         status: 'ok',
+      }),
+    );
+  });
+
+  it('uses authenticated provider validation URL overrides when they are configured', async () => {
+    process.env.AUTH_EMAIL_RELAY_VALIDATION_URL =
+      'https://email.example.com/custom/email-check';
+    process.env.WALLET_SMART_ACCOUNT_RELAY_VALIDATION_URL =
+      'https://relay.example.com/custom/provision-check';
+    process.env.ESCROW_RELAY_VALIDATION_URL =
+      'https://escrow.example.com/custom/execute-check';
+
+    const fetchMock = jest.mocked(global.fetch);
+    fetchMock.mockImplementation((input) => {
+      const url = resolveFetchInput(input);
+      if (
+        url === 'https://email.example.com/custom/email-check' ||
+        url === 'https://relay.example.com/custom/provision-check' ||
+        url === 'https://escrow.example.com/custom/execute-check'
+      ) {
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
+      if (
+        url === 'https://email.example.com/email/send' ||
+        url === 'https://relay.example.com/wallets/smart-accounts/provision' ||
+        url === 'https://escrow.example.com/escrow/execute'
+      ) {
+        throw new Error(`Default validation route should not be called: ${url}`);
+      }
+      if (url === 'https://bundler.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      if (url === 'https://paymaster.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(true);
+    expect(
+      report.checks.find((check) => check.id === 'email-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        metadata: expect.objectContaining({
+          url: 'https://email.example.com/custom/email-check',
+        }),
+      }),
+    );
+    expect(
+      report.checks.find((check) => check.id === 'smart-account-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        metadata: expect.objectContaining({
+          url: 'https://relay.example.com/custom/provision-check',
+        }),
+      }),
+    );
+    expect(
+      report.checks.find((check) => check.id === 'escrow-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        metadata: expect.objectContaining({
+          url: 'https://escrow.example.com/custom/execute-check',
+        }),
       }),
     );
   });
@@ -96,6 +202,13 @@ describe('DeploymentValidationService', () => {
     const fetchMock = jest.mocked(global.fetch);
     fetchMock.mockImplementation((input) => {
       const url = resolveFetchInput(input);
+      if (
+        url === 'https://email.example.com/email/send' ||
+        url === 'https://relay.example.com/wallets/smart-accounts/provision' ||
+        url === 'https://escrow.example.com/escrow/execute'
+      ) {
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
       if (url === 'https://bundler.example.com') {
         return Promise.resolve(jsonResponse({ result: '0x14a34' }));
       }
@@ -124,6 +237,45 @@ describe('DeploymentValidationService', () => {
     expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
       expect.objectContaining({
         status: 'warning',
+      }),
+    );
+  });
+
+  it('fails deployment validation when an authenticated relay route rejects credentials', async () => {
+    process.env.AUTH_EMAIL_RELAY_API_KEY = 'email-key';
+
+    const fetchMock = jest.mocked(global.fetch);
+    fetchMock.mockImplementation((input, init) => {
+      const url = resolveFetchInput(input);
+      if (url === 'https://email.example.com/email/send') {
+        expect(readHeader(init?.headers, 'x-api-key')).toBe('email-key');
+        return Promise.resolve(new Response('', { status: 401 }));
+      }
+      if (url === 'https://relay.example.com/wallets/smart-accounts/provision') {
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
+      if (url === 'https://escrow.example.com/escrow/execute') {
+        return Promise.resolve(new Response('', { status: 400 }));
+      }
+      if (url === 'https://bundler.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      if (url === 'https://paymaster.example.com') {
+        return Promise.resolve(jsonResponse({ result: '0x14a34' }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+
+    const service = createService(allMigrationsAppliedQuery());
+    const report = await service.runValidation();
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.checks.find((check) => check.id === 'email-relay-auth'),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        details: 'Authenticated route rejected credentials with 401',
       }),
     );
   });
@@ -375,5 +527,31 @@ describe('DeploymentValidationService', () => {
     }
 
     return input.url;
+  }
+
+  function readHeader(
+    headers: RequestInit['headers'] | undefined,
+    headerName: string,
+  ) {
+    if (!headers) {
+      return null;
+    }
+
+    if (headers instanceof Headers) {
+      return headers.get(headerName);
+    }
+
+    if (Array.isArray(headers)) {
+      const match = headers.find(
+        ([name]) => name.toLowerCase() === headerName.toLowerCase(),
+      );
+      return match?.[1] ?? null;
+    }
+
+    const entries = Object.entries(headers);
+    const match = entries.find(
+      ([name]) => name.toLowerCase() === headerName.toLowerCase(),
+    );
+    return typeof match?.[1] === 'string' ? match[1] : null;
   }
 });

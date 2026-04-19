@@ -45,6 +45,7 @@ Required environment contract:
    Run: `pnpm --filter escrow4334-api db:migrate:status`
    Run: `pnpm --filter escrow4334-api deployment:validate`
    Both must pass against staging secrets and live provider URLs.
+   Treat a failed authenticated-route provider probe as a hard stop even if the provider `/health` endpoint responds, because that means staging credentials or route mappings are not actually usable.
 
 7. Check the deployed API posture directly.
    `GET /operations/runtime-profile` must report `deployment-like`.

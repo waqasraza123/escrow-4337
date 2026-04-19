@@ -79,10 +79,28 @@ export class DeploymentValidationService {
     checks.push(
       await this.whenChecksPass(
         checks,
+        ['email-config', 'email-relay'],
+        'email-relay-auth',
+        'Email relay authenticated route probe skipped because email relay validation is not ready',
+        () => this.checkEmailRelayAuth(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
         ['smart-account-config'],
         'smart-account-relay',
         'Smart-account relay probe skipped because smart-account configuration is invalid',
         () => this.checkSmartAccountRelay(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['smart-account-config', 'smart-account-relay'],
+        'smart-account-relay-auth',
+        'Smart-account relay authenticated route probe skipped because smart-account relay validation is not ready',
+        () => this.checkSmartAccountRelayAuth(),
       ),
     );
     checks.push(
@@ -110,6 +128,15 @@ export class DeploymentValidationService {
         'escrow-relay',
         'Escrow relay probe skipped because escrow configuration is invalid',
         () => this.checkEscrowRelay(),
+      ),
+    );
+    checks.push(
+      await this.whenChecksPass(
+        checks,
+        ['escrow-config', 'escrow-relay'],
+        'escrow-relay-auth',
+        'Escrow relay authenticated route probe skipped because escrow relay validation is not ready',
+        () => this.checkEscrowRelayAuth(),
       ),
     );
     checks.push(await this.checkChainSyncDaemon());
@@ -530,6 +557,31 @@ export class DeploymentValidationService {
     );
   }
 
+  private async checkEmailRelayAuth() {
+    if (this.emailConfig.mode !== 'relay') {
+      return {
+        id: 'email-relay-auth',
+        status: 'skipped',
+        summary:
+          'Email relay authenticated route probe skipped because mock mode is enabled',
+      } satisfies DeploymentCheck;
+    }
+
+    return this.probeAuthenticatedRoute(
+      'email-relay-auth',
+      process.env.AUTH_EMAIL_RELAY_VALIDATION_URL?.trim() ||
+        `${this.emailConfig.relayBaseUrl}/email/send`,
+      'Auth email relay authenticated route is reachable',
+      {
+        'content-type': 'application/json',
+        ...(this.emailConfig.relayApiKey
+          ? { 'x-api-key': this.emailConfig.relayApiKey }
+          : {}),
+      },
+      '{}',
+    );
+  }
+
   private async checkSmartAccountRelay() {
     if (this.smartAccountConfig.mode !== 'relay') {
       return {
@@ -553,6 +605,31 @@ export class DeploymentValidationService {
     );
   }
 
+  private async checkSmartAccountRelayAuth() {
+    if (this.smartAccountConfig.mode !== 'relay') {
+      return {
+        id: 'smart-account-relay-auth',
+        status: 'skipped',
+        summary:
+          'Smart-account relay authenticated route probe skipped because mock mode is enabled',
+      } satisfies DeploymentCheck;
+    }
+
+    return this.probeAuthenticatedRoute(
+      'smart-account-relay-auth',
+      process.env.WALLET_SMART_ACCOUNT_RELAY_VALIDATION_URL?.trim() ||
+        `${this.smartAccountConfig.relayBaseUrl}/wallets/smart-accounts/provision`,
+      'Smart-account relay authenticated route is reachable',
+      {
+        'content-type': 'application/json',
+        ...(this.smartAccountConfig.relayApiKey
+          ? { 'x-api-key': this.smartAccountConfig.relayApiKey }
+          : {}),
+      },
+      '{}',
+    );
+  }
+
   private async checkEscrowRelay() {
     if (this.escrowConfig.mode !== 'relay') {
       return {
@@ -572,6 +649,31 @@ export class DeploymentValidationService {
             'x-api-key': this.escrowConfig.relayApiKey,
           }
         : undefined,
+    );
+  }
+
+  private async checkEscrowRelayAuth() {
+    if (this.escrowConfig.mode !== 'relay') {
+      return {
+        id: 'escrow-relay-auth',
+        status: 'skipped',
+        summary:
+          'Escrow relay authenticated route probe skipped because mock mode is enabled',
+      } satisfies DeploymentCheck;
+    }
+
+    return this.probeAuthenticatedRoute(
+      'escrow-relay-auth',
+      process.env.ESCROW_RELAY_VALIDATION_URL?.trim() ||
+        `${this.escrowConfig.relayBaseUrl}/escrow/execute`,
+      'Escrow relay authenticated route is reachable',
+      {
+        'content-type': 'application/json',
+        ...(this.escrowConfig.relayApiKey
+          ? { 'x-api-key': this.escrowConfig.relayApiKey }
+          : {}),
+      },
+      '{}',
     );
   }
 
@@ -648,6 +750,95 @@ export class DeploymentValidationService {
         status: 'ok',
         summary,
         details: `Received ${response.status} from ${url}`,
+        metadata: {
+          statusCode: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      return {
+        id,
+        status: 'failed',
+        summary,
+        details:
+          error instanceof Error ? error.message : 'Unknown network failure',
+        metadata: { url },
+      };
+    }
+  }
+
+  private async probeAuthenticatedRoute(
+    id: string,
+    url: string,
+    summary: string,
+    headers: Record<string, string>,
+    body: string,
+  ): Promise<DeploymentCheck> {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: new Headers(headers),
+        body,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          id,
+          status: 'failed',
+          summary,
+          details: `Authenticated route rejected credentials with ${response.status}`,
+          metadata: {
+            statusCode: response.status,
+            url,
+          },
+        };
+      }
+
+      if (response.status === 404) {
+        return {
+          id,
+          status: 'failed',
+          summary,
+          details: `Authenticated route was not found at ${url}`,
+          metadata: {
+            statusCode: response.status,
+            url,
+          },
+        };
+      }
+
+      if (response.status >= 500) {
+        return {
+          id,
+          status: 'failed',
+          summary,
+          details: `Authenticated route returned ${response.status} from ${url}`,
+          metadata: {
+            statusCode: response.status,
+            url,
+          },
+        };
+      }
+
+      if (response.status >= 400) {
+        return {
+          id,
+          status: 'ok',
+          summary,
+          details: `Authenticated route responded with expected non-success validation status ${response.status}`,
+          metadata: {
+            statusCode: response.status,
+            url,
+          },
+        };
+      }
+
+      return {
+        id,
+        status: 'warning',
+        summary,
+        details: `Authenticated route accepted the probe payload with ${response.status}; verify that the validation endpoint cannot create side effects`,
         metadata: {
           statusCode: response.status,
           url,

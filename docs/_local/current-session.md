@@ -4,7 +4,7 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the first production-grade Phase 0 slice by tightening the staging deployment contract and real provider validation: enforce strict staging/production deployment validation, verify deployed browser target/CORS alignment, and carry that contract through workflows and docs.
+- Implement the next production-grade Phase 0 slice by hardening real provider validation: distinguish host reachability from usable authenticated provider routes for email relay, smart-account relay, and escrow relay, then carry that contract through docs and env examples.
 
 ## Last Completed Step
 - Added the immediate execution docs and repo framing:
@@ -14,7 +14,7 @@
   - committed docs snapshot as `d01c547`
 
 ## Current Step
-- Task complete. Added a second README pass so the repo front page now reads as a clear product/program document: status-at-a-glance, launch scope, current execution stack, and immediate Phase 0 emphasis are all explicit.
+- Task complete. Authenticated provider validation now distinguishes reachable providers from usable protected routes, and the docs/env contract now matches the code path.
 
 ## Why This Step Exists
 - The phased plan still needed an actionable entry point. The Phase 0 backlog now turns the highest-risk hardening work into concrete workstreams, and the README now matches the product and roadmap the repo is actually following.
@@ -28,6 +28,9 @@
   `services/api/src/modules/operations/deployment-validation.types.ts`
   `services/api/src/modules/operations/launch-readiness.service.ts`
   `services/api/src/modules/operations/launch-readiness.types.ts`
+- API env/runtime docs:
+  `services/api/.env.example`
+  `services/api/README.md`
 - Tests:
   `services/api/test/deployment-validation.service.spec.ts`
   `services/api/test/launch-readiness.service.spec.ts`
@@ -37,6 +40,7 @@
 - Docs/memory:
   `docs/ENVIRONMENT_MATRIX.md`
   `docs/DEPLOYMENT_RUNBOOK.md`
+  `docs/LAUNCH_READINESS.md`
   `docs/STAGING_EXECUTION_SEQUENCE.md`
   `docs/project-state.md`
   `docs/_local/current-session.md`
@@ -64,7 +68,37 @@
   - real `Launch Candidate` execution against staging with the new strict target contract
 
 ## Next Likely Step
-- Run the new strict deployment validation contract against the actual staging environment, then fix any real secret/runtime/CORS mismatches it exposes before moving on to deeper Phase 0 evidence and chain/reconciliation hardening.
+- Run the stronger provider validation contract against the actual staging environment, then fix whatever credential, route, or ingress mismatches it exposes before moving on to deeper Phase 0 chain/reconciliation hardening.
+
+## Update (2026-04-19, Authenticated Provider Validation)
+- Tightened `services/api/src/modules/operations/deployment-validation.service.ts` so relay-backed provider checks now run in two layers:
+  - reachability or health probes
+  - authenticated protected-route probes for email relay, smart-account relay, and escrow relay
+- Added explicit checks:
+  - `email-relay-auth`
+  - `smart-account-relay-auth`
+  - `escrow-relay-auth`
+- Default authenticated validation routes now assume:
+  - email relay: `${AUTH_EMAIL_RELAY_BASE_URL}/email/send`
+  - smart-account relay: `${WALLET_SMART_ACCOUNT_RELAY_BASE_URL}/wallets/smart-accounts/provision`
+  - escrow relay: `${ESCROW_RELAY_BASE_URL}/escrow/execute`
+- Added dedicated override env vars for providers whose protected route contracts differ:
+  - `AUTH_EMAIL_RELAY_VALIDATION_URL`
+  - `WALLET_SMART_ACCOUNT_RELAY_VALIDATION_URL`
+  - `ESCROW_RELAY_VALIDATION_URL`
+- Validation semantics:
+  - `401` or `403`: fail because credentials were rejected
+  - `404`: fail because the expected protected route is missing or misrouted
+  - `5xx`: fail because the provider route is unhealthy
+  - other `4xx`: pass because the route exists, auth worked, and the intentionally invalid probe payload was rejected
+  - `2xx`: warn because the route accepted the probe payload and should be checked for side effects
+- Updated operator docs and env examples so the new provider-validation contract is discoverable without reading source.
+- Verification:
+  - `git diff --check`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/deployment-validation.service.spec.ts test/launch-readiness.service.spec.ts test/runtime-profile.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Strict Staging Validation Contract)
 - Added `services/api/src/modules/operations/deployment-target.ts` so deployment/readiness logic can recognize explicit `staging`/`production` targets separately from generic local/prod `NODE_ENV` behavior.

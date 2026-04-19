@@ -27,7 +27,7 @@ The API is intended to own:
 - client job creation now requires a provisioned smart account as the default execution wallet
 - test mode uses a mock contract gateway, while non-test environments target a configured relay for contract execution
 - test mode uses a mock smart-account provider, while non-test environments target a configured relay plus environment-driven chain, bundler, paymaster, and recovery settings
-- non-test startup now fails fast on invalid deployment configuration and the API exposes a deployment validation CLI for runtime config, migration status, relay reachability, bundler or paymaster probing, and trust-proxy posture
+- non-test startup now fails fast on invalid deployment configuration and the API exposes a deployment validation CLI for runtime config, migration status, relay reachability, authenticated relay-route probing, bundler or paymaster probing, and trust-proxy posture
 - API tests currently cover auth flow, policy behavior, OTP lifecycle behavior, session lifecycle behavior, and escrow lifecycle behavior
 
 ## Local Development
@@ -127,11 +127,21 @@ Optional deployment-validation overrides:
 ```bash
 DEPLOYMENT_VALIDATION_TIMEOUT_MS=5000
 AUTH_EMAIL_RELAY_HEALTHCHECK_URL=https://...
+AUTH_EMAIL_RELAY_VALIDATION_URL=https://...
 WALLET_SMART_ACCOUNT_RELAY_HEALTHCHECK_URL=https://...
+WALLET_SMART_ACCOUNT_RELAY_VALIDATION_URL=https://...
 WALLET_SMART_ACCOUNT_BUNDLER_HEALTHCHECK_URL=https://...
 WALLET_SMART_ACCOUNT_PAYMASTER_HEALTHCHECK_URL=https://...
 ESCROW_RELAY_HEALTHCHECK_URL=https://...
+ESCROW_RELAY_VALIDATION_URL=https://...
 ```
+
+The validation CLI now uses two probe classes for relay-backed providers:
+
+- health or reachability probes to confirm the host is reachable
+- authenticated route probes to confirm the configured API key can hit a protected route without being rejected
+
+Default authenticated probe routes are `${AUTH_EMAIL_RELAY_BASE_URL}/email/send`, `${WALLET_SMART_ACCOUNT_RELAY_BASE_URL}/wallets/smart-accounts/provision`, and `${ESCROW_RELAY_BASE_URL}/escrow/execute`. Set the `*_VALIDATION_URL` overrides when the real provider contract differs.
 
 Escrow chain-audit batch runner:
 

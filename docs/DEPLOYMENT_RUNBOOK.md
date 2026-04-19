@@ -25,6 +25,9 @@ Run the same image with different commands:
 2. Run the migration command once against the target database.
 3. Run `pnpm --filter escrow4334-api deployment:validate` with the deployed environment config.
    In staging/production, set `DEPLOYMENT_TARGET_ENVIRONMENT` so validation also enforces deployed browser target URLs and backend CORS alignment.
+   Validation now checks provider posture in two layers:
+   - reachability or health probes for the configured relay/bundler/paymaster URLs
+   - authenticated route probes for email relay, smart-account relay, and escrow relay so bad API keys fail even when health endpoints are green
 4. Deploy the API service with `node dist/main`.
 5. Deploy the recurring worker separately if `OPERATIONS_ESCROW_BATCH_SYNC_DAEMON_REQUIRED=true`.
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
@@ -59,6 +62,20 @@ The deployment validation gate is now expected to fail when:
 - deployed browser targets point at non-HTTPS URLs without explicit override
 - deployed browser targets point at loopback/localhost without explicit override
 - `NEST_API_CORS_ORIGINS` does not include the deployed web/admin origins
+- relay health or reachability checks cannot reach the configured provider URLs
+- authenticated relay validation routes reject the configured credentials with `401` or `403`
+- authenticated relay validation routes are missing or misrouted
+
+Optional provider probe overrides:
+
+- reachability: `AUTH_EMAIL_RELAY_HEALTHCHECK_URL`, `WALLET_SMART_ACCOUNT_RELAY_HEALTHCHECK_URL`, `WALLET_SMART_ACCOUNT_BUNDLER_HEALTHCHECK_URL`, `WALLET_SMART_ACCOUNT_PAYMASTER_HEALTHCHECK_URL`, `ESCROW_RELAY_HEALTHCHECK_URL`
+- authenticated route: `AUTH_EMAIL_RELAY_VALIDATION_URL`, `WALLET_SMART_ACCOUNT_RELAY_VALIDATION_URL`, `ESCROW_RELAY_VALIDATION_URL`
+
+Use the validation-route overrides when the production provider does not expose the repo's default route assumptions:
+
+- email relay default: `${AUTH_EMAIL_RELAY_BASE_URL}/email/send`
+- smart-account relay default: `${WALLET_SMART_ACCOUNT_RELAY_BASE_URL}/wallets/smart-accounts/provision`
+- escrow relay default: `${ESCROW_RELAY_BASE_URL}/escrow/execute`
 
 Required launch-candidate evidence for the narrowed launch flow:
 
