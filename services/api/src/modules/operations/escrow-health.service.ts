@@ -13,6 +13,7 @@ import type {
   EscrowExecutionRecord,
   EscrowJobRecord,
 } from '../escrow/escrow.types';
+import { buildExecutionTraceSummary } from '../escrow/escrow-execution-traces';
 import { EscrowOnchainAuthorityService } from './escrow-onchain-authority.service';
 import type {
   EscrowAttentionReason,
@@ -91,6 +92,7 @@ function buildFailedExecutionDiagnostics(executions: EscrowExecutionRecord[]) {
   if (failures.length === 0) {
     return null;
   }
+  const traceSummary = buildExecutionTraceSummary(failures);
 
   const actionCounts = new Map<
     EscrowExecutionRecord['action'],
@@ -132,6 +134,14 @@ function buildFailedExecutionDiagnostics(executions: EscrowExecutionRecord[]) {
   return {
     firstFailureAt: failureTimestamp(failures[failures.length - 1]),
     latestFailureAt: failureTimestamp(failures[0]),
+    traceCoverage: {
+      totalFailures: failures.length,
+      correlationTaggedFailures: traceSummary.correlationTaggedExecutions,
+      requestTaggedFailures: traceSummary.requestTaggedExecutions,
+      idempotentFailures: traceSummary.idempotentExecutions,
+      operationTaggedFailures: traceSummary.operationTaggedExecutions,
+      uncorrelatedFailures: traceSummary.failedWithoutCorrelation,
+    },
     actionBreakdown: Array.from(actionCounts.entries())
       .map(([action, value]) => ({
         action,
@@ -162,6 +172,16 @@ function buildFailedExecutionDiagnostics(executions: EscrowExecutionRecord[]) {
         count,
         latestMessage,
       })),
+    traceBreakdown: traceSummary.traces.slice(0, 3).map((trace) => ({
+      traceId: trace.traceId,
+      correlationId: trace.correlationId,
+      count: trace.statusCounts.failed,
+      latestAt: trace.latestSubmittedAt,
+      actions: trace.actions,
+      requestIds: trace.requestIds,
+      idempotencyKeys: trace.idempotencyKeys,
+      operationKeys: trace.operationKeys,
+    })),
     recentFailures: failures.slice(0, 3).map(summarizeFailedExecution),
   };
 }

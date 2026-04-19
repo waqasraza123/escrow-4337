@@ -29,6 +29,17 @@ export type EscrowFailedExecutionSummary = {
   milestoneIndex: number | null;
 };
 
+export type EscrowFailedExecutionTraceSummary = {
+  traceId: string;
+  correlationId: string | null;
+  count: number;
+  latestAt: number;
+  actions: EscrowContractAction[];
+  requestIds: string[];
+  idempotencyKeys: string[];
+  operationKeys: string[];
+};
+
 export type EscrowFailureGuidance = {
   severity: 'warning' | 'critical';
   responsibleSurface:
@@ -132,6 +143,14 @@ export type EscrowHealthJob = {
   failedExecutionDiagnostics: null | {
     firstFailureAt: number;
     latestFailureAt: number;
+    traceCoverage: {
+      totalFailures: number;
+      correlationTaggedFailures: number;
+      requestTaggedFailures: number;
+      idempotentFailures: number;
+      operationTaggedFailures: number;
+      uncorrelatedFailures: number;
+    };
     actionBreakdown: Array<{
       action: EscrowContractAction;
       count: number;
@@ -141,6 +160,7 @@ export type EscrowHealthJob = {
       count: number;
       latestMessage: string | null;
     }>;
+    traceBreakdown: EscrowFailedExecutionTraceSummary[];
     recentFailures: EscrowFailedExecutionSummary[];
   };
   failureGuidance: EscrowFailureGuidance | null;

@@ -354,6 +354,49 @@ async function main() {
       exportArtifacts.disputeCaseJson.authority.source === 'chain_projection',
     'Expected JSON export artifacts to report chain_projection authority',
   );
+  const executionTraces = exportArtifacts.jobHistoryJson.summary?.executionTraces ?? null;
+  const recordedTxHashes = Object.values(partialState.txHashes).filter(
+    (value) => typeof value === 'string' && value.length > 0,
+  );
+  const exportedTxHashes = new Set(
+    (exportArtifacts.jobHistoryJson.executions ?? [])
+      .map((execution) => execution?.txHash ?? null)
+      .filter((value) => typeof value === 'string' && value.length > 0),
+  );
+  const missingTxHashes = recordedTxHashes.filter((txHash) => !exportedTxHashes.has(txHash));
+
+  requireCondition(
+    executionTraces !== null,
+    'Expected job-history export summary to include execution trace coverage',
+  );
+  requireCondition(
+    executionTraces.executionCount === recordedTxHashes.length,
+    `Expected ${recordedTxHashes.length} execution traces but received ${executionTraces.executionCount}`,
+  );
+  requireCondition(
+    executionTraces.confirmedExecutions === recordedTxHashes.length,
+    `Expected ${recordedTxHashes.length} confirmed executions but received ${executionTraces.confirmedExecutions}`,
+  );
+  requireCondition(
+    executionTraces.correlationTaggedExecutions === executionTraces.executionCount,
+    'Expected every staged authority execution to include a correlation id',
+  );
+  requireCondition(
+    executionTraces.requestTaggedExecutions === executionTraces.executionCount,
+    'Expected every staged authority execution to include a request id',
+  );
+  requireCondition(
+    executionTraces.operationTaggedExecutions === executionTraces.executionCount,
+    'Expected every staged authority execution to include an operation key',
+  );
+  requireCondition(
+    executionTraces.confirmedWithoutCorrelation === 0,
+    'Expected staged authority executions to have zero confirmed-without-correlation entries',
+  );
+  requireCondition(
+    missingTxHashes.length === 0,
+    `Expected all staged tx hashes in job-history export but missing ${missingTxHashes.join(', ')}`,
+  );
 
   const summary = {
     ok: true,
@@ -396,6 +439,16 @@ async function main() {
       disputeCaseAuthoritySource: exportArtifacts.disputeCaseJson.authority.source,
       jobHistoryCsvBytes: exportArtifacts.jobHistoryCsv.length,
       disputeCaseCsvBytes: exportArtifacts.disputeCaseCsv.length,
+    },
+    executionTraces: {
+      executionCount: executionTraces.executionCount,
+      traceCount: executionTraces.traceCount,
+      correlationTaggedExecutions: executionTraces.correlationTaggedExecutions,
+      requestTaggedExecutions: executionTraces.requestTaggedExecutions,
+      operationTaggedExecutions: executionTraces.operationTaggedExecutions,
+      confirmedWithoutCorrelation: executionTraces.confirmedWithoutCorrelation,
+      missingTxHashes,
+      traces: executionTraces.traces,
     },
     runtimeProfile: {
       profile: runtimeProfile.profile,

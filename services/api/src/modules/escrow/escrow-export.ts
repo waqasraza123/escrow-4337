@@ -7,6 +7,7 @@ import type {
   EscrowExportTimelineEntry,
   EscrowJobHistoryExport,
 } from './escrow.types';
+import { buildExecutionTraceSummary } from './escrow-execution-traces';
 
 const EXPORT_SCHEMA_VERSION = 1 as const;
 
@@ -133,6 +134,7 @@ function buildJobHistoryExport(
   bundle: EscrowAuditBundle['bundle'],
   exportedAt: string,
 ): EscrowJobHistoryExport {
+  const executionTraces = buildExecutionTraceSummary(bundle.executions);
   return {
     schemaVersion: EXPORT_SCHEMA_VERSION,
     artifact: 'job-history',
@@ -148,6 +150,7 @@ function buildJobHistoryExport(
         (execution) => execution.status === 'failed',
       ).length,
       latestActivityAt: latestActivityAt(bundle),
+      executionTraces,
     },
     audit: bundle.audit,
     executions: bundle.executions,
@@ -159,6 +162,7 @@ function buildDisputeCaseExport(
   bundle: EscrowAuditBundle['bundle'],
   exportedAt: string,
 ): EscrowDisputeCaseExport {
+  const executionTraces = buildExecutionTraceSummary(bundle.executions);
   const disputes = bundle.job.milestones
     .map((milestone, milestoneIndex) => {
       const relatedAudit = bundle.audit.filter(
@@ -224,6 +228,7 @@ function buildDisputeCaseExport(
       ).length,
       failedExecutions: failedExecutions.length,
       latestActivityAt: latestActivityAt(bundle),
+      executionTraces,
     },
     disputes,
     failedExecutions,

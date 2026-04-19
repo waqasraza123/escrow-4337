@@ -481,6 +481,14 @@ export type EscrowHealthReport = {
     failedExecutionDiagnostics: null | {
       firstFailureAt: number;
       latestFailureAt: number;
+      traceCoverage?: {
+        totalFailures: number;
+        correlationTaggedFailures: number;
+        requestTaggedFailures: number;
+        idempotentFailures: number;
+        operationTaggedFailures: number;
+        uncorrelatedFailures: number;
+      };
       actionBreakdown: Array<{
         action: string;
         count: number;
@@ -489,6 +497,16 @@ export type EscrowHealthReport = {
         failureCode: string | null;
         count: number;
         latestMessage: string | null;
+      }>;
+      traceBreakdown?: Array<{
+        traceId: string;
+        correlationId: string | null;
+        count: number;
+        latestAt: number;
+        actions: string[];
+        requestIds: string[];
+        idempotencyKeys: string[];
+        operationKeys: string[];
       }>;
       recentFailures: Array<{
         action: string;

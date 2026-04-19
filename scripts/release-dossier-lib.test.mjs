@@ -225,6 +225,15 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
       },
       launchCandidate: {
         authorityAuditSource: 'chain_projection',
+        executionTraceCoverage: {
+          executionCount: 8,
+          traceCount: 8,
+          correlationTaggedExecutions: 8,
+          requestTaggedExecutions: 8,
+          operationTaggedExecutions: 8,
+          confirmedWithoutCorrelation: 0,
+          missingTxHashes: [],
+        },
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
       },
@@ -287,6 +296,7 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.launchEvidence.rollbackPointerArtifactName, 'release-pointer-staging');
   assert.equal(record.launchEvidence.rollbackPointerSelectionSource, 'artifact-search');
   assert.equal(record.launchEvidence.rollbackPointerArtifactId, '41');
+  assert.equal(record.launchEvidence.executionTraceCoverage.executionCount, 8);
   assert.equal(record.workflows.deployedSmoke.selectionSource, 'artifact-search');
   assert.equal(record.workflows.deployedSmoke.artifactId, '22');
   assert.equal(record.workflows.launchCandidate.selectionSource, 'input');

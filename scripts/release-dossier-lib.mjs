@@ -363,6 +363,8 @@ export function buildReleaseDossier({
       requiredArtifactCount: launchEvidenceManifest?.requiredArtifacts?.total ?? null,
       missingArtifacts,
       authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
+      executionTraceCoverage:
+        launchPromotionRecord?.launchCandidate?.executionTraceCoverage ?? null,
       rollbackImageSha: launchPromotionRecord?.rollback?.rollbackImageSha ?? null,
       rollbackSource: launchPromotionRecord?.rollback?.rollbackSource ?? null,
       rollbackPointerRunId: launchPromotionRecord?.rollback?.rollbackPointerRunId ?? null,
@@ -409,6 +411,11 @@ export function buildReleaseDossierMarkdown(record) {
 - Launch rollback pointer artifact ID: ${record.launchEvidence.rollbackPointerArtifactId ?? 'n/a'}
 - Launch rollback pointer selected at: ${record.launchEvidence.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Launch authority audit source: ${record.launchEvidence.authorityAuditSource ?? 'n/a'}
+- Launch execution trace coverage: ${
+    record.launchEvidence.executionTraceCoverage
+      ? `${record.launchEvidence.executionTraceCoverage.correlationTaggedExecutions}/${record.launchEvidence.executionTraceCoverage.executionCount} correlated`
+      : 'n/a'
+  }
 - Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}
 - Launch marketplace exact canary failures: ${record.launchEvidence.marketplaceExactCanaryFailures ?? 'n/a'}
 - Evidence files: ${record.evidence.fileCount}

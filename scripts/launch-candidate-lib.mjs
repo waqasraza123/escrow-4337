@@ -421,6 +421,21 @@ export function buildPromotionRecord({
       walkthroughCanaryFailures: summary.walkthroughCanary.failed,
       authorityEvidenceOk: summary.authorityEvidence.ok,
       authorityAuditSource: summary.authorityEvidence.auditSource,
+      executionTraceCoverage: summary.authorityEvidence.executionTraces
+        ? {
+            executionCount: summary.authorityEvidence.executionTraces.executionCount,
+            traceCount: summary.authorityEvidence.executionTraces.traceCount,
+            correlationTaggedExecutions:
+              summary.authorityEvidence.executionTraces.correlationTaggedExecutions,
+            requestTaggedExecutions:
+              summary.authorityEvidence.executionTraces.requestTaggedExecutions,
+            operationTaggedExecutions:
+              summary.authorityEvidence.executionTraces.operationTaggedExecutions,
+            confirmedWithoutCorrelation:
+              summary.authorityEvidence.executionTraces.confirmedWithoutCorrelation,
+            missingTxHashes: summary.authorityEvidence.executionTraces.missingTxHashes ?? [],
+          }
+        : null,
       providerValidation: {
         failedProviders: summary.providerValidation?.failedProviders ?? [],
         warningProviders: summary.providerValidation?.warningProviders ?? [],
@@ -488,6 +503,11 @@ export function buildPromotionMarkdown(record) {
 - Rollback pointer selected at: ${record.rollback.rollbackPointerSelectedCreatedAt ?? 'n/a'}
 - Launch readiness: ${record.launchCandidate.launchReady ? 'ready' : 'blocked'}
 - Authority audit source: ${record.launchCandidate.authorityAuditSource}
+- Execution trace coverage: ${
+    record.launchCandidate.executionTraceCoverage
+      ? `${record.launchCandidate.executionTraceCoverage.correlationTaggedExecutions}/${record.launchCandidate.executionTraceCoverage.executionCount} correlated, ${record.launchCandidate.executionTraceCoverage.requestTaggedExecutions}/${record.launchCandidate.executionTraceCoverage.executionCount} request-tagged, ${record.launchCandidate.executionTraceCoverage.operationTaggedExecutions}/${record.launchCandidate.executionTraceCoverage.executionCount} operation-tagged`
+      : 'n/a'
+  }
 - Marketplace seeded canary failures: ${record.launchCandidate.marketplaceSeededCanaryFailures}
 - Marketplace exact canary failures: ${record.launchCandidate.marketplaceExactCanaryFailures}
 - Provider validation failures: ${
@@ -595,6 +615,11 @@ export function buildSummaryMarkdown(summary) {
 - Exact canary failures: ${summary.exactCanary.failed}
 - Walkthrough canary failures: ${summary.walkthroughCanary.failed}
 - Authority evidence: ${summary.authorityEvidence.auditSource} after ${summary.authorityEvidence.syncAttempts} sync attempt(s)
+- Execution traces: ${
+    summary.authorityEvidence.executionTraces
+      ? `${summary.authorityEvidence.executionTraces.correlationTaggedExecutions}/${summary.authorityEvidence.executionTraces.executionCount} correlated, ${summary.authorityEvidence.executionTraces.requestTaggedExecutions}/${summary.authorityEvidence.executionTraces.executionCount} request-tagged, ${summary.authorityEvidence.executionTraces.operationTaggedExecutions}/${summary.authorityEvidence.executionTraces.executionCount} operation-tagged`
+      : 'n/a'
+  }
 - Promotion review: ${promotion.status}
 - Alert drill configured: ${promotion.alertDrillConfigured ? 'true' : 'false'}
 - Alert drill reason: ${promotion.alertDrillReason ?? 'n/a'}

@@ -313,6 +313,21 @@ async function main() {
         jobHistory: authorityEvidence.exports.jobHistoryAuthoritySource,
         disputeCase: authorityEvidence.exports.disputeCaseAuthoritySource,
       },
+      executionTraces: authorityEvidence.executionTraces
+        ? {
+            executionCount: authorityEvidence.executionTraces.executionCount,
+            traceCount: authorityEvidence.executionTraces.traceCount,
+            correlationTaggedExecutions:
+              authorityEvidence.executionTraces.correlationTaggedExecutions,
+            requestTaggedExecutions:
+              authorityEvidence.executionTraces.requestTaggedExecutions,
+            operationTaggedExecutions:
+              authorityEvidence.executionTraces.operationTaggedExecutions,
+            confirmedWithoutCorrelation:
+              authorityEvidence.executionTraces.confirmedWithoutCorrelation,
+            missingTxHashes: authorityEvidence.executionTraces.missingTxHashes ?? [],
+          }
+        : null,
     },
     evidenceContract: {
       requiredArtifactCount: evidenceManifest.requiredArtifacts.total,
@@ -695,6 +710,43 @@ function collectBlockers({
   }
   if (authorityEvidence.ingestion?.status !== 'ok') {
     blockers.push('Deployed authority evidence reported unhealthy ingestion posture.');
+  }
+  if (!authorityEvidence.executionTraces) {
+    blockers.push('Deployed authority evidence did not report execution trace coverage.');
+  } else {
+    if (authorityEvidence.executionTraces.executionCount <= 0) {
+      blockers.push('Deployed authority evidence did not capture any traced executions.');
+    }
+    if (
+      authorityEvidence.executionTraces.correlationTaggedExecutions !==
+      authorityEvidence.executionTraces.executionCount
+    ) {
+      blockers.push(
+        'Deployed authority evidence reported executions without correlation ids.',
+      );
+    }
+    if (
+      authorityEvidence.executionTraces.requestTaggedExecutions !==
+      authorityEvidence.executionTraces.executionCount
+    ) {
+      blockers.push('Deployed authority evidence reported executions without request ids.');
+    }
+    if (
+      authorityEvidence.executionTraces.operationTaggedExecutions !==
+      authorityEvidence.executionTraces.executionCount
+    ) {
+      blockers.push('Deployed authority evidence reported executions without operation keys.');
+    }
+    if (authorityEvidence.executionTraces.confirmedWithoutCorrelation > 0) {
+      blockers.push(
+        'Deployed authority evidence reported confirmed executions without correlation ids.',
+      );
+    }
+    if ((authorityEvidence.executionTraces.missingTxHashes ?? []).length > 0) {
+      blockers.push(
+        `Deployed authority evidence is missing traced tx hashes: ${authorityEvidence.executionTraces.missingTxHashes.join(', ')}`,
+      );
+    }
   }
   if (evidenceManifest.requiredArtifacts.missing.length > 0) {
     blockers.push(

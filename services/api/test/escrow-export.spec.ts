@@ -130,6 +130,19 @@ describe('Escrow export support', () => {
         milestoneCount: 2,
         disputedMilestones: 0,
         failedExecutions: 0,
+        executionTraces: {
+          executionCount: 6,
+          traceCount: 6,
+          confirmedExecutions: 6,
+          failedExecutions: 0,
+          pendingExecutions: 0,
+          requestTaggedExecutions: 6,
+          correlationTaggedExecutions: 6,
+          idempotentExecutions: 0,
+          operationTaggedExecutions: 6,
+          confirmedWithoutCorrelation: 0,
+          failedWithoutCorrelation: 0,
+        },
       },
     });
     if (typeof jobHistory.body === 'string') {
@@ -165,6 +178,14 @@ describe('Escrow export support', () => {
         correlationId: expect.stringMatching(/^exec_/),
         idempotencyKey: null,
         operationKey: expect.stringMatching(/^resolve_dispute_/),
+      }),
+    );
+    expect(jobHistoryBody.summary.executionTraces.traces[0]).toEqual(
+      expect.objectContaining({
+        traceId: expect.stringMatching(/^exec_/),
+        correlationId: expect.stringMatching(/^exec_/),
+        requestIds: [expect.stringMatching(/^svc_/)],
+        operationKeys: [expect.stringMatching(/_/)],
       }),
     );
 

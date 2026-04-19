@@ -457,6 +457,40 @@ export type EscrowExportArtifactKind = 'job-history' | 'dispute-case';
 
 export type EscrowExportFormat = 'json' | 'csv';
 
+export type EscrowExecutionTraceGroup = {
+  traceId: string;
+  correlationId: string | null;
+  requestIds: string[];
+  idempotencyKeys: string[];
+  operationKeys: string[];
+  actions: EscrowContractAction[];
+  milestoneIndices: number[];
+  txHashes: string[];
+  statusCounts: {
+    pending: number;
+    confirmed: number;
+    failed: number;
+  };
+  firstSubmittedAt: number;
+  latestSubmittedAt: number;
+  latestConfirmedAt: number | null;
+};
+
+export type EscrowExecutionTraceSummary = {
+  executionCount: number;
+  traceCount: number;
+  confirmedExecutions: number;
+  failedExecutions: number;
+  pendingExecutions: number;
+  requestTaggedExecutions: number;
+  correlationTaggedExecutions: number;
+  idempotentExecutions: number;
+  operationTaggedExecutions: number;
+  confirmedWithoutCorrelation: number;
+  failedWithoutCorrelation: number;
+  traces: EscrowExecutionTraceGroup[];
+};
+
 export type EscrowExportTimelineEntry = {
   source: 'audit' | 'execution';
   at: number;
@@ -479,6 +513,7 @@ export type EscrowJobHistoryExport = {
     disputedMilestones: number;
     failedExecutions: number;
     latestActivityAt: number | null;
+    executionTraces: EscrowExecutionTraceSummary;
   };
   audit: EscrowAuditEvent[];
   executions: EscrowExecutionRecord[];
@@ -497,6 +532,7 @@ export type EscrowDisputeCaseExport = {
     resolvedDisputes: number;
     failedExecutions: number;
     latestActivityAt: number | null;
+    executionTraces: EscrowExecutionTraceSummary;
   };
   disputes: Array<{
     milestoneIndex: number;

@@ -4,44 +4,44 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.5: replace implicit wallet-authority heuristics with explicit privileged capability checks and blocked-state explanations for operator/moderation surfaces.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.4: carry execution correlation into exports, failure diagnostics, and launch evidence.
 
 ## Last Completed Step
-- Added the immediate execution docs and repo framing:
-  - Phase docs plus design guide and implementation index
-  - `docs/MARKETPLACE_PHASE_0_BACKLOG_V1.md`
-  - rewritten `readme.md`
-  - committed docs snapshot as `d01c547`
+- Added the execution-correlation baseline:
+  - request-context propagation and relay header forwarding
+  - persisted `requestId`, `correlationId`, `idempotencyKey`, and `operationKey`
+  - idempotent replay for escrow mutations
+  - committed as `3032ded`
 
 ## Current Step
-- Task complete. Privileged operator and moderator paths now depend on explicit backend capability evaluation instead of scattered wallet heuristics.
+- Task complete. Execution traces now have a canonical summary in exports, operator failure diagnostics, deployed authority evidence, and launch/release review artifacts.
 
 ## Why This Step Exists
-- Phase 0 still needed an explicit authorization baseline before broader RBAC work. High-risk actions were only protected by authentication plus duplicated arbitrator-wallet checks, and the admin UI had no server-authoritative explanation for blocked operator paths.
+- Phase 0 already persisted request and correlation metadata on escrow executions, but operators still had to reconstruct retry chains manually from raw execution lists. Promotion evidence also proved chain projection without proving trace completeness. This step closes that gap.
 
 ## Changed Files
-- Backend capabilities/auth:
-  `services/api/src/modules/users/user-capabilities.service.ts`
-  `services/api/src/modules/users/users.module.ts`
-  `services/api/src/modules/users/users.types.ts`
-  `services/api/src/modules/auth/auth.service.ts`
-- Backend privileged-path enforcement:
-  `services/api/src/modules/marketplace/marketplace.service.ts`
+- Backend trace summary and export surfaces:
+  `services/api/src/modules/escrow/escrow-execution-traces.ts`
+  `services/api/src/modules/escrow/escrow-export.ts`
+  `services/api/src/modules/escrow/escrow.types.ts`
+- Backend failure diagnostics:
   `services/api/src/modules/operations/escrow-health.service.ts`
-  `services/api/src/modules/operations/escrow-chain-sync.service.ts`
-  `services/api/src/modules/operations/escrow-history-import.service.ts`
-  `services/api/src/modules/escrow/escrow.service.ts`
-- Admin/web profile types and admin blocked states:
+  `services/api/src/modules/operations/escrow-health.types.ts`
+- Launch/release evidence:
+  `scripts/deployed-authority-evidence.mjs`
+  `scripts/launch-candidate.mjs`
+  `scripts/launch-candidate-lib.mjs`
+  `scripts/promotion-review-lib.mjs`
+  `scripts/release-dossier-lib.mjs`
+- Admin operator UI:
   `apps/admin/src/lib/api.ts`
   `apps/admin/src/app/operator-console.tsx`
-  `apps/admin/src/app/marketplace/moderation-console.tsx`
-  `apps/admin/src/test/fixtures.ts`
-  `apps/web/src/lib/api.ts`
-  `apps/web/src/test/fixtures.ts`
 - Tests/docs:
-  `services/api/test/auth.integration.spec.ts`
+  `services/api/test/escrow-export.spec.ts`
+  `services/api/test/escrow-health.service.spec.ts`
+  `scripts/promotion-review-lib.test.mjs`
+  `scripts/release-dossier-lib.test.mjs`
   `apps/admin/src/app/page.spec.tsx`
-  `apps/admin/src/app/marketplace/marketplace-moderation.spec.tsx`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -54,29 +54,55 @@
 
 ## Verification Commands
 - `git diff --check`
-- `pnpm --filter escrow4334-api test -- --runTestsByPath test/auth.integration.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts`
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/escrow-health.service.spec.ts`
+- `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
 - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-- `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+- `pnpm --filter admin test src/app/page.spec.tsx`
 - `pnpm --filter admin typecheck`
-- `pnpm --filter web typecheck`
 - `pnpm build`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
-  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/auth.integration.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/escrow-health.service.spec.ts`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
   - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
-  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin test src/app/page.spec.tsx`
   - `pnpm --filter admin typecheck`
-  - `pnpm --filter web typecheck`
   - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
+  - real staged `verify:authority:deployed` execution with the new trace-coverage contract
   - real `Deployed Smoke` execution against staging with the new strict target contract
   - real `Launch Candidate` execution against staging with the new strict target contract
 
 ## Next Likely Step
-- Move to Phase 0 Workstream 0.3 and formalize the chain-event mirror/reconciliation baseline so operator tooling can distinguish chain truth, API-owned workflow state, and replay drift without manual reconstruction.
+- Run the trace-aware authority evidence flow against real staging, then fix any missing request/correlation/operation coverage or staged tx-hash mismatches it exposes before moving deeper into marketplace-origin canary proof.
+
+## Update (2026-04-19, Execution Trace Evidence Contract)
+- Added `services/api/src/modules/escrow/escrow-execution-traces.ts` as the canonical trace summarizer for persisted escrow executions.
+- `job-history` and `dispute-case` export JSON summaries now include `summary.executionTraces` with:
+  - execution count and trace count
+  - request/correlation/idempotency/operation coverage
+  - confirmed-without-correlation count
+  - grouped trace entries with actions, request ids, operation keys, milestone indices, and tx hashes
+- Failed-execution diagnostics now expose trace coverage and grouped trace clusters so retries can be understood without reconstructing them from raw execution arrays.
+- Deployed authority evidence now proves trace completeness in addition to chain projection:
+  - validates trace summary presence
+  - validates request/correlation/operation coverage
+  - validates staged tx hashes appear in the exported job-history document
+- Launch candidate, promotion review, and release dossier artifacts now carry execution-trace coverage so promotion proof includes both chain authority and execution traceability.
+- Admin operator UI now surfaces trace coverage and grouped trace hints for failed execution clusters.
+- Verification:
+  - `git diff --check`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-export.spec.ts test/escrow-health.service.spec.ts`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter admin test src/app/page.spec.tsx`
+  - `pnpm --filter admin typecheck`
+  - `pnpm build`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Privileged Capability Baseline)
 - Added `UserCapabilitiesService` under `services/api/src/modules/users` and extended auth/user profiles with explicit capabilities for:

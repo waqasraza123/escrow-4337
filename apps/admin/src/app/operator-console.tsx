@@ -2617,6 +2617,31 @@ export function OperatorConsole({
                               })),
                             )}`}
                           </small>
+                          {failedExecutionDiagnostics.traceCoverage ? (
+                            <small>
+                              {`Trace coverage: correlation ${failedExecutionDiagnostics.traceCoverage.correlationTaggedFailures}/${failedExecutionDiagnostics.traceCoverage.totalFailures} · request ${failedExecutionDiagnostics.traceCoverage.requestTaggedFailures}/${failedExecutionDiagnostics.traceCoverage.totalFailures} · operation ${failedExecutionDiagnostics.traceCoverage.operationTaggedFailures}/${failedExecutionDiagnostics.traceCoverage.totalFailures} · uncorrelated ${failedExecutionDiagnostics.traceCoverage.uncorrelatedFailures}`}
+                            </small>
+                          ) : null}
+                          {failedExecutionDiagnostics.traceBreakdown &&
+                          failedExecutionDiagnostics.traceBreakdown.length > 0 ? (
+                            <small>
+                              {`Trace groups: ${failedExecutionDiagnostics.traceBreakdown
+                                .map((trace) => {
+                                  const parts = [
+                                    `${trace.traceId} (${trace.count})`,
+                                    trace.actions.length > 0
+                                      ? trace.actions.join('/')
+                                      : null,
+                                    trace.requestIds[0] ? `request ${trace.requestIds[0]}` : null,
+                                    trace.idempotencyKeys[0]
+                                      ? `idempotency ${trace.idempotencyKeys[0]}`
+                                      : null,
+                                  ].filter(Boolean);
+                                  return parts.join(' · ');
+                                })
+                                .join(' | ')}`}
+                            </small>
+                          ) : null}
                           {isFailedJob ? (
                             <>
                               <strong>

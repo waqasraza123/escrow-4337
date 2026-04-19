@@ -316,6 +316,15 @@ test('buildPromotionReview requires artifact-search selections to include artifa
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: true,
         authorityAuditSource: 'chain_projection',
+        executionTraceCoverage: {
+          executionCount: 8,
+          traceCount: 8,
+          correlationTaggedExecutions: 8,
+          requestTaggedExecutions: 8,
+          operationTaggedExecutions: 8,
+          confirmedWithoutCorrelation: 0,
+          missingTxHashes: [],
+        },
       },
       rollback: {},
       warnings: [],
@@ -444,6 +453,15 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
         walkthroughCanaryFailures: 0,
         authorityEvidenceOk: true,
         authorityAuditSource: 'chain_projection',
+        executionTraceCoverage: {
+          executionCount: 8,
+          traceCount: 8,
+          correlationTaggedExecutions: 8,
+          requestTaggedExecutions: 8,
+          operationTaggedExecutions: 8,
+          confirmedWithoutCorrelation: 0,
+          missingTxHashes: [],
+        },
       },
       rollback: {
         rollbackImageSha: 'sha256:old',
@@ -475,5 +493,6 @@ test('buildPromotionReview returns ready when manifest, smoke, and launch eviden
   assert.equal(review.reviews.deployedSmoke.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceSeededCanaryPassed, true);
   assert.equal(review.reviews.launchCandidate.marketplaceExactCanaryPassed, true);
+  assert.equal(review.reviews.launchCandidate.executionTraceCoverage.executionCount, 8);
   assert.deepEqual(review.warnings, ['Rollback image SHA is not yet recorded for this candidate.']);
 });

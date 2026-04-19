@@ -385,6 +385,8 @@ export function buildPromotionReview({
         marketplaceExactCanaryPassed:
           (launchPromotionRecord?.launchCandidate?.marketplaceExactCanaryFailures ?? 0) === 0,
         authorityAuditSource: launchPromotionRecord?.launchCandidate?.authorityAuditSource ?? null,
+        executionTraceCoverage:
+          launchPromotionRecord?.launchCandidate?.executionTraceCoverage ?? null,
       },
     },
     blockers: uniqueMessages(blockers),
@@ -427,6 +429,11 @@ export function buildPromotionReviewMarkdown(review) {
 - Launch marketplace seeded canary passed: ${review.reviews.launchCandidate.marketplaceSeededCanaryPassed ? 'true' : 'false'}
 - Launch marketplace exact canary passed: ${review.reviews.launchCandidate.marketplaceExactCanaryPassed ? 'true' : 'false'}
 - Launch authority audit source: ${review.reviews.launchCandidate.authorityAuditSource ?? 'n/a'}
+- Launch execution trace coverage: ${
+    review.reviews.launchCandidate.executionTraceCoverage
+      ? `${review.reviews.launchCandidate.executionTraceCoverage.correlationTaggedExecutions}/${review.reviews.launchCandidate.executionTraceCoverage.executionCount} correlated`
+      : 'n/a'
+  }
 
 ## Blockers
 
@@ -587,6 +594,46 @@ function validateLaunchPromotionReview({
     issues.push(
       `Launch candidate promotion record authority audit source must be chain_projection but was ${record?.launchCandidate?.authorityAuditSource ?? '<missing>'}.`,
     );
+  }
+  const executionTraceCoverage = record?.launchCandidate?.executionTraceCoverage ?? null;
+  if (!executionTraceCoverage) {
+    issues.push('Launch candidate promotion record is missing execution trace coverage.');
+  } else {
+    if ((executionTraceCoverage.executionCount ?? 0) <= 0) {
+      issues.push('Launch candidate promotion record reports zero execution traces.');
+    }
+    if (
+      (executionTraceCoverage.correlationTaggedExecutions ?? 0) !==
+      (executionTraceCoverage.executionCount ?? 0)
+    ) {
+      issues.push(
+        'Launch candidate promotion record reports executions without correlation ids.',
+      );
+    }
+    if (
+      (executionTraceCoverage.requestTaggedExecutions ?? 0) !==
+      (executionTraceCoverage.executionCount ?? 0)
+    ) {
+      issues.push('Launch candidate promotion record reports executions without request ids.');
+    }
+    if (
+      (executionTraceCoverage.operationTaggedExecutions ?? 0) !==
+      (executionTraceCoverage.executionCount ?? 0)
+    ) {
+      issues.push(
+        'Launch candidate promotion record reports executions without operation keys.',
+      );
+    }
+    if ((executionTraceCoverage.confirmedWithoutCorrelation ?? 0) > 0) {
+      issues.push(
+        'Launch candidate promotion record reports confirmed executions without correlation ids.',
+      );
+    }
+    if (Array.isArray(executionTraceCoverage.missingTxHashes) && executionTraceCoverage.missingTxHashes.length > 0) {
+      issues.push(
+        `Launch candidate promotion record is missing traced tx hashes: ${executionTraceCoverage.missingTxHashes.join(', ')}.`,
+      );
+    }
   }
 
   const missingArtifacts = Array.isArray(evidenceManifest?.requiredArtifacts?.missing)
