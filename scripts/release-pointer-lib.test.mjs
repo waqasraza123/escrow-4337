@@ -41,6 +41,49 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
         },
       },
       launchEvidence: {
+        posture: {
+          status: 'ready',
+          launchReady: true,
+          blockers: [],
+          warnings: ['paymaster readability degraded'],
+          authority: {
+            auditSource: 'chain_projection',
+          },
+          evidenceContract: {
+            requiredArtifactCount: 20,
+            missingArtifactCount: 0,
+            complete: true,
+          },
+          providerValidation: {
+            failureCount: 0,
+            warningCount: 1,
+          },
+          executionTraceCoverage: {
+            executionCount: 8,
+            correlationTaggedExecutions: 8,
+            requestTaggedExecutions: 8,
+            operationTaggedExecutions: 8,
+          },
+          marketplaceOrigin: {
+            ok: true,
+            confirmedModes: ['seeded', 'exact'],
+            missingModes: [],
+            failedModes: [],
+          },
+          canaries: {
+            marketplaceSeededCanaryFailures: 0,
+            marketplaceExactCanaryFailures: 0,
+          },
+          rollback: {
+            rollbackImageSha: 'sha256:old',
+            rollbackSource: 'release-pointer',
+            rollbackPointerRunId: '651',
+            rollbackPointerArtifactName: 'release-pointer-staging',
+            rollbackPointerSelectionSource: 'artifact-search',
+            rollbackPointerArtifactId: '41',
+            rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
+          },
+        },
         rollbackImageSha: 'sha256:old',
         rollbackSource: 'release-pointer',
         rollbackPointerRunId: '651',
@@ -88,6 +131,10 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.artifactName, 'release-pointer-production');
   assert.equal(pointer.imageDigest, 'sha256:deadbeef');
   assert.equal(pointer.releaseReviewRunId, '701');
+  assert.equal(pointer.launchStatus, 'ready');
+  assert.equal(pointer.launchReady, true);
+  assert.equal(pointer.launchBlockerCount, 0);
+  assert.equal(pointer.launchWarningCount, 1);
   assert.equal(pointer.rollbackImageSha, 'sha256:old');
   assert.equal(pointer.rollbackSource, 'release-pointer');
   assert.equal(pointer.rollbackPointerRunId, '651');
@@ -107,7 +154,7 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.launchMarketplaceSeededCanaryFailures, 0);
   assert.equal(pointer.launchMarketplaceExactCanaryFailures, 0);
   assert.equal(pointer.authorityAuditSource, 'chain_projection');
-  assert.equal(pointer.launchRequiredArtifactCount, 19);
+  assert.equal(pointer.launchRequiredArtifactCount, 20);
   assert.equal(pointer.launchMissingArtifactCount, 0);
   assert.equal(pointer.launchEvidenceComplete, true);
   assert.equal(pointer.launchProviderFailureCount, 0);
@@ -142,6 +189,9 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       deployedSmokeSelectionSource: 'manual',
       launchCandidateSelectionSource: 'manual',
       launchMarketplaceExactCanaryFailures: -1,
+      launchStatus: 'pending',
+      launchReady: 'true',
+      launchBlockerCount: -1,
       launchEvidenceComplete: 'true',
       launchMarketplaceOriginOk: 'true',
       launchMarketplaceOriginConfirmedModes: ['seeded', ''],
@@ -160,11 +210,14 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer rollback image SHA is required when rollback source is present.',
     'Release pointer rollback pointer selection source must be input or artifact-search when present.',
     'Release pointer deployed smoke marketplace seeded canary passed must be boolean when present.',
+    'Release pointer launch ready must be boolean when present.',
     'Release pointer launch marketplace exact canary failures must be a non-negative integer when present.',
+    'Release pointer launch blocker count must be a non-negative integer when present.',
     'Release pointer deployed smoke selection source must be input or artifact-search when present.',
     'Release pointer launch candidate selection source must be input or artifact-search when present.',
     'Release pointer deployed smoke artifact name is required when selection source is present.',
     'Release pointer launch candidate artifact name is required when selection source is present.',
+    'Release pointer launch status must be ready or blocked when present, but was pending.',
     'Release pointer launch evidence complete must be boolean when present.',
     'Release pointer launch marketplace origin ok must be boolean when present.',
     'Release pointer launch marketplace origin confirmed modes must be an array of non-empty strings when present.',
@@ -238,6 +291,9 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
       imageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
       rollbackImageSha: 'sha256:old',
       rollbackSource: null,
+      launchStatus: 'blocked',
+      launchReady: false,
+      launchBlockerCount: 1,
       deployedSmokePassed: true,
       deployedSmokeSeededCanaryPassed: false,
       deployedSmokeMarketplaceSeededCanaryPassed: false,
@@ -258,6 +314,9 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
   );
 
   assert.deepEqual(issues, [
+    'Release pointer launch status must be ready but was blocked.',
+    'Release pointer does not confirm launch ready posture.',
+    'Release pointer reports launch blockers.',
     'Release pointer does not confirm deployed smoke seeded canary passed.',
     'Release pointer does not confirm deployed smoke marketplace seeded canary passed.',
     'Release pointer reports launch marketplace seeded canary failures.',

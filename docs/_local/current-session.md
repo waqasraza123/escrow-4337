@@ -4,29 +4,26 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep tightening canonical evidence artifacts so launch/release consumers read one normalized posture instead of re-deriving nested state.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep pushing all release consumers onto the canonical launch posture artifact instead of mixed nested summaries.
 
 ## Last Completed Step
-- Added a canonical launch-evidence posture artifact and wired it into the release dossier:
-  - `launch-candidate` now writes `launch-evidence-posture.json`
-  - `launch-evidence-posture.json` is now part of the required launch artifact contract
-  - `release-dossier` now copies and validates that posture artifact against `promotion-record.json` and `evidence-manifest.json`
+- Moved `release-pointer` onto the canonical launch posture path:
+  - `buildReleasePointer(...)` now prefers `release-dossier.launchEvidence.posture`
+  - `release-pointer` now carries launch status, launch ready, blocker/warning counts, and the rest of the normalized posture fields from that canonical source
+  - older dossiers still fall back to the previous nested fields
   - pending commit for this slice
 
 ## Current Step
-- Commit and push the canonical launch-evidence posture slice, then continue Workstream 0.7 by reconciling workflow consumers and review docs around that normalized artifact.
+- Commit and push the `release-pointer` posture integration, then continue Workstream 0.7 by updating workflow consumers and runbooks to read the same canonical artifact directly.
 
 ## Why This Step Exists
-- Phase 0 already proves chain authority, execution traces, and marketplace-origin flow shape, but release consumers were still reading those fields from different nested artifacts. This step creates one normalized launch posture document and ensures the release dossier validates it instead of trusting duplicated derivations.
+- Phase 0 already has a canonical launch posture artifact and the release dossier validates it, but the stable release pointer was still partially rebuilding that state from mixed nested fields. This step removes that drift by making the pointer prefer the canonical posture directly.
 
 ## Changed Files
-- Canonical launch posture artifact:
-  `scripts/launch-candidate-lib.mjs`
-  `scripts/launch-candidate.mjs`
-  `scripts/launch-candidate-lib.test.mjs`
-  `scripts/release-dossier-lib.mjs`
-  `scripts/release-dossier.mjs`
-  `scripts/release-dossier-lib.test.mjs`
+- Release pointer posture integration:
+  `scripts/release-pointer-lib.mjs`
+  `scripts/release-pointer.mjs`
+  `scripts/release-pointer-lib.test.mjs`
 - Docs:
   `docs/project-state.md`
   `docs/_local/current-session.md`
@@ -54,7 +51,7 @@
   - real promotion/release workflows consuming the new canonical `launch-evidence-posture.json` artifact in GitHub Actions
 
 ## Next Likely Step
-- After committing this slice, continue Workstream 0.7 by teaching promotion/release workflow consumers or runbooks to reference `launch-evidence-posture.json` directly so rollout, rollback, and audit drills all point at the same canonical posture artifact.
+- After committing this slice, continue Workstream 0.7 by updating GitHub workflow consumers and runbooks to reference `launch-evidence-posture.json` directly instead of only relying on propagated pointer env fields.
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.
@@ -125,6 +122,30 @@
 - Verification:
   - `git diff --check`
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `pnpm build`
+- Result:
+  - Passed
+
+## Update (2026-04-19, Release Pointer Canonical Posture Integration)
+- Updated `scripts/release-pointer-lib.mjs` so `buildReleasePointer(...)` now prefers `releaseDossier.launchEvidence.posture` as the canonical source for:
+  - launch status and launch-ready posture
+  - launch blocker/warning counts
+  - evidence completeness and required/missing artifact counts
+  - provider failure/warning counts
+  - execution-trace coverage counts
+  - marketplace-origin proof posture
+  - marketplace canary failure counts
+  - rollback posture
+- Added stronger `validateReleasePointer(...)` checks for:
+  - `launchStatus`
+  - `launchReady`
+  - `launchBlockerCount`
+- Extended `scripts/release-pointer.mjs` so `release-pointer.md` and `--write-env` now expose the canonical launch-status fields too.
+- Backward compatibility:
+  - older release dossiers still fall back to the previous nested fields if `launchEvidence.posture` is absent
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/release-pointer-lib.test.mjs scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
   - `pnpm build`
 - Result:
   - Passed

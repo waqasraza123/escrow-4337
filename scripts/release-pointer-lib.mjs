@@ -42,6 +42,13 @@ export function buildReleasePointer({
     releaseDossier?.candidate?.imageDigest,
     'releaseDossier.candidate.imageDigest',
   );
+  const launchPosture = releaseDossier?.launchEvidence?.posture ?? null;
+  const launchProviderValidation = launchPosture?.providerValidation ?? null;
+  const launchEvidenceContract = launchPosture?.evidenceContract ?? null;
+  const launchMarketplaceOrigin = launchPosture?.marketplaceOrigin ?? null;
+  const launchExecutionTraceCoverage = launchPosture?.executionTraceCoverage ?? null;
+  const launchCanaries = launchPosture?.canaries ?? null;
+  const rollback = launchPosture?.rollback ?? null;
 
   return {
     generatedAt,
@@ -56,20 +63,30 @@ export function buildReleasePointer({
     imageDigest,
     imageReference: normalizeOptionalString(releaseDossier?.candidate?.imageReference),
     imageName: normalizeOptionalString(releaseDossier?.candidate?.imageName),
-    rollbackImageSha: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackImageSha),
-    rollbackSource: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackSource),
-    rollbackPointerRunId: normalizeOptionalString(releaseDossier?.launchEvidence?.rollbackPointerRunId),
+    launchStatus: normalizeOptionalString(launchPosture?.status),
+    launchReady: normalizeOptionalBoolean(launchPosture?.launchReady),
+    launchBlockerCount: Array.isArray(launchPosture?.blockers) ? launchPosture.blockers.length : null,
+    launchWarningCount: Array.isArray(launchPosture?.warnings) ? launchPosture.warnings.length : null,
+    rollbackImageSha: normalizeOptionalString(
+      rollback?.rollbackImageSha ?? releaseDossier?.launchEvidence?.rollbackImageSha,
+    ),
+    rollbackSource: normalizeOptionalString(
+      rollback?.rollbackSource ?? releaseDossier?.launchEvidence?.rollbackSource,
+    ),
+    rollbackPointerRunId: normalizeOptionalString(
+      rollback?.rollbackPointerRunId ?? releaseDossier?.launchEvidence?.rollbackPointerRunId,
+    ),
     rollbackPointerArtifactName: normalizeOptionalString(
-      releaseDossier?.launchEvidence?.rollbackPointerArtifactName,
+      rollback?.rollbackPointerArtifactName ?? releaseDossier?.launchEvidence?.rollbackPointerArtifactName,
     ),
     rollbackPointerSelectionSource: normalizeOptionalString(
-      releaseDossier?.launchEvidence?.rollbackPointerSelectionSource,
+      rollback?.rollbackPointerSelectionSource ?? releaseDossier?.launchEvidence?.rollbackPointerSelectionSource,
     ),
     rollbackPointerArtifactId: normalizeOptionalString(
-      releaseDossier?.launchEvidence?.rollbackPointerArtifactId,
+      rollback?.rollbackPointerArtifactId ?? releaseDossier?.launchEvidence?.rollbackPointerArtifactId,
     ),
     rollbackPointerSelectedCreatedAt: normalizeOptionalString(
-      releaseDossier?.launchEvidence?.rollbackPointerSelectedCreatedAt,
+      rollback?.rollbackPointerSelectedCreatedAt ?? releaseDossier?.launchEvidence?.rollbackPointerSelectedCreatedAt,
     ),
     deployedSmokePassed: normalizeOptionalBoolean(releaseDossier?.workflows?.deployedSmoke?.smokePassed),
     deployedSmokeSeededCanaryPassed: normalizeOptionalBoolean(
@@ -97,53 +114,79 @@ export function buildReleasePointer({
       releaseDossier?.workflows?.launchCandidate?.selectedCreatedAt,
     ),
     launchMarketplaceSeededCanaryFailures: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.marketplaceSeededCanaryFailures,
+      launchCanaries?.marketplaceSeededCanaryFailures ??
+        releaseDossier?.launchEvidence?.marketplaceSeededCanaryFailures,
     ),
     launchMarketplaceExactCanaryFailures: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.marketplaceExactCanaryFailures,
+      launchCanaries?.marketplaceExactCanaryFailures ??
+        releaseDossier?.launchEvidence?.marketplaceExactCanaryFailures,
     ),
-    authorityAuditSource: normalizeOptionalString(releaseDossier?.launchEvidence?.authorityAuditSource),
+    authorityAuditSource: normalizeOptionalString(
+      launchPosture?.authority?.auditSource ?? releaseDossier?.launchEvidence?.authorityAuditSource,
+    ),
     launchRequiredArtifactCount: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.requiredArtifactCount,
+      launchEvidenceContract?.requiredArtifactCount ??
+        releaseDossier?.launchEvidence?.requiredArtifactCount,
     ),
-    launchMissingArtifactCount: Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
-      ? releaseDossier.launchEvidence.missingArtifacts.length
-      : null,
-    launchEvidenceComplete: Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
-      ? releaseDossier.launchEvidence.missingArtifacts.length === 0
-      : null,
-    launchProviderFailureCount: Array.isArray(
-      releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationFailures,
-    )
-      ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationFailures.length
-      : null,
-    launchProviderWarningCount: Array.isArray(
-      releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationWarnings,
-    )
-      ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationWarnings.length
-      : null,
+    launchMissingArtifactCount: normalizeOptionalNumber(
+      launchEvidenceContract?.missingArtifactCount ??
+        (Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
+          ? releaseDossier.launchEvidence.missingArtifacts.length
+          : null),
+    ),
+    launchEvidenceComplete:
+      typeof launchEvidenceContract?.complete === 'boolean'
+        ? launchEvidenceContract.complete
+        : Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
+          ? releaseDossier.launchEvidence.missingArtifacts.length === 0
+          : null,
+    launchProviderFailureCount: normalizeOptionalNumber(
+      launchProviderValidation?.failureCount ??
+        (Array.isArray(
+          releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationFailures,
+        )
+          ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationFailures.length
+          : null),
+    ),
+    launchProviderWarningCount: normalizeOptionalNumber(
+      launchProviderValidation?.warningCount ??
+        (Array.isArray(
+          releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationWarnings,
+        )
+          ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationWarnings.length
+          : null),
+    ),
     launchExecutionTraceExecutionCount: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.executionTraceCoverage?.executionCount,
+      launchExecutionTraceCoverage?.executionCount ??
+        releaseDossier?.launchEvidence?.executionTraceCoverage?.executionCount,
     ),
     launchExecutionTraceCorrelationTaggedExecutions: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.executionTraceCoverage?.correlationTaggedExecutions,
+      launchExecutionTraceCoverage?.correlationTaggedExecutions ??
+        releaseDossier?.launchEvidence?.executionTraceCoverage?.correlationTaggedExecutions,
     ),
     launchExecutionTraceRequestTaggedExecutions: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.executionTraceCoverage?.requestTaggedExecutions,
+      launchExecutionTraceCoverage?.requestTaggedExecutions ??
+        releaseDossier?.launchEvidence?.executionTraceCoverage?.requestTaggedExecutions,
     ),
     launchExecutionTraceOperationTaggedExecutions: normalizeOptionalNumber(
-      releaseDossier?.launchEvidence?.executionTraceCoverage?.operationTaggedExecutions,
+      launchExecutionTraceCoverage?.operationTaggedExecutions ??
+        releaseDossier?.launchEvidence?.executionTraceCoverage?.operationTaggedExecutions,
     ),
     launchMarketplaceOriginOk:
-      releaseDossier?.launchEvidence?.marketplaceOrigin?.ok === true,
+      typeof launchMarketplaceOrigin?.ok === 'boolean'
+        ? launchMarketplaceOrigin.ok
+        : releaseDossier?.launchEvidence?.marketplaceOrigin?.ok === true,
     launchMarketplaceOriginConfirmedModes: normalizeOptionalStringArray(
-      releaseDossier?.launchEvidence?.marketplaceOrigin?.confirmedModes,
+      launchMarketplaceOrigin?.confirmedModes ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.confirmedModes,
     ),
     launchMarketplaceOriginMissingModes: normalizeOptionalStringArray(
-      releaseDossier?.launchEvidence?.marketplaceOrigin?.missingModes,
+      launchMarketplaceOrigin?.missingModes ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.missingModes,
     ),
     launchMarketplaceOriginFailedModes: normalizeOptionalStringArray(
-      releaseDossier?.launchEvidence?.marketplaceOrigin?.failedModes,
+      launchMarketplaceOrigin?.failedModes ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.failedModes,
     ),
   };
 }
@@ -263,6 +306,7 @@ export function validateReleasePointer(
     ['deployedSmokePassed', 'deployed smoke passed'],
     ['deployedSmokeSeededCanaryPassed', 'deployed smoke seeded canary passed'],
     ['deployedSmokeMarketplaceSeededCanaryPassed', 'deployed smoke marketplace seeded canary passed'],
+    ['launchReady', 'launch ready'],
   ]) {
     if (pointer?.[field] !== undefined && pointer?.[field] !== null && typeof pointer[field] !== 'boolean') {
       issues.push(`Release pointer ${label} must be boolean when present.`);
@@ -276,6 +320,8 @@ export function validateReleasePointer(
     ['launchMissingArtifactCount', 'launch missing artifact count'],
     ['launchProviderFailureCount', 'launch provider failure count'],
     ['launchProviderWarningCount', 'launch provider warning count'],
+    ['launchBlockerCount', 'launch blocker count'],
+    ['launchWarningCount', 'launch warning count'],
     ['launchExecutionTraceExecutionCount', 'launch execution trace execution count'],
     [
       'launchExecutionTraceCorrelationTaggedExecutions',
@@ -346,6 +392,17 @@ export function validateReleasePointer(
     );
   }
 
+  if (
+    pointer?.launchStatus !== undefined &&
+    pointer?.launchStatus !== null &&
+    pointer.launchStatus !== 'ready' &&
+    pointer.launchStatus !== 'blocked'
+  ) {
+    issues.push(
+      `Release pointer launch status must be ready or blocked when present, but was ${pointer.launchStatus}.`,
+    );
+  }
+
   for (const [field, label] of [
     ['launchEvidenceComplete', 'launch evidence complete'],
     ['launchMarketplaceOriginOk', 'launch marketplace origin ok'],
@@ -368,6 +425,17 @@ export function validateReleasePointer(
   }
 
   if (requireReadyLaunchPosture) {
+    if (normalizeOptionalString(pointer?.launchStatus) !== 'ready') {
+      issues.push(
+        `Release pointer launch status must be ready but was ${pointer?.launchStatus ?? '<missing>'}.`,
+      );
+    }
+    if (pointer?.launchReady !== true) {
+      issues.push('Release pointer does not confirm launch ready posture.');
+    }
+    if ((pointer?.launchBlockerCount ?? 0) > 0) {
+      issues.push('Release pointer reports launch blockers.');
+    }
     if (pointer?.deployedSmokePassed !== true) {
       issues.push('Release pointer does not confirm deployed smoke passed.');
     }

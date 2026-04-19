@@ -129,6 +129,10 @@ function runValidate(argv) {
         `RELEASE_POINTER_IMAGE_DIGEST=${pointer.imageDigest}`,
         `RELEASE_POINTER_IMAGE_REFERENCE=${pointer.imageReference ?? ''}`,
         `RELEASE_POINTER_IMAGE_NAME=${pointer.imageName ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_STATUS=${pointer.launchStatus ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_READY=${pointer.launchReady ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_BLOCKER_COUNT=${pointer.launchBlockerCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_WARNING_COUNT=${pointer.launchWarningCount ?? ''}`,
         `RELEASE_POINTER_ROLLBACK_IMAGE_SHA=${pointer.rollbackImageSha ?? ''}`,
         `RELEASE_POINTER_ROLLBACK_SOURCE=${pointer.rollbackSource ?? ''}`,
         `RELEASE_POINTER_ROLLBACK_POINTER_RUN_ID=${pointer.rollbackPointerRunId ?? ''}`,
@@ -223,6 +227,10 @@ function buildMarkdown(pointer) {
 - Commit SHA: ${pointer.commitSha}
 - Image digest: ${pointer.imageDigest}
 - Image reference: ${pointer.imageReference ?? 'n/a'}
+- Launch status: ${pointer.launchStatus ?? 'n/a'}
+- Launch ready: ${formatOptionalBoolean(pointer.launchReady)}
+- Launch blocker count: ${pointer.launchBlockerCount ?? 'n/a'}
+- Launch warning count: ${pointer.launchWarningCount ?? 'n/a'}
 - Rollback image SHA: ${pointer.rollbackImageSha ?? 'n/a'}
 - Rollback source: ${pointer.rollbackSource ?? 'n/a'}
 - Rollback pointer run ID: ${pointer.rollbackPointerRunId ?? 'n/a'}
