@@ -150,6 +150,19 @@ function runValidate(argv) {
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_SEEDED_CANARY_FAILURES=${pointer.launchMarketplaceSeededCanaryFailures ?? ''}`,
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CANARY_FAILURES=${pointer.launchMarketplaceExactCanaryFailures ?? ''}`,
         `RELEASE_POINTER_AUTHORITY_AUDIT_SOURCE=${pointer.authorityAuditSource ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_REQUIRED_ARTIFACT_COUNT=${pointer.launchRequiredArtifactCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MISSING_ARTIFACT_COUNT=${pointer.launchMissingArtifactCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE=${pointer.launchEvidenceComplete ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_PROVIDER_FAILURE_COUNT=${pointer.launchProviderFailureCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_PROVIDER_WARNING_COUNT=${pointer.launchProviderWarningCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_EXECUTION_TRACE_EXECUTION_COUNT=${pointer.launchExecutionTraceExecutionCount ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_EXECUTION_TRACE_CORRELATION_TAGGED_EXECUTIONS=${pointer.launchExecutionTraceCorrelationTaggedExecutions ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_EXECUTION_TRACE_REQUEST_TAGGED_EXECUTIONS=${pointer.launchExecutionTraceRequestTaggedExecutions ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_EXECUTION_TRACE_OPERATION_TAGGED_EXECUTIONS=${pointer.launchExecutionTraceOperationTaggedExecutions ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK=${pointer.launchMarketplaceOriginOk ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_CONFIRMED_MODES=${(pointer.launchMarketplaceOriginConfirmedModes ?? []).join(',')}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_MISSING_MODES=${(pointer.launchMarketplaceOriginMissingModes ?? []).join(',')}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_FAILED_MODES=${(pointer.launchMarketplaceOriginFailedModes ?? []).join(',')}`,
       ].join('\n') + '\n',
       'utf8',
     );
@@ -231,6 +244,33 @@ function buildMarkdown(pointer) {
 - Launch marketplace seeded canary failures: ${pointer.launchMarketplaceSeededCanaryFailures ?? 'n/a'}
 - Launch marketplace exact canary failures: ${pointer.launchMarketplaceExactCanaryFailures ?? 'n/a'}
 - Authority audit source: ${pointer.authorityAuditSource ?? 'n/a'}
+- Launch required artifact count: ${pointer.launchRequiredArtifactCount ?? 'n/a'}
+- Launch missing artifact count: ${pointer.launchMissingArtifactCount ?? 'n/a'}
+- Launch evidence complete: ${formatOptionalBoolean(pointer.launchEvidenceComplete)}
+- Launch provider failure count: ${pointer.launchProviderFailureCount ?? 'n/a'}
+- Launch provider warning count: ${pointer.launchProviderWarningCount ?? 'n/a'}
+- Launch execution trace coverage: ${
+    pointer.launchExecutionTraceExecutionCount !== null &&
+    pointer.launchExecutionTraceExecutionCount !== undefined
+      ? `${pointer.launchExecutionTraceCorrelationTaggedExecutions ?? 0}/${pointer.launchExecutionTraceExecutionCount} correlated, ${pointer.launchExecutionTraceRequestTaggedExecutions ?? 0}/${pointer.launchExecutionTraceExecutionCount} request-tagged, ${pointer.launchExecutionTraceOperationTaggedExecutions ?? 0}/${pointer.launchExecutionTraceExecutionCount} operation-tagged`
+      : 'n/a'
+  }
+- Launch marketplace origin proof: ${formatOptionalBoolean(pointer.launchMarketplaceOriginOk)}
+- Launch marketplace origin confirmed modes: ${
+    pointer.launchMarketplaceOriginConfirmedModes?.length
+      ? pointer.launchMarketplaceOriginConfirmedModes.join(', ')
+      : 'n/a'
+  }
+- Launch marketplace origin missing modes: ${
+    pointer.launchMarketplaceOriginMissingModes?.length
+      ? pointer.launchMarketplaceOriginMissingModes.join(', ')
+      : 'none'
+  }
+- Launch marketplace origin failed modes: ${
+    pointer.launchMarketplaceOriginFailedModes?.length
+      ? pointer.launchMarketplaceOriginFailedModes.join(', ')
+      : 'none'
+  }
 `;
 }
 

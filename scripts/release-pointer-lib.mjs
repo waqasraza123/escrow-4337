@@ -103,6 +103,48 @@ export function buildReleasePointer({
       releaseDossier?.launchEvidence?.marketplaceExactCanaryFailures,
     ),
     authorityAuditSource: normalizeOptionalString(releaseDossier?.launchEvidence?.authorityAuditSource),
+    launchRequiredArtifactCount: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.requiredArtifactCount,
+    ),
+    launchMissingArtifactCount: Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
+      ? releaseDossier.launchEvidence.missingArtifacts.length
+      : null,
+    launchEvidenceComplete: Array.isArray(releaseDossier?.launchEvidence?.missingArtifacts)
+      ? releaseDossier.launchEvidence.missingArtifacts.length === 0
+      : null,
+    launchProviderFailureCount: Array.isArray(
+      releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationFailures,
+    )
+      ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationFailures.length
+      : null,
+    launchProviderWarningCount: Array.isArray(
+      releaseDossier?.promotionReview?.reviews?.launchCandidate?.providerValidationWarnings,
+    )
+      ? releaseDossier.promotionReview.reviews.launchCandidate.providerValidationWarnings.length
+      : null,
+    launchExecutionTraceExecutionCount: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.executionTraceCoverage?.executionCount,
+    ),
+    launchExecutionTraceCorrelationTaggedExecutions: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.executionTraceCoverage?.correlationTaggedExecutions,
+    ),
+    launchExecutionTraceRequestTaggedExecutions: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.executionTraceCoverage?.requestTaggedExecutions,
+    ),
+    launchExecutionTraceOperationTaggedExecutions: normalizeOptionalNumber(
+      releaseDossier?.launchEvidence?.executionTraceCoverage?.operationTaggedExecutions,
+    ),
+    launchMarketplaceOriginOk:
+      releaseDossier?.launchEvidence?.marketplaceOrigin?.ok === true,
+    launchMarketplaceOriginConfirmedModes: normalizeOptionalStringArray(
+      releaseDossier?.launchEvidence?.marketplaceOrigin?.confirmedModes,
+    ),
+    launchMarketplaceOriginMissingModes: normalizeOptionalStringArray(
+      releaseDossier?.launchEvidence?.marketplaceOrigin?.missingModes,
+    ),
+    launchMarketplaceOriginFailedModes: normalizeOptionalStringArray(
+      releaseDossier?.launchEvidence?.marketplaceOrigin?.failedModes,
+    ),
   };
 }
 
@@ -230,6 +272,23 @@ export function validateReleasePointer(
   for (const [field, label] of [
     ['launchMarketplaceSeededCanaryFailures', 'launch marketplace seeded canary failures'],
     ['launchMarketplaceExactCanaryFailures', 'launch marketplace exact canary failures'],
+    ['launchRequiredArtifactCount', 'launch required artifact count'],
+    ['launchMissingArtifactCount', 'launch missing artifact count'],
+    ['launchProviderFailureCount', 'launch provider failure count'],
+    ['launchProviderWarningCount', 'launch provider warning count'],
+    ['launchExecutionTraceExecutionCount', 'launch execution trace execution count'],
+    [
+      'launchExecutionTraceCorrelationTaggedExecutions',
+      'launch execution trace correlation-tagged executions',
+    ],
+    [
+      'launchExecutionTraceRequestTaggedExecutions',
+      'launch execution trace request-tagged executions',
+    ],
+    [
+      'launchExecutionTraceOperationTaggedExecutions',
+      'launch execution trace operation-tagged executions',
+    ],
   ]) {
     if (pointer?.[field] !== undefined && pointer?.[field] !== null) {
       if (!Number.isInteger(pointer[field]) || pointer[field] < 0) {
@@ -287,6 +346,27 @@ export function validateReleasePointer(
     );
   }
 
+  for (const [field, label] of [
+    ['launchEvidenceComplete', 'launch evidence complete'],
+    ['launchMarketplaceOriginOk', 'launch marketplace origin ok'],
+  ]) {
+    if (pointer?.[field] !== undefined && pointer?.[field] !== null && typeof pointer[field] !== 'boolean') {
+      issues.push(`Release pointer ${label} must be boolean when present.`);
+    }
+  }
+
+  for (const [field, label] of [
+    ['launchMarketplaceOriginConfirmedModes', 'launch marketplace origin confirmed modes'],
+    ['launchMarketplaceOriginMissingModes', 'launch marketplace origin missing modes'],
+    ['launchMarketplaceOriginFailedModes', 'launch marketplace origin failed modes'],
+  ]) {
+    if (pointer?.[field] !== undefined && pointer?.[field] !== null) {
+      if (!Array.isArray(pointer[field]) || pointer[field].some((value) => !normalizeOptionalString(value))) {
+        issues.push(`Release pointer ${label} must be an array of non-empty strings when present.`);
+      }
+    }
+  }
+
   if (requireReadyLaunchPosture) {
     if (pointer?.deployedSmokePassed !== true) {
       issues.push('Release pointer does not confirm deployed smoke passed.');
@@ -307,6 +387,24 @@ export function validateReleasePointer(
       issues.push(
         `Release pointer authority audit source must be chain_projection but was ${pointer?.authorityAuditSource ?? '<missing>'}.`,
       );
+    }
+    if (pointer?.launchEvidenceComplete !== true) {
+      issues.push('Release pointer does not confirm launch evidence completeness.');
+    }
+    if ((pointer?.launchMissingArtifactCount ?? 0) > 0) {
+      issues.push('Release pointer reports missing launch evidence artifacts.');
+    }
+    if (pointer?.launchMarketplaceOriginOk !== true) {
+      issues.push('Release pointer does not confirm marketplace origin proof.');
+    }
+    if (!hasRequiredModes(pointer?.launchMarketplaceOriginConfirmedModes, ['seeded', 'exact'])) {
+      issues.push('Release pointer does not confirm both seeded and exact marketplace origin modes.');
+    }
+    if ((pointer?.launchMarketplaceOriginMissingModes ?? []).length > 0) {
+      issues.push('Release pointer reports missing marketplace origin modes.');
+    }
+    if ((pointer?.launchMarketplaceOriginFailedModes ?? []).length > 0) {
+      issues.push('Release pointer reports failed marketplace origin modes.');
     }
     if (!normalizeOptionalString(pointer?.rollbackSource)) {
       issues.push('Release pointer does not record rollback source.');
@@ -395,4 +493,21 @@ function normalizeOptionalBoolean(value) {
 
 function normalizeOptionalNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function normalizeOptionalStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((entry) => normalizeOptionalString(entry)).filter(Boolean);
+}
+
+function hasRequiredModes(values, requiredModes) {
+  if (!Array.isArray(values)) {
+    return false;
+  }
+
+  const normalized = new Set(values.map((value) => normalizeOptionalString(value)).filter(Boolean));
+  return requiredModes.every((mode) => normalized.has(mode));
 }

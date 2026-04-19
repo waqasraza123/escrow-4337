@@ -4,36 +4,27 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.7: tighten the observability and evidence contract around marketplace-origin launch proof.
+- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep tightening release-facing evidence so rollout and rollback review do not depend on reopening the full dossier.
 
 ## Last Completed Step
-- Added explicit marketplace-origin launch proof artifacts and gating:
-  - seeded and exact deployed marketplace canaries now persist dedicated marketplace-evidence JSON
-  - launch-candidate builds `marketplace-origin-summary.json`
-  - promotion review and release dossier now fail if marketplace-origin proof is missing or incomplete
+- Added release-pointer launch-evidence posture fields:
+  - `release-pointer.json` now records launch evidence completeness, required/missing artifact counts, provider failure/warning counts, execution-trace coverage counts, and marketplace-origin proof posture
+  - `release-pointer` validation can now reject missing/incomplete marketplace-origin proof directly
+  - `release-pointer.md` and `--write-env` now expose the same posture for operators and workflows
   - pending commit for this slice
 
 ## Current Step
-- Commit and push the marketplace-origin proof slice, then move into Workstream 0.7 so release/evidence artifacts carry a more consistent operator-facing contract.
+- Commit and push the release-pointer evidence-contract hardening, then continue Workstream 0.7 by tightening release-facing summaries or workflow consumers around the same canonical launch posture.
 
 ## Why This Step Exists
-- Phase 0 now proves chain authority, execution traces, and marketplace-origin flow shape, but the launch/release evidence contract is still spread across multiple artifacts and summaries. The next step is to make that evidence easier to review and harder to misread or partially publish.
+- Phase 0 already proves chain authority, execution traces, and marketplace-origin flow shape, but the stable approved release pointer still only carried coarse canary counts. This step makes the pointer itself useful for operator review and automated rollout checks.
 
 ## Changed Files
-- Launch/release marketplace-origin evidence:
-  `tests/e2e/fixtures/marketplace-evidence.ts`
-  `tests/e2e/flows/operator-export-flow.ts`
-  `tests/e2e/flows/marketplace-exact-flow.ts`
-  `tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts`
-  `tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts`
-  `scripts/launch-candidate.mjs`
-  `scripts/launch-candidate-lib.mjs`
-  `scripts/promotion-review-lib.mjs`
-  `scripts/release-dossier-lib.mjs`
-- Tests/docs:
-  `scripts/launch-candidate-lib.test.mjs`
-  `scripts/promotion-review-lib.test.mjs`
-  `scripts/release-dossier-lib.test.mjs`
+- Release pointer evidence contract:
+  `scripts/release-pointer-lib.mjs`
+  `scripts/release-pointer.mjs`
+  `scripts/release-pointer-lib.test.mjs`
+- Docs:
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -46,25 +37,21 @@
 
 ## Verification Commands
 - `git diff --check`
-- `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+- `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
 - `pnpm build`
-- `export PLAYWRIGHT_PROFILE=deployed; pnpm exec playwright test tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts --project=deployed-seeded --project=deployed-exact --list`
-- `pnpm exec tsc --noEmit --module nodenext --moduleResolution nodenext --target es2022 tests/e2e/fixtures/marketplace-evidence.ts tests/e2e/flows/operator-export-flow.ts tests/e2e/flows/marketplace-exact-flow.ts tests/e2e/specs/journeys/deployed/deployed-seeded-marketplace-launch-candidate-flow.spec.ts tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
-  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/promotion-review-lib.test.mjs`
+- `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
   - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
   - real staged deployed marketplace canaries with the new marketplace-origin artifact contract
-  - `export PLAYWRIGHT_PROFILE=deployed; pnpm exec playwright test ... --list`
-    blocked by missing deployed base URLs in local env
-  - direct `pnpm exec tsc` over the changed e2e files surfaces existing harness/module-resolution gaps in unrelated deployed e2e dependencies (`ethers`, package path aliases, Playwright type surface), so it is not currently a clean targeted compile signal for only the changed files
+  - real promotion/release workflows consuming the richer release-pointer fields in GitHub Actions
 
 ## Next Likely Step
-- After committing this slice, tighten the Phase 0 Workstream 0.7 evidence contract so release pointer and release-facing summaries also carry marketplace-origin proof posture instead of forcing reviewers to inspect only the nested dossier payloads.
+- After committing this slice, continue Workstream 0.7 by reconciling workflow consumers and human-readable release docs around the richer `release-pointer` posture so staged promotion review and rollback drills use the same compact evidence contract.
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.
@@ -92,6 +79,29 @@
 - Result:
   - Passed
   - local deployed-profile Playwright list still requires explicit staged base URLs
+
+## Update (2026-04-19, Release Pointer Evidence Contract)
+- Extended `scripts/release-pointer-lib.mjs` so `buildReleasePointer(...)` now snapshots launch evidence posture directly from the release dossier:
+  - `launchRequiredArtifactCount`
+  - `launchMissingArtifactCount`
+  - `launchEvidenceComplete`
+  - `launchProviderFailureCount`
+  - `launchProviderWarningCount`
+  - execution-trace coverage counts
+  - marketplace-origin proof status plus confirmed/missing/failed modes
+- Tightened `validateReleasePointer(...)` so `--require-ready-launch-posture` now also blocks when:
+  - launch evidence is incomplete
+  - missing launch artifacts are reported
+  - marketplace-origin proof is not confirmed
+  - both `seeded` and `exact` marketplace modes are not confirmed
+  - marketplace-origin missing/failed modes are present
+- Extended `scripts/release-pointer.mjs` so `release-pointer.md` and `--write-env` expose the richer launch posture to operators and workflow consumers.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `pnpm build`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Execution Trace Evidence Contract)
 - Added `services/api/src/modules/escrow/escrow-execution-traces.ts` as the canonical trace summarizer for persisted escrow executions.

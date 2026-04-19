@@ -223,6 +223,7 @@
   - `marketplace-exact-evidence.json`
   - `marketplace-origin-summary.json`
   Promotion review and release dossier validation now require both marketplace modes to confirm that the reviewed escrow jobs originated from the marketplace pipeline and preserved chain-projection authority plus execution-trace coverage.
+- `release-pointer.json` and `release-pointer.md` now carry a compact launch-evidence posture snapshot instead of only coarse canary counts. The pointer now records launch evidence completeness, required/missing artifact counts, provider failure/warning counts, execution-trace coverage counts, and marketplace-origin proof posture (`ok`, confirmed modes, missing modes, failed modes) so rollout and rollback review can validate the latest approved release without reopening the full release dossier.
 - API typechecking still depends on the compliance package build output existing and matching source.
 - Documentation should remain truth-first; do not reintroduce claims about missing repo layers as if they already exist.
 - Root verification now includes a real local Playwright smoke lane against built web, admin, and API processes on top of local Postgres, but it still does not validate a real deployed frontend/backend target, live relay infrastructure, deployed ingress, or non-mock smart-account and escrow execution by default.

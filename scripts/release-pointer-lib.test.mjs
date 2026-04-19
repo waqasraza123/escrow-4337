@@ -49,8 +49,30 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
         rollbackPointerArtifactId: '41',
         rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
         authorityAuditSource: 'chain_projection',
+        requiredArtifactCount: 19,
+        missingArtifacts: [],
+        executionTraceCoverage: {
+          executionCount: 8,
+          correlationTaggedExecutions: 8,
+          requestTaggedExecutions: 8,
+          operationTaggedExecutions: 8,
+        },
+        marketplaceOrigin: {
+          ok: true,
+          confirmedModes: ['seeded', 'exact'],
+          missingModes: [],
+          failedModes: [],
+        },
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
+      },
+      promotionReview: {
+        reviews: {
+          launchCandidate: {
+            providerValidationFailures: [],
+            providerValidationWarnings: ['paymaster'],
+          },
+        },
       },
       candidate: {
         runId: '101',
@@ -85,6 +107,19 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.equal(pointer.launchMarketplaceSeededCanaryFailures, 0);
   assert.equal(pointer.launchMarketplaceExactCanaryFailures, 0);
   assert.equal(pointer.authorityAuditSource, 'chain_projection');
+  assert.equal(pointer.launchRequiredArtifactCount, 19);
+  assert.equal(pointer.launchMissingArtifactCount, 0);
+  assert.equal(pointer.launchEvidenceComplete, true);
+  assert.equal(pointer.launchProviderFailureCount, 0);
+  assert.equal(pointer.launchProviderWarningCount, 1);
+  assert.equal(pointer.launchExecutionTraceExecutionCount, 8);
+  assert.equal(pointer.launchExecutionTraceCorrelationTaggedExecutions, 8);
+  assert.equal(pointer.launchExecutionTraceRequestTaggedExecutions, 8);
+  assert.equal(pointer.launchExecutionTraceOperationTaggedExecutions, 8);
+  assert.equal(pointer.launchMarketplaceOriginOk, true);
+  assert.deepEqual(pointer.launchMarketplaceOriginConfirmedModes, ['seeded', 'exact']);
+  assert.deepEqual(pointer.launchMarketplaceOriginMissingModes, []);
+  assert.deepEqual(pointer.launchMarketplaceOriginFailedModes, []);
 });
 
 test('validateReleasePointer catches environment drift and invalid digests', () => {
@@ -107,6 +142,9 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       deployedSmokeSelectionSource: 'manual',
       launchCandidateSelectionSource: 'manual',
       launchMarketplaceExactCanaryFailures: -1,
+      launchEvidenceComplete: 'true',
+      launchMarketplaceOriginOk: 'true',
+      launchMarketplaceOriginConfirmedModes: ['seeded', ''],
     },
     {
       expectedEnvironment: 'production',
@@ -127,6 +165,9 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer launch candidate selection source must be input or artifact-search when present.',
     'Release pointer deployed smoke artifact name is required when selection source is present.',
     'Release pointer launch candidate artifact name is required when selection source is present.',
+    'Release pointer launch evidence complete must be boolean when present.',
+    'Release pointer launch marketplace origin ok must be boolean when present.',
+    'Release pointer launch marketplace origin confirmed modes must be an array of non-empty strings when present.',
   ]);
 });
 
@@ -200,9 +241,15 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
       deployedSmokePassed: true,
       deployedSmokeSeededCanaryPassed: false,
       deployedSmokeMarketplaceSeededCanaryPassed: false,
+      launchEvidenceComplete: false,
+      launchMissingArtifactCount: 2,
       launchMarketplaceSeededCanaryFailures: 1,
       launchMarketplaceExactCanaryFailures: 2,
       authorityAuditSource: 'aggregate',
+      launchMarketplaceOriginOk: false,
+      launchMarketplaceOriginConfirmedModes: ['seeded'],
+      launchMarketplaceOriginMissingModes: ['exact'],
+      launchMarketplaceOriginFailedModes: ['seeded'],
     },
     {
       expectedEnvironment: 'production',
@@ -216,6 +263,12 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
     'Release pointer reports launch marketplace seeded canary failures.',
     'Release pointer reports launch marketplace exact canary failures.',
     'Release pointer authority audit source must be chain_projection but was aggregate.',
+    'Release pointer does not confirm launch evidence completeness.',
+    'Release pointer reports missing launch evidence artifacts.',
+    'Release pointer does not confirm marketplace origin proof.',
+    'Release pointer does not confirm both seeded and exact marketplace origin modes.',
+    'Release pointer reports missing marketplace origin modes.',
+    'Release pointer reports failed marketplace origin modes.',
     'Release pointer does not record rollback source.',
   ]);
 });
