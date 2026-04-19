@@ -134,6 +134,8 @@ export type MarketplaceApplicationDossier = {
 
 export type MarketplaceProfileRecord = {
   userId: string;
+  organizationId: string | null;
+  workspaceId: string | null;
   slug: string;
   displayName: string;
   headline: string;
@@ -156,6 +158,8 @@ export type MarketplaceProfileRecord = {
 export type MarketplaceOpportunityRecord = {
   id: string;
   ownerUserId: string;
+  ownerOrganizationId: string | null;
+  ownerWorkspaceId: string | null;
   title: string;
   summary: string;
   description: string;
@@ -187,6 +191,8 @@ export type MarketplaceApplicationRecord = {
   id: string;
   opportunityId: string;
   applicantUserId: string;
+  applicantOrganizationId: string | null;
+  applicantWorkspaceId: string | null;
   coverNote: string;
   proposedRate: string | null;
   selectedWalletAddress: string;
@@ -246,12 +252,18 @@ export type MarketplaceAdminProfileView = MarketplaceProfileView & {
 
 export type MarketplaceClientSummary = {
   userId: string;
+  organizationId: string | null;
+  workspaceId: string | null;
+  workspaceKind: 'client';
   displayName: string;
   profileSlug: string | null;
 };
 
 export type MarketplaceTalentSummary = {
   userId: string;
+  organizationId: string | null;
+  workspaceId: string | null;
+  workspaceKind: 'freelancer';
   displayName: string;
   profileSlug: string | null;
   headline: string;
@@ -269,6 +281,7 @@ export type MarketplaceApplicationOpportunitySummary = {
   visibility: OpportunityVisibility;
   status: OpportunityStatus;
   ownerDisplayName: string;
+  ownerWorkspaceId: string | null;
 };
 
 export type MarketplaceApplicationView = Omit<

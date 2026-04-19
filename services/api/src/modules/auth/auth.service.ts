@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import { UsersService } from '../users/users.service';
 import { toUserProfile } from '../users/users.types';
@@ -14,6 +15,7 @@ export class AuthService {
     private readonly otp: OtpStore,
     private readonly emailer: EmailService,
     private readonly users: UsersService,
+    private readonly organizations: OrganizationsService,
     private readonly userCapabilities: UserCapabilitiesService,
     private readonly jwt: JwtService,
     private readonly sessions: SessionsService,
@@ -51,11 +53,17 @@ export class AuthService {
       session.refreshTokenId,
       session.exp,
     );
+    const workspaceContext =
+      await this.organizations.buildWorkspaceContextForUser(user);
 
     return {
       accessToken,
       refreshToken,
-      user: toUserProfile(user, this.userCapabilities.buildCapabilities(user)),
+      user: toUserProfile(
+        workspaceContext.user,
+        this.userCapabilities.buildCapabilities(workspaceContext.user),
+        workspaceContext,
+      ),
     };
   }
 
@@ -101,7 +109,12 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    return toUserProfile(user, this.userCapabilities.buildCapabilities(user));
+    const workspaceContext = await this.organizations.buildWorkspaceContextForUser(user);
+    return toUserProfile(
+      workspaceContext.user,
+      this.userCapabilities.buildCapabilities(workspaceContext.user),
+      workspaceContext,
+    );
   }
 
   async setShariah(userId: string, value: boolean) {
@@ -109,6 +122,11 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    return toUserProfile(user, this.userCapabilities.buildCapabilities(user));
+    const workspaceContext = await this.organizations.buildWorkspaceContextForUser(user);
+    return toUserProfile(
+      workspaceContext.user,
+      this.userCapabilities.buildCapabilities(workspaceContext.user),
+      workspaceContext,
+    );
   }
 }

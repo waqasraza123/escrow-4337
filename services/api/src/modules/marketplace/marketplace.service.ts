@@ -18,6 +18,8 @@ import type {
 } from '../../persistence/persistence.types';
 import type { EscrowMilestoneRecord } from '../escrow/escrow.types';
 import { EscrowService } from '../escrow/escrow.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import type { WorkspaceSummary } from '../organizations/organizations.types';
 import { EscrowOnchainAuthorityService } from '../operations/escrow-onchain-authority.service';
 import { UserCapabilitiesService } from '../users/user-capabilities.service';
 import { UsersService } from '../users/users.service';
@@ -191,6 +193,7 @@ export class MarketplaceService {
     private readonly marketplaceRepository: MarketplaceRepository,
     @Inject(ESCROW_REPOSITORY)
     private readonly escrowRepository: EscrowRepository,
+    private readonly organizationsService: OrganizationsService,
     private readonly usersService: UsersService,
     private readonly escrowService: EscrowService,
     private readonly escrowOnchainAuthority: EscrowOnchainAuthorityService,
@@ -198,7 +201,12 @@ export class MarketplaceService {
   ) {}
 
   async getMyProfile(userId: string): Promise<MarketplaceProfileResponse> {
-    const profile = await this.requireProfileByUserId(userId);
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+      'manageProfile',
+    );
+    const profile = await this.requireProfileByUserId(userId, workspace);
     return {
       profile: await this.toProfileView(profile),
     };
@@ -208,6 +216,11 @@ export class MarketplaceService {
     userId: string,
     dto: UpsertMarketplaceProfileDto,
   ): Promise<MarketplaceProfileResponse> {
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+      'manageProfile',
+    );
     const now = Date.now();
     const existingBySlug = await this.marketplaceRepository.getProfileBySlug(
       dto.slug,
@@ -221,6 +234,8 @@ export class MarketplaceService {
       await this.marketplaceRepository.getProfileByUserId(userId);
     const profile: MarketplaceProfileRecord = {
       userId,
+      organizationId: workspace.organizationId,
+      workspaceId: workspace.workspaceId,
       slug: dto.slug,
       displayName: dto.displayName,
       headline: dto.headline,
@@ -276,7 +291,12 @@ export class MarketplaceService {
     userId: string,
     dto: UpdateMarketplaceProofsDto,
   ): Promise<MarketplaceProfileResponse> {
-    const profile = await this.requireProfileByUserId(userId);
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+      'manageProfile',
+    );
+    const profile = await this.requireProfileByUserId(userId, workspace);
     const portfolioProofs = profile.proofArtifacts.filter(
       (artifact) => artifact.kind === 'portfolio',
     );
@@ -384,12 +404,19 @@ export class MarketplaceService {
     userId: string,
     dto: CreateMarketplaceOpportunityDto,
   ): Promise<MarketplaceOpportunityResponse> {
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'client',
+      'createOpportunity',
+    );
     const now = Date.now();
     this.validateBudgetRange(dto.budgetMin ?? null, dto.budgetMax ?? null);
 
     const opportunity: MarketplaceOpportunityRecord = {
       id: randomUUID(),
       ownerUserId: userId,
+      ownerOrganizationId: workspace.organizationId,
+      ownerWorkspaceId: workspace.workspaceId,
       title: dto.title,
       summary: dto.summary,
       description: dto.description,
@@ -430,7 +457,7 @@ export class MarketplaceService {
     dto: UpdateMarketplaceOpportunityDto,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
 
     if (opportunity.status === 'hired' || opportunity.status === 'archived') {
       throw new ConflictException(
@@ -498,7 +525,7 @@ export class MarketplaceService {
     dto: UpdateMarketplaceScreeningDto,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     opportunity.outcomes = normalizeTextArray(dto.outcomes);
     opportunity.acceptanceCriteria = normalizeTextArray(dto.acceptanceCriteria);
     opportunity.mustHaveSkills = normalizeTextArray(dto.mustHaveSkills);
@@ -529,17 +556,10 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     if (opportunity.moderationStatus === 'suspended') {
       throw new ForbiddenException(
         'Suspended marketplace opportunities cannot be published',
-      );
-    }
-
-    const profile = await this.requireProfileByUserId(userId);
-    if (!this.isProfileComplete(profile)) {
-      throw new ForbiddenException(
-        'Complete your marketplace profile before publishing briefs',
       );
     }
 
@@ -568,7 +588,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     opportunity.status = 'paused';
     opportunity.updatedAt = Date.now();
     await this.marketplaceRepository.saveOpportunity(opportunity);
@@ -581,8 +601,20 @@ export class MarketplaceService {
   async listMyOpportunities(
     userId: string,
   ): Promise<MarketplaceOpportunitiesListResponse> {
-    const opportunities = (await this.marketplaceRepository.listOpportunities())
-      .filter((opportunity) => opportunity.ownerUserId === userId)
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'client',
+    );
+    const opportunities = (
+      await Promise.all(
+        (await this.marketplaceRepository.listOpportunities()).map(
+          (opportunity) => this.ensureOpportunityWorkspace(opportunity),
+        ),
+      )
+    )
+      .filter(
+        (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
+      )
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
     return {
@@ -670,7 +702,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
 
     const applications = (await this.marketplaceRepository.listApplications())
       .filter((application) => application.opportunityId === opportunityId)
@@ -688,7 +720,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceMatchesResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     const applications = (
       await this.marketplaceRepository.listApplications()
     ).filter((application) => application.opportunityId === opportunityId);
@@ -714,10 +746,21 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    if (
-      application.applicantUserId !== userId &&
-      opportunity.ownerUserId !== userId
-    ) {
+    const applicantWorkspace = await this.ensureApplicationWorkspace(application);
+    const opportunityWorkspace = await this.ensureOpportunityWorkspace(opportunity);
+    const canAccessAsApplicant =
+      applicantWorkspace.applicantWorkspaceId !== null &&
+      (await this.organizationsService.findAccessibleWorkspace(
+        userId,
+        applicantWorkspace.applicantWorkspaceId,
+      )) !== null;
+    const canAccessAsOwner =
+      opportunityWorkspace.ownerWorkspaceId !== null &&
+      (await this.organizationsService.findAccessibleWorkspace(
+        userId,
+        opportunityWorkspace.ownerWorkspaceId,
+      )) !== null;
+    if (!canAccessAsApplicant && !canAccessAsOwner) {
       throw new ForbiddenException(
         'You do not have access to this application dossier',
       );
@@ -732,6 +775,11 @@ export class MarketplaceService {
     opportunityId: string,
     dto: ApplyToOpportunityDto,
   ): Promise<MarketplaceOpportunityResponse> {
+    const freelancerWorkspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+      'applyToOpportunity',
+    );
     const opportunity = await this.requireOpportunity(opportunityId);
     const applicant = await this.usersService.getRequiredById(userId);
 
@@ -749,7 +797,7 @@ export class MarketplaceService {
       throw new ForbiddenException('Marketplace opportunity is not available');
     }
 
-    const profile = await this.requireProfileByUserId(userId);
+    const profile = await this.requireProfileByUserId(userId, freelancerWorkspace);
     if (profile.moderationStatus === 'suspended') {
       throw new ForbiddenException('Suspended marketplace talent cannot apply');
     }
@@ -800,6 +848,8 @@ export class MarketplaceService {
       id: existing?.id ?? randomUUID(),
       opportunityId,
       applicantUserId: userId,
+      applicantOrganizationId: freelancerWorkspace.organizationId,
+      applicantWorkspaceId: freelancerWorkspace.workspaceId,
       coverNote: dto.coverNote,
       proposedRate: dto.proposedRate ?? null,
       selectedWalletAddress: selectedWallet.address,
@@ -896,8 +946,20 @@ export class MarketplaceService {
   async listMyApplications(
     userId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
-    const applications = (await this.marketplaceRepository.listApplications())
-      .filter((application) => application.applicantUserId === userId)
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+    );
+    const applications = (
+      await Promise.all(
+        (await this.marketplaceRepository.listApplications()).map(
+          (application) => this.ensureApplicationWorkspace(application),
+        ),
+      )
+    )
+      .filter(
+        (application) => application.applicantWorkspaceId === workspace.workspaceId,
+      )
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
     return {
@@ -914,8 +976,14 @@ export class MarketplaceService {
     applicationId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
-
-    if (application.applicantUserId !== userId) {
+    const hydrated = await this.ensureApplicationWorkspace(application);
+    if (
+      !hydrated.applicantWorkspaceId ||
+      !(await this.organizationsService.findAccessibleWorkspace(
+        userId,
+        hydrated.applicantWorkspaceId,
+      ))
+    ) {
       throw new ForbiddenException(
         'Only the applicant can withdraw this application',
       );
@@ -940,7 +1008,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
     application.status = 'shortlisted';
@@ -957,7 +1025,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
     application.status = 'rejected';
@@ -974,7 +1042,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity);
     this.assertOpportunityOpenForDecision(opportunity);
 
     const dossier = await this.buildApplicationDossier(application);
@@ -1483,12 +1551,15 @@ export class MarketplaceService {
     };
   }
 
-  private async requireProfileByUserId(userId: string) {
+  private async requireProfileByUserId(
+    userId: string,
+    workspace?: WorkspaceSummary,
+  ) {
     const profile = await this.marketplaceRepository.getProfileByUserId(userId);
     if (!profile) {
       throw new NotFoundException('Marketplace profile not found');
     }
-    return profile;
+    return this.ensureProfileWorkspace(profile, workspace);
   }
 
   private async requireOpportunity(opportunityId: string) {
@@ -1497,7 +1568,7 @@ export class MarketplaceService {
     if (!opportunity) {
       throw new NotFoundException('Marketplace opportunity not found');
     }
-    return opportunity;
+    return this.ensureOpportunityWorkspace(opportunity);
   }
 
   private async requireApplication(applicationId: string) {
@@ -1506,7 +1577,7 @@ export class MarketplaceService {
     if (!application) {
       throw new NotFoundException('Marketplace application not found');
     }
-    return application;
+    return this.ensureApplicationWorkspace(application);
   }
 
   private async requireAbuseReport(reportId: string) {
@@ -1521,11 +1592,12 @@ export class MarketplaceService {
   private async toProfileView(
     profile: MarketplaceProfileRecord,
   ): Promise<MarketplaceProfileView> {
-    const user = await this.usersService.getRequiredById(profile.userId);
+    const hydratedProfile = await this.ensureProfileWorkspace(profile);
+    const user = await this.usersService.getRequiredById(hydratedProfile.userId);
     const escrowStats = await this.getEscrowStats(user);
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
     return {
-      ...profile,
+      ...hydratedProfile,
       verifiedWalletAddress,
       verificationLevel: this.computeVerificationLevel(
         verifiedWalletAddress,
@@ -1533,25 +1605,26 @@ export class MarketplaceService {
       ),
       escrowStats,
       completedEscrowCount: escrowStats.completionCount,
-      isComplete: this.isProfileComplete(profile),
+      isComplete: this.isProfileComplete(hydratedProfile),
     };
   }
 
   private async toOpportunityView(
     opportunity: MarketplaceOpportunityRecord,
   ): Promise<MarketplaceOpportunityView> {
+    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
     const owner = await this.usersService.getRequiredById(
-      opportunity.ownerUserId,
+      hydratedOpportunity.ownerUserId,
     );
     const applications = await this.marketplaceRepository.listApplications();
 
     return {
-      ...opportunity,
-      owner: await this.toClientSummary(owner),
+      ...hydratedOpportunity,
+      owner: await this.toClientSummary(owner, hydratedOpportunity),
       escrowReadiness: await this.getEscrowReadiness(owner.id),
       applicationCount: applications.filter(
         (application) =>
-          application.opportunityId === opportunity.id &&
+          application.opportunityId === hydratedOpportunity.id &&
           application.status !== 'withdrawn',
       ).length,
     };
@@ -1562,14 +1635,18 @@ export class MarketplaceService {
     viewerUserId?: string,
     prefetchedApplications?: MarketplaceApplicationRecord[],
   ): Promise<MarketplaceOpportunityDetailView> {
-    const base = await this.toOpportunityView(opportunity);
+    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const base = await this.toOpportunityView(hydratedOpportunity);
     const applications =
       prefetchedApplications ??
       (await this.marketplaceRepository.listApplications()).filter(
-        (application) => application.opportunityId === opportunity.id,
+        (application) => application.opportunityId === hydratedOpportunity.id,
       );
 
-    if (viewerUserId && viewerUserId === opportunity.ownerUserId) {
+    if (
+      viewerUserId &&
+      (await this.canAccessOpportunityAsOwner(viewerUserId, hydratedOpportunity))
+    ) {
       const sortedApplications = await Promise.all(
         applications.map(async (application) => ({
           application,
@@ -1595,26 +1672,27 @@ export class MarketplaceService {
     application: MarketplaceApplicationRecord,
     viewerUserId?: string,
   ): Promise<MarketplaceApplicationView> {
+    const hydratedApplication = await this.ensureApplicationWorkspace(application);
     const applicantUser = await this.usersService.getRequiredById(
-      application.applicantUserId,
+      hydratedApplication.applicantUserId,
     );
     const opportunity = await this.requireOpportunity(
-      application.opportunityId,
+      hydratedApplication.opportunityId,
     );
     const owner = await this.usersService.getRequiredById(
       opportunity.ownerUserId,
     );
     const applicantSummary = await this.toTalentSummary(applicantUser);
     const dossier = await this.buildApplicationDossier(
-      application,
+      hydratedApplication,
       opportunity,
       applicantSummary,
     );
 
     return {
-      ...application,
+      ...hydratedApplication,
       contractPath: await this.resolveApplicationContractPath(
-        application,
+        hydratedApplication,
         applicantUser,
         viewerUserId,
       ),
@@ -1629,6 +1707,7 @@ export class MarketplaceService {
             ?.displayName ??
           owner.email.split('@')[0] ??
           owner.id,
+        ownerWorkspaceId: opportunity.ownerWorkspaceId,
       },
       fitScore: dossier.matchSummary.fitScore,
       fitBreakdown: dossier.matchSummary.fitBreakdown,
@@ -1782,6 +1861,7 @@ export class MarketplaceService {
 
   private async toClientSummary(
     user: UserRecord,
+    opportunity?: MarketplaceOpportunityRecord,
   ): Promise<MarketplaceClientSummary> {
     const profile = await this.marketplaceRepository.getProfileByUserId(
       user.id,
@@ -1789,6 +1869,9 @@ export class MarketplaceService {
 
     return {
       userId: user.id,
+      organizationId: opportunity?.ownerOrganizationId ?? null,
+      workspaceId: opportunity?.ownerWorkspaceId ?? null,
+      workspaceKind: 'client',
       displayName: profile?.displayName ?? user.email.split('@')[0] ?? user.id,
       profileSlug: profile?.slug ?? null,
     };
@@ -1797,14 +1880,18 @@ export class MarketplaceService {
   private async toTalentSummary(
     user: UserRecord,
   ): Promise<MarketplaceTalentSummary> {
-    const profile = await this.marketplaceRepository.getProfileByUserId(
-      user.id,
-    );
+    const rawProfile = await this.marketplaceRepository.getProfileByUserId(user.id);
+    const profile = rawProfile
+      ? await this.ensureProfileWorkspace(rawProfile)
+      : null;
     const escrowStats = await this.getEscrowStats(user);
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
 
     return {
       userId: user.id,
+      organizationId: profile?.organizationId ?? null,
+      workspaceId: profile?.workspaceId ?? null,
+      workspaceKind: 'freelancer',
       displayName: profile?.displayName ?? user.email.split('@')[0] ?? user.id,
       profileSlug: profile?.slug ?? null,
       headline: profile?.headline ?? 'Marketplace applicant',
@@ -2013,7 +2100,8 @@ export class MarketplaceService {
       return [];
     }
 
-    return [...profile.skills, ...profile.specialties];
+    const hydratedProfile = await this.ensureProfileWorkspace(profile);
+    return [...hydratedProfile.skills, ...hydratedProfile.specialties];
   }
 
   private validateScreeningAnswers(
@@ -2190,15 +2278,117 @@ export class MarketplaceService {
       : 'smart_account_required';
   }
 
-  private assertOpportunityOwner(
+  private async assertOpportunityOwner(
     userId: string,
     opportunity: MarketplaceOpportunityRecord,
   ) {
-    if (opportunity.ownerUserId !== userId) {
+    if (!(await this.canAccessOpportunityAsOwner(userId, opportunity))) {
       throw new ForbiddenException(
         'Only the client who owns the opportunity can do that',
       );
     }
+  }
+
+  private async canAccessOpportunityAsOwner(
+    userId: string,
+    opportunity: MarketplaceOpportunityRecord,
+  ) {
+    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    if (hydratedOpportunity.ownerWorkspaceId) {
+      const workspace = await this.organizationsService.findAccessibleWorkspace(
+        userId,
+        hydratedOpportunity.ownerWorkspaceId,
+      );
+      if (workspace) {
+        return true;
+      }
+    }
+
+    return hydratedOpportunity.ownerUserId === userId;
+  }
+
+  private async ensureProfileWorkspace(
+    profile: MarketplaceProfileRecord,
+    workspace?: WorkspaceSummary,
+  ) {
+    if (profile.organizationId && profile.workspaceId) {
+      return profile;
+    }
+
+    const nextWorkspace =
+      workspace ??
+      (await this.requireUserWorkspaceByKind(profile.userId, 'freelancer'));
+    const next: MarketplaceProfileRecord = {
+      ...profile,
+      organizationId: nextWorkspace.organizationId,
+      workspaceId: nextWorkspace.workspaceId,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveProfile(next);
+    return next;
+  }
+
+  private async ensureOpportunityWorkspace(
+    opportunity: MarketplaceOpportunityRecord,
+  ) {
+    if (opportunity.ownerOrganizationId && opportunity.ownerWorkspaceId) {
+      return opportunity;
+    }
+
+    const workspace = await this.requireUserWorkspaceByKind(
+      opportunity.ownerUserId,
+      'client',
+    );
+    const next: MarketplaceOpportunityRecord = {
+      ...opportunity,
+      ownerOrganizationId: workspace.organizationId,
+      ownerWorkspaceId: workspace.workspaceId,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveOpportunity(next);
+    return next;
+  }
+
+  private async ensureApplicationWorkspace(
+    application: MarketplaceApplicationRecord,
+  ) {
+    if (application.applicantOrganizationId && application.applicantWorkspaceId) {
+      return application;
+    }
+
+    const workspace = await this.requireUserWorkspaceByKind(
+      application.applicantUserId,
+      'freelancer',
+    );
+    const next: MarketplaceApplicationRecord = {
+      ...application,
+      applicantOrganizationId: workspace.organizationId,
+      applicantWorkspaceId: workspace.workspaceId,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveApplication(next);
+    return next;
+  }
+
+  private async requireUserWorkspaceByKind(
+    userId: string,
+    workspaceKind: WorkspaceSummary['kind'],
+  ) {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const workspace =
+      context.workspaces.find(
+        (candidate) =>
+          candidate.kind === workspaceKind &&
+          candidate.isDefault,
+      ) ??
+      context.workspaces.find((candidate) => candidate.kind === workspaceKind) ??
+      null;
+    if (!workspace) {
+      throw new NotFoundException(
+        `Workspace ${workspaceKind} not found for marketplace user`,
+      );
+    }
+    return workspace;
   }
 
   private assertOpportunityOpenForDecision(

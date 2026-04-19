@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PersistenceModule } from '../../persistence/persistence.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
 import { AuthConfigService } from './auth.config';
 import { AuthController } from './auth.controller';
@@ -13,7 +14,7 @@ import { OtpStore } from './otp.store';
 import { SessionsService } from './sessions.service';
 
 @Module({
-  imports: [PersistenceModule, UsersModule, AuthEmailModule],
+  imports: [PersistenceModule, UsersModule, OrganizationsModule, AuthEmailModule],
   controllers: [AuthController],
   providers: [
     AuthConfigService,

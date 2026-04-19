@@ -4,6 +4,7 @@ import type {
   EscrowHealthReport,
   RuntimeProfile,
   SessionTokens,
+  WorkspaceSummary,
   UserCapabilities,
   UserProfile,
   WalletLinkChallenge,
@@ -107,6 +108,25 @@ export function createUserProfile(
   const controlsArbitratorWallet = wallets.some(
     (wallet) => wallet.address === createHexAddress('2'),
   );
+  const operatorWorkspace: WorkspaceSummary = {
+    workspaceId: 'workspace-client-operator',
+    kind: 'client',
+    label: 'Personal client workspace',
+    slug: 'personal-client-operator',
+    organizationId: 'org-personal-operator',
+    organizationName: 'Personal workspace',
+    organizationSlug: 'personal-operator',
+    organizationKind: 'personal',
+    roles: ['client_owner'],
+    capabilities: {
+      manageProfile: false,
+      applyToOpportunity: false,
+      createOpportunity: true,
+      reviewApplications: true,
+      manageWorkspace: true,
+    },
+    isDefault: true,
+  };
   return {
     id: 'operator-user-1',
     email: 'operator@example.com',
@@ -114,6 +134,8 @@ export function createUserProfile(
     defaultExecutionWalletAddress: null,
     wallets,
     capabilities: createUserCapabilities({}, { controlsArbitratorWallet }),
+    workspaces: [operatorWorkspace],
+    activeWorkspace: operatorWorkspace,
   };
 }
 

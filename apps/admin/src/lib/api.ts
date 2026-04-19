@@ -48,6 +48,35 @@ export type UserCapabilities = {
   marketplaceModeration: UserCapability;
 };
 
+export type WorkspaceKind = 'client' | 'freelancer';
+export type OrganizationKind = 'personal' | 'client';
+export type OrganizationRole =
+  | 'client_owner'
+  | 'client_recruiter'
+  | 'freelancer'
+  | 'operator'
+  | 'moderator';
+export type WorkspaceCapabilities = {
+  manageProfile: boolean;
+  applyToOpportunity: boolean;
+  createOpportunity: boolean;
+  reviewApplications: boolean;
+  manageWorkspace: boolean;
+};
+export type WorkspaceSummary = {
+  workspaceId: string;
+  kind: WorkspaceKind;
+  label: string;
+  slug: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationKind: OrganizationKind;
+  roles: OrganizationRole[];
+  capabilities: WorkspaceCapabilities;
+  isDefault: boolean;
+};
+
 export type UserProfile = {
   id: string;
   email: string;
@@ -55,6 +84,8 @@ export type UserProfile = {
   defaultExecutionWalletAddress: string | null;
   wallets: UserWallet[];
   capabilities: UserCapabilities;
+  workspaces: WorkspaceSummary[];
+  activeWorkspace: WorkspaceSummary | null;
 };
 
 export type WalletState = {

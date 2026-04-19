@@ -7,11 +7,13 @@ import {
   FileUsersRepository,
   FileWalletLinkChallengesRepository,
 } from './file/file.repositories';
+import { FileOrganizationsRepository } from './file/file.organizations.repositories';
 import { FileMarketplaceRepository } from './file/file.marketplace.repositories';
 import { FilePersistenceStore } from './file/file-persistence.store';
 import { PersistenceConfigService } from './persistence.config';
 import {
   ESCROW_REPOSITORY,
+  ORGANIZATIONS_REPOSITORY,
   MARKETPLACE_REPOSITORY,
   OTP_REPOSITORY,
   OTP_REQUEST_THROTTLES_REPOSITORY,
@@ -29,6 +31,7 @@ import {
   PostgresWalletLinkChallengesRepository,
 } from './postgres/postgres.repositories';
 import { PostgresMarketplaceRepository } from './postgres/postgres.marketplace.repositories';
+import { PostgresOrganizationsRepository } from './postgres/postgres.organizations.repositories';
 
 @Global()
 @Module({
@@ -51,6 +54,22 @@ import { PostgresMarketplaceRepository } from './postgres/postgres.marketplace.r
         config.driver === 'file'
           ? new FileUsersRepository(fileStore)
           : new PostgresUsersRepository(db),
+    },
+    {
+      provide: ORGANIZATIONS_REPOSITORY,
+      inject: [
+        PersistenceConfigService,
+        FilePersistenceStore,
+        PostgresDatabaseService,
+      ],
+      useFactory: (
+        config: PersistenceConfigService,
+        fileStore: FilePersistenceStore,
+        db: PostgresDatabaseService,
+      ) =>
+        config.driver === 'file'
+          ? new FileOrganizationsRepository(fileStore)
+          : new PostgresOrganizationsRepository(db),
     },
     {
       provide: OTP_REPOSITORY,
@@ -153,6 +172,7 @@ import { PostgresMarketplaceRepository } from './postgres/postgres.marketplace.r
     PersistenceConfigService,
     PostgresDatabaseService,
     USERS_REPOSITORY,
+    ORGANIZATIONS_REPOSITORY,
     OTP_REPOSITORY,
     OTP_REQUEST_THROTTLES_REPOSITORY,
     SESSIONS_REPOSITORY,

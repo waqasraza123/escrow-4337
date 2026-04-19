@@ -4,32 +4,38 @@
 - 2026-04-19
 
 ## Current Objective
-- Implement the next production-grade Phase 0 slice inside Workstream 0.7: keep pushing all release consumers onto the canonical launch posture artifact instead of mixed nested summaries.
+- Implement the combined Phase 0 + Phase 1 identity/workspace baseline from the new marketplace plan:
+  - keep the Phase 0 launch/evidence hardening intact
+  - normalize marketplace ownership around organizations and workspaces
+  - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
 
 ## Last Completed Step
-- Wired GitHub promotion consumers onto the canonical launch posture artifact:
-  - `Launch Candidate` review artifacts now upload `launch-evidence-posture.json`
-  - `Promotion Review` now requires `--launch-evidence-posture` and validates it against `promotion-record.json` plus `evidence-manifest.json`
-  - promotion review markdown now surfaces canonical posture status, blocker/warning counts, artifact counts, and provider counts
-  - launch/readiness runbooks now name `launch-evidence-posture.json` as the canonical compact operator artifact
+- Landed the Phase 1 ownership and workspace baseline across API, persistence, auth payloads, and web workspace:
+  - added `organizations`, `organization_memberships`, and `workspaces` persistence plus migration `018_organizations_workspaces.sql`
+  - added `OrganizationsService` and protected `/organizations`, `/memberships`, `/role-capabilities`, and `/workspaces/select`
+  - auth `verify` and `me` now return `workspaces[]` plus `activeWorkspace`
+  - marketplace ownership now lazily backfills and persists organization/workspace ids for profiles, opportunities, and applications
+  - the web marketplace workspace now renders explicit client vs freelancer modes with a workspace switcher
 
 ## Current Step
-- Commit and push the workflow-consumer posture integration, then continue Workstream 0.7 by driving the same canonical posture into any remaining release tooling or operator drill paths.
+- Finalize verification and record the new architecture in repo memory so the next implementation step can move from identity/workspace normalization into deeper Phase 1 client/freelancer workflow work.
 
 ## Why This Step Exists
-- Phase 0 already has a canonical launch posture artifact and the release dossier validates it, but the stable release pointer was still partially rebuilding that state from mixed nested fields. This step removes that drift by making the pointer prefer the canonical posture directly.
+- The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
 
 ## Changed Files
-- Workflow and promotion review posture integration:
-  `.github/workflows/launch-candidate.yml`
-  `.github/workflows/promotion-review.yml`
-  `scripts/promotion-review.mjs`
-  `scripts/promotion-review-lib.mjs`
-  `scripts/promotion-review-lib.test.mjs`
+- Identity/workspace model:
+  `services/api/src/modules/organizations/*`
+  `services/api/src/persistence/postgres/migrations/018_organizations_workspaces.sql`
+  `services/api/src/persistence/{persistence.module.ts,persistence.tokens.ts,persistence.types.ts}`
+  `services/api/src/persistence/file/{file-persistence.store.ts,file.organizations.repositories.ts,file.repositories.ts}`
+  `services/api/src/persistence/postgres/{postgres.organizations.repositories.ts,postgres.marketplace.repositories.ts,postgres.repositories.ts}`
+- Auth/user/marketplace integration:
+  `services/api/src/modules/{auth,users,marketplace}/**/*`
+- Frontend/admin session shape and marketplace workspace:
+  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,test/fixtures.ts}`
+  `apps/admin/src/{lib/api.ts,test/fixtures.ts}`
 - Docs:
-  `docs/LAUNCH_READINESS.md`
-  `docs/DEPLOYMENT_RUNBOOK.md`
-  `docs/STAGING_EXECUTION_SEQUENCE.md`
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -42,21 +48,34 @@
 
 ## Verification Commands
 - `git diff --check`
-- `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts test/auth.integration.spec.ts`
+- `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+- `pnpm --filter web typecheck`
+- `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+- `pnpm --filter admin typecheck`
 - `pnpm build`
 
 ## Verification Status
 - Passed:
   - `git diff --check`
-  - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts test/auth.integration.spec.ts`
+  - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - `pnpm --filter web typecheck`
+  - `pnpm --filter admin test src/app/page.spec.tsx src/app/marketplace/marketplace-moderation.spec.tsx`
+  - `pnpm --filter admin typecheck`
   - `pnpm build`
 - Blocked or not run:
   - real staged deployment validation against live staging secrets and URLs
-  - real staged deployed marketplace canaries with the new marketplace-origin artifact contract
-  - real promotion/release workflows consuming the new canonical `launch-evidence-posture.json` artifact in GitHub Actions
+  - real Phase 0 staging proof against launch-candidate evidence artifacts
+  - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue Workstream 0.7 by pushing the canonical posture into any remaining release-drill or operator-facing tooling, especially places still reconstructing launch posture from nested dossier fields instead of consuming `launch-evidence-posture.json` directly.
+- Continue the combined Phase 0 + Phase 1 program by adding organization-aware marketplace workflows on top of the new workspace baseline:
+  - client organization creation/use from the web app
+  - workspace-aware navigation and copy cleanup
+  - deeper client/freelancer separation for profile/apply/review/hire flows
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.

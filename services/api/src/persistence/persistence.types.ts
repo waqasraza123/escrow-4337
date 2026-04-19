@@ -5,6 +5,11 @@ import type {
 } from '../modules/auth/auth.types';
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type {
+  OrganizationMembershipRecord,
+  OrganizationRecord,
+  WorkspaceRecord,
+} from '../modules/organizations/organizations.types';
+import type {
   EscrowExecutionRecord,
   EscrowChainCursorRecord,
   EscrowChainEventRecord,
@@ -25,6 +30,24 @@ export interface UsersRepository {
   getByWalletAddress(address: string): Promise<UserRecord | null>;
   create(user: UserRecord): Promise<UserRecord>;
   update(user: UserRecord): Promise<UserRecord>;
+}
+
+export interface OrganizationsRepository {
+  getOrganizationById(id: string): Promise<OrganizationRecord | null>;
+  getOrganizationBySlug(slug: string): Promise<OrganizationRecord | null>;
+  listOrganizationsByUserId(userId: string): Promise<OrganizationRecord[]>;
+  listMembershipsByUserId(
+    userId: string,
+  ): Promise<OrganizationMembershipRecord[]>;
+  listMembershipsByOrganizationId(
+    organizationId: string,
+  ): Promise<OrganizationMembershipRecord[]>;
+  listWorkspacesByUserId(userId: string): Promise<WorkspaceRecord[]>;
+  listWorkspacesByOrganizationId(organizationId: string): Promise<WorkspaceRecord[]>;
+  getWorkspaceById(id: string): Promise<WorkspaceRecord | null>;
+  saveOrganization(organization: OrganizationRecord): Promise<void>;
+  saveMembership(membership: OrganizationMembershipRecord): Promise<void>;
+  saveWorkspace(workspace: WorkspaceRecord): Promise<void>;
 }
 
 export interface OtpRepository {
@@ -129,8 +152,11 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 19;
+  version: 20;
   users: Record<string, UserRecord>;
+  organizations: Record<string, OrganizationRecord>;
+  organizationMemberships: Record<string, OrganizationMembershipRecord>;
+  workspaces: Record<string, WorkspaceRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
   sessions: Record<string, SessionRecord>;

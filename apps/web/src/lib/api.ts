@@ -46,6 +46,63 @@ export type UserCapabilities = {
   marketplaceModeration: UserCapability;
 };
 
+export type WorkspaceKind = 'client' | 'freelancer';
+export type OrganizationKind = 'personal' | 'client';
+export type OrganizationRole =
+  | 'client_owner'
+  | 'client_recruiter'
+  | 'freelancer'
+  | 'operator'
+  | 'moderator';
+export type WorkspaceCapabilities = {
+  manageProfile: boolean;
+  applyToOpportunity: boolean;
+  createOpportunity: boolean;
+  reviewApplications: boolean;
+  manageWorkspace: boolean;
+};
+export type WorkspaceSummary = {
+  workspaceId: string;
+  kind: WorkspaceKind;
+  label: string;
+  slug: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationKind: OrganizationKind;
+  roles: OrganizationRole[];
+  capabilities: WorkspaceCapabilities;
+  isDefault: boolean;
+};
+export type OrganizationSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  kind: OrganizationKind;
+  roles: OrganizationRole[];
+  workspaces: WorkspaceSummary[];
+};
+export type OrganizationMembership = {
+  membershipId: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationKind: OrganizationKind;
+  role: OrganizationRole;
+  status: 'active';
+  workspaceIds: string[];
+};
+export type RoleCapabilitiesResponse = {
+  activeWorkspace: WorkspaceSummary | null;
+  workspaceRoles: Record<
+    WorkspaceKind,
+    {
+      roles: OrganizationRole[];
+      capabilities: WorkspaceCapabilities;
+    }
+  >;
+};
+
 export type UserProfile = {
   id: string;
   email: string;
@@ -53,6 +110,8 @@ export type UserProfile = {
   defaultExecutionWalletAddress: string | null;
   wallets: UserWallet[];
   capabilities: UserCapabilities;
+  workspaces: WorkspaceSummary[];
+  activeWorkspace: WorkspaceSummary | null;
 };
 
 export type WalletState = {
@@ -396,6 +455,8 @@ export type MarketplaceApplicationDossier = {
 
 export type MarketplaceProfile = {
   userId: string;
+  organizationId: string | null;
+  workspaceId: string | null;
   slug: string;
   displayName: string;
   headline: string;
@@ -419,6 +480,8 @@ export type MarketplaceProfile = {
 
 export type MarketplaceOpportunity = {
   id: string;
+  ownerOrganizationId: string | null;
+  ownerWorkspaceId: string | null;
   title: string;
   summary: string;
   description: string;
@@ -445,6 +508,9 @@ export type MarketplaceOpportunity = {
   updatedAt: number;
   owner: {
     userId: string;
+    organizationId: string | null;
+    workspaceId: string | null;
+    workspaceKind: 'client';
     displayName: string;
     profileSlug: string | null;
   };
@@ -455,6 +521,8 @@ export type MarketplaceOpportunity = {
 export type MarketplaceApplication = {
   id: string;
   opportunityId: string;
+  applicantOrganizationId: string | null;
+  applicantWorkspaceId: string | null;
   coverNote: string;
   proposedRate: string | null;
   selectedWalletAddress: string;
@@ -471,6 +539,9 @@ export type MarketplaceApplication = {
   updatedAt: number;
   applicant: {
     userId: string;
+    organizationId: string | null;
+    workspaceId: string | null;
+    workspaceKind: 'freelancer';
     displayName: string;
     profileSlug: string | null;
     headline: string;
@@ -487,6 +558,7 @@ export type MarketplaceApplication = {
     visibility: OpportunityVisibility;
     status: OpportunityStatus;
     ownerDisplayName: string;
+    ownerWorkspaceId: string | null;
   };
   fitScore: number;
   fitBreakdown: MarketplaceFitBreakdownEntry[];
@@ -594,6 +666,62 @@ export const webApi = {
   },
   me(accessToken: string) {
     return requestJson<UserProfile>(apiBaseUrl, '/auth/me', { method: 'GET' }, accessToken);
+  },
+  listOrganizations(accessToken: string) {
+    return requestJson<{ organizations: OrganizationSummary[] }>(
+      apiBaseUrl,
+      '/organizations',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listMemberships(accessToken: string) {
+    return requestJson<{ memberships: OrganizationMembership[] }>(
+      apiBaseUrl,
+      '/memberships',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getRoleCapabilities(accessToken: string) {
+    return requestJson<RoleCapabilitiesResponse>(
+      apiBaseUrl,
+      '/role-capabilities',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createOrganization(
+    input: {
+      name: string;
+      slug?: string;
+      setActive?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ organization: OrganizationSummary }>(
+      apiBaseUrl,
+      '/organizations',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  selectWorkspace(workspaceId: string, accessToken: string) {
+    return requestJson<{
+      activeWorkspace: WorkspaceSummary;
+      workspaces: WorkspaceSummary[];
+    }>(
+      apiBaseUrl,
+      '/workspaces/select',
+      {
+        method: 'POST',
+        body: JSON.stringify({ workspaceId }),
+      },
+      accessToken,
+    );
   },
   setShariah(shariah: boolean, accessToken: string) {
     return requestJson<UserProfile>(

@@ -40,6 +40,7 @@ export class UsersService {
       email: normalizedEmail,
       shariahMode: false,
       defaultExecutionWalletAddress: null,
+      activeWorkspaceId: null,
       wallets: [],
       createdAt: now,
       updatedAt: now,
@@ -101,6 +102,15 @@ export class UsersService {
     return this.usersRepository.update({
       ...user,
       defaultExecutionWalletAddress: normalizedAddress,
+      updatedAt: Date.now(),
+    });
+  }
+
+  async setActiveWorkspace(userId: string, workspaceId: string | null) {
+    const user = await this.getRequiredById(userId);
+    return this.usersRepository.update({
+      ...user,
+      activeWorkspaceId: workspaceId,
       updatedAt: Date.now(),
     });
   }

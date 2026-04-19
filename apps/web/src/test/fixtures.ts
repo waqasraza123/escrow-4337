@@ -3,6 +3,7 @@ import type {
   JobView,
   JobsListResponse,
   SessionTokens,
+  WorkspaceSummary,
   UserCapabilities,
   UserProfile,
   VerifyResponse,
@@ -128,6 +129,44 @@ export function createUserCapabilities(
 
 export function createUserProfile(): UserProfile {
   const walletState = createWalletState();
+  const clientWorkspace: WorkspaceSummary = {
+    workspaceId: 'workspace-client-1',
+    kind: 'client',
+    label: 'Personal client workspace',
+    slug: 'personal-client-user-1',
+    organizationId: 'org-personal-1',
+    organizationName: 'Personal workspace',
+    organizationSlug: 'personal-user-1',
+    organizationKind: 'personal',
+    roles: ['client_owner'],
+    capabilities: {
+      manageProfile: false,
+      applyToOpportunity: false,
+      createOpportunity: true,
+      reviewApplications: true,
+      manageWorkspace: true,
+    },
+    isDefault: true,
+  };
+  const freelancerWorkspace: WorkspaceSummary = {
+    workspaceId: 'workspace-freelancer-1',
+    kind: 'freelancer',
+    label: 'Personal freelancer workspace',
+    slug: 'personal-freelancer-user-1',
+    organizationId: 'org-personal-1',
+    organizationName: 'Personal workspace',
+    organizationSlug: 'personal-user-1',
+    organizationKind: 'personal',
+    roles: ['freelancer'],
+    capabilities: {
+      manageProfile: true,
+      applyToOpportunity: true,
+      createOpportunity: false,
+      reviewApplications: false,
+      manageWorkspace: false,
+    },
+    isDefault: true,
+  };
 
   return {
     id: 'user-1',
@@ -136,6 +175,8 @@ export function createUserProfile(): UserProfile {
     defaultExecutionWalletAddress: walletState.defaultExecutionWalletAddress,
     wallets: walletState.wallets,
     capabilities: createUserCapabilities(),
+    workspaces: [clientWorkspace, freelancerWorkspace],
+    activeWorkspace: clientWorkspace,
   };
 }
 

@@ -64,6 +64,9 @@ describe('marketplace workspace', () => {
           updatedAt: 10,
           owner: {
             userId: 'client-2',
+            organizationId: 'org-client-2',
+            workspaceId: 'workspace-client-2',
+            workspaceKind: 'client',
             displayName: 'Client Two',
             profileSlug: 'client-two',
           },
@@ -78,10 +81,72 @@ describe('marketplace workspace', () => {
       shariahMode: false,
       defaultExecutionWalletAddress: '0x5555555555555555555555555555555555555555',
       wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+        {
+          workspaceId: 'workspace-freelancer-1',
+          kind: 'freelancer',
+          label: 'Personal freelancer workspace',
+          slug: 'personal-freelancer-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['freelancer'],
+          capabilities: {
+            manageProfile: true,
+            applyToOpportunity: true,
+            createOpportunity: false,
+            reviewApplications: false,
+            manageWorkspace: false,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-freelancer-1',
+        kind: 'freelancer',
+        label: 'Personal freelancer workspace',
+        slug: 'personal-freelancer-client-1',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['freelancer'],
+        capabilities: {
+          manageProfile: true,
+          applyToOpportunity: true,
+          createOpportunity: false,
+          reviewApplications: false,
+          manageWorkspace: false,
+        },
+        isDefault: true,
+      },
     });
     mockedWebApi.getMyMarketplaceProfile.mockResolvedValue({
       profile: {
         userId: 'client-1',
+        organizationId: 'org-personal-1',
+        workspaceId: 'workspace-freelancer-1',
         slug: 'client-one',
         displayName: 'Client One',
         headline: 'Hiring through escrow',
@@ -150,6 +215,9 @@ describe('marketplace workspace', () => {
           updatedAt: 20,
           owner: {
             userId: 'client-1',
+            organizationId: 'org-personal-1',
+            workspaceId: 'workspace-client-1',
+            workspaceKind: 'client',
             displayName: 'Client One',
             profileSlug: 'client-one',
           },
@@ -179,6 +247,9 @@ describe('marketplace workspace', () => {
           updatedAt: 20,
           applicant: {
             userId: 'talent-1',
+            organizationId: 'org-talent-1',
+            workspaceId: 'workspace-freelancer-talent-1',
+            workspaceKind: 'freelancer',
             displayName: 'Builder One',
             profileSlug: 'builder-one',
             headline: 'Full-stack contractor',
@@ -204,6 +275,7 @@ describe('marketplace workspace', () => {
             visibility: 'private',
             status: 'hired',
             ownerDisplayName: 'Client One',
+            ownerWorkspaceId: 'workspace-client-1',
           },
           fitScore: 88,
           fitBreakdown: [],
@@ -277,10 +349,8 @@ describe('marketplace workspace', () => {
       screen.getByRole('heading', { name: 'Credibility profile' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Create hiring spec' }),
+      screen.getByRole('heading', { name: 'My applications' }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Must-have skills')).toBeInTheDocument();
-    expect(screen.getByLabelText('Screening questions')).toBeInTheDocument();
     expect(screen.getByLabelText('External proof URLs')).toBeInTheDocument();
     expect(
       within(screen.getByTestId('marketplace-my-application-app-1')).getByRole('link', {
@@ -299,6 +369,47 @@ describe('marketplace workspace', () => {
       shariahMode: false,
       defaultExecutionWalletAddress: null,
       wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'مساحة العميل',
+          slug: 'client-workspace',
+          organizationId: 'org-personal-1',
+          organizationName: 'مساحة شخصية',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-1',
+        kind: 'client',
+        label: 'مساحة العميل',
+        slug: 'client-workspace',
+        organizationId: 'org-personal-1',
+        organizationName: 'مساحة شخصية',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['client_owner'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: true,
+          reviewApplications: true,
+          manageWorkspace: true,
+        },
+        isDefault: true,
+      },
     });
     mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
     mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
@@ -325,7 +436,6 @@ describe('marketplace workspace', () => {
       expect(screen.getByText('مسار السوق')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('heading', { name: 'ملف الموثوقية' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'إنشاء مواصفات التوظيف' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'السوق العام' })).toHaveAttribute(
       'href',
@@ -333,6 +443,5 @@ describe('marketplace workspace', () => {
     );
     expect(screen.getByRole('button', { name: 'تسجيل الخروج' })).toBeInTheDocument();
     expect(screen.getByLabelText('المهارات الأساسية')).toBeInTheDocument();
-    expect(screen.getByLabelText('روابط الإثبات الخارجية')).toBeInTheDocument();
   });
 });

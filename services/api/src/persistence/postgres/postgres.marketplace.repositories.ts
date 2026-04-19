@@ -17,6 +17,8 @@ import { PostgresDatabaseService } from './postgres-database.service';
 
 type MarketplaceProfileRow = QueryResultRow & {
   user_id: string;
+  organization_id: string | null;
+  workspace_id: string | null;
   slug: string;
   display_name: string;
   headline: string;
@@ -39,6 +41,8 @@ type MarketplaceProfileRow = QueryResultRow & {
 type MarketplaceOpportunityRow = QueryResultRow & {
   id: string;
   owner_user_id: string;
+  owner_organization_id: string | null;
+  owner_workspace_id: string | null;
   title: string;
   summary: string;
   description: string;
@@ -70,6 +74,8 @@ type MarketplaceApplicationRow = QueryResultRow & {
   id: string;
   opportunity_id: string;
   applicant_user_id: string;
+  applicant_organization_id: string | null;
+  applicant_workspace_id: string | null;
   cover_note: string;
   proposed_rate: string | null;
   selected_wallet_address: string;
@@ -117,6 +123,8 @@ type MarketplaceAbuseReportRow = QueryResultRow & {
 function mapProfile(row: MarketplaceProfileRow): MarketplaceProfileRecord {
   return {
     userId: row.user_id,
+    organizationId: row.organization_id,
+    workspaceId: row.workspace_id,
     slug: row.slug,
     displayName: row.display_name,
     headline: row.headline,
@@ -143,6 +151,8 @@ function mapOpportunity(
   return {
     id: row.id,
     ownerUserId: row.owner_user_id,
+    ownerOrganizationId: row.owner_organization_id,
+    ownerWorkspaceId: row.owner_workspace_id,
     title: row.title,
     summary: row.summary,
     description: row.description,
@@ -180,6 +190,8 @@ function mapApplication(
     id: row.id,
     opportunityId: row.opportunity_id,
     applicantUserId: row.applicant_user_id,
+    applicantOrganizationId: row.applicant_organization_id,
+    applicantWorkspaceId: row.applicant_workspace_id,
     coverNote: row.cover_note,
     proposedRate: row.proposed_rate,
     selectedWalletAddress: row.selected_wallet_address,
@@ -285,6 +297,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       `
         INSERT INTO marketplace_profiles (
           user_id,
+          organization_id,
+          workspace_id,
           slug,
           display_name,
           headline,
@@ -304,11 +318,13 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb,
-          $11, $12, $13, $14, $15, $16, $17, $18
+          $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb,
+          $13, $14, $15, $16, $17, $18, $19, $20
         )
         ON CONFLICT (user_id)
         DO UPDATE SET
+          organization_id = EXCLUDED.organization_id,
+          workspace_id = EXCLUDED.workspace_id,
           slug = EXCLUDED.slug,
           display_name = EXCLUDED.display_name,
           headline = EXCLUDED.headline,
@@ -328,6 +344,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       `,
       [
         profile.userId,
+        profile.organizationId,
+        profile.workspaceId,
         profile.slug,
         profile.displayName,
         profile.headline,
@@ -381,6 +399,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         INSERT INTO marketplace_opportunities (
           id,
           owner_user_id,
+          owner_organization_id,
+          owner_workspace_id,
           title,
           summary,
           description,
@@ -408,11 +428,13 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb,
-          $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb,
+          $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
         )
         ON CONFLICT (id)
         DO UPDATE SET
+          owner_organization_id = EXCLUDED.owner_organization_id,
+          owner_workspace_id = EXCLUDED.owner_workspace_id,
           title = EXCLUDED.title,
           summary = EXCLUDED.summary,
           description = EXCLUDED.description,
@@ -441,6 +463,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       [
         opportunity.id,
         opportunity.ownerUserId,
+        opportunity.ownerOrganizationId,
+        opportunity.ownerWorkspaceId,
         opportunity.title,
         opportunity.summary,
         opportunity.description,
@@ -507,6 +531,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           id,
           opportunity_id,
           applicant_user_id,
+          applicant_organization_id,
+          applicant_workspace_id,
           cover_note,
           proposed_rate,
           selected_wallet_address,
@@ -522,11 +548,13 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11::jsonb, $12::jsonb,
-          $13, $14, $15, $16
+          $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13::jsonb, $14::jsonb,
+          $15, $16, $17, $18
         )
         ON CONFLICT (id)
         DO UPDATE SET
+          applicant_organization_id = EXCLUDED.applicant_organization_id,
+          applicant_workspace_id = EXCLUDED.applicant_workspace_id,
           cover_note = EXCLUDED.cover_note,
           proposed_rate = EXCLUDED.proposed_rate,
           selected_wallet_address = EXCLUDED.selected_wallet_address,
@@ -544,6 +572,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         application.id,
         application.opportunityId,
         application.applicantUserId,
+        application.applicantOrganizationId,
+        application.applicantWorkspaceId,
         application.coverNote,
         application.proposedRate,
         application.selectedWalletAddress,

@@ -286,6 +286,10 @@ export function MarketplaceWorkspace() {
   const strongMatches = Object.values(matchesByOpportunity)
     .flat()
     .filter((match) => match.recommendation === 'strong_match').length;
+  const activeWorkspace = user?.activeWorkspace ?? null;
+  const isClientWorkspace = activeWorkspace?.kind === 'client';
+  const isFreelancerWorkspace = activeWorkspace?.kind === 'freelancer';
+  const availableWorkspaces = user?.workspaces ?? [];
 
   const formatOpportunityStatus = (status: MarketplaceOpportunity['status']) =>
     marketplaceMessages.labels.opportunityStatus[status];
@@ -314,15 +318,24 @@ export function MarketplaceWorkspace() {
         return;
       }
 
-      const [me, myProfileResult, myOpportunityResult, myApplicationResult, jobs] =
+      const [me, jobs] = await Promise.all([
+        webApi.me(nextTokens.accessToken),
+        webApi.listJobs(nextTokens.accessToken),
+      ]);
+      const nextWorkspace = me.activeWorkspace;
+      const [myProfileResult, myOpportunityResult, myApplicationResult] =
         await Promise.all([
-          webApi.me(nextTokens.accessToken),
-          webApi
-            .getMyMarketplaceProfile(nextTokens.accessToken)
-            .catch(() => null),
-          webApi.listMyMarketplaceOpportunities(nextTokens.accessToken),
-          webApi.listMyMarketplaceApplications(nextTokens.accessToken),
-          webApi.listJobs(nextTokens.accessToken),
+          nextWorkspace?.kind === 'freelancer'
+            ? webApi
+                .getMyMarketplaceProfile(nextTokens.accessToken)
+                .catch(() => null)
+            : Promise.resolve(null),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listMyMarketplaceOpportunities(nextTokens.accessToken)
+            : Promise.resolve({ opportunities: [] }),
+          nextWorkspace?.kind === 'freelancer'
+            ? webApi.listMyMarketplaceApplications(nextTokens.accessToken)
+            : Promise.resolve({ applications: [] }),
         ]);
 
       setUser(me);
@@ -330,6 +343,8 @@ export function MarketplaceWorkspace() {
       setMyOpportunities(myOpportunityResult.opportunities);
       setMyApplications(myApplicationResult.applications);
       setContracts(jobs.jobs.map((entry) => entry.job));
+      setApplicationsByOpportunity({});
+      setMatchesByOpportunity({});
 
       if (myProfileResult?.profile) {
         const externalProofs = myProfileResult.profile.proofArtifacts
@@ -353,6 +368,8 @@ export function MarketplaceWorkspace() {
           portfolioUrls: myProfileResult.profile.portfolioUrls.join('\n'),
           externalProofUrls: externalProofs,
         });
+      } else {
+        setProfileDraft(createEmptyProfileDraft());
       }
 
       setApplicationDrafts((current) => {
@@ -392,6 +409,17 @@ export function MarketplaceWorkspace() {
     setTokens(null);
     setMessage(workspaceMessages.messages.sessionCleared);
     await loadWorkspace(null);
+  }
+
+  async function handleSelectWorkspace(workspaceId: string) {
+    if (!tokens || user?.activeWorkspace?.workspaceId === workspaceId) {
+      return;
+    }
+
+    setError(null);
+    await webApi.selectWorkspace(workspaceId, tokens.accessToken);
+    setMessage('Workspace switched.');
+    await loadWorkspace(tokens);
   }
 
   async function handleSaveProfile() {
@@ -684,6 +712,36 @@ export function MarketplaceWorkspace() {
         </MotionEmptyState>
       ) : null}
 
+      {!loading && tokens && activeWorkspace ? (
+        <RevealSection as="div" delay={0.06}>
+          <SurfaceCard className={styles.panel}>
+            <div className={styles.stack}>
+              <span className={styles.metaLabel}>Active workspace</span>
+              <strong>
+                {activeWorkspace.label} • {activeWorkspace.kind}
+              </strong>
+              <p className={styles.stateText}>
+                {activeWorkspace.organizationName}
+              </p>
+              {availableWorkspaces.length > 1 ? (
+                <div className={styles.inlineActions}>
+                  {availableWorkspaces.map((workspace) => (
+                    <button
+                      key={workspace.workspaceId}
+                      type="button"
+                      disabled={workspace.workspaceId === activeWorkspace.workspaceId}
+                      onClick={() => void handleSelectWorkspace(workspace.workspaceId)}
+                    >
+                      {workspace.kind === 'client' ? 'Hire' : 'Freelance'}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </SurfaceCard>
+        </RevealSection>
+      ) : null}
+
       <RevealSection className={styles.grid} delay={0.08}>
         <SectionCard
           className={styles.panel}
@@ -721,6 +779,7 @@ export function MarketplaceWorkspace() {
       </RevealSection>
 
       <RevealSection className={styles.grid} delay={0.12}>
+        {isFreelancerWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -901,7 +960,9 @@ export function MarketplaceWorkspace() {
             </div>
           </div>
         </article>
+        ) : null}
 
+        {isClientWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1166,9 +1227,11 @@ export function MarketplaceWorkspace() {
             </div>
           </div>
         </article>
+        ) : null}
       </RevealSection>
 
       <RevealSection className={styles.grid} delay={0.16}>
+        {isClientWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1338,7 +1401,9 @@ export function MarketplaceWorkspace() {
             )}
           </div>
         </article>
+        ) : null}
 
+        {isFreelancerWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1390,8 +1455,10 @@ export function MarketplaceWorkspace() {
             )}
           </div>
         </article>
+        ) : null}
       </RevealSection>
 
+      {isFreelancerWorkspace ? (
       <RevealSection className={styles.grid} delay={0.2}>
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
@@ -1516,6 +1583,7 @@ export function MarketplaceWorkspace() {
           </div>
         </article>
       </RevealSection>
+      ) : null}
     </ConsolePage>
   );
 }

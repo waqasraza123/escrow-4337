@@ -6,8 +6,11 @@ import { PersistenceConfigService } from '../persistence.config';
 
 function createInitialData(): PersistenceFileData {
   return {
-    version: 19,
+    version: 20,
     users: {},
+    organizations: {},
+    organizationMemberships: {},
+    workspaces: {},
     otpEntries: {},
     otpRequestThrottles: {},
     sessions: {},
@@ -70,8 +73,11 @@ export class FilePersistenceStore {
     const parsed = JSON.parse(raw) as Partial<PersistenceFileData>;
 
     return {
-      version: 19,
+      version: 20,
       users: parsed.users ?? {},
+      organizations: parsed.organizations ?? {},
+      organizationMemberships: parsed.organizationMemberships ?? {},
+      workspaces: parsed.workspaces ?? {},
       otpEntries: parsed.otpEntries ?? {},
       otpRequestThrottles: parsed.otpRequestThrottles ?? {},
       sessions: parsed.sessions ?? {},

@@ -39,6 +39,7 @@ type UserRow = QueryResultRow & {
   email: string;
   shariah_mode: boolean;
   default_execution_wallet_address: string | null;
+  active_workspace_id: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -253,6 +254,7 @@ function mapUser(row: UserRow): UserRecord {
     email: row.email,
     shariahMode: row.shariah_mode,
     defaultExecutionWalletAddress: row.default_execution_wallet_address,
+    activeWorkspaceId: row.active_workspace_id,
     wallets: [],
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
@@ -803,6 +805,7 @@ export class PostgresUsersRepository implements UsersRepository {
           email,
           shariah_mode,
           default_execution_wallet_address,
+          active_workspace_id,
           created_at_ms,
           updated_at_ms
         FROM users
@@ -821,6 +824,7 @@ export class PostgresUsersRepository implements UsersRepository {
           email,
           shariah_mode,
           default_execution_wallet_address,
+          active_workspace_id,
           created_at_ms,
           updated_at_ms
         FROM users
@@ -839,6 +843,7 @@ export class PostgresUsersRepository implements UsersRepository {
           u.email,
           u.shariah_mode,
           u.default_execution_wallet_address,
+          u.active_workspace_id,
           u.created_at_ms,
           u.updated_at_ms
         FROM users u
@@ -859,15 +864,17 @@ export class PostgresUsersRepository implements UsersRepository {
             email,
             shariah_mode,
             default_execution_wallet_address,
+            active_workspace_id,
             created_at_ms,
             updated_at_ms
           )
-          VALUES ($1, $2, $3, $4, $5, $6)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING
             id,
             email,
             shariah_mode,
             default_execution_wallet_address,
+            active_workspace_id,
             created_at_ms,
             updated_at_ms
         `,
@@ -876,6 +883,7 @@ export class PostgresUsersRepository implements UsersRepository {
           user.email,
           user.shariahMode,
           user.defaultExecutionWalletAddress,
+          user.activeWorkspaceId,
           String(user.createdAt),
           String(user.updatedAt),
         ],
@@ -894,13 +902,15 @@ export class PostgresUsersRepository implements UsersRepository {
             email = $2,
             shariah_mode = $3,
             default_execution_wallet_address = $4,
-            updated_at_ms = $5
+            active_workspace_id = $5,
+            updated_at_ms = $6
           WHERE id = $1
           RETURNING
             id,
             email,
             shariah_mode,
             default_execution_wallet_address,
+            active_workspace_id,
             created_at_ms,
             updated_at_ms
         `,
@@ -909,6 +919,7 @@ export class PostgresUsersRepository implements UsersRepository {
           user.email,
           user.shariahMode,
           user.defaultExecutionWalletAddress,
+          user.activeWorkspaceId,
           String(user.updatedAt),
         ],
       );

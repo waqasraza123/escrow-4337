@@ -203,6 +203,7 @@ function normalizeUserRecord(
   return {
     ...user,
     defaultExecutionWalletAddress: user.defaultExecutionWalletAddress ?? null,
+    activeWorkspaceId: user.activeWorkspaceId ?? null,
     wallets: structuredClone(normalizedWallets),
   };
 }

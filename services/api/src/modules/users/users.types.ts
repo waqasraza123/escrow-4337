@@ -1,3 +1,5 @@
+import type { WorkspaceSummary } from '../organizations/organizations.types';
+
 export type UserWalletKind = 'eoa' | 'smart_account';
 export type WalletVerificationMethod = 'siwe' | 'legacy_link';
 export type SmartAccountProviderKind = 'mock' | 'relay';
@@ -38,6 +40,7 @@ export type UserRecord = {
   email: string;
   shariahMode: boolean;
   defaultExecutionWalletAddress: string | null;
+  activeWorkspaceId: string | null;
   wallets: UserWalletRecord[];
   createdAt: number;
   updatedAt: number;
@@ -68,6 +71,8 @@ export type UserProfile = {
   defaultExecutionWalletAddress: string | null;
   wallets: UserWalletRecord[];
   capabilities: UserCapabilities;
+  workspaces: WorkspaceSummary[];
+  activeWorkspace: WorkspaceSummary | null;
 };
 
 export type LinkEoaWalletInput = {
@@ -135,6 +140,10 @@ export function createEmptyUserCapabilities(): UserCapabilities {
 export function toUserProfile(
   user: UserRecord,
   capabilities: UserCapabilities = createEmptyUserCapabilities(),
+  workspaceContext: {
+    workspaces?: WorkspaceSummary[];
+    activeWorkspace?: WorkspaceSummary | null;
+  } = {},
 ): UserProfile {
   return {
     id: user.id,
@@ -143,6 +152,8 @@ export function toUserProfile(
     defaultExecutionWalletAddress: user.defaultExecutionWalletAddress,
     wallets: structuredClone(user.wallets),
     capabilities: structuredClone(capabilities),
+    workspaces: structuredClone(workspaceContext.workspaces ?? []),
+    activeWorkspace: structuredClone(workspaceContext.activeWorkspace ?? null),
   };
 }
 
