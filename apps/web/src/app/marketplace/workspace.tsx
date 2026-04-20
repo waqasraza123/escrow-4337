@@ -316,6 +316,18 @@ export function MarketplaceWorkspace() {
   const isClientWorkspace = activeWorkspace?.kind === 'client';
   const isFreelancerWorkspace = activeWorkspace?.kind === 'freelancer';
   const availableWorkspaces = user?.workspaces ?? [];
+  const workspaceCapabilities = activeWorkspace?.capabilities ?? {
+    manageProfile: false,
+    applyToOpportunity: false,
+    createOpportunity: false,
+    reviewApplications: false,
+    manageWorkspace: false,
+  };
+  const canManageWorkspace = workspaceCapabilities.manageWorkspace;
+  const canManageProfile = workspaceCapabilities.manageProfile;
+  const canApplyToOpportunity = workspaceCapabilities.applyToOpportunity;
+  const canCreateOpportunity = workspaceCapabilities.createOpportunity;
+  const canReviewApplications = workspaceCapabilities.reviewApplications;
 
   const formatOpportunityStatus = (status: MarketplaceOpportunity['status']) =>
     marketplaceMessages.labels.opportunityStatus[status];
@@ -914,6 +926,7 @@ export function MarketplaceWorkspace() {
               <label className={styles.field}>
                 <span>{workspaceMessages.organizationForm.name}</span>
                 <input
+                  disabled={!canManageWorkspace}
                   value={organizationDraft.name}
                   onChange={(event) =>
                     setOrganizationDraft((current) => ({
@@ -930,6 +943,7 @@ export function MarketplaceWorkspace() {
               <label className={styles.field}>
                 <span>{workspaceMessages.organizationForm.slug}</span>
                 <input
+                  disabled={!canManageWorkspace}
                   value={organizationDraft.slug}
                   onChange={(event) =>
                     setOrganizationDraft((current) => ({
@@ -939,8 +953,17 @@ export function MarketplaceWorkspace() {
                   }
                 />
               </label>
+              {!canManageWorkspace ? (
+                <p className={styles.stateText}>
+                  {workspaceMessages.capabilityNotices.manageWorkspace}
+                </p>
+              ) : null}
               <div className={styles.inlineActions}>
-                <button type="button" onClick={() => void handleCreateOrganization()}>
+                <button
+                  type="button"
+                  disabled={!canManageWorkspace}
+                  onClick={() => void handleCreateOrganization()}
+                >
                   {workspaceMessages.organizationForm.create}
                 </button>
               </div>
@@ -960,6 +983,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.slug}</span>
               <input
+                disabled={!canManageProfile}
                 value={profileDraft.slug}
                 onChange={(event) =>
                   setProfileDraft((current) => ({ ...current, slug: event.target.value }))
@@ -969,6 +993,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.displayName}</span>
               <input
+                disabled={!canManageProfile}
                 value={profileDraft.displayName}
                 onChange={(event) =>
                   setProfileDraft((current) => ({
@@ -981,6 +1006,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.headline}</span>
               <input
+                disabled={!canManageProfile}
                 value={profileDraft.headline}
                 onChange={(event) =>
                   setProfileDraft((current) => ({
@@ -993,6 +1019,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.bio}</span>
               <textarea
+                disabled={!canManageProfile}
                 rows={4}
                 value={profileDraft.bio}
                 onChange={(event) =>
@@ -1003,6 +1030,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.skills}</span>
               <input
+                disabled={!canManageProfile}
                 placeholder={workspaceMessages.profileForm.skillsPlaceholder}
                 value={profileDraft.skills}
                 onChange={(event) =>
@@ -1013,6 +1041,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.specialties}</span>
               <input
+                disabled={!canManageProfile}
                 placeholder={workspaceMessages.profileForm.specialtiesPlaceholder}
                 value={profileDraft.specialties}
                 onChange={(event) =>
@@ -1026,6 +1055,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.preferredEngagements}</span>
               <input
+                disabled={!canManageProfile}
                 placeholder={workspaceMessages.profileForm.preferredEngagementsPlaceholder}
                 value={profileDraft.preferredEngagements}
                 onChange={(event) =>
@@ -1039,6 +1069,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.cryptoReadiness}</span>
               <select
+                disabled={!canManageProfile}
                 value={profileDraft.cryptoReadiness}
                 onChange={(event) =>
                   setProfileDraft((current) => ({
@@ -1061,6 +1092,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.portfolioUrls}</span>
               <textarea
+                disabled={!canManageProfile}
                 rows={3}
                 value={profileDraft.portfolioUrls}
                 onChange={(event) =>
@@ -1074,6 +1106,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.profileForm.externalProofUrls}</span>
               <textarea
+                disabled={!canManageProfile}
                 rows={3}
                 value={profileDraft.externalProofUrls}
                 onChange={(event) =>
@@ -1114,8 +1147,17 @@ export function MarketplaceWorkspace() {
                 </article>
               </section>
             ) : null}
+            {!canManageProfile ? (
+              <p className={styles.stateText}>
+                {workspaceMessages.capabilityNotices.manageProfile}
+              </p>
+            ) : null}
             <div className={styles.inlineActions}>
-              <button type="button" onClick={() => void handleSaveProfile()}>
+              <button
+                type="button"
+                disabled={!canManageProfile}
+                onClick={() => void handleSaveProfile()}
+              >
                 {workspaceMessages.profileForm.saveProfile}
               </button>
               {profile ? (
@@ -1143,6 +1185,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.title}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.title}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1155,6 +1198,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.summary}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.summary}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1167,6 +1211,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.description}</span>
               <textarea
+                disabled={!canCreateOpportunity}
                 rows={4}
                 value={opportunityDraft.description}
                 onChange={(event) =>
@@ -1180,6 +1225,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.visibility}</span>
               <select
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.visibility}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1199,6 +1245,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.category}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.category}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1211,6 +1258,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.settlementTokenAddress}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.currencyAddress}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1223,6 +1271,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.requiredSkills}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.requiredSkills}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1235,6 +1284,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.mustHaveSkills}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.mustHaveSkills}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1247,6 +1297,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.outcomes}</span>
               <textarea
+                disabled={!canCreateOpportunity}
                 rows={3}
                 value={opportunityDraft.outcomes}
                 onChange={(event) =>
@@ -1260,6 +1311,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.acceptanceCriteria}</span>
               <textarea
+                disabled={!canCreateOpportunity}
                 rows={3}
                 value={opportunityDraft.acceptanceCriteria}
                 onChange={(event) =>
@@ -1273,6 +1325,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.screeningQuestions}</span>
               <textarea
+                disabled={!canCreateOpportunity}
                 rows={3}
                 value={opportunityDraft.screeningQuestions}
                 onChange={(event) =>
@@ -1286,6 +1339,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.timeline}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.timeline}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1298,6 +1352,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.desiredStart}</span>
               <input
+                disabled={!canCreateOpportunity}
                 type="datetime-local"
                 value={opportunityDraft.desiredStartAt}
                 onChange={(event) =>
@@ -1311,6 +1366,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.timezoneOverlapHours}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.timezoneOverlapHours}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1323,6 +1379,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.engagementType}</span>
               <select
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.engagementType}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1345,6 +1402,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.requiredCryptoReadiness}</span>
               <select
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.cryptoReadinessRequired}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1368,6 +1426,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.budgetMinimum}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.budgetMin}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1380,6 +1439,7 @@ export function MarketplaceWorkspace() {
             <label className={styles.field}>
               <span>{workspaceMessages.opportunityForm.budgetMaximum}</span>
               <input
+                disabled={!canCreateOpportunity}
                 value={opportunityDraft.budgetMax}
                 onChange={(event) =>
                   setOpportunityDraft((current) => ({
@@ -1389,8 +1449,17 @@ export function MarketplaceWorkspace() {
                 }
               />
             </label>
+            {!canCreateOpportunity ? (
+              <p className={styles.stateText}>
+                {workspaceMessages.capabilityNotices.createOpportunity}
+              </p>
+            ) : null}
             <div className={styles.inlineActions}>
-              <button type="button" onClick={() => void handleCreateOpportunity()}>
+              <button
+                type="button"
+                disabled={!canCreateOpportunity}
+                onClick={() => void handleCreateOpportunity()}
+              >
                 {workspaceMessages.opportunityForm.createDraftBrief}
               </button>
             </div>
@@ -1409,6 +1478,11 @@ export function MarketplaceWorkspace() {
             </div>
           </div>
           <div className={styles.stack}>
+            {!canReviewApplications ? (
+              <p className={styles.stateText}>
+                {workspaceMessages.capabilityNotices.reviewApplications}
+              </p>
+            ) : null}
             {myOpportunities.length === 0 ? (
               <p className={styles.stateText}>{workspaceMessages.noOpportunities}</p>
             ) : (
@@ -1452,6 +1526,7 @@ export function MarketplaceWorkspace() {
                       ) : null}
                       <button
                         type="button"
+                        disabled={!canReviewApplications}
                         onClick={() => void handleLoadApplications(opportunity.id)}
                       >
                         {workspaceMessages.loadReviewBoard}
@@ -1459,6 +1534,7 @@ export function MarketplaceWorkspace() {
                       {opportunity.status === 'draft' || opportunity.status === 'paused' ? (
                         <button
                           type="button"
+                          disabled={!canCreateOpportunity}
                           onClick={() => void handlePublishOpportunity(opportunity.id)}
                         >
                           {workspaceMessages.publish}
@@ -1467,6 +1543,7 @@ export function MarketplaceWorkspace() {
                       {opportunity.status === 'published' ? (
                         <button
                           type="button"
+                          disabled={!canCreateOpportunity}
                           onClick={() => void handlePauseOpportunity(opportunity.id)}
                         >
                           {workspaceMessages.pause}
@@ -1501,6 +1578,7 @@ export function MarketplaceWorkspace() {
                         <div className={styles.inlineActions}>
                           <button
                             type="button"
+                            disabled={!canReviewApplications}
                             onClick={() =>
                               void handleApplicationDecision(
                                 'shortlist',
@@ -1513,6 +1591,7 @@ export function MarketplaceWorkspace() {
                           </button>
                           <button
                             type="button"
+                            disabled={!canReviewApplications}
                             onClick={() =>
                               void handleApplicationDecision(
                                 'reject',
@@ -1526,6 +1605,7 @@ export function MarketplaceWorkspace() {
                           <button
                             type="button"
                             disabled={
+                              !canReviewApplications ||
                               application.dossier.matchSummary.missingRequirements.length > 0
                             }
                             onClick={() =>
@@ -1581,6 +1661,11 @@ export function MarketplaceWorkspace() {
             </div>
           </div>
           <div className={styles.stack}>
+            {!canApplyToOpportunity ? (
+              <p className={styles.stateText}>
+                {workspaceMessages.capabilityNotices.applyToOpportunity}
+              </p>
+            ) : null}
             {myApplications.length === 0 ? (
               <p className={styles.stateText}>{workspaceMessages.noApplications}</p>
             ) : (
@@ -1614,6 +1699,7 @@ export function MarketplaceWorkspace() {
                   ) : (
                     <button
                       type="button"
+                      disabled={!canApplyToOpportunity}
                       onClick={() => void handleWithdrawApplication(application.id)}
                     >
                       {workspaceMessages.withdraw}
@@ -1680,6 +1766,7 @@ export function MarketplaceWorkspace() {
                           <label className={styles.field}>
                             <span>{workspaceMessages.coverNote}</span>
                             <textarea
+                              disabled={!canApplyToOpportunity}
                               rows={3}
                               value={draft.coverNote}
                               onChange={(event) =>
@@ -1693,6 +1780,7 @@ export function MarketplaceWorkspace() {
                           <label className={styles.field}>
                             <span>{workspaceMessages.deliveryApproach}</span>
                             <textarea
+                              disabled={!canApplyToOpportunity}
                               rows={3}
                               value={draft.deliveryApproach}
                               onChange={(event) =>
@@ -1706,6 +1794,7 @@ export function MarketplaceWorkspace() {
                           <label className={styles.field}>
                             <span>{workspaceMessages.milestonePlanSummary}</span>
                             <textarea
+                              disabled={!canApplyToOpportunity}
                               rows={3}
                               value={draft.milestonePlanSummary}
                               onChange={(event) =>
@@ -1720,6 +1809,7 @@ export function MarketplaceWorkspace() {
                             <label key={question.id} className={styles.field}>
                               <span>{question.prompt}</span>
                               <textarea
+                                disabled={!canApplyToOpportunity}
                                 rows={2}
                                 value={draft.screeningAnswers[question.id] ?? ''}
                                 onChange={(event) =>
@@ -1737,6 +1827,7 @@ export function MarketplaceWorkspace() {
                           <div className={styles.inlineActions}>
                             <button
                               type="button"
+                              disabled={!canApplyToOpportunity}
                               onClick={() => void handleApplyToOpportunity(opportunity)}
                             >
                               {workspaceMessages.submitStructuredApplication}

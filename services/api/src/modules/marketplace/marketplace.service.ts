@@ -457,7 +457,7 @@ export class MarketplaceService {
     dto: UpdateMarketplaceOpportunityDto,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'createOpportunity');
 
     if (opportunity.status === 'hired' || opportunity.status === 'archived') {
       throw new ConflictException(
@@ -525,7 +525,7 @@ export class MarketplaceService {
     dto: UpdateMarketplaceScreeningDto,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'createOpportunity');
     opportunity.outcomes = normalizeTextArray(dto.outcomes);
     opportunity.acceptanceCriteria = normalizeTextArray(dto.acceptanceCriteria);
     opportunity.mustHaveSkills = normalizeTextArray(dto.mustHaveSkills);
@@ -556,7 +556,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'createOpportunity');
     if (opportunity.moderationStatus === 'suspended') {
       throw new ForbiddenException(
         'Suspended marketplace opportunities cannot be published',
@@ -588,7 +588,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceOpportunityResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'createOpportunity');
     opportunity.status = 'paused';
     opportunity.updatedAt = Date.now();
     await this.marketplaceRepository.saveOpportunity(opportunity);
@@ -702,7 +702,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
 
     const applications = (await this.marketplaceRepository.listApplications())
       .filter((application) => application.opportunityId === opportunityId)
@@ -720,7 +720,7 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceMatchesResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     const applications = (
       await this.marketplaceRepository.listApplications()
     ).filter((application) => application.opportunityId === opportunityId);
@@ -756,10 +756,12 @@ export class MarketplaceService {
       )) !== null;
     const canAccessAsOwner =
       opportunityWorkspace.ownerWorkspaceId !== null &&
-      (await this.organizationsService.findAccessibleWorkspace(
-        userId,
-        opportunityWorkspace.ownerWorkspaceId,
-      )) !== null;
+      (
+        await this.organizationsService.findAccessibleWorkspace(
+          userId,
+          opportunityWorkspace.ownerWorkspaceId,
+        )
+      )?.capabilities.reviewApplications === true;
     if (!canAccessAsApplicant && !canAccessAsOwner) {
       throw new ForbiddenException(
         'You do not have access to this application dossier',
@@ -1008,7 +1010,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
 
     application.status = 'shortlisted';
@@ -1025,7 +1027,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
 
     application.status = 'rejected';
@@ -1042,7 +1044,7 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
 
     const dossier = await this.buildApplicationDossier(application);
@@ -2281,10 +2283,17 @@ export class MarketplaceService {
   private async assertOpportunityOwner(
     userId: string,
     opportunity: MarketplaceOpportunityRecord,
+    capability?: keyof WorkspaceSummary['capabilities'],
   ) {
-    if (!(await this.canAccessOpportunityAsOwner(userId, opportunity))) {
+    if (!(await this.canAccessOpportunityAsOwner(userId, opportunity, capability))) {
+      const message =
+        capability === 'reviewApplications'
+          ? 'Only a client workspace with review access can do that'
+          : capability === 'createOpportunity'
+            ? 'Only a client workspace with authoring access can do that'
+            : 'Only the client who owns the opportunity can do that';
       throw new ForbiddenException(
-        'Only the client who owns the opportunity can do that',
+        message,
       );
     }
   }
@@ -2292,6 +2301,7 @@ export class MarketplaceService {
   private async canAccessOpportunityAsOwner(
     userId: string,
     opportunity: MarketplaceOpportunityRecord,
+    capability?: keyof WorkspaceSummary['capabilities'],
   ) {
     const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
     if (hydratedOpportunity.ownerWorkspaceId) {
@@ -2300,8 +2310,9 @@ export class MarketplaceService {
         hydratedOpportunity.ownerWorkspaceId,
       );
       if (workspace) {
-        return true;
+        return capability ? workspace.capabilities[capability] : true;
       }
+      return false;
     }
 
     return hydratedOpportunity.ownerUserId === userId;

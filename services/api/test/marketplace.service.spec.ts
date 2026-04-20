@@ -5,6 +5,7 @@ import type { MarketplaceRepository } from '../src/persistence/persistence.types
 import { EscrowService } from '../src/modules/escrow/escrow.service';
 import { MarketplaceModule } from '../src/modules/marketplace/marketplace.module';
 import { MarketplaceService } from '../src/modules/marketplace/marketplace.service';
+import { OrganizationsService } from '../src/modules/organizations/organizations.service';
 import { UsersService } from '../src/modules/users/users.service';
 import { configureFilePersistence } from './support/test-persistence';
 
@@ -18,6 +19,7 @@ const currencyAddress = '0x4444444444444444444444444444444444444444';
 describe('MarketplaceService', () => {
   let marketplaceService: MarketplaceService;
   let escrowService: EscrowService;
+  let organizationsService: OrganizationsService;
   let usersService: UsersService;
   let marketplaceRepository: MarketplaceRepository;
   let moduleRef: TestingModule;
@@ -36,6 +38,7 @@ describe('MarketplaceService', () => {
 
     marketplaceService = moduleRef.get(MarketplaceService);
     escrowService = moduleRef.get(EscrowService);
+    organizationsService = moduleRef.get(OrganizationsService);
     usersService = moduleRef.get(UsersService);
     marketplaceRepository = moduleRef.get(MARKETPLACE_REPOSITORY);
 
@@ -198,6 +201,94 @@ describe('MarketplaceService', () => {
     expect(myApplications.applications[0]?.contractPath).toMatch(
       new RegExp(`^/app/contracts/${hired.jobId}\\?invite=`),
     );
+  });
+
+  it('blocks client review actions when the active client workspace lacks review capability', async () => {
+    const created = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Review-gated brief',
+        summary: 'Requires reviewer capability',
+        description: 'Used to verify workspace review capability enforcement.',
+      }),
+    );
+    await marketplaceService.publishOpportunity(clientUserId, created.opportunity.id);
+    await marketplaceService.upsertProfile(
+      applicantUserId,
+      buildProfileInput({
+        slug: 'review-gated-builder',
+        displayName: 'Review Gated Builder',
+        headline: 'Ready to apply',
+        bio: 'Profile complete enough for application checks.',
+        skills: ['typescript'],
+        specialties: ['marketplaces'],
+        preferredEngagements: ['fixed_scope'],
+        cryptoReadiness: 'wallet_only',
+        portfolioUrls: ['https://example.com/review-gated'],
+      }),
+    );
+    await marketplaceService.applyToOpportunity(
+      applicantUserId,
+      created.opportunity.id,
+      buildApplicationInput({
+        selectedWalletAddress: applicantAddress,
+      }),
+    );
+
+    const originalFindAccessibleWorkspace =
+      organizationsService.findAccessibleWorkspace.bind(organizationsService);
+    jest
+      .spyOn(organizationsService, 'findAccessibleWorkspace')
+      .mockImplementation(async (userId, workspaceId) => {
+        const workspace = await originalFindAccessibleWorkspace(userId, workspaceId);
+        if (!workspace || userId !== clientUserId || workspace.kind !== 'client') {
+          return workspace;
+        }
+        return {
+          ...workspace,
+          capabilities: {
+            ...workspace.capabilities,
+            reviewApplications: false,
+          },
+        };
+      });
+
+    await expect(
+      marketplaceService.getOpportunityApplications(clientUserId, created.opportunity.id),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('blocks publish actions when the active client workspace lacks authoring capability', async () => {
+    const created = await marketplaceService.createOpportunity(
+      clientUserId,
+      buildOpportunityInput({
+        title: 'Authoring-gated brief',
+        summary: 'Requires authoring capability',
+        description: 'Used to verify client authoring enforcement.',
+      }),
+    );
+
+    const originalFindAccessibleWorkspace =
+      organizationsService.findAccessibleWorkspace.bind(organizationsService);
+    jest
+      .spyOn(organizationsService, 'findAccessibleWorkspace')
+      .mockImplementation(async (userId, workspaceId) => {
+        const workspace = await originalFindAccessibleWorkspace(userId, workspaceId);
+        if (!workspace || userId !== clientUserId || workspace.kind !== 'client') {
+          return workspace;
+        }
+        return {
+          ...workspace,
+          capabilities: {
+            ...workspace.capabilities,
+            createOpportunity: false,
+          },
+        };
+      });
+
+    await expect(
+      marketplaceService.publishOpportunity(clientUserId, created.opportunity.id),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('ranks stronger applicants ahead of weaker ones using deterministic dossier scoring', async () => {

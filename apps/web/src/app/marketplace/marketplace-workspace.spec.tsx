@@ -801,4 +801,399 @@ describe('marketplace workspace', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('renders client workspace actions as disabled when the active workspace lacks client capabilities', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Recruiter workspace',
+          slug: 'recruiter-workspace',
+          organizationId: 'org-client-1',
+          organizationName: 'Atlas Labs',
+          organizationSlug: 'atlas-labs',
+          organizationKind: 'client',
+          roles: ['client_recruiter'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: false,
+            reviewApplications: false,
+            manageWorkspace: false,
+          },
+          isDefault: false,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-1',
+        kind: 'client',
+        label: 'Recruiter workspace',
+        slug: 'recruiter-workspace',
+        organizationId: 'org-client-1',
+        organizationName: 'Atlas Labs',
+        organizationSlug: 'atlas-labs',
+        organizationKind: 'client',
+        roles: ['client_recruiter'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: false,
+          reviewApplications: false,
+          manageWorkspace: false,
+        },
+        isDefault: false,
+      },
+    });
+    mockedWebApi.listOrganizations.mockResolvedValue({
+      organizations: [
+        {
+          id: 'org-client-1',
+          slug: 'atlas-labs',
+          name: 'Atlas Labs',
+          kind: 'client',
+          roles: ['client_recruiter'],
+          workspaces: [
+            {
+              workspaceId: 'workspace-client-1',
+              kind: 'client',
+              label: 'Recruiter workspace',
+              slug: 'recruiter-workspace',
+              organizationId: 'org-client-1',
+              organizationName: 'Atlas Labs',
+              organizationSlug: 'atlas-labs',
+              organizationKind: 'client',
+              roles: ['client_recruiter'],
+              capabilities: {
+                manageProfile: false,
+                applyToOpportunity: false,
+                createOpportunity: false,
+                reviewApplications: false,
+                manageWorkspace: false,
+              },
+              isDefault: false,
+            },
+          ],
+        },
+      ],
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [
+        {
+          id: 'opp-locked-1',
+          title: 'Locked brief',
+          summary: 'Cannot be reviewed from this workspace',
+          description: 'Read-only client workspace.',
+          category: 'software-development',
+          currencyAddress: '0x4444444444444444444444444444444444444444',
+          requiredSkills: ['typescript'],
+          mustHaveSkills: ['typescript'],
+          outcomes: ['Ship UI'],
+          acceptanceCriteria: ['Responsive'],
+          screeningQuestions: [],
+          visibility: 'public',
+          status: 'draft',
+          budgetMin: '1000',
+          budgetMax: '2000',
+          timeline: '2 weeks',
+          desiredStartAt: null,
+          timezoneOverlapHours: 2,
+          engagementType: 'fixed_scope',
+          cryptoReadinessRequired: 'wallet_only',
+          publishedAt: null,
+          hiredApplicationId: null,
+          hiredJobId: null,
+          createdAt: 10,
+          updatedAt: 10,
+          owner: {
+            userId: 'client-1',
+            organizationId: 'org-client-1',
+            workspaceId: 'workspace-client-1',
+            workspaceKind: 'client',
+            displayName: 'Atlas Labs',
+            profileSlug: 'atlas-labs',
+          },
+          escrowReadiness: 'wallet_required',
+          applicationCount: 0,
+        },
+      ],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Workspace ownership' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/only a workspace with management access/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create client organization' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Create draft brief' }),
+    ).toBeDisabled();
+    expect(
+      within(screen.getByTestId('marketplace-my-opportunity-opp-locked-1')).getByRole('button', {
+        name: 'Load review board',
+      }),
+    ).toBeDisabled();
+  });
+
+  it('renders freelancer workspace actions as disabled when the active workspace lacks freelancer capabilities', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [
+        {
+          id: 'public-locked-1',
+          title: 'Public brief',
+          summary: 'Visible but not actionable',
+          description: 'Freelancer workspace is read-only.',
+          category: 'software-development',
+          currencyAddress: '0x4444444444444444444444444444444444444444',
+          requiredSkills: ['typescript'],
+          mustHaveSkills: ['typescript'],
+          outcomes: ['Ship UI'],
+          acceptanceCriteria: ['Responsive'],
+          screeningQuestions: [
+            { id: 'q1', prompt: 'How would you deliver?', required: true },
+          ],
+          visibility: 'public',
+          status: 'published',
+          budgetMin: '1000',
+          budgetMax: '2000',
+          timeline: '2 weeks',
+          desiredStartAt: null,
+          timezoneOverlapHours: 2,
+          engagementType: 'fixed_scope',
+          cryptoReadinessRequired: 'wallet_only',
+          publishedAt: 10,
+          hiredApplicationId: null,
+          hiredJobId: null,
+          createdAt: 10,
+          updatedAt: 10,
+          owner: {
+            userId: 'client-2',
+            organizationId: 'org-client-2',
+            workspaceId: 'workspace-client-2',
+            workspaceKind: 'client',
+            displayName: 'Client Two',
+            profileSlug: 'client-two',
+          },
+          escrowReadiness: 'ready',
+          applicationCount: 1,
+        },
+      ],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'talent-1',
+      email: 'talent@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-freelancer-1',
+          kind: 'freelancer',
+          label: 'Freelancer workspace',
+          slug: 'freelancer-workspace',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-workspace',
+          organizationKind: 'personal',
+          roles: ['freelancer'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: false,
+            reviewApplications: false,
+            manageWorkspace: false,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-freelancer-1',
+        kind: 'freelancer',
+        label: 'Freelancer workspace',
+        slug: 'freelancer-workspace',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-workspace',
+        organizationKind: 'personal',
+        roles: ['freelancer'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: false,
+          reviewApplications: false,
+          manageWorkspace: false,
+        },
+        isDefault: true,
+      },
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockResolvedValue({
+      profile: {
+        userId: 'talent-1',
+        organizationId: 'org-personal-1',
+        workspaceId: 'workspace-freelancer-1',
+        slug: 'talent-one',
+        displayName: 'Talent One',
+        headline: 'Builder',
+        bio: 'Read-only profile',
+        skills: ['typescript'],
+        specialties: ['marketplaces'],
+        rateMin: null,
+        rateMax: null,
+        timezone: 'UTC',
+        availability: 'open',
+        preferredEngagements: ['fixed_scope'],
+        portfolioUrls: ['https://example.com/talent'],
+        proofArtifacts: [],
+        cryptoReadiness: 'wallet_only',
+        verifiedWalletAddress: '0x3333333333333333333333333333333333333333',
+        verificationLevel: 'wallet_verified',
+        escrowStats: {
+          totalContracts: 0,
+          completionCount: 0,
+          disputeCount: 0,
+          completionRate: 0,
+          disputeRate: 0,
+          onTimeDeliveryRate: 0,
+          averageContractValueBand: 'unknown',
+          completedByCategory: [],
+        },
+        completedEscrowCount: 0,
+        isComplete: true,
+      },
+    });
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [
+        {
+          id: 'app-readonly-1',
+          opportunityId: 'public-locked-1',
+          coverNote: 'Read only',
+          proposedRate: '100',
+          selectedWalletAddress: '0x3333333333333333333333333333333333333333',
+          screeningAnswers: [],
+          deliveryApproach: 'Plan and execute.',
+          milestonePlanSummary: 'Two milestones.',
+          estimatedStartAt: null,
+          relevantProofArtifacts: [],
+          portfolioUrls: ['https://example.com/work'],
+          status: 'submitted',
+          hiredJobId: null,
+          contractPath: null,
+          createdAt: 20,
+          updatedAt: 20,
+          applicant: {
+            userId: 'talent-1',
+            organizationId: 'org-personal-1',
+            workspaceId: 'workspace-freelancer-1',
+            workspaceKind: 'freelancer',
+            displayName: 'Talent One',
+            profileSlug: 'talent-one',
+            headline: 'Builder',
+            specialties: ['marketplaces'],
+            verifiedWalletAddress: '0x3333333333333333333333333333333333333333',
+            verificationLevel: 'wallet_verified',
+            cryptoReadiness: 'wallet_only',
+            escrowStats: {
+              totalContracts: 0,
+              completionCount: 0,
+              disputeCount: 0,
+              completionRate: 0,
+              disputeRate: 0,
+              onTimeDeliveryRate: 0,
+              averageContractValueBand: 'unknown',
+              completedByCategory: [],
+            },
+            completedEscrowCount: 0,
+          },
+          opportunity: {
+            id: 'public-locked-1',
+            title: 'Public brief',
+            visibility: 'public',
+            status: 'published',
+            ownerDisplayName: 'Client Two',
+            ownerWorkspaceId: 'workspace-client-2',
+          },
+          fitScore: 50,
+          fitBreakdown: [],
+          riskFlags: [],
+          dossier: {
+            applicationId: 'app-readonly-1',
+            opportunityId: 'public-locked-1',
+            recommendation: 'review',
+            matchSummary: {
+              fitScore: 50,
+              requirementCoverage: 50,
+              skillOverlap: ['typescript'],
+              mustHaveSkillGaps: [],
+              riskFlags: [],
+              missingRequirements: [],
+              fitBreakdown: [],
+            },
+            whyShortlisted: ['Skill overlap'],
+          },
+        },
+      ],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Credibility profile' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/read-only for freelancer profile edits/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save profile' })).toBeDisabled();
+    expect(
+      within(screen.getByTestId('marketplace-my-application-app-readonly-1')).getByRole('button', {
+        name: 'Withdraw',
+      }),
+    ).toBeDisabled();
+    expect(
+      within(screen.getByTestId('marketplace-open-brief-public-locked-1')).getByRole('button', {
+        name: 'Submit structured application',
+      }),
+    ).toBeDisabled();
+  });
 });

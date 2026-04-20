@@ -10,15 +10,19 @@
   - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
 
 ## Last Completed Step
-- Added the first production client-organization workflow on top of the Phase 1 workspace baseline:
-  - the web marketplace workspace now loads authenticated organizations
-  - client mode now exposes explicit workspace-ownership UI with current workspace context, existing organization workspaces, and client-organization creation
-  - organization creation uses the protected `/organizations` API with `setActive: true` and then reloads the active workspace state
-  - workspace switching now uses localized role/mode-aware labels instead of hardcoded `Hire`/`Freelance` buttons
-  - the new client-organization flow is covered by focused web tests
+- Tightened Phase 1 capability enforcement across the authenticated marketplace surface:
+  - owner-side opportunity actions in the API now distinguish client authoring capability vs review capability instead of relying on raw workspace ownership alone
+  - application-dossier owner access now requires a workspace with review capability
+  - the web workspace now renders explicit read-only/disabled states for:
+    - client organization management
+    - client brief authoring/publish controls
+    - applicant review/hire controls
+    - freelancer profile editing
+    - freelancer application submit/withdraw flows
+  - focused API and web tests now cover capability-denied owner actions and disabled client/freelancer UI states
 
 ## Current Step
-- Record the shipped client-organization workflow in repo memory and move the next implementation step toward deeper Phase 1 workflow separation on top of the workspace model.
+- Record the shipped capability-gated workspace behavior in repo memory and move the next implementation step toward browser-verified Phase 1 workflow separation on top of the workspace model.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -35,6 +39,9 @@
 - Frontend/admin session shape and marketplace workspace:
   `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,test/fixtures.ts}`
   `apps/admin/src/{lib/api.ts,test/fixtures.ts}`
+- Marketplace capability enforcement:
+  `services/api/src/modules/marketplace/marketplace.service.ts`
+  `services/api/test/marketplace.service.spec.ts`
 - Docs:
   `docs/project-state.md`
   `docs/_local/current-session.md`
@@ -47,6 +54,8 @@
 - Keep the implementation docs repo-specific: they should describe modules, workflows, data shape direction, verification, and UI posture in terms of the current monorepo instead of generic marketplace advice.
 
 ## Verification Commands
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
 - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
 - `pnpm --filter web typecheck`
 - `git diff --check`
@@ -54,21 +63,23 @@
 
 ## Verification Status
 - Passed:
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
   - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
   - `pnpm --filter web typecheck`
   - `git diff --check`
   - `pnpm build`
 - Blocked or not run:
-  - wider admin/API verification from the previous workspace-baseline commit was not rerun because this step only touched the web app and shared workspace copy
+  - wider admin verification was not rerun because this step touched marketplace API enforcement plus the web workspace, but not admin surfaces
   - real staged deployment validation against live staging secrets and URLs
   - real Phase 0 staging proof against launch-candidate evidence artifacts
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
 - Continue the combined Phase 0 + Phase 1 program by adding organization-aware marketplace workflows on top of the new workspace baseline:
-  - deeper workspace-aware navigation and copy cleanup across the authenticated marketplace surface
-  - client-only gating for publish/review/hire actions when the active workspace lacks those capabilities
-  - freelancer-only workflow tightening for profile/apply/history views so the mixed workspace assumptions disappear entirely
+  - browser-verify the capability-gated client/freelancer marketplace journey end to end
+  - tighten workspace-aware empty states and route entry points so the authenticated marketplace never feels mixed-mode
+  - continue Phase 0 staging-proof work once the Phase 1 workspace journey is stable enough for deployed canaries
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.

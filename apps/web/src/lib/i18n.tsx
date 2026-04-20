@@ -278,6 +278,18 @@ const webMessages = {
           switchWorkspace: (label: string, mode: string) =>
             `${mode}: ${label}`,
         },
+        capabilityNotices: {
+          manageWorkspace:
+            'This workspace can view organization ownership, but only a workspace with management access can create another client organization.',
+          manageProfile:
+            'This workspace is read-only for freelancer profile edits. Switch to a freelancer workspace with profile access to update credibility data.',
+          createOpportunity:
+            'This workspace cannot author or publish client briefs. Switch to a hiring workspace with client authoring access.',
+          reviewApplications:
+            'This workspace cannot review applicants or make hiring decisions. Switch to a hiring workspace with review access.',
+          applyToOpportunity:
+            'This workspace cannot submit or manage applications. Switch to a freelancer workspace with proposal access.',
+        },
         overviewEyebrow: 'Overview',
         pipelineTitle: 'Marketplace pipeline',
         pipelineStats: {
@@ -1239,6 +1251,18 @@ const webMessages = {
           },
           switchWorkspace: (label: string, mode: string) =>
             `${mode}: ${label}`,
+        },
+        capabilityNotices: {
+          manageWorkspace:
+            'يمكن لمساحة العمل هذه عرض ملكية المنظمة، لكن إنشاء منظمة عميل جديدة يتطلب مساحة عمل تملك صلاحية الإدارة.',
+          manageProfile:
+            'هذه المساحة للقراءة فقط فيما يخص تعديل ملف المستقل. انتقل إلى مساحة عمل مستقلة تملك صلاحية تعديل الملف لتحديث بيانات الموثوقية.',
+          createOpportunity:
+            'لا تستطيع هذه المساحة إنشاء أو نشر عروض العميل. انتقل إلى مساحة توظيف تملك صلاحية إنشاء العروض.',
+          reviewApplications:
+            'لا تستطيع هذه المساحة مراجعة المرشحين أو اتخاذ قرارات التوظيف. انتقل إلى مساحة توظيف تملك صلاحية المراجعة.',
+          applyToOpportunity:
+            'لا تستطيع هذه المساحة إرسال الطلبات أو إدارتها. انتقل إلى مساحة عمل مستقلة تملك صلاحية التقديم.',
         },
         overviewEyebrow: 'نظرة عامة',
         pipelineTitle: 'مسار السوق',
