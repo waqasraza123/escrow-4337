@@ -72,6 +72,9 @@ test('exact marketplace journey publishes, applies, hires, and resolves through 
       bio: 'We want one contractor and one escrow-backed workflow.',
       skills: 'product, react',
       portfolioUrl: `https://example.com/client/${runId}`,
+      expectedLane: 'client',
+      expectedEmptyState:
+        'No briefs are live from this workspace yet. Start with one decision-ready brief so review and hire can stay inside the client lane.',
     },
     contractorProfile: {
       slug: `exact-talent-${runId}`.slice(0, 40),
@@ -80,6 +83,9 @@ test('exact marketplace journey publishes, applies, hires, and resolves through 
       bio: 'I apply with a verified wallet and expect escrow.',
       skills: 'typescript, react',
       portfolioUrl: `https://example.com/talent/${runId}`,
+      expectedLane: 'freelancer',
+      expectedEmptyState:
+        'Complete your freelancer profile here before applying so proposals carry proof, specialties, and crypto-readiness context.',
     },
     opportunity: {
       title: opportunityTitle,

@@ -599,6 +599,26 @@
   - `pnpm --filter admin build`
 - Result:
   - Passed: all commands above
+## Update (2026-04-20, Marketplace Lane Contract In Exact Browser Journeys)
+- Extended the exact marketplace Playwright contract so both local and deployed exact lanes assert the post-Phase-1 workspace split before continuing the escrow journey:
+  - client actors must land in the client lane and see the client-native empty state before authoring a brief
+  - freelancer actors must land in the freelancer lane and see the freelancer-native empty state before editing the credibility profile
+- Updated:
+  - `tests/e2e/flows/marketplace-exact-flow.ts`
+  - `tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
+  - `tests/e2e/specs/journeys/deployed/deployed-exact-marketplace-launch-candidate-flow.spec.ts`
+- Browser-contract adjustment:
+  - the exact flow now treats client and freelancer entry paths differently
+  - client actors assert lane/empty-state plus `Create hiring spec`
+  - freelancer actors assert lane/empty-state plus the editable `Credibility profile` form
+- Verification:
+  - `pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
+  - `git diff --check`
+- Result:
+  - Partial: the first browser failure was fixed by aligning the exact flow with the shipped lane split
+  - Current blocker: the same local exact journey still times out later in the client publish step under the local dev-backed stack, after draft creation succeeds and the draft card plus publish control are rendered
+- Next step:
+  - investigate the slow or stalled local exact publish path and stabilize the exact canary so the new lane contract is fully covered end to end
 ## Update (2026-04-19, Phase 0 Chain Event Mirror Baseline)
 - Implemented the next production-grade Phase 0 step from `MARKETPLACE_PHASE_0_BACKLOG_V1.md`: Workstream `0.3` chain event mirror and reconciliation baseline.
 - Backend changes:

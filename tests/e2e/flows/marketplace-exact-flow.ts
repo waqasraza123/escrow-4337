@@ -18,6 +18,8 @@ type MarketplaceProfileInput = {
   bio: string;
   skills: string;
   portfolioUrl: string;
+  expectedLane: 'client' | 'freelancer';
+  expectedEmptyState: string;
 };
 
 type MarketplaceOpportunityInput = {
@@ -67,6 +69,32 @@ async function saveMarketplaceProfile(input: {
   const { page, profile, webBaseUrl } = input;
 
   await page.goto(`${webBaseUrl}/app/marketplace`);
+  await expect(
+    page.getByRole('heading', { name: 'Choose your marketplace lane' }),
+  ).toBeVisible();
+  await expect(page.getByTestId('marketplace-mode-card-client')).toBeVisible();
+  await expect(page.getByTestId('marketplace-mode-card-freelancer')).toBeVisible();
+  if (profile.expectedLane === 'client') {
+    await expect(
+      page
+        .getByTestId('marketplace-mode-card-client')
+        .getByText('Current lane'),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page
+        .getByTestId('marketplace-mode-card-freelancer')
+        .getByText('Current lane'),
+    ).toBeVisible();
+  }
+  await expect(page.getByText(profile.expectedEmptyState)).toBeVisible();
+  if (profile.expectedLane === 'client') {
+    await expect(page.getByRole('heading', { name: 'Create hiring spec' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Credibility profile' }),
+    ).not.toBeVisible();
+    return;
+  }
   await expect(page.getByRole('heading', { name: 'Credibility profile' })).toBeVisible();
   await page.getByLabel('Slug', { exact: true }).fill(profile.slug);
   await page.getByLabel('Display name', { exact: true }).fill(profile.displayName);

@@ -118,6 +118,9 @@ test('[@exact] deployed environment can exercise the exact marketplace publish-t
       bio: 'This browser-auth canary proves marketplace-origin escrow behavior against deployed infrastructure.',
       skills: 'product, react',
       portfolioUrl: `https://example.com/deployed-exact-client/${runId}`,
+      expectedLane: 'client',
+      expectedEmptyState:
+        'No briefs are live from this workspace yet. Start with one decision-ready brief so review and hire can stay inside the client lane.',
     },
     contractorProfile: {
       slug: `deployed-exact-talent-${runId}`.slice(0, 40),
@@ -126,6 +129,9 @@ test('[@exact] deployed environment can exercise the exact marketplace publish-t
       bio: 'I apply from the public brief and join the resulting escrow contract from the staged browser flow.',
       skills: 'typescript, react',
       portfolioUrl: `https://example.com/deployed-exact-talent/${runId}`,
+      expectedLane: 'freelancer',
+      expectedEmptyState:
+        'Complete your freelancer profile here before applying so proposals carry proof, specialties, and crypto-readiness context.',
     },
     opportunity: {
       title: opportunityTitle,
