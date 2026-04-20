@@ -36,7 +36,7 @@ Run the same image with different commands:
 9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id.
    By default it now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that environment and candidate.
    Supply explicit smoke or launch run ids only when you need to override that auto-selection.
-   The launch review artifact now includes `launch-evidence-posture.json`, and promotion review treats that file as the canonical launch posture contract instead of reconstructing posture from mixed nested fields.
+   The launch review artifact now includes `launch-evidence-posture.json`, marketplace-origin summary plus seeded/exact marketplace evidence, and `provider-validation-summary.json`, and promotion review treats that set as the canonical launch posture/evidence contract instead of reconstructing posture from mixed nested fields.
 10. Review the uploaded `release-dossier` artifact before any production promotion decision.
 11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`.
 12. Treat the uploaded `release-pointer-<environment>` artifact as the latest approved release pointer for that environment.
@@ -87,6 +87,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - let the launch-candidate suite capture both the seeded canary and the exact-flow spec covering create, fund, contractor join, delivery, dispute, and operator resolution on the staged environment
 - run `Promotion Review` for the staged candidate; let it auto-discover the newest matching smoke and launch review artifacts unless you need explicit override run ids
 - review `launch-evidence-posture.json` inside the launch review artifact when triaging blockers or warnings; it is the compact canonical launch posture consumed by promotion review
+- confirm the launch review artifact also contains `marketplace-origin-summary.json`, `marketplace-seeded-evidence.json`, `marketplace-exact-evidence.json`, and `provider-validation-summary.json` before relying on later release-dossier assembly
 - preserve the uploaded `release-dossier` artifact, which now includes copied evidence under `evidence/` plus `release-dossier-checksums.txt`
 - preserve the uploaded `release-pointer-staging` artifact so the reviewed candidate can be referenced without reopening the full dossier
 - review the workflow summary lines for exact marketplace lane proof and client/freelancer workspace-switch posture when confirming the rollback pointer or newly generated staging pointer

@@ -265,7 +265,11 @@ jobs:
           path: |
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/evidence-manifest.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/launch-evidence-posture.json
+            ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/marketplace-origin-summary.json
+            ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/marketplace-seeded-evidence.json
+            ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/marketplace-exact-evidence.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/promotion-record.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/promotion-record.md
+            ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/provider-validation-summary.json
             ${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}/summary.md
           if-no-files-found: error

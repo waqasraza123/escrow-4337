@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Surface the release-pointer exact-lane contract directly in workflow/operator review surfaces so rollback and promotion reviewers can see the same Phase 1 marketplace proof without opening raw artifacts.
+- Align the real GitHub launch-review artifact with the release-dossier contract so promotion review and dossier assembly consume the same preserved marketplace/provider evidence set.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,10 +64,10 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by taking the surfaced exact-lane proof into real staging execution:
+- Continue the combined Phase 0 + Phase 1 program by using the now-complete review artifact contract in real staging execution:
   - run the deployed exact marketplace journey against real staging once secrets and URLs are ready
-  - continue Phase 0 staging-proof work now that rollback/promotion review surfaces expose exact lane proof directly
-  - if more workflow consumers appear, keep using release-pointer env fields instead of re-reading nested dossier JSON
+  - verify the GitHub `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
+  - keep any further workflow consumers on canonical release-pointer/env fields instead of re-reading nested dossier JSON
 
 ## Update (2026-04-20, Exact Marketplace Canary Stabilization)
 - Stabilized the exact Phase 1 marketplace browser canary against the built local stack.
@@ -135,6 +135,23 @@
   - exact client/freelancer workspace-switch facts
 - `Promotion Review` now validates the generated release pointer with `--write-env` and writes the same exact-lane posture into its workflow summary for reviewers.
 - Updated launch/deployment/staging docs so reviewers explicitly check workflow-summary exact-lane proof alongside the persisted `release-pointer` artifact.
+- Verification:
+  - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Launch Review Artifact Contract)
+- Fixed the live GitHub `Launch Candidate` review artifact so it now preserves the full release-facing launch evidence subset expected later by `Promotion Review` and `release-dossier`:
+  - `evidence-manifest.json`
+  - `launch-evidence-posture.json`
+  - `marketplace-origin-summary.json`
+  - `marketplace-seeded-evidence.json`
+  - `marketplace-exact-evidence.json`
+  - `promotion-record.json`
+  - `promotion-record.md`
+  - `provider-validation-summary.json`
+  - `summary.md`
+- Updated launch/deployment/staging docs so reviewers explicitly expect that fuller artifact set before trusting dossier assembly.
 - Verification:
   - `git diff --check`
 - Result:

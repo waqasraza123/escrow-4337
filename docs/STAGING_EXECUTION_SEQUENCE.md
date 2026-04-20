@@ -71,6 +71,7 @@ Required environment contract:
     It now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that candidate and environment.
     Provide explicit smoke or launch run ids only when you need to override the auto-selected review artifacts.
     The launch review artifact now includes `launch-evidence-posture.json`; use that file as the compact canonical launch posture when reviewing staged blockers, provider posture, evidence completeness, and marketplace-origin proof.
+    Confirm the artifact also contains `marketplace-origin-summary.json`, `marketplace-seeded-evidence.json`, `marketplace-exact-evidence.json`, and `provider-validation-summary.json` so `release-dossier` assembly can reuse the same reviewed evidence set without gaps.
     Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
     Preserve the uploaded `release-dossier` artifact from that workflow; it now copies the source evidence into one canonical folder and includes `release-dossier-checksums.txt`.
     Preserve the uploaded `release-pointer-staging` artifact too; it is the stable reviewed pointer for the latest ready staging candidate.
@@ -79,7 +80,7 @@ Required environment contract:
 11. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
     Record the successful `Deployed Smoke` run URL, `Launch Candidate` run URL, `Promotion Review` run URL, target commit SHA, deployed image SHA, and any rollback image SHA.
-    The release review set now includes `deployed-smoke-record.json`, `evidence-manifest.json`, `promotion-record.json`, `promotion-review.json`, the assembled `release-dossier.json`, and `release-pointer.json`. `evidence-manifest.json` should show zero missing artifacts and `promotion-review.json` should report `ready` before promotion discussion.
+    The release review set now includes `deployed-smoke-record.json`, `evidence-manifest.json`, `provider-validation-summary.json`, `marketplace-origin-summary.json`, marketplace seeded/exact evidence, `promotion-record.json`, `promotion-review.json`, the assembled `release-dossier.json`, and `release-pointer.json`. `evidence-manifest.json` should show zero missing artifacts and `promotion-review.json` should report `ready` before promotion discussion.
 
 12. Decide whether deeper staged proof is required.
     The `Launch Candidate` workflow and `pnpm launch:candidate` now require the staged `PLAYWRIGHT_DEPLOYED_FLOW_*` contract and capture both seeded and exact canary evidence.
