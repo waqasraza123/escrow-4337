@@ -167,6 +167,9 @@ function runValidate(argv) {
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_CONFIRMED_MODES=${(pointer.launchMarketplaceOriginConfirmedModes ?? []).join(',')}`,
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_MISSING_MODES=${(pointer.launchMarketplaceOriginMissingModes ?? []).join(',')}`,
         `RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_FAILED_MODES=${(pointer.launchMarketplaceOriginFailedModes ?? []).join(',')}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK=${pointer.launchMarketplaceExactLaneProofOk ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED=${pointer.launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher ?? ''}`,
+        `RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED=${pointer.launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher ?? ''}`,
       ].join('\n') + '\n',
       'utf8',
     );
@@ -264,6 +267,12 @@ function buildMarkdown(pointer) {
       : 'n/a'
   }
 - Launch marketplace origin proof: ${formatOptionalBoolean(pointer.launchMarketplaceOriginOk)}
+- Launch exact marketplace lane proof: ${
+    pointer.launchMarketplaceExactLaneProofOk !== null &&
+    pointer.launchMarketplaceExactLaneProofOk !== undefined
+      ? `${formatOptionalBoolean(pointer.launchMarketplaceExactLaneProofOk)} · client switched ${formatOptionalBoolean(pointer.launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher)} · freelancer switched ${formatOptionalBoolean(pointer.launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher)}`
+      : 'n/a'
+  }
 - Launch marketplace origin confirmed modes: ${
     pointer.launchMarketplaceOriginConfirmedModes?.length
       ? pointer.launchMarketplaceOriginConfirmedModes.join(', ')

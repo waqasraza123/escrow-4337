@@ -69,6 +69,11 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
             confirmedModes: ['seeded', 'exact'],
             missingModes: [],
             failedModes: [],
+            exactLaneProof: {
+              ok: true,
+              clientSwitchedViaWorkspaceSwitcher: false,
+              freelancerSwitchedViaWorkspaceSwitcher: true,
+            },
           },
           canaries: {
             marketplaceSeededCanaryFailures: 0,
@@ -105,6 +110,11 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
           confirmedModes: ['seeded', 'exact'],
           missingModes: [],
           failedModes: [],
+          exactLaneProof: {
+            ok: true,
+            clientSwitchedViaWorkspaceSwitcher: false,
+            freelancerSwitchedViaWorkspaceSwitcher: true,
+          },
         },
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
@@ -167,6 +177,9 @@ test('buildReleasePointer requires a ready release dossier and carries rollback 
   assert.deepEqual(pointer.launchMarketplaceOriginConfirmedModes, ['seeded', 'exact']);
   assert.deepEqual(pointer.launchMarketplaceOriginMissingModes, []);
   assert.deepEqual(pointer.launchMarketplaceOriginFailedModes, []);
+  assert.equal(pointer.launchMarketplaceExactLaneProofOk, true);
+  assert.equal(pointer.launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher, false);
+  assert.equal(pointer.launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher, true);
 });
 
 test('validateReleasePointer catches environment drift and invalid digests', () => {
@@ -194,6 +207,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
       launchBlockerCount: -1,
       launchEvidenceComplete: 'true',
       launchMarketplaceOriginOk: 'true',
+      launchMarketplaceExactLaneProofOk: 'true',
+      launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher: 'false',
       launchMarketplaceOriginConfirmedModes: ['seeded', ''],
     },
     {
@@ -220,6 +235,8 @@ test('validateReleasePointer catches environment drift and invalid digests', () 
     'Release pointer launch status must be ready or blocked when present, but was pending.',
     'Release pointer launch evidence complete must be boolean when present.',
     'Release pointer launch marketplace origin ok must be boolean when present.',
+    'Release pointer launch marketplace exact lane proof ok must be boolean when present.',
+    'Release pointer launch marketplace exact client lane workspace switch must be boolean when present.',
     'Release pointer launch marketplace origin confirmed modes must be an array of non-empty strings when present.',
   ]);
 });
@@ -303,6 +320,7 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
       launchMarketplaceExactCanaryFailures: 2,
       authorityAuditSource: 'aggregate',
       launchMarketplaceOriginOk: false,
+      launchMarketplaceExactLaneProofOk: false,
       launchMarketplaceOriginConfirmedModes: ['seeded'],
       launchMarketplaceOriginMissingModes: ['exact'],
       launchMarketplaceOriginFailedModes: ['seeded'],
@@ -325,6 +343,7 @@ test('validateReleasePointer can require ready marketplace launch posture', () =
     'Release pointer does not confirm launch evidence completeness.',
     'Release pointer reports missing launch evidence artifacts.',
     'Release pointer does not confirm marketplace origin proof.',
+    'Release pointer does not confirm exact marketplace lane proof.',
     'Release pointer does not confirm both seeded and exact marketplace origin modes.',
     'Release pointer reports missing marketplace origin modes.',
     'Release pointer reports failed marketplace origin modes.',

@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Push the lane-aware exact marketplace contract into deployed launch evidence and release review so Phase 1 browser proof survives promotion artifacts, not just local Playwright runs.
+- Propagate the canonical exact marketplace lane proof into downstream release consumers so rollout/rollback tooling sees the same Phase 1 client/freelancer workspace contract as launch review.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,8 +64,8 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by propagating the canonical exact-lane proof into the remaining release-facing surfaces and real staging proof:
-  - mirror the same exact lane-proof signal into `release-pointer` and any workflow/runbook consumer that still only sees coarse marketplace-origin state
+- Continue the combined Phase 0 + Phase 1 program by taking the exact-lane proof from release artifacts into real workflow consumption and staging proof:
+  - wire the new release-pointer env fields into launch/promotion/promotion-adjacent workflow consumers or runbooks that still only rely on coarse marketplace-origin posture
   - browser-verify the deployed exact marketplace journey against real staging once secrets and URLs are ready
   - continue Phase 0 staging-proof work now that the Phase 1 workspace journey is stable enough locally for production-like canaries
 
@@ -108,6 +108,19 @@
 - Verification:
   - `git diff --check`
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Exact Lane Proof in Release Pointer)
+- `scripts/release-pointer-lib.mjs` now snapshots exact marketplace lane proof from the canonical launch posture into the release pointer:
+  - `launchMarketplaceExactLaneProofOk`
+  - `launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher`
+  - `launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher`
+- Ready-launch validation for release pointers now also blocks when exact marketplace lane proof is not confirmed.
+- `scripts/release-pointer.mjs` now exports the new exact lane proof fields through `--write-env` and surfaces them in `release-pointer.md`.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/release-pointer-lib.test.mjs scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs`
 - Result:
   - Passed
 

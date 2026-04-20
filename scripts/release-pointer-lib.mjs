@@ -46,6 +46,7 @@ export function buildReleasePointer({
   const launchProviderValidation = launchPosture?.providerValidation ?? null;
   const launchEvidenceContract = launchPosture?.evidenceContract ?? null;
   const launchMarketplaceOrigin = launchPosture?.marketplaceOrigin ?? null;
+  const launchExactLaneProof = launchMarketplaceOrigin?.exactLaneProof ?? null;
   const launchExecutionTraceCoverage = launchPosture?.executionTraceCoverage ?? null;
   const launchCanaries = launchPosture?.canaries ?? null;
   const rollback = launchPosture?.rollback ?? null;
@@ -187,6 +188,20 @@ export function buildReleasePointer({
     launchMarketplaceOriginFailedModes: normalizeOptionalStringArray(
       launchMarketplaceOrigin?.failedModes ??
         releaseDossier?.launchEvidence?.marketplaceOrigin?.failedModes,
+    ),
+    launchMarketplaceExactLaneProofOk: normalizeOptionalBoolean(
+      launchExactLaneProof?.ok ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.exactLaneProof?.ok,
+    ),
+    launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher: normalizeOptionalBoolean(
+      launchExactLaneProof?.clientSwitchedViaWorkspaceSwitcher ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.exactLaneProof
+          ?.clientSwitchedViaWorkspaceSwitcher,
+    ),
+    launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher: normalizeOptionalBoolean(
+      launchExactLaneProof?.freelancerSwitchedViaWorkspaceSwitcher ??
+        releaseDossier?.launchEvidence?.marketplaceOrigin?.exactLaneProof
+          ?.freelancerSwitchedViaWorkspaceSwitcher,
     ),
   };
 }
@@ -406,6 +421,15 @@ export function validateReleasePointer(
   for (const [field, label] of [
     ['launchEvidenceComplete', 'launch evidence complete'],
     ['launchMarketplaceOriginOk', 'launch marketplace origin ok'],
+    ['launchMarketplaceExactLaneProofOk', 'launch marketplace exact lane proof ok'],
+    [
+      'launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher',
+      'launch marketplace exact client lane workspace switch',
+    ],
+    [
+      'launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher',
+      'launch marketplace exact freelancer lane workspace switch',
+    ],
   ]) {
     if (pointer?.[field] !== undefined && pointer?.[field] !== null && typeof pointer[field] !== 'boolean') {
       issues.push(`Release pointer ${label} must be boolean when present.`);
@@ -464,6 +488,9 @@ export function validateReleasePointer(
     }
     if (pointer?.launchMarketplaceOriginOk !== true) {
       issues.push('Release pointer does not confirm marketplace origin proof.');
+    }
+    if (pointer?.launchMarketplaceExactLaneProofOk !== true) {
+      issues.push('Release pointer does not confirm exact marketplace lane proof.');
     }
     if (!hasRequiredModes(pointer?.launchMarketplaceOriginConfirmedModes, ['seeded', 'exact'])) {
       issues.push('Release pointer does not confirm both seeded and exact marketplace origin modes.');
