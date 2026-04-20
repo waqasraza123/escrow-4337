@@ -44,6 +44,15 @@ export const releaseDossierSourceSpecs = [
   },
 ];
 
+export const releaseDossierOutputRequiredFiles = [
+  'release-dossier.json',
+  'release-dossier.md',
+  'release-dossier-checksums.txt',
+  ...releaseDossierSourceSpecs.flatMap((spec) =>
+    spec.requiredFiles.map((relativePath) => `evidence/${spec.label}/${relativePath}`),
+  ),
+];
+
 export function findReleaseDossierSourceSpec(sourceKey) {
   return releaseDossierSourceSpecs.find((spec) => spec.key === sourceKey) ?? null;
 }
@@ -172,6 +181,20 @@ export function validateReleaseDossierSourceDirectory({ sourceKey, sourceDir }) 
     const sourcePath = resolve(resolvedSourceDir, relativePath);
     if (!existsSync(sourcePath)) {
       issues.push(`Release dossier source ${spec.label} is missing required file ${relativePath}.`);
+    }
+  }
+
+  return issues;
+}
+
+export function validateReleaseDossierOutputDirectory({ outputDir }) {
+  const resolvedOutputDir = resolve(outputDir);
+  const issues = [];
+
+  for (const relativePath of releaseDossierOutputRequiredFiles) {
+    const filePath = resolve(resolvedOutputDir, relativePath);
+    if (!existsSync(filePath)) {
+      issues.push(`Release dossier output is missing required file ${relativePath}.`);
     }
   }
 

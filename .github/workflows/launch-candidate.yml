@@ -256,8 +256,15 @@ jobs:
             --source launchCandidateReview \
             --dir "${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}"
 
-      - name: Upload launch candidate artifacts
+      - name: Validate launch candidate artifact bundle
         if: always()
+        id: validate_launch_candidate_artifacts
+        run: |
+          node ./scripts/launch-candidate.mjs validate-artifacts \
+            --artifacts-dir "${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}"
+
+      - name: Upload launch candidate artifacts
+        if: always() && steps.validate_launch_candidate_artifacts.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: launch-candidate-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}

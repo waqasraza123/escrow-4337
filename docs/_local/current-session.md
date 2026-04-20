@@ -10,14 +10,13 @@
   - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
 
 ## Last Completed Step
-- Tightened the authenticated marketplace route entry and empty-state behavior on top of capability gating:
-  - `/app/marketplace` now renders explicit client vs freelancer lane cards with workspace-switch entry points
-  - freelancer profile setup now shows role-native empty-state guidance when the active workspace has no profile yet
-  - client and freelancer empty states now explain whether the lane is ready or blocked and offer a direct switch into a capable workspace when available
-  - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
+- Completed the generated GitHub release-bundle contract across the remaining full upload boundaries:
+  - `Launch Candidate` now validates the full `launch-candidate-*` bundle before upload
+  - `Promotion Review` now validates generated `release-dossier-*` and `release-pointer-*` bundles before upload
+  - the underlying script layer now exposes explicit validators for full launch-candidate, release-dossier, and release-pointer output directories
 
 ## Current Step
-- Complete the reviewed-artifact contract across the remaining GitHub review bundles so smoke and promotion outputs are also validated before upload.
+- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the full generated-bundle validation pass.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -192,6 +191,23 @@
 - `Promotion Review` now validates `artifacts/promotion-review` with `validate-source-dir --source promotionReview` before uploading the reviewed promotion artifact.
 - Updated launch/deployment docs so the reviewed-artifact contract is stated consistently across smoke, launch, promotion, dossier, and pointer steps.
 - Verification:
+  - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Full Generated Bundle Validation)
+- Added explicit generated-bundle validators for the remaining full GitHub upload boundaries:
+  - `scripts/launch-candidate.mjs validate-artifacts --artifacts-dir <path>`
+  - `scripts/release-dossier.mjs validate-output-dir --dir <path>`
+  - `scripts/release-pointer.mjs validate-output-dir --dir <path>`
+- `scripts/launch-candidate-lib.mjs` now defines the full upload contract for `launch-candidate-*`, including canonical evidence, posture, manifest, promotion, and summary files.
+- `scripts/release-dossier-lib.mjs` now validates the generated dossier root files plus the copied canonical evidence tree under `evidence/`.
+- `scripts/release-pointer-lib.mjs` now validates the generated pointer directory before upload.
+- GitHub workflow changes:
+  - `Launch Candidate` validates the full `launch-candidate-*` bundle before upload
+  - `Promotion Review` validates generated `release-dossier-*` and `release-pointer-*` directories before upload
+- Verification:
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
   - `git diff --check`
 - Result:
   - Passed

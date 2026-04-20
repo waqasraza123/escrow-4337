@@ -24,6 +24,13 @@ export const launchCandidateRequiredArtifacts = [
   'promotion-record.md',
 ];
 
+export const launchCandidateUploadRequiredArtifacts = [
+  ...launchCandidateRequiredArtifacts,
+  'evidence-manifest.json',
+  'summary.json',
+  'summary.md',
+];
+
 const providerValidationGroups = [
   {
     id: 'emailRelay',
@@ -293,6 +300,20 @@ export function buildEvidenceManifest({
     incidents,
     producedArtifacts: listArtifacts(artifactsDir),
   };
+}
+
+export function validateLaunchCandidateArtifactsDirectory({ artifactsDir }) {
+  const resolvedArtifactsDir = resolve(artifactsDir);
+  const issues = [];
+
+  for (const relativePath of launchCandidateUploadRequiredArtifacts) {
+    const artifactPath = resolve(resolvedArtifactsDir, relativePath);
+    if (!existsSync(artifactPath)) {
+      issues.push(`Launch candidate artifact bundle is missing required file ${relativePath}.`);
+    }
+  }
+
+  return issues;
 }
 
 export function summarizeProviderValidation(

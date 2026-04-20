@@ -5,7 +5,11 @@ import {
   buildReleasePointerArtifactName,
   selectLatestReleasePointerArtifact,
   validateReleasePointer,
+  validateReleasePointerOutputDirectory,
 } from './release-pointer-lib.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 
 test('buildReleasePointerArtifactName normalizes environment', () => {
   assert.equal(buildReleasePointerArtifactName('Production'), 'release-pointer-production');
@@ -264,6 +268,20 @@ test('validateReleasePointer requires rollback pointer artifact details for arti
     'Release pointer rollback pointer artifact id is required for artifact-search selection.',
     'Release pointer rollback pointer selected timestamp is required for artifact-search selection.',
   ]);
+});
+
+test('validateReleasePointerOutputDirectory reports missing generated output files explicitly', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-pointer-lib-'));
+
+  try {
+    writeFileSync(resolve(root, 'release-pointer.json'), '{}\n', 'utf8');
+
+    assert.deepEqual(validateReleasePointerOutputDirectory({ outputDir: root }), [
+      'Release pointer output is missing required file release-pointer.md.',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('validateReleasePointer requires review selection artifact details for artifact-search selection', () => {

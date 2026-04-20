@@ -227,16 +227,30 @@ jobs:
           path: artifacts/promotion-review
           if-no-files-found: error
 
-      - name: Upload release dossier artifact
+      - name: Validate release dossier output bundle
         if: always()
+        id: validate_release_dossier_output
+        run: |
+          node ./scripts/release-dossier.mjs validate-output-dir \
+            --dir artifacts/release-dossier
+
+      - name: Upload release dossier artifact
+        if: always() && steps.validate_release_dossier_output.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: release-dossier-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/release-dossier
           if-no-files-found: error
 
-      - name: Upload release pointer artifact
+      - name: Validate release pointer output bundle
         if: success()
+        id: validate_release_pointer_output
+        run: |
+          node ./scripts/release-pointer.mjs validate-output-dir \
+            --dir artifacts/release-pointer
+
+      - name: Upload release pointer artifact
+        if: success() && steps.validate_release_pointer_output.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: release-pointer-${{ inputs.environment }}

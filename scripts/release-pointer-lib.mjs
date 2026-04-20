@@ -1,6 +1,11 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 export function buildReleasePointerArtifactName(environment) {
   return `release-pointer-${normalizeRequiredSegment(environment, 'environment')}`;
 }
+
+export const releasePointerOutputRequiredFiles = ['release-pointer.json', 'release-pointer.md'];
 
 export function buildReleasePointer({
   generatedAt = new Date().toISOString(),
@@ -503,6 +508,20 @@ export function validateReleasePointer(
     }
     if (!normalizeOptionalString(pointer?.rollbackSource)) {
       issues.push('Release pointer does not record rollback source.');
+    }
+  }
+
+  return issues;
+}
+
+export function validateReleasePointerOutputDirectory({ outputDir }) {
+  const resolvedOutputDir = resolve(outputDir);
+  const issues = [];
+
+  for (const relativePath of releasePointerOutputRequiredFiles) {
+    const filePath = resolve(resolvedOutputDir, relativePath);
+    if (!existsSync(filePath)) {
+      issues.push(`Release pointer output is missing required file ${relativePath}.`);
     }
   }
 

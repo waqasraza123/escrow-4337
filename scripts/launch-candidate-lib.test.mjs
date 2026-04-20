@@ -11,6 +11,7 @@ import {
   summarizeMarketplaceJourneyEvidence,
   summarizeProviderValidation,
   evaluatePromotionReadiness,
+  validateLaunchCandidateArtifactsDirectory,
   validateIncidentPlaybook,
   validateLaunchMetadata,
 } from './launch-candidate-lib.mjs';
@@ -204,6 +205,47 @@ test('buildEvidenceManifest reports missing artifacts and incident evidence cove
       },
     ]);
     assert.ok(manifest.producedArtifacts.includes('authority-evidence/summary.json'));
+  } finally {
+    rmSync(root, {
+      recursive: true,
+      force: true,
+    });
+  }
+});
+
+test('validateLaunchCandidateArtifactsDirectory reports missing generated upload files explicitly', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'launch-candidate-lib-'));
+
+  try {
+    writeFileSync(resolve(root, 'deployment-validation.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'provider-validation-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'launch-evidence-posture.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'chain-sync-daemon-health.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'chain-sync-daemon-alert-dry-run.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'runtime-profile.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'launch-readiness.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'smoke-deployed.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-seeded-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-exact-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-marketplace-seeded-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-marketplace-exact-canary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-walkthrough.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'deployed-authority-evidence.json'), '{}\n', 'utf8');
+    mkdirSync(resolve(root, 'authority-evidence'), {
+      recursive: true,
+    });
+    writeFileSync(resolve(root, 'authority-evidence', 'summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'promotion-record.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'promotion-record.md'), '# promotion\n', 'utf8');
+    writeFileSync(resolve(root, 'evidence-manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(root, 'summary.json'), '{}\n', 'utf8');
+
+    assert.deepEqual(validateLaunchCandidateArtifactsDirectory({ artifactsDir: root }), [
+      'Launch candidate artifact bundle is missing required file summary.md.',
+    ]);
   } finally {
     rmSync(root, {
       recursive: true,

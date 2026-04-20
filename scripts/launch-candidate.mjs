@@ -15,6 +15,7 @@ import {
   summarizeMarketplaceJourneyEvidence,
   summarizeProviderValidation,
   validateIncidentPlaybook,
+  validateLaunchCandidateArtifactsDirectory,
   validateLaunchMetadata,
   writeGitHubStepSummary,
 } from './launch-candidate-lib.mjs';
@@ -25,15 +26,44 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help')) {
   console.log(`Usage: pnpm launch:candidate [--artifacts-dir <path>]
+       node ./scripts/launch-candidate.mjs validate-artifacts --artifacts-dir <path>
 
 Runs the deployed launch-candidate gate, captures evidence artifacts under
-artifacts/launch-candidate by default, and exits non-zero on launch blockers.`);
+artifacts/launch-candidate by default, and exits non-zero on launch blockers.
+
+validate-artifacts: validates that a generated launch-candidate artifact directory
+contains the full upload contract expected by GitHub workflow consumers.`);
   process.exit(0);
 }
 
-const artifactsDir = readArtifactsDir(args);
+const command = args[0] === 'validate-artifacts' ? 'validate-artifacts' : 'run';
+const commandArgs = command === 'validate-artifacts' ? args.slice(1) : args;
+const artifactsDir = readArtifactsDir(commandArgs);
 
 loadOptionalEnv('.env.e2e.deployed');
+
+if (command === 'validate-artifacts') {
+  const issues = validateLaunchCandidateArtifactsDirectory({ artifactsDir });
+  if (issues.length > 0) {
+    throw new Error(
+      ['Launch candidate artifact validation failed.', ...issues.map((issue) => `- ${issue}`)].join(
+        '\n',
+      ),
+    );
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        status: 'ready',
+        artifactsDir,
+      },
+      null,
+      2,
+    ),
+  );
+  process.exit(0);
+}
 
 const apiBaseUrl = readRequiredEnv('PLAYWRIGHT_DEPLOYED_API_BASE_URL');
 const expectLaunchReady =

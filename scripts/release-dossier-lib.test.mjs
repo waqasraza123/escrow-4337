@@ -11,6 +11,7 @@ import {
   copyReleaseDossierSources,
   findReleaseDossierSourceSpec,
   listReleaseDossierFiles,
+  validateReleaseDossierOutputDirectory,
   validateReleaseDossierSourceDirectory,
   validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
@@ -160,6 +161,82 @@ test('validateReleaseDossierSourceDirectory validates one source bundle by key',
       }),
       ['Unknown release dossier source key unknown.'],
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateReleaseDossierOutputDirectory reports missing generated output files explicitly', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const outputDir = resolve(root, 'out');
+    mkdirSync(resolve(outputDir, 'evidence', 'api-image-manifest'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'deployed-smoke-review'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'launch-candidate-review'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'promotion-review'), { recursive: true });
+
+    writeFileSync(resolve(outputDir, 'release-dossier.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'release-dossier.md'), '# dossier\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'release-dossier-checksums.txt'), 'abc  file\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'api-image-manifest', 'manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'api-image-manifest', 'manifest.md'), '# image\n', 'utf8');
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'deployed-smoke-review', 'deployed-smoke-record.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'deployed-smoke-review', 'deployed-smoke-record.md'),
+      '# smoke\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'evidence-manifest.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'launch-evidence-posture.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-origin-summary.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-seeded-evidence.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-exact-evidence.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'promotion-record.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'promotion-record.md'),
+      '# launch\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'provider-validation-summary.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(resolve(outputDir, 'evidence', 'promotion-review', 'promotion-review.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'promotion-review', 'promotion-review.md'), '# review\n', 'utf8');
+
+    assert.deepEqual(validateReleaseDossierOutputDirectory({ outputDir }), [
+      'Release dossier output is missing required file evidence/launch-candidate-review/summary.md.',
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

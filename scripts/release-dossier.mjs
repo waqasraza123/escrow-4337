@@ -9,6 +9,7 @@ import {
   copyReleaseDossierSources,
   findReleaseDossierSourceSpec,
   listReleaseDossierFiles,
+  validateReleaseDossierOutputDirectory,
   validateReleaseDossierSourceDirectory,
   validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
@@ -26,7 +27,10 @@ if (args.includes('--help')) {
 
 try {
   const command =
-    args[0] === 'validate-sources' || args[0] === 'validate-source-dir' || args[0] === 'generate'
+    args[0] === 'validate-sources' ||
+    args[0] === 'validate-source-dir' ||
+    args[0] === 'validate-output-dir' ||
+    args[0] === 'generate'
       ? args[0]
       : 'generate';
   const commandArgs = command === 'generate' && args[0] !== 'generate' ? args : args.slice(1);
@@ -53,6 +57,30 @@ try {
           status: 'ready',
           source: spec?.label ?? sourceKey,
           sourceDir,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(0);
+  }
+
+  if (command === 'validate-output-dir') {
+    const outputDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--dir'));
+    const issues = validateReleaseDossierOutputDirectory({ outputDir });
+    if (issues.length > 0) {
+      throw new Error(
+        ['Release dossier output validation failed.', ...issues.map((issue) => `- ${issue}`)].join(
+          '\n',
+        ),
+      );
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          status: 'ready',
+          outputDir,
         },
         null,
         2,
@@ -198,6 +226,7 @@ function printHelp() {
   console.log(`Usage:
   node ./scripts/release-dossier.mjs generate --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path> [--output-dir <path>]
   node ./scripts/release-dossier.mjs validate-source-dir --source <imageManifest|deployedSmokeReview|launchCandidateReview|promotionReview> --dir <path>
+  node ./scripts/release-dossier.mjs validate-output-dir --dir <path>
   node ./scripts/release-dossier.mjs validate-sources --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path>
 
 Copies the reviewed release evidence into one canonical dossier directory, writes

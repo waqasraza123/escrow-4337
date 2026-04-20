@@ -6,6 +6,7 @@ import {
   buildReleasePointerArtifactName,
   selectLatestReleasePointerArtifact,
   validateReleasePointer,
+  validateReleasePointerOutputDirectory,
 } from './release-pointer-lib.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,11 @@ try {
 
   if (command === 'validate') {
     runValidate(args.slice(1));
+    process.exit(0);
+  }
+
+  if (command === 'validate-output-dir') {
+    runValidateOutputDir(args.slice(1));
     process.exit(0);
   }
 
@@ -176,6 +182,29 @@ function runValidate(argv) {
   }
 
   console.log(JSON.stringify(pointer, null, 2));
+}
+
+function runValidateOutputDir(argv) {
+  const outputDir = resolve(repoRoot, readRequiredFlag(argv, '--dir'));
+  const issues = validateReleasePointerOutputDirectory({ outputDir });
+  if (issues.length > 0) {
+    throw new Error(
+      ['Release pointer output validation failed.', ...issues.map((issue) => `- ${issue}`)].join(
+        '\n',
+      ),
+    );
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        status: 'ready',
+        outputDir,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function listRepoArtifacts() {
@@ -323,6 +352,7 @@ function printHelp() {
   node ./scripts/release-pointer.mjs generate --release-dossier <path> [--output-dir <path>]
   node ./scripts/release-pointer.mjs resolve --environment <env> [--write-env <path>]
   node ./scripts/release-pointer.mjs validate --pointer <path> [--expected-environment <env>] [--require-ready-launch-posture] [--write-env <path>]
+  node ./scripts/release-pointer.mjs validate-output-dir --dir <path>
 
 generate: writes a ready-only release pointer derived from release-dossier.json.
 resolve: finds the newest non-expired release pointer artifact for an environment and prints the run id plus artifact name.
