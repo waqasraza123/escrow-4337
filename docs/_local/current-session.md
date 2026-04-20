@@ -10,13 +10,13 @@
   - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
 
 ## Last Completed Step
-- Completed the generated GitHub release-bundle contract across the remaining full upload boundaries:
-  - `Launch Candidate` now validates the full `launch-candidate-*` bundle before upload
-  - `Promotion Review` now validates generated `release-dossier-*` and `release-pointer-*` bundles before upload
-  - the underlying script layer now exposes explicit validators for full launch-candidate, release-dossier, and release-pointer output directories
+- Tightened the full generated GitHub release-bundle validators from file-presence checks into semantic contract checks:
+  - launch-candidate upload validation now cross-checks `evidence-manifest.json`, `launch-evidence-posture.json`, `promotion-record.json`, and `summary.json`
+  - release-dossier output validation now recomputes the copied evidence inventory and checksum text before upload
+  - release-pointer output validation now re-runs ready-launch pointer validation against the generated JSON before upload
 
 ## Current Step
-- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the full generated-bundle validation pass.
+- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the semantic generated-bundle validation pass.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -206,6 +206,24 @@
 - GitHub workflow changes:
   - `Launch Candidate` validates the full `launch-candidate-*` bundle before upload
   - `Promotion Review` validates generated `release-dossier-*` and `release-pointer-*` directories before upload
+- Verification:
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Semantic Generated Bundle Validation)
+- Upgraded the generated-bundle validators from file-presence checks to semantic consistency checks.
+- Launch-candidate validation now:
+  - parses `evidence-manifest.json`, `launch-evidence-posture.json`, `promotion-record.json`, and `summary.json`
+  - cross-checks artifact counts, completeness flags, promotion status, authority audit source, provider failure/warning counts, marketplace-origin proof, and exact-lane proof
+- Release-dossier output validation now:
+  - recomputes the copied evidence inventory under `evidence/`
+  - compares file count, total bytes, per-file path/hash/size inventory, and `release-dossier-checksums.txt`
+- Release-pointer output validation now:
+  - parses the generated pointer JSON
+  - re-runs `validateReleasePointer(..., { requireReadyLaunchPosture: true })`
+- Added focused regression tests for semantic drift in all three validators.
 - Verification:
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
   - `git diff --check`

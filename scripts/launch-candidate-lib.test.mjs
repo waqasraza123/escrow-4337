@@ -254,6 +254,178 @@ test('validateLaunchCandidateArtifactsDirectory reports missing generated upload
   }
 });
 
+test('validateLaunchCandidateArtifactsDirectory reports semantic drift across generated artifacts', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'launch-candidate-lib-'));
+
+  try {
+    const requiredFiles = [
+      'deployment-validation.json',
+      'provider-validation-summary.json',
+      'launch-evidence-posture.json',
+      'chain-sync-daemon-health.json',
+      'chain-sync-daemon-alert-dry-run.json',
+      'runtime-profile.json',
+      'launch-readiness.json',
+      'smoke-deployed.json',
+      'deployed-seeded-canary.json',
+      'deployed-exact-canary.json',
+      'deployed-marketplace-seeded-canary.json',
+      'deployed-marketplace-exact-canary.json',
+      'marketplace-seeded-evidence.json',
+      'marketplace-exact-evidence.json',
+      'marketplace-origin-summary.json',
+      'deployed-walkthrough.json',
+      'deployed-authority-evidence.json',
+      'promotion-record.md',
+      'summary.md',
+    ];
+
+    for (const file of requiredFiles) {
+      writeFileSync(resolve(root, file), '{}\n', 'utf8');
+    }
+    mkdirSync(resolve(root, 'authority-evidence'), {
+      recursive: true,
+    });
+    writeFileSync(resolve(root, 'authority-evidence', 'summary.json'), '{}\n', 'utf8');
+
+    const present = [
+      'deployment-validation.json',
+      'provider-validation-summary.json',
+      'launch-evidence-posture.json',
+      'chain-sync-daemon-health.json',
+      'chain-sync-daemon-alert-dry-run.json',
+      'runtime-profile.json',
+      'launch-readiness.json',
+      'smoke-deployed.json',
+      'deployed-seeded-canary.json',
+      'deployed-exact-canary.json',
+      'deployed-marketplace-seeded-canary.json',
+      'deployed-marketplace-exact-canary.json',
+      'marketplace-seeded-evidence.json',
+      'marketplace-exact-evidence.json',
+      'marketplace-origin-summary.json',
+      'deployed-walkthrough.json',
+      'deployed-authority-evidence.json',
+      'authority-evidence/summary.json',
+      'promotion-record.json',
+      'promotion-record.md',
+      'evidence-manifest.json',
+      'summary.json',
+      'summary.md',
+    ];
+
+    writeFileSync(
+      resolve(root, 'evidence-manifest.json'),
+      `${JSON.stringify(
+        {
+          requiredArtifacts: {
+            total: present.length,
+            present,
+            missing: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      resolve(root, 'launch-evidence-posture.json'),
+      `${JSON.stringify(
+        {
+          status: 'blocked',
+          authority: {
+            auditSource: 'chain_projection',
+          },
+          evidenceContract: {
+            requiredArtifactCount: present.length,
+            presentArtifactCount: present.length,
+            missingArtifactCount: 0,
+            complete: true,
+          },
+          providerValidation: {
+            failureCount: 0,
+            warningCount: 1,
+          },
+          marketplaceOrigin: {
+            ok: true,
+            exactLaneProof: {
+              ok: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      resolve(root, 'promotion-record.json'),
+      `${JSON.stringify(
+        {
+          status: 'blocked',
+          launchCandidate: {
+            authorityAuditSource: 'chain_projection',
+            providerValidation: {
+              failedProviders: [],
+              warningProviders: ['paymaster'],
+            },
+            marketplaceOrigin: {
+              ok: true,
+              exactLaneProof: {
+                ok: true,
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      resolve(root, 'summary.json'),
+      `${JSON.stringify(
+        {
+          evidenceContract: {
+            requiredArtifactCount: present.length,
+            presentArtifactCount: present.length,
+            missingArtifacts: [],
+          },
+          promotion: {
+            status: 'blocked',
+          },
+          authorityEvidence: {
+            auditSource: 'chain_projection',
+          },
+          providerValidation: {
+            failedProviders: ['emailRelay'],
+            warningProviders: ['paymaster'],
+          },
+          marketplaceOrigin: {
+            ok: true,
+            exactLaneProof: {
+              ok: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+
+    assert.deepEqual(validateLaunchCandidateArtifactsDirectory({ artifactsDir: root }), [
+      'Launch evidence posture provider failure count 0 does not match summary provider failure count 1.',
+    ]);
+  } finally {
+    rmSync(root, {
+      recursive: true,
+      force: true,
+    });
+  }
+});
+
 test('buildLaunchEvidencePosture produces a canonical launch posture summary', () => {
   const posture = buildLaunchEvidencePosture({
     metadata: {

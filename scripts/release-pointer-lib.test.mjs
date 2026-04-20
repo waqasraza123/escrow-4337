@@ -284,6 +284,82 @@ test('validateReleasePointerOutputDirectory reports missing generated output fil
   }
 });
 
+test('validateReleasePointerOutputDirectory reports semantic drift for a non-ready pointer', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-pointer-lib-'));
+
+  try {
+    writeFileSync(
+      resolve(root, 'release-pointer.json'),
+      `${JSON.stringify(
+        {
+          generatedAt: '2026-04-13T00:00:00.000Z',
+          environment: 'production',
+          repository: 'mc/escrow4337',
+          artifactName: 'release-pointer-production',
+          releaseReviewRunId: '701',
+          releaseReviewRunUrl: 'https://github.com/mc/escrow4337/actions/runs/701',
+          candidateRunId: '101',
+          candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+          commitSha: 'abc123',
+          imageDigest: 'sha256:deadbeef',
+          imageReference: 'ghcr.io/mc/escrow-4337-api@sha256:deadbeef',
+          launchStatus: 'ready',
+          launchReady: false,
+          launchBlockerCount: 0,
+          launchWarningCount: 0,
+          rollbackImageSha: 'sha256:old',
+          rollbackSource: 'release-pointer',
+          rollbackPointerRunId: '651',
+          rollbackPointerArtifactName: 'release-pointer-staging',
+          rollbackPointerSelectionSource: 'artifact-search',
+          rollbackPointerArtifactId: '41',
+          rollbackPointerSelectedCreatedAt: '2026-04-13T03:00:00Z',
+          deployedSmokePassed: true,
+          deployedSmokeSeededCanaryPassed: true,
+          deployedSmokeMarketplaceSeededCanaryPassed: true,
+          deployedSmokeSelectionSource: 'artifact-search',
+          deployedSmokeArtifactId: '22',
+          deployedSmokeArtifactName: 'deployed-smoke-review-production-candidate-101',
+          deployedSmokeSelectedCreatedAt: '2026-04-13T01:00:00Z',
+          launchCandidateSelectionSource: 'input',
+          launchCandidateArtifactId: '12',
+          launchCandidateArtifactName: 'launch-candidate-review-production-candidate-101',
+          launchCandidateSelectedCreatedAt: '2026-04-13T02:00:00Z',
+          launchMarketplaceSeededCanaryFailures: 0,
+          launchMarketplaceExactCanaryFailures: 0,
+          authorityAuditSource: 'chain_projection',
+          launchRequiredArtifactCount: 20,
+          launchMissingArtifactCount: 0,
+          launchEvidenceComplete: true,
+          launchProviderFailureCount: 0,
+          launchProviderWarningCount: 0,
+          launchExecutionTraceExecutionCount: 8,
+          launchExecutionTraceCorrelationTaggedExecutions: 8,
+          launchExecutionTraceRequestTaggedExecutions: 8,
+          launchExecutionTraceOperationTaggedExecutions: 8,
+          launchMarketplaceOriginOk: true,
+          launchMarketplaceOriginConfirmedModes: ['seeded', 'exact'],
+          launchMarketplaceOriginMissingModes: [],
+          launchMarketplaceOriginFailedModes: [],
+          launchMarketplaceExactLaneProofOk: true,
+          launchMarketplaceExactClientLaneSwitchedViaWorkspaceSwitcher: false,
+          launchMarketplaceExactFreelancerLaneSwitchedViaWorkspaceSwitcher: true,
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(resolve(root, 'release-pointer.md'), '# pointer\n', 'utf8');
+
+    assert.deepEqual(validateReleasePointerOutputDirectory({ outputDir: root }), [
+      'Release pointer does not confirm launch ready posture.',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('validateReleasePointer requires review selection artifact details for artifact-search selection', () => {
   const issues = validateReleasePointer({
     generatedAt: '2026-04-13T00:00:00.000Z',

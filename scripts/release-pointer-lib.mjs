@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export function buildReleasePointerArtifactName(environment) {
@@ -525,6 +525,22 @@ export function validateReleasePointerOutputDirectory({ outputDir }) {
     }
   }
 
+  if (issues.length > 0) {
+    return issues;
+  }
+
+  const pointer = readJsonOutputFile(resolvedOutputDir, 'release-pointer.json', issues);
+  if (!pointer) {
+    return issues;
+  }
+
+  issues.push(
+    ...validateReleasePointer(pointer, {
+      expectedEnvironment: normalizeOptionalString(pointer?.environment),
+      requireReadyLaunchPosture: true,
+    }),
+  );
+
   return issues;
 }
 
@@ -564,6 +580,20 @@ function compareArtifactsNewestFirst(left, right) {
   }
 
   return Number(right?.id ?? 0) - Number(left?.id ?? 0);
+}
+
+function readJsonOutputFile(rootDir, relativePath, issues) {
+  const filePath = resolve(rootDir, relativePath);
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    issues.push(
+      `Release pointer output ${relativePath} is not valid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }.`,
+    );
+    return null;
+  }
 }
 
 function normalizeRequiredSegment(value, field) {

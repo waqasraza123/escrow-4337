@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 export const launchCandidateRequiredArtifacts = [
@@ -312,6 +312,183 @@ export function validateLaunchCandidateArtifactsDirectory({ artifactsDir }) {
       issues.push(`Launch candidate artifact bundle is missing required file ${relativePath}.`);
     }
   }
+
+  if (issues.length > 0) {
+    return issues;
+  }
+
+  const evidenceManifest = readJsonArtifact(resolvedArtifactsDir, 'evidence-manifest.json', issues);
+  const launchEvidencePosture = readJsonArtifact(
+    resolvedArtifactsDir,
+    'launch-evidence-posture.json',
+    issues,
+  );
+  const promotionRecord = readJsonArtifact(resolvedArtifactsDir, 'promotion-record.json', issues);
+  const summary = readJsonArtifact(resolvedArtifactsDir, 'summary.json', issues);
+
+  if (!evidenceManifest || !launchEvidencePosture || !promotionRecord || !summary) {
+    return issues;
+  }
+
+  const requiredArtifactCount = normalizeOptionalNumber(evidenceManifest?.requiredArtifacts?.total);
+  const missingArtifacts = normalizeOptionalStringArray(evidenceManifest?.requiredArtifacts?.missing);
+  const presentArtifacts = normalizeOptionalStringArray(evidenceManifest?.requiredArtifacts?.present);
+  const missingArtifactCount = missingArtifacts ? missingArtifacts.length : null;
+  const presentArtifactCount = presentArtifacts ? presentArtifacts.length : null;
+  const evidenceComplete = missingArtifactCount === null ? null : missingArtifactCount === 0;
+
+  compareField(
+    issues,
+    'Launch candidate evidence manifest required artifact count',
+    requiredArtifactCount,
+    'launch evidence posture required artifact count',
+    normalizeOptionalNumber(launchEvidencePosture?.evidenceContract?.requiredArtifactCount),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest required artifact count',
+    requiredArtifactCount,
+    'summary evidence contract required artifact count',
+    normalizeOptionalNumber(summary?.evidenceContract?.requiredArtifactCount),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest missing artifact count',
+    missingArtifactCount,
+    'launch evidence posture missing artifact count',
+    normalizeOptionalNumber(launchEvidencePosture?.evidenceContract?.missingArtifactCount),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest missing artifact count',
+    missingArtifactCount,
+    'summary evidence contract missing artifact count',
+    Array.isArray(summary?.evidenceContract?.missingArtifacts)
+      ? summary.evidenceContract.missingArtifacts.length
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest present artifact count',
+    presentArtifactCount,
+    'launch evidence posture present artifact count',
+    normalizeOptionalNumber(launchEvidencePosture?.evidenceContract?.presentArtifactCount),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest present artifact count',
+    presentArtifactCount,
+    'summary evidence contract present artifact count',
+    normalizeOptionalNumber(summary?.evidenceContract?.presentArtifactCount),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest completeness',
+    evidenceComplete,
+    'launch evidence posture completeness',
+    normalizeOptionalBoolean(launchEvidencePosture?.evidenceContract?.complete),
+  );
+  compareField(
+    issues,
+    'Launch candidate evidence manifest completeness',
+    evidenceComplete,
+    'summary evidence contract completeness',
+    Array.isArray(summary?.evidenceContract?.missingArtifacts)
+      ? summary.evidenceContract.missingArtifacts.length === 0
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch evidence posture status',
+    trimToNull(launchEvidencePosture?.status),
+    'promotion record status',
+    trimToNull(promotionRecord?.status),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture status',
+    trimToNull(launchEvidencePosture?.status),
+    'summary promotion status',
+    trimToNull(summary?.promotion?.status),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture authority audit source',
+    trimToNull(launchEvidencePosture?.authority?.auditSource),
+    'promotion record authority audit source',
+    trimToNull(promotionRecord?.launchCandidate?.authorityAuditSource),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture authority audit source',
+    trimToNull(launchEvidencePosture?.authority?.auditSource),
+    'summary authority audit source',
+    trimToNull(summary?.authorityEvidence?.auditSource),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture provider failure count',
+    normalizeOptionalNumber(launchEvidencePosture?.providerValidation?.failureCount),
+    'promotion record provider failure count',
+    Array.isArray(promotionRecord?.launchCandidate?.providerValidation?.failedProviders)
+      ? promotionRecord.launchCandidate.providerValidation.failedProviders.length
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch evidence posture provider failure count',
+    normalizeOptionalNumber(launchEvidencePosture?.providerValidation?.failureCount),
+    'summary provider failure count',
+    Array.isArray(summary?.providerValidation?.failedProviders)
+      ? summary.providerValidation.failedProviders.length
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch evidence posture provider warning count',
+    normalizeOptionalNumber(launchEvidencePosture?.providerValidation?.warningCount),
+    'promotion record provider warning count',
+    Array.isArray(promotionRecord?.launchCandidate?.providerValidation?.warningProviders)
+      ? promotionRecord.launchCandidate.providerValidation.warningProviders.length
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch evidence posture provider warning count',
+    normalizeOptionalNumber(launchEvidencePosture?.providerValidation?.warningCount),
+    'summary provider warning count',
+    Array.isArray(summary?.providerValidation?.warningProviders)
+      ? summary.providerValidation.warningProviders.length
+      : null,
+  );
+  compareField(
+    issues,
+    'Launch evidence posture marketplace origin proof',
+    normalizeOptionalBoolean(launchEvidencePosture?.marketplaceOrigin?.ok),
+    'promotion record marketplace origin proof',
+    normalizeOptionalBoolean(promotionRecord?.launchCandidate?.marketplaceOrigin?.ok),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture marketplace origin proof',
+    normalizeOptionalBoolean(launchEvidencePosture?.marketplaceOrigin?.ok),
+    'summary marketplace origin proof',
+    normalizeOptionalBoolean(summary?.marketplaceOrigin?.ok),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture exact marketplace lane proof',
+    normalizeOptionalBoolean(launchEvidencePosture?.marketplaceOrigin?.exactLaneProof?.ok),
+    'promotion record exact marketplace lane proof',
+    normalizeOptionalBoolean(promotionRecord?.launchCandidate?.marketplaceOrigin?.exactLaneProof?.ok),
+  );
+  compareField(
+    issues,
+    'Launch evidence posture exact marketplace lane proof',
+    normalizeOptionalBoolean(launchEvidencePosture?.marketplaceOrigin?.exactLaneProof?.ok),
+    'summary exact marketplace lane proof',
+    normalizeOptionalBoolean(summary?.marketplaceOrigin?.exactLaneProof?.ok),
+  );
 
   return issues;
 }
@@ -1101,6 +1278,58 @@ function trimToNull(value) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeOptionalNumber(value) {
+  return Number.isInteger(value) ? value : null;
+}
+
+function normalizeOptionalStringArray(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value
+    .map((entry) => trimToNull(entry))
+    .filter(Boolean)
+    .sort();
+}
+
+function compareField(issues, leftLabel, leftValue, rightLabel, rightValue) {
+  if (leftValue == null || rightValue == null) {
+    return;
+  }
+
+  if (JSON.stringify(leftValue) !== JSON.stringify(rightValue)) {
+    issues.push(
+      `${leftLabel} ${formatComparedValue(leftValue)} does not match ${rightLabel} ${formatComparedValue(rightValue)}.`,
+    );
+  }
+}
+
+function formatComparedValue(value) {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return JSON.stringify(value);
+}
+
+function readJsonArtifact(rootDir, relativePath, issues) {
+  const artifactPath = resolve(rootDir, relativePath);
+  try {
+    return JSON.parse(readFileSync(artifactPath, 'utf8'));
+  } catch (error) {
+    issues.push(
+      `Launch candidate artifact ${relativePath} is not valid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }.`,
+    );
+    return null;
+  }
 }
 
 function summarizeNotification(daemonAlertDrill) {

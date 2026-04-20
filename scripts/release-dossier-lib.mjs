@@ -198,6 +198,48 @@ export function validateReleaseDossierOutputDirectory({ outputDir }) {
     }
   }
 
+  if (issues.length > 0) {
+    return issues;
+  }
+
+  const dossier = readJsonOutputFile(resolvedOutputDir, 'release-dossier.json', issues);
+  if (!dossier) {
+    return issues;
+  }
+
+  const actualEvidenceFiles = listReleaseDossierFiles(resolve(resolvedOutputDir, 'evidence'));
+  const expectedChecksums = `${buildChecksumsText(actualEvidenceFiles)}\n`;
+  const actualChecksums = readFileSync(resolve(resolvedOutputDir, 'release-dossier-checksums.txt'), 'utf8');
+
+  compareNumberField({
+    issues,
+    leftLabel: 'Release dossier evidence file count',
+    leftValue: Number.isInteger(dossier?.evidence?.files?.length) ? dossier.evidence.files.length : null,
+    rightLabel: 'actual evidence file count',
+    rightValue: actualEvidenceFiles.length,
+  });
+  compareNumberField({
+    issues,
+    leftLabel: 'Release dossier evidence total bytes',
+    leftValue: Number.isInteger(dossier?.evidence?.totalBytes) ? dossier.evidence.totalBytes : null,
+    rightLabel: 'actual evidence total bytes',
+    rightValue: actualEvidenceFiles.reduce((sum, entry) => sum + entry.bytes, 0),
+  });
+  compareJsonField(
+    issues,
+    'Release dossier evidence inventory',
+    Array.isArray(dossier?.evidence?.files) ? dossier.evidence.files : null,
+    'actual evidence inventory',
+    actualEvidenceFiles,
+  );
+  compareJsonField(
+    issues,
+    'Release dossier checksums text',
+    actualChecksums,
+    'expected checksums text',
+    expectedChecksums,
+  );
+
   return issues;
 }
 
@@ -736,6 +778,40 @@ function listFiles(rootDir, currentDir = rootDir) {
   }
 
   return files.sort();
+}
+
+function readJsonOutputFile(rootDir, relativePath, issues) {
+  const filePath = resolve(rootDir, relativePath);
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    issues.push(
+      `Release dossier output ${relativePath} is not valid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }.`,
+    );
+    return null;
+  }
+}
+
+function compareJsonField(issues, leftLabel, leftValue, rightLabel, rightValue) {
+  if (leftValue == null || rightValue == null) {
+    return;
+  }
+
+  if (JSON.stringify(leftValue) !== JSON.stringify(rightValue)) {
+    issues.push(
+      `${leftLabel} ${formatComparedValue(leftValue)} does not match ${rightLabel} ${formatComparedValue(rightValue)}.`,
+    );
+  }
+}
+
+function formatComparedValue(value) {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return JSON.stringify(value);
 }
 
 function hashFile(path) {

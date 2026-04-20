@@ -242,6 +242,105 @@ test('validateReleaseDossierOutputDirectory reports missing generated output fil
   }
 });
 
+test('validateReleaseDossierOutputDirectory reports semantic drift in copied evidence inventory', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const outputDir = resolve(root, 'out');
+    mkdirSync(resolve(outputDir, 'evidence', 'api-image-manifest'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'deployed-smoke-review'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'launch-candidate-review'), { recursive: true });
+    mkdirSync(resolve(outputDir, 'evidence', 'promotion-review'), { recursive: true });
+
+    writeFileSync(
+      resolve(outputDir, 'release-dossier.json'),
+      `${JSON.stringify(
+        {
+          evidence: {
+            fileCount: 0,
+            totalBytes: 0,
+            files: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(resolve(outputDir, 'release-dossier.md'), '# dossier\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'release-dossier-checksums.txt'), 'bad-checksum  wrong-file\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'api-image-manifest', 'manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'api-image-manifest', 'manifest.md'), '# image\n', 'utf8');
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'deployed-smoke-review', 'deployed-smoke-record.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'deployed-smoke-review', 'deployed-smoke-record.md'),
+      '# smoke\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'evidence-manifest.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'launch-evidence-posture.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-origin-summary.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-seeded-evidence.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'marketplace-exact-evidence.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'promotion-record.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'promotion-record.md'),
+      '# launch\n',
+      'utf8',
+    );
+    writeFileSync(
+      resolve(outputDir, 'evidence', 'launch-candidate-review', 'provider-validation-summary.json'),
+      '{}\n',
+      'utf8',
+    );
+    writeFileSync(resolve(outputDir, 'evidence', 'launch-candidate-review', 'summary.md'), '# summary\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'promotion-review', 'promotion-review.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(outputDir, 'evidence', 'promotion-review', 'promotion-review.md'), '# review\n', 'utf8');
+
+    const issues = validateReleaseDossierOutputDirectory({ outputDir });
+    assert.ok(
+      issues.some((issue) =>
+        issue.startsWith('Release dossier evidence file count 0 does not match actual evidence file count '),
+      ),
+    );
+    assert.ok(
+      issues.some((issue) =>
+        issue.startsWith('Release dossier checksums text bad-checksum  wrong-file'),
+      ),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
   const issues = validateReleaseDossierInputs({
     metadata: {
