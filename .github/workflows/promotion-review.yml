@@ -100,6 +100,18 @@ jobs:
             --expected-commit-sha "${{ steps.candidate_manifest.outputs.commit_sha }}" \
             --expected-run-id "${{ inputs.candidate_run_id }}"
 
+      - name: Validate downloaded review source bundles
+        run: |
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source imageManifest \
+            --dir "${{ runner.temp }}/api-image-manifest"
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source deployedSmokeReview \
+            --dir "${{ runner.temp }}/deployed-smoke-review"
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source launchCandidateReview \
+            --dir "${{ runner.temp }}/launch-candidate-review"
+
       - name: Run promotion review
         run: |
           node ./scripts/promotion-review.mjs review \

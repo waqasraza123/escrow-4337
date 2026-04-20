@@ -33,11 +33,12 @@ Run the same image with different commands:
 6. Let GitHub Actions run `Deployed Smoke` against `staging`, or trigger it manually for `production`.
 7. Before final sign-off, run the manual `Launch Candidate` workflow or `pnpm launch:candidate` against the same environment.
 8. Preserve the generated launch-candidate artifact bundle for rollout evidence and any rollback review.
+   The GitHub workflow now validates the reviewed launch subset before uploading the `launch-candidate-review-*` artifact, so missing required reviewed files fail before promotion review ever consumes the bundle.
 9. Run the manual `Promotion Review` workflow against the same environment using the candidate CI run id.
    By default it now auto-discovers the newest matching `Deployed Smoke` and `Launch Candidate` review artifacts for that environment and candidate.
    Supply explicit smoke or launch run ids only when you need to override that auto-selection.
    The launch review artifact now includes `launch-evidence-posture.json`, marketplace-origin summary plus seeded/exact marketplace evidence, and `provider-validation-summary.json`, and promotion review treats that set as the canonical launch posture/evidence contract instead of reconstructing posture from mixed nested fields.
-   The workflow now validates those downloaded source bundles before `release-dossier` generation, so missing reviewed files fail as an explicit contract error instead of a later dossier copy crash.
+   The workflow now validates those downloaded source bundles before promotion review reads them and again before `release-dossier` generation, so missing reviewed files fail as an explicit contract error instead of a later dossier copy crash.
 10. Review the uploaded `release-dossier` artifact before any production promotion decision.
 11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`.
 12. Treat the uploaded `release-pointer-<environment>` artifact as the latest approved release pointer for that environment.

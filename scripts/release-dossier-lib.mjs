@@ -44,6 +44,10 @@ export const releaseDossierSourceSpecs = [
   },
 ];
 
+export function findReleaseDossierSourceSpec(sourceKey) {
+  return releaseDossierSourceSpecs.find((spec) => spec.key === sourceKey) ?? null;
+}
+
 export function buildReleaseDossierMetadata(env = process.env) {
   return {
     source: env.GITHUB_ACTIONS === 'true' ? 'github-actions' : 'local',
@@ -145,13 +149,29 @@ export function validateReleaseDossierSourceDirectories({
 
   for (const spec of releaseDossierSourceSpecs) {
     const sourceDir = sourceDirs[spec.key];
-    for (const relativePath of spec.requiredFiles) {
-      const sourcePath = resolve(sourceDir, relativePath);
-      if (!existsSync(sourcePath)) {
-        issues.push(
-          `Release dossier source ${spec.label} is missing required file ${relativePath}.`,
-        );
-      }
+    issues.push(
+      ...validateReleaseDossierSourceDirectory({
+        sourceKey: spec.key,
+        sourceDir,
+      }),
+    );
+  }
+
+  return issues;
+}
+
+export function validateReleaseDossierSourceDirectory({ sourceKey, sourceDir }) {
+  const spec = findReleaseDossierSourceSpec(sourceKey);
+  if (!spec) {
+    return [`Unknown release dossier source key ${String(sourceKey)}.`];
+  }
+
+  const resolvedSourceDir = resolve(sourceDir);
+  const issues = [];
+  for (const relativePath of spec.requiredFiles) {
+    const sourcePath = resolve(resolvedSourceDir, relativePath);
+    if (!existsSync(sourcePath)) {
+      issues.push(`Release dossier source ${spec.label} is missing required file ${relativePath}.`);
     }
   }
 

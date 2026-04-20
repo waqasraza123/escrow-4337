@@ -7,7 +7,9 @@ import {
   buildReleaseDossierMarkdown,
   buildReleaseDossierMetadata,
   copyReleaseDossierSources,
+  findReleaseDossierSourceSpec,
   listReleaseDossierFiles,
+  validateReleaseDossierSourceDirectory,
   validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
   writeGitHubStepSummary,
@@ -23,8 +25,41 @@ if (args.includes('--help')) {
 }
 
 try {
-  const command = args[0] === 'validate-sources' || args[0] === 'generate' ? args[0] : 'generate';
+  const command =
+    args[0] === 'validate-sources' || args[0] === 'validate-source-dir' || args[0] === 'generate'
+      ? args[0]
+      : 'generate';
   const commandArgs = command === 'generate' && args[0] !== 'generate' ? args : args.slice(1);
+
+  if (command === 'validate-source-dir') {
+    const sourceKey = readRequiredFlag(commandArgs, '--source');
+    const sourceDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--dir'));
+    const issues = validateReleaseDossierSourceDirectory({
+      sourceKey,
+      sourceDir,
+    });
+    if (issues.length > 0) {
+      throw new Error(
+        ['Release dossier source validation failed.', ...issues.map((issue) => `- ${issue}`)].join(
+          '\n',
+        ),
+      );
+    }
+
+    const spec = findReleaseDossierSourceSpec(sourceKey);
+    console.log(
+      JSON.stringify(
+        {
+          status: 'ready',
+          source: spec?.label ?? sourceKey,
+          sourceDir,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(0);
+  }
 
   const outputDir = readOptionalFlag(args, '--output-dir')
     ? resolve(repoRoot, readOptionalFlag(args, '--output-dir'))
@@ -162,6 +197,7 @@ function readOptionalFlag(argv, flag) {
 function printHelp() {
   console.log(`Usage:
   node ./scripts/release-dossier.mjs generate --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path> [--output-dir <path>]
+  node ./scripts/release-dossier.mjs validate-source-dir --source <imageManifest|deployedSmokeReview|launchCandidateReview|promotionReview> --dir <path>
   node ./scripts/release-dossier.mjs validate-sources --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path>
 
 Copies the reviewed release evidence into one canonical dossier directory, writes

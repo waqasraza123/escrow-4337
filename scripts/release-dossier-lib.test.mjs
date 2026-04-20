@@ -9,7 +9,9 @@ import {
   buildReleaseDossierMetadata,
   buildChecksumsText,
   copyReleaseDossierSources,
+  findReleaseDossierSourceSpec,
   listReleaseDossierFiles,
+  validateReleaseDossierSourceDirectory,
   validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
   validateReleaseDossierMetadata,
@@ -122,6 +124,42 @@ test('validateReleaseDossierSourceDirectories reports missing reviewed evidence 
       'Release dossier source launch-candidate-review is missing required file provider-validation-summary.json.',
       'Release dossier source launch-candidate-review is missing required file summary.md.',
     ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateReleaseDossierSourceDirectory validates one source bundle by key', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const launchReviewDir = resolve(root, 'launch');
+    mkdirSync(launchReviewDir, { recursive: true });
+
+    writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'launch-evidence-posture.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'promotion-record.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'provider-validation-summary.json'), '{}\n', 'utf8');
+
+    assert.deepEqual(findReleaseDossierSourceSpec('launchCandidateReview')?.label, 'launch-candidate-review');
+    assert.deepEqual(
+      validateReleaseDossierSourceDirectory({
+        sourceKey: 'launchCandidateReview',
+        sourceDir: launchReviewDir,
+      }),
+      ['Release dossier source launch-candidate-review is missing required file summary.md.'],
+    );
+    assert.deepEqual(
+      validateReleaseDossierSourceDirectory({
+        sourceKey: 'unknown',
+        sourceDir: launchReviewDir,
+      }),
+      ['Unknown release dossier source key unknown.'],
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

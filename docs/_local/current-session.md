@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Add explicit source-bundle validation to the promotion/release path so missing reviewed artifacts fail with a clear contract error before dossier assembly.
+- Move reviewed-bundle validation to the earliest GitHub workflow boundaries so launch/promotion fail before they start consuming incomplete evidence bundles.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,7 +64,7 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by exercising the hardened artifact contract against real staging:
+- Continue the combined Phase 0 + Phase 1 program by exercising the now-earlier artifact validation against real staging:
   - run the deployed exact marketplace journey against real staging once secrets and URLs are ready
   - verify the GitHub `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
   - keep any further workflow consumers on canonical release-pointer/env fields instead of re-reading nested dossier JSON
@@ -166,6 +166,23 @@
   - `git diff --check`
   - `node --test scripts/release-dossier-lib.test.mjs`
   - `node ./scripts/release-dossier.mjs validate-sources --image-manifest-dir scripts --deployed-smoke-dir scripts --launch-review-dir scripts --promotion-review-dir scripts`
+    Expected to fail with explicit missing-file errors.
+- Result:
+  - Passed
+
+## Update (2026-04-20, Early GitHub Bundle Validation)
+- Added reusable single-source validation to `scripts/release-dossier-lib.mjs`:
+  - `findReleaseDossierSourceSpec(...)`
+  - `validateReleaseDossierSourceDirectory(...)`
+- `scripts/release-dossier.mjs` now supports:
+  - `validate-source-dir --source <key> --dir <path>`
+- `Launch Candidate` now validates the reviewed `launchCandidateReview` bundle before uploading the review artifact.
+- `Promotion Review` now validates the downloaded `imageManifest`, `deployedSmokeReview`, and `launchCandidateReview` bundles before reconciliation begins.
+- Added targeted test coverage for single-source validation and unknown source keys.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/release-dossier-lib.test.mjs`
+  - `node ./scripts/release-dossier.mjs validate-source-dir --source launchCandidateReview --dir scripts`
     Expected to fail with explicit missing-file errors.
 - Result:
   - Passed

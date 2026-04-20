@@ -249,6 +249,13 @@ jobs:
           LAUNCH_CANDIDATE_ROLLBACK_POINTER_ARTIFACT_ID: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_ARTIFACT_ID }}
           LAUNCH_CANDIDATE_ROLLBACK_POINTER_SELECTED_CREATED_AT: ${{ steps.rollback_release_pointer_selection.outputs.RELEASE_POINTER_SELECTED_CREATED_AT }}
 
+      - name: Validate launch candidate review bundle
+        if: always()
+        run: |
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source launchCandidateReview \
+            --dir "${{ env.LAUNCH_CANDIDATE_ARTIFACT_DIR }}"
+
       - name: Upload launch candidate artifacts
         if: always()
         uses: actions/upload-artifact@v4
