@@ -211,8 +211,16 @@ jobs:
           RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED }}
           RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED }}
 
-      - name: Upload promotion review artifact
+      - name: Validate promotion review bundle
         if: always()
+        id: validate_promotion_review_bundle
+        run: |
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source promotionReview \
+            --dir artifacts/promotion-review
+
+      - name: Upload promotion review artifact
+        if: always() && steps.validate_promotion_review_bundle.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: promotion-review-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}

@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Move reviewed-bundle validation to the earliest GitHub workflow boundaries so launch/promotion fail before they start consuming incomplete evidence bundles.
+- Complete the reviewed-artifact contract across the remaining GitHub review bundles so smoke and promotion outputs are also validated before upload.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,9 +64,9 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by exercising the now-earlier artifact validation against real staging:
+- Continue the combined Phase 0 + Phase 1 program by exercising the fully validated review-artifact chain against real staging:
   - run the deployed exact marketplace journey against real staging once secrets and URLs are ready
-  - verify the GitHub `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
+  - verify the GitHub `Deployed Smoke` -> `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
   - keep any further workflow consumers on canonical release-pointer/env fields instead of re-reading nested dossier JSON
 
 ## Update (2026-04-20, Exact Marketplace Canary Stabilization)
@@ -184,6 +184,15 @@
   - `node --test scripts/release-dossier-lib.test.mjs`
   - `node ./scripts/release-dossier.mjs validate-source-dir --source launchCandidateReview --dir scripts`
     Expected to fail with explicit missing-file errors.
+- Result:
+  - Passed
+
+## Update (2026-04-20, Reviewed Artifact Upload Validation)
+- `Deployed Smoke` now validates `artifacts/deployed-smoke-review` with `validate-source-dir --source deployedSmokeReview` before uploading the reviewed smoke artifact in both staging-auto and manual paths.
+- `Promotion Review` now validates `artifacts/promotion-review` with `validate-source-dir --source promotionReview` before uploading the reviewed promotion artifact.
+- Updated launch/deployment docs so the reviewed-artifact contract is stated consistently across smoke, launch, promotion, dossier, and pointer steps.
+- Verification:
+  - `git diff --check`
 - Result:
   - Passed
 

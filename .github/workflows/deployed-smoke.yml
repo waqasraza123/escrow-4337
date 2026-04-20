@@ -310,8 +310,16 @@ jobs:
           DEPLOYED_SMOKE_SEEDED_CANARY_PASSED: ${{ steps.seeded_canary.outcome == 'success' }}
           DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED: ${{ steps.marketplace_seeded_canary.outcome == 'success' }}
 
-      - name: Upload deployed smoke review artifact
+      - name: Validate deployed smoke review bundle
         if: ${{ always() }}
+        id: validate_deployed_smoke_review
+        run: |
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source deployedSmokeReview \
+            --dir artifacts/deployed-smoke-review
+
+      - name: Upload deployed smoke review artifact
+        if: ${{ always() && steps.validate_deployed_smoke_review.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: deployed-smoke-review-staging-candidate-${{ github.event.workflow_run.id }}
@@ -603,8 +611,16 @@ jobs:
           DEPLOYED_SMOKE_SEEDED_CANARY_PASSED: ${{ steps.seeded_canary.outcome == 'success' }}
           DEPLOYED_SMOKE_MARKETPLACE_SEEDED_CANARY_PASSED: ${{ steps.marketplace_seeded_canary.outcome == 'success' }}
 
-      - name: Upload deployed smoke review artifact
+      - name: Validate deployed smoke review bundle
         if: ${{ always() }}
+        id: validate_deployed_smoke_review
+        run: |
+          node ./scripts/release-dossier.mjs validate-source-dir \
+            --source deployedSmokeReview \
+            --dir artifacts/deployed-smoke-review
+
+      - name: Upload deployed smoke review artifact
+        if: ${{ always() && steps.validate_deployed_smoke_review.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: deployed-smoke-review-${{ inputs.environment }}-candidate-${{ inputs.candidate_run_id }}
