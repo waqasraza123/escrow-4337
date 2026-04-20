@@ -1196,4 +1196,272 @@ describe('marketplace workspace', () => {
       }),
     ).toBeDisabled();
   });
+
+  it('renders explicit client and freelancer lane cards with workspace-switch entry points', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+        {
+          workspaceId: 'workspace-freelancer-1',
+          kind: 'freelancer',
+          label: 'Personal freelancer workspace',
+          slug: 'personal-freelancer-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['freelancer'],
+          capabilities: {
+            manageProfile: true,
+            applyToOpportunity: true,
+            createOpportunity: false,
+            reviewApplications: false,
+            manageWorkspace: false,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-freelancer-1',
+        kind: 'freelancer',
+        label: 'Personal freelancer workspace',
+        slug: 'personal-freelancer-client-1',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['freelancer'],
+        capabilities: {
+          manageProfile: true,
+          applyToOpportunity: true,
+          createOpportunity: false,
+          reviewApplications: false,
+          manageWorkspace: false,
+        },
+        isDefault: true,
+      },
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Choose your marketplace lane' })).toBeInTheDocument();
+    });
+
+    expect(
+      within(screen.getByTestId('marketplace-mode-card-client')).getByText('Client lane'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('marketplace-mode-card-client')).getByRole('button', {
+        name: 'Hire: Personal client workspace',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('marketplace-mode-card-freelancer')).getByText('Current lane'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders capability-aware client empty state guidance when no client brief can be authored from the active workspace', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-readonly',
+          kind: 'client',
+          label: 'Recruiter workspace',
+          slug: 'recruiter-workspace',
+          organizationId: 'org-client-1',
+          organizationName: 'Atlas Labs',
+          organizationSlug: 'atlas-labs',
+          organizationKind: 'client',
+          roles: ['client_recruiter'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: false,
+            reviewApplications: true,
+            manageWorkspace: false,
+          },
+          isDefault: false,
+        },
+        {
+          workspaceId: 'workspace-client-authoring',
+          kind: 'client',
+          label: 'Owner workspace',
+          slug: 'owner-workspace',
+          organizationId: 'org-client-1',
+          organizationName: 'Atlas Labs',
+          organizationSlug: 'atlas-labs',
+          organizationKind: 'client',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: false,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-readonly',
+        kind: 'client',
+        label: 'Recruiter workspace',
+        slug: 'recruiter-workspace',
+        organizationId: 'org-client-1',
+        organizationName: 'Atlas Labs',
+        organizationSlug: 'atlas-labs',
+        organizationKind: 'client',
+        roles: ['client_recruiter'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: false,
+          reviewApplications: true,
+          manageWorkspace: false,
+        },
+        isDefault: false,
+      },
+    });
+    mockedWebApi.listOrganizations.mockResolvedValue({
+      organizations: [
+        {
+          id: 'org-client-1',
+          slug: 'atlas-labs',
+          name: 'Atlas Labs',
+          kind: 'client',
+          roles: ['client_owner', 'client_recruiter'],
+          workspaces: [
+            {
+              workspaceId: 'workspace-client-readonly',
+              kind: 'client',
+              label: 'Recruiter workspace',
+              slug: 'recruiter-workspace',
+              organizationId: 'org-client-1',
+              organizationName: 'Atlas Labs',
+              organizationSlug: 'atlas-labs',
+              organizationKind: 'client',
+              roles: ['client_recruiter'],
+              capabilities: {
+                manageProfile: false,
+                applyToOpportunity: false,
+                createOpportunity: false,
+                reviewApplications: true,
+                manageWorkspace: false,
+              },
+              isDefault: false,
+            },
+            {
+              workspaceId: 'workspace-client-authoring',
+              kind: 'client',
+              label: 'Owner workspace',
+              slug: 'owner-workspace',
+              organizationId: 'org-client-1',
+              organizationName: 'Atlas Labs',
+              organizationSlug: 'atlas-labs',
+              organizationKind: 'client',
+              roles: ['client_owner'],
+              capabilities: {
+                manageProfile: false,
+                applyToOpportunity: false,
+                createOpportunity: true,
+                reviewApplications: true,
+                manageWorkspace: true,
+              },
+              isDefault: false,
+            },
+          ],
+        },
+      ],
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My opportunities' })).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(
+        'No briefs are shown for this workspace, and client authoring is blocked here. Switch to a client workspace with authoring access to open a hiring lane.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole('heading', { name: 'My opportunities' }).closest('article')!,
+      ).getByRole('button', { name: 'Hire: Owner workspace' }),
+    ).toBeInTheDocument();
+  });
 });

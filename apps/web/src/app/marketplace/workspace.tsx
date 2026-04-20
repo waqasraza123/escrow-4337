@@ -328,6 +328,29 @@ export function MarketplaceWorkspace() {
   const canApplyToOpportunity = workspaceCapabilities.applyToOpportunity;
   const canCreateOpportunity = workspaceCapabilities.createOpportunity;
   const canReviewApplications = workspaceCapabilities.reviewApplications;
+  const findWorkspaceWithCapability = (
+    kind: 'client' | 'freelancer',
+    capability: keyof typeof workspaceCapabilities,
+  ) =>
+    availableWorkspaces.find(
+      (workspace) => workspace.kind === kind && workspace.capabilities[capability],
+    ) ?? null;
+  const clientAuthoringWorkspace = findWorkspaceWithCapability(
+    'client',
+    'createOpportunity',
+  );
+  const clientReviewWorkspace = findWorkspaceWithCapability(
+    'client',
+    'reviewApplications',
+  );
+  const freelancerProfileWorkspace = findWorkspaceWithCapability(
+    'freelancer',
+    'manageProfile',
+  );
+  const freelancerApplicationWorkspace = findWorkspaceWithCapability(
+    'freelancer',
+    'applyToOpportunity',
+  );
 
   const formatOpportunityStatus = (status: MarketplaceOpportunity['status']) =>
     marketplaceMessages.labels.opportunityStatus[status];
@@ -336,6 +359,39 @@ export function MarketplaceWorkspace() {
   const formatRecommendation = (
     recommendation: MarketplaceApplicationDossier['recommendation'],
   ) => marketplaceMessages.labels.recommendation[recommendation];
+  const renderWorkspaceAction = (
+    workspace:
+      | {
+          workspaceId: string;
+          label: string;
+          kind: 'client' | 'freelancer';
+        }
+      | null,
+  ) => {
+    if (!workspace) {
+      return null;
+    }
+
+    if (workspace.workspaceId === activeWorkspace?.workspaceId) {
+      return (
+        <button type="button" disabled>
+          {workspaceMessages.modeGuide.currentWorkspace}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => void handleSelectWorkspace(workspace.workspaceId)}
+      >
+        {workspaceMessages.activeWorkspace.switchWorkspace(
+          workspace.label,
+          workspaceMessages.activeWorkspace.modeLabel[workspace.kind],
+        )}
+      </button>
+    );
+  };
 
   async function loadWorkspace(nextTokens: SessionTokens | null = tokens) {
     setLoading(true);
@@ -821,6 +877,82 @@ export function MarketplaceWorkspace() {
         </RevealSection>
       ) : null}
 
+      {!loading && tokens && availableWorkspaces.length > 0 ? (
+        <RevealSection className={styles.grid} delay={0.07}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow={workspaceMessages.modeGuide.eyebrow}
+            headerClassName={styles.panelHeader}
+            title={workspaceMessages.modeGuide.title}
+          >
+            <div className={styles.summaryGrid}>
+              <SharedCard
+                className={styles.actionPanel}
+                data-testid="marketplace-mode-card-client"
+                interactive
+              >
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.modeGuide.client.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.modeGuide.client.body}
+                  </p>
+                  <p className={styles.stateText}>
+                    {isClientWorkspace
+                      ? workspaceMessages.modeGuide.currentMode
+                      : clientAuthoringWorkspace
+                        ? workspaceMessages.modeGuide.availableMode(
+                            clientAuthoringWorkspace.label,
+                          )
+                        : clientReviewWorkspace
+                          ? workspaceMessages.modeGuide.availableMode(
+                              clientReviewWorkspace.label,
+                            )
+                          : workspaceMessages.modeGuide.unavailableMode}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    {renderWorkspaceAction(clientAuthoringWorkspace)}
+                    {!clientAuthoringWorkspace
+                      ? renderWorkspaceAction(clientReviewWorkspace)
+                      : null}
+                  </div>
+                </div>
+              </SharedCard>
+              <SharedCard
+                className={styles.actionPanel}
+                data-testid="marketplace-mode-card-freelancer"
+                interactive
+              >
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.modeGuide.freelancer.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.modeGuide.freelancer.body}
+                  </p>
+                  <p className={styles.stateText}>
+                    {isFreelancerWorkspace
+                      ? workspaceMessages.modeGuide.currentMode
+                      : freelancerApplicationWorkspace
+                        ? workspaceMessages.modeGuide.availableMode(
+                            freelancerApplicationWorkspace.label,
+                          )
+                        : freelancerProfileWorkspace
+                          ? workspaceMessages.modeGuide.availableMode(
+                              freelancerProfileWorkspace.label,
+                            )
+                          : workspaceMessages.modeGuide.unavailableMode}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    {renderWorkspaceAction(freelancerApplicationWorkspace)}
+                    {!freelancerApplicationWorkspace
+                      ? renderWorkspaceAction(freelancerProfileWorkspace)
+                      : null}
+                  </div>
+                </div>
+              </SharedCard>
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
+
       <RevealSection className={styles.grid} delay={0.08}>
         <SectionCard
           className={styles.panel}
@@ -1147,6 +1279,13 @@ export function MarketplaceWorkspace() {
                 </article>
               </section>
             ) : null}
+            {!profile ? (
+              <p className={styles.stateText}>
+                {canManageProfile
+                  ? workspaceMessages.emptyStates.profileReady
+                  : workspaceMessages.emptyStates.profileBlocked}
+              </p>
+            ) : null}
             {!canManageProfile ? (
               <p className={styles.stateText}>
                 {workspaceMessages.capabilityNotices.manageProfile}
@@ -1160,6 +1299,9 @@ export function MarketplaceWorkspace() {
               >
                 {workspaceMessages.profileForm.saveProfile}
               </button>
+              {!canManageProfile
+                ? renderWorkspaceAction(freelancerProfileWorkspace)
+                : null}
               {profile ? (
                 <Link
                   className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
@@ -1484,7 +1626,16 @@ export function MarketplaceWorkspace() {
               </p>
             ) : null}
             {myOpportunities.length === 0 ? (
-              <p className={styles.stateText}>{workspaceMessages.noOpportunities}</p>
+              <div className={styles.stack}>
+                <p className={styles.stateText}>
+                  {canCreateOpportunity
+                    ? workspaceMessages.emptyStates.clientOpportunitiesReady
+                    : workspaceMessages.emptyStates.clientOpportunitiesBlocked}
+                </p>
+                {!canCreateOpportunity
+                  ? renderWorkspaceAction(clientAuthoringWorkspace)
+                  : null}
+              </div>
             ) : (
               myOpportunities.map((opportunity) => (
                 <SharedCard
@@ -1667,7 +1818,16 @@ export function MarketplaceWorkspace() {
               </p>
             ) : null}
             {myApplications.length === 0 ? (
-              <p className={styles.stateText}>{workspaceMessages.noApplications}</p>
+              <div className={styles.stack}>
+                <p className={styles.stateText}>
+                  {canApplyToOpportunity
+                    ? workspaceMessages.emptyStates.freelancerApplicationsReady
+                    : workspaceMessages.emptyStates.freelancerApplicationsBlocked}
+                </p>
+                {!canApplyToOpportunity
+                  ? renderWorkspaceAction(freelancerApplicationWorkspace)
+                  : null}
+              </div>
             ) : (
               myApplications.map((application) => (
                 <article

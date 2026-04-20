@@ -278,6 +278,22 @@ const webMessages = {
           switchWorkspace: (label: string, mode: string) =>
             `${mode}: ${label}`,
         },
+        modeGuide: {
+          eyebrow: 'Mode guide',
+          title: 'Choose your marketplace lane',
+          currentMode: 'Current lane',
+          currentWorkspace: 'Current workspace',
+          availableMode: (label: string) => `Available via ${label}`,
+          unavailableMode: 'No matching workspace available yet',
+          client: {
+            title: 'Client lane',
+            body: 'Post briefs, review applicants, and move hires into escrow from a client workspace.',
+          },
+          freelancer: {
+            title: 'Freelancer lane',
+            body: 'Maintain your credibility profile, browse briefs, and manage applications from a freelancer workspace.',
+          },
+        },
         capabilityNotices: {
           manageWorkspace:
             'This workspace can view organization ownership, but only a workspace with management access can create another client organization.',
@@ -289,6 +305,20 @@ const webMessages = {
             'This workspace cannot review applicants or make hiring decisions. Switch to a hiring workspace with review access.',
           applyToOpportunity:
             'This workspace cannot submit or manage applications. Switch to a freelancer workspace with proposal access.',
+        },
+        emptyStates: {
+          profileReady:
+            'Complete your freelancer profile here before applying so proposals carry proof, specialties, and crypto-readiness context.',
+          profileBlocked:
+            'This workspace can view freelancer posture, but profile setup belongs in a freelancer workspace with edit access.',
+          clientOpportunitiesReady:
+            'No briefs are live from this workspace yet. Start with one decision-ready brief so review and hire can stay inside the client lane.',
+          clientOpportunitiesBlocked:
+            'No briefs are shown for this workspace, and client authoring is blocked here. Switch to a client workspace with authoring access to open a hiring lane.',
+          freelancerApplicationsReady:
+            'No applications yet. Use this workspace to browse open briefs and build proposal history before hire-to-escrow.',
+          freelancerApplicationsBlocked:
+            'No applications are available here because this workspace does not have freelancer proposal access. Switch to a freelancer workspace that can apply.',
         },
         overviewEyebrow: 'Overview',
         pipelineTitle: 'Marketplace pipeline',
@@ -1252,6 +1282,22 @@ const webMessages = {
           switchWorkspace: (label: string, mode: string) =>
             `${mode}: ${label}`,
         },
+        modeGuide: {
+          eyebrow: 'دليل الوضع',
+          title: 'اختر مسار السوق المناسب',
+          currentMode: 'المسار الحالي',
+          currentWorkspace: 'مساحة العمل الحالية',
+          availableMode: (label: string) => `متاح عبر ${label}`,
+          unavailableMode: 'لا توجد مساحة عمل مطابقة بعد',
+          client: {
+            title: 'مسار العميل',
+            body: 'أنشئ العروض، وراجع المرشحين، وانقل التوظيفات إلى الضمان من خلال مساحة عمل عميل.',
+          },
+          freelancer: {
+            title: 'مسار المستقل',
+            body: 'حافظ على ملف الموثوقية، وتصفح العروض، وأدر الطلبات من خلال مساحة عمل مستقل.',
+          },
+        },
         capabilityNotices: {
           manageWorkspace:
             'يمكن لمساحة العمل هذه عرض ملكية المنظمة، لكن إنشاء منظمة عميل جديدة يتطلب مساحة عمل تملك صلاحية الإدارة.',
@@ -1263,6 +1309,20 @@ const webMessages = {
             'لا تستطيع هذه المساحة مراجعة المرشحين أو اتخاذ قرارات التوظيف. انتقل إلى مساحة توظيف تملك صلاحية المراجعة.',
           applyToOpportunity:
             'لا تستطيع هذه المساحة إرسال الطلبات أو إدارتها. انتقل إلى مساحة عمل مستقلة تملك صلاحية التقديم.',
+        },
+        emptyStates: {
+          profileReady:
+            'أكمل ملف المستقل هنا قبل التقديم حتى تحمل العروض مواد الإثبات والتخصصات وسياق الجاهزية الرقمية.',
+          profileBlocked:
+            'يمكن لهذه المساحة عرض وضع المستقل، لكن إعداد الملف يجب أن يتم من خلال مساحة مستقل تملك صلاحية التعديل.',
+          clientOpportunitiesReady:
+            'لا توجد عروض مباشرة من هذه المساحة بعد. ابدأ بعرض جاهز للقرار حتى يبقى التوظيف والمراجعة داخل مسار العميل.',
+          clientOpportunitiesBlocked:
+            'لا تظهر أي عروض لهذه المساحة، كما أن إنشاء عروض العميل محظور هنا. انتقل إلى مساحة عميل تملك صلاحية الإنشاء لفتح مسار التوظيف.',
+          freelancerApplicationsReady:
+            'لا توجد طلبات بعد. استخدم هذه المساحة لتصفح العروض المفتوحة وبناء سجل طلبات قبل التحويل إلى الضمان.',
+          freelancerApplicationsBlocked:
+            'لا توجد طلبات متاحة هنا لأن هذه المساحة لا تملك صلاحية تقديم عروض المستقلين. انتقل إلى مساحة مستقل تستطيع التقديم.',
         },
         overviewEyebrow: 'نظرة عامة',
         pipelineTitle: 'مسار السوق',
