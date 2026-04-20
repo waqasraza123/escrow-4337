@@ -156,6 +156,137 @@ export function validateDeployedSmokeRecord(
   return issues;
 }
 
+export function validateLaunchCandidateReviewBundle({
+  record,
+  evidenceManifest,
+  evidencePosture,
+  expectedEnvironment,
+  expectedRepository,
+  expectedCandidateRunId,
+  expectedRunId,
+}) {
+  return validateLaunchPromotionReview({
+    record,
+    evidenceManifest,
+    evidencePosture,
+    expectedEnvironment,
+    expectedRepository,
+    expectedCandidateRunId,
+    expectedRunId,
+  });
+}
+
+export function validatePromotionReviewArtifact(review) {
+  const issues = [];
+
+  if (!review || typeof review !== 'object') {
+    return ['Promotion review artifact is missing or invalid JSON.'];
+  }
+
+  if (!trimToNull(review.generatedAt)) {
+    issues.push('Promotion review artifact is missing generatedAt.');
+  }
+  if (!trimToNull(review.status)) {
+    issues.push('Promotion review artifact is missing status.');
+  } else if (review.status !== 'ready' && review.status !== 'blocked') {
+    issues.push(
+      `Promotion review artifact status must be ready or blocked but was ${review.status}.`,
+    );
+  }
+  if (review.status === 'ready' && Array.isArray(review.blockers) && review.blockers.length > 0) {
+    issues.push('Promotion review artifact status ready cannot include blockers.');
+  }
+
+  for (const [field, label] of [
+    ['environment', 'environment'],
+  ]) {
+    if (!trimToNull(review?.[field])) {
+      issues.push(`Promotion review artifact is missing ${label}.`);
+    }
+  }
+
+  for (const [field, label] of [
+    ['repository', 'candidate repository'],
+    ['runId', 'candidate run id'],
+    ['runUrl', 'candidate run URL'],
+    ['commitSha', 'candidate commit SHA'],
+    ['imageDigest', 'candidate image digest'],
+  ]) {
+    if (!trimToNull(review?.candidate?.[field])) {
+      issues.push(`Promotion review artifact is missing ${label}.`);
+    }
+  }
+  if (
+    trimToNull(review?.candidate?.imageDigest) &&
+    !review.candidate.imageDigest.startsWith('sha256:')
+  ) {
+    issues.push('Promotion review artifact candidate image digest must start with sha256:.');
+  }
+
+  for (const [scope, label] of [
+    ['deployedSmoke', 'deployed smoke review'],
+    ['launchCandidate', 'launch candidate review'],
+  ]) {
+    const reviewEntry = review?.reviews?.[scope];
+    if (!reviewEntry || typeof reviewEntry !== 'object') {
+      issues.push(`Promotion review artifact is missing ${label} details.`);
+      continue;
+    }
+
+    for (const [field, fieldLabel] of [
+      ['status', 'status'],
+      ['workflow', 'workflow'],
+      ['runId', 'run id'],
+      ['runUrl', 'run URL'],
+      ['candidateRunId', 'candidate run id'],
+    ]) {
+      if (!trimToNull(reviewEntry[field])) {
+        issues.push(`Promotion review artifact is missing ${label} ${fieldLabel}.`);
+      }
+    }
+
+    issues.push(
+      ...validateSelection({
+        label: `${label[0].toUpperCase()}${label.slice(1)} selection`,
+        selection: {
+          source: reviewEntry.selectionSource,
+          artifactId: reviewEntry.artifactId,
+          artifactName: reviewEntry.artifactName,
+          createdAt: reviewEntry.selectedCreatedAt,
+        },
+      }),
+    );
+  }
+
+  if (typeof review?.reviews?.launchCandidate?.postureLaunchReady !== 'boolean') {
+    issues.push('Promotion review artifact is missing launch candidate posture launch readiness.');
+  }
+  if (typeof review?.reviews?.launchCandidate?.evidenceComplete !== 'boolean') {
+    issues.push('Promotion review artifact is missing launch candidate evidence completeness.');
+  }
+  if (
+    typeof review?.reviews?.launchCandidate?.evidenceComplete === 'boolean' &&
+    Number.isInteger(review?.reviews?.launchCandidate?.missingArtifactCount)
+  ) {
+    const expectedEvidenceComplete = review.reviews.launchCandidate.missingArtifactCount === 0;
+    if (review.reviews.launchCandidate.evidenceComplete !== expectedEvidenceComplete) {
+      issues.push(
+        'Promotion review artifact evidence completeness does not match launch candidate missing artifact count.',
+      );
+    }
+  }
+  if (
+    typeof review?.reviews?.launchCandidate?.marketplaceSeededCanaryPassed !== 'boolean' ||
+    typeof review?.reviews?.launchCandidate?.marketplaceExactCanaryPassed !== 'boolean'
+  ) {
+    issues.push(
+      'Promotion review artifact is missing launch candidate marketplace canary posture.',
+    );
+  }
+
+  return issues;
+}
+
 export function buildDeployedSmokeRecordMarkdown(record) {
   return `# Deployed Smoke Record
 

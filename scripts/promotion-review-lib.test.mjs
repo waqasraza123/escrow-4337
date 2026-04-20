@@ -7,6 +7,7 @@ import {
   buildPromotionReviewMarkdown,
   validateDeployedSmokeMetadata,
   validateDeployedSmokeRecord,
+  validatePromotionReviewArtifact,
 } from './promotion-review-lib.mjs';
 
 test('validateDeployedSmokeMetadata requires promotion review fields for GitHub runs', () => {
@@ -92,6 +93,48 @@ test('validateDeployedSmokeRecord blocks when marketplace seeded canary evidence
   assert.deepEqual(issues, [
     'Deployed smoke review artifact status must be ready but was blocked.',
     'Deployed smoke review artifact does not confirm marketplace seeded canary passed.',
+  ]);
+});
+
+test('validatePromotionReviewArtifact catches incomplete review structure', () => {
+  const issues = validatePromotionReviewArtifact({
+    generatedAt: '2026-04-13T00:00:00.000Z',
+    status: 'ready',
+    environment: 'staging',
+    candidate: {
+      repository: 'mc/escrow4337',
+      runId: '101',
+      runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+      commitSha: 'abc123',
+      imageDigest: 'sha256:deadbeef',
+    },
+    reviews: {
+      deployedSmoke: {
+        status: 'ready',
+        workflow: 'Deployed Smoke',
+        runId: '201',
+        runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+        candidateRunId: '101',
+      },
+      launchCandidate: {
+        status: 'ready',
+        workflow: 'Launch Candidate',
+        runId: '301',
+        runUrl: 'https://github.com/mc/escrow4337/actions/runs/301',
+        candidateRunId: '101',
+        postureLaunchReady: true,
+        evidenceComplete: true,
+        missingArtifactCount: 1,
+        marketplaceSeededCanaryPassed: true,
+      },
+    },
+    blockers: ['still blocked'],
+  });
+
+  assert.deepEqual(issues, [
+    'Promotion review artifact status ready cannot include blockers.',
+    'Promotion review artifact evidence completeness does not match launch candidate missing artifact count.',
+    'Promotion review artifact is missing launch candidate marketplace canary posture.',
   ]);
 });
 

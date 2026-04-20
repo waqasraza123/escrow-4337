@@ -10,13 +10,14 @@
   - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
 
 ## Last Completed Step
-- Tightened the full generated GitHub release-bundle validators from file-presence checks into semantic contract checks:
-  - launch-candidate upload validation now cross-checks `evidence-manifest.json`, `launch-evidence-posture.json`, `promotion-record.json`, and `summary.json`
-  - release-dossier output validation now recomputes the copied evidence inventory and checksum text before upload
-  - release-pointer output validation now re-runs ready-launch pointer validation against the generated JSON before upload
+- Tightened reviewed source-bundle validation from file-presence checks into semantic contract checks:
+  - `imageManifest` source validation now parses and validates `manifest.json`
+  - `deployedSmokeReview` source validation now verifies the smoke review record is a coherent ready smoke packet
+  - `launchCandidateReview` source validation now reuses the promotion-record/evidence-posture consistency checks
+  - `promotionReview` source validation now verifies coherent review structure before upload or dossier assembly
 
 ## Current Step
-- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the semantic generated-bundle validation pass.
+- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the semantic source-bundle validation pass.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -226,6 +227,26 @@
 - Added focused regression tests for semantic drift in all three validators.
 - Verification:
   - `node --test scripts/launch-candidate-lib.test.mjs scripts/release-dossier-lib.test.mjs scripts/release-pointer-lib.test.mjs`
+  - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Semantic Source Bundle Validation)
+- Upgraded `validate-source-dir` and the shared source-bundle path from file-presence checks to semantic validation.
+- `release-dossier-lib.mjs` now:
+  - validates image manifests with `validateApiImageManifest(...)`
+  - validates deployed-smoke review packets with `validateDeployedSmokeRecord(...)`
+  - validates launch-candidate review bundles with the same promotion-record/evidence-manifest/evidence-posture consistency checks used by promotion review
+  - validates promotion-review bundles for coherent review structure before upload or dossier assembly
+- `promotion-review-lib.mjs` now exports reusable validators for:
+  - launch-candidate review bundles
+  - promotion-review artifacts
+- Added focused regression tests for:
+  - incomplete promotion-review structure
+  - semantic image-manifest source drift
+  - semantic launch-candidate review source drift
+- Verification:
+  - `node --test scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs`
   - `git diff --check`
 - Result:
   - Passed

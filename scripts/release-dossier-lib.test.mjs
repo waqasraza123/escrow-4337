@@ -100,15 +100,109 @@ test('validateReleaseDossierSourceDirectories reports missing reviewed evidence 
     mkdirSync(launchReviewDir, { recursive: true });
     mkdirSync(promotionReviewDir, { recursive: true });
 
-    writeFileSync(resolve(imageManifestDir, 'manifest.json'), '{}\n', 'utf8');
+    writeFileSync(
+      resolve(imageManifestDir, 'manifest.json'),
+      `${JSON.stringify(
+        {
+          generatedAt: '2026-04-13T00:00:00.000Z',
+          repository: 'mc/escrow4337',
+          workflow: 'CI',
+          runId: '101',
+          runAttempt: '1',
+          runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+          eventName: 'push',
+          gitRef: 'main',
+          commitSha: 'abc123',
+          image: {
+            name: 'ghcr.io/mc/escrow-4337-api',
+            digest: 'sha256:deadbeef',
+            tags: ['main'],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
     writeFileSync(resolve(imageManifestDir, 'manifest.md'), '# image\n', 'utf8');
-    writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.json'), '{}\n', 'utf8');
+    writeFileSync(
+      resolve(deployedSmokeDir, 'deployed-smoke-record.json'),
+      `${JSON.stringify(
+        {
+          generatedAt: '2026-04-13T00:00:00.000Z',
+          status: 'ready',
+          metadata: {
+            environment: 'staging',
+            repository: 'mc/escrow4337',
+            workflow: 'Deployed Smoke',
+            runId: '201',
+            runAttempt: '1',
+            runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+            actor: 'mc',
+            candidateRunId: '101',
+            candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+            commitSha: 'abc123',
+            gitRef: 'main',
+            deployedImageSha: 'sha256:deadbeef',
+          },
+          checks: {
+            smokePassed: true,
+            seededCanaryPassed: true,
+            marketplaceSeededCanaryPassed: true,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
     writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.md'), '# smoke\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'launch-evidence-posture.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.json'), '{}\n', 'utf8');
     writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
-    writeFileSync(resolve(promotionReviewDir, 'promotion-review.json'), '{}\n', 'utf8');
+    writeFileSync(
+      resolve(promotionReviewDir, 'promotion-review.json'),
+      `${JSON.stringify(
+        {
+          generatedAt: '2026-04-13T00:00:00.000Z',
+          status: 'blocked',
+          environment: 'staging',
+          candidate: {
+            repository: 'mc/escrow4337',
+            runId: '101',
+            runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+            commitSha: 'abc123',
+            imageDigest: 'sha256:deadbeef',
+          },
+          reviews: {
+            deployedSmoke: {
+              status: 'ready',
+              workflow: 'Deployed Smoke',
+              runId: '201',
+              runUrl: 'https://github.com/mc/escrow4337/actions/runs/201',
+              candidateRunId: '101',
+            },
+            launchCandidate: {
+              status: 'blocked',
+              workflow: 'Launch Candidate',
+              runId: '301',
+              runUrl: 'https://github.com/mc/escrow4337/actions/runs/301',
+              candidateRunId: '101',
+              postureLaunchReady: false,
+              evidenceComplete: false,
+              missingArtifactCount: 1,
+              marketplaceSeededCanaryPassed: true,
+              marketplaceExactCanaryPassed: false,
+            },
+          },
+          blockers: ['missing launch evidence'],
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
     writeFileSync(resolve(promotionReviewDir, 'promotion-review.md'), '# promotion\n', 'utf8');
 
     const issues = validateReleaseDossierSourceDirectories({
@@ -160,6 +254,192 @@ test('validateReleaseDossierSourceDirectory validates one source bundle by key',
         sourceDir: launchReviewDir,
       }),
       ['Unknown release dossier source key unknown.'],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateReleaseDossierSourceDirectory validates image manifest semantics', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const imageDir = resolve(root, 'image');
+    mkdirSync(imageDir, { recursive: true });
+
+    writeFileSync(
+      resolve(imageDir, 'manifest.json'),
+      `${JSON.stringify(
+        {
+          generatedAt: '2026-04-13T00:00:00.000Z',
+          repository: 'mc/escrow4337',
+          workflow: 'CI',
+          runId: '101',
+          runAttempt: '1',
+          runUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+          eventName: 'push',
+          gitRef: 'main',
+          commitSha: 'abc123',
+          image: {
+            name: 'ghcr.io/mc/escrow-4337-api',
+            digest: 'deadbeef',
+            tags: ['main'],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(resolve(imageDir, 'manifest.md'), '# image\n', 'utf8');
+
+    assert.deepEqual(
+      validateReleaseDossierSourceDirectory({
+        sourceKey: 'imageManifest',
+        sourceDir: imageDir,
+      }),
+      ['Image manifest image.digest must start with sha256:.'],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateReleaseDossierSourceDirectory validates launch candidate review semantics', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const launchReviewDir = resolve(root, 'launch');
+    mkdirSync(launchReviewDir, { recursive: true });
+
+    writeFileSync(
+      resolve(launchReviewDir, 'evidence-manifest.json'),
+      `${JSON.stringify(
+        {
+          requiredArtifacts: {
+            missing: [],
+            total: 20,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      resolve(launchReviewDir, 'launch-evidence-posture.json'),
+      `${JSON.stringify(
+        {
+          status: 'ready',
+          launchReady: true,
+          authority: {
+            auditSource: 'chain_projection',
+          },
+          providerValidation: {
+            failureCount: 0,
+            warningCount: 0,
+          },
+          evidenceContract: {
+            complete: true,
+            requiredArtifactCount: 20,
+            missingArtifactCount: 0,
+          },
+          executionTraceCoverage: {
+            executionCount: 8,
+            correlationTaggedExecutions: 8,
+          },
+          marketplaceOrigin: {
+            ok: true,
+            confirmedModes: ['seeded', 'exact'],
+            missingModes: [],
+            failedModes: [],
+            exactLaneProof: {
+              ok: true,
+              clientSwitchedViaWorkspaceSwitcher: false,
+              freelancerSwitchedViaWorkspaceSwitcher: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(resolve(launchReviewDir, 'marketplace-origin-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-seeded-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'marketplace-exact-evidence.json'), '{}\n', 'utf8');
+    writeFileSync(
+      resolve(launchReviewDir, 'promotion-record.json'),
+      `${JSON.stringify(
+        {
+          status: 'blocked',
+          metadata: {
+            environment: 'staging',
+            repository: 'mc/escrow4337',
+            workflow: 'Launch Candidate',
+            runId: '301',
+            runUrl: 'https://github.com/mc/escrow4337/actions/runs/301',
+            candidateRunId: '101',
+            candidateRunUrl: 'https://github.com/mc/escrow4337/actions/runs/101',
+            commitSha: 'abc123',
+            gitRef: 'main',
+            deployedImageSha: 'sha256:deadbeef',
+          },
+          launchCandidate: {
+            launchReady: true,
+            smokeFailures: 0,
+            seededCanaryFailures: 0,
+            exactCanaryFailures: 0,
+            marketplaceSeededCanaryFailures: 0,
+            marketplaceExactCanaryFailures: 0,
+            walkthroughCanaryFailures: 0,
+            authorityEvidenceOk: true,
+            authorityAuditSource: 'chain_projection',
+            executionTraceCoverage: {
+              executionCount: 8,
+              traceCount: 8,
+              correlationTaggedExecutions: 8,
+              requestTaggedExecutions: 8,
+              operationTaggedExecutions: 8,
+              confirmedWithoutCorrelation: 0,
+              missingTxHashes: [],
+            },
+            providerValidation: {
+              failedProviders: [],
+              warningProviders: [],
+            },
+            marketplaceOrigin: {
+              ok: true,
+              confirmedModes: ['seeded', 'exact'],
+              missingModes: [],
+              failedModes: [],
+              exactLaneProof: {
+                ok: true,
+                clientSwitchedViaWorkspaceSwitcher: false,
+                freelancerSwitchedViaWorkspaceSwitcher: true,
+              },
+            },
+          },
+          rollback: {},
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'provider-validation-summary.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'summary.md'), '# summary\n', 'utf8');
+
+    assert.deepEqual(
+      validateReleaseDossierSourceDirectory({
+        sourceKey: 'launchCandidateReview',
+        sourceDir: launchReviewDir,
+      }),
+      [
+        'Launch candidate promotion record status must be ready but was blocked.',
+        'Launch evidence posture status ready does not match launch candidate promotion status blocked.',
+      ],
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

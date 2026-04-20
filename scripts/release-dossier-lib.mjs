@@ -9,7 +9,12 @@ import {
 } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { relative, resolve } from 'node:path';
-import { buildImageCandidateSelection } from './api-image-manifest-lib.mjs';
+import { buildImageCandidateSelection, validateApiImageManifest } from './api-image-manifest-lib.mjs';
+import {
+  validateDeployedSmokeRecord,
+  validateLaunchCandidateReviewBundle,
+  validatePromotionReviewArtifact,
+} from './promotion-review-lib.mjs';
 
 export const releaseDossierSourceSpecs = [
   {
@@ -181,6 +186,69 @@ export function validateReleaseDossierSourceDirectory({ sourceKey, sourceDir }) 
     const sourcePath = resolve(resolvedSourceDir, relativePath);
     if (!existsSync(sourcePath)) {
       issues.push(`Release dossier source ${spec.label} is missing required file ${relativePath}.`);
+    }
+  }
+
+  if (issues.length > 0) {
+    return issues;
+  }
+
+  if (sourceKey === 'imageManifest') {
+    const manifest = readJsonOutputFile(resolvedSourceDir, 'manifest.json', issues, spec.label);
+    if (manifest) {
+      issues.push(...validateApiImageManifest(manifest));
+    }
+    return issues;
+  }
+
+  if (sourceKey === 'deployedSmokeReview') {
+    const record = readJsonOutputFile(
+      resolvedSourceDir,
+      'deployed-smoke-record.json',
+      issues,
+      spec.label,
+    );
+    if (record) {
+      issues.push(...validateDeployedSmokeRecord(record));
+    }
+    return issues;
+  }
+
+  if (sourceKey === 'launchCandidateReview') {
+    const record = readJsonOutputFile(resolvedSourceDir, 'promotion-record.json', issues, spec.label);
+    const evidenceManifest = readJsonOutputFile(
+      resolvedSourceDir,
+      'evidence-manifest.json',
+      issues,
+      spec.label,
+    );
+    const evidencePosture = readJsonOutputFile(
+      resolvedSourceDir,
+      'launch-evidence-posture.json',
+      issues,
+      spec.label,
+    );
+    if (record && evidenceManifest && evidencePosture) {
+      issues.push(
+        ...validateLaunchCandidateReviewBundle({
+          record,
+          evidenceManifest,
+          evidencePosture,
+        }),
+      );
+    }
+    return issues;
+  }
+
+  if (sourceKey === 'promotionReview') {
+    const review = readJsonOutputFile(
+      resolvedSourceDir,
+      'promotion-review.json',
+      issues,
+      spec.label,
+    );
+    if (review) {
+      issues.push(...validatePromotionReviewArtifact(review));
     }
   }
 
@@ -780,13 +848,13 @@ function listFiles(rootDir, currentDir = rootDir) {
   return files.sort();
 }
 
-function readJsonOutputFile(rootDir, relativePath, issues) {
+function readJsonOutputFile(rootDir, relativePath, issues, label = 'output') {
   const filePath = resolve(rootDir, relativePath);
   try {
     return JSON.parse(readFileSync(filePath, 'utf8'));
   } catch (error) {
     issues.push(
-      `Release dossier output ${relativePath} is not valid JSON: ${
+      `Release dossier ${label} ${relativePath} is not valid JSON: ${
         error instanceof Error ? error.message : String(error)
       }.`,
     );
