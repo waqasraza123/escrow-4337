@@ -41,6 +41,7 @@ Run the same image with different commands:
 11. Treat `release-dossier.json` or `release-dossier.md` as the canonical release packet; it includes the copied source evidence, a checksum inventory, and the reconciled promotion decision from `promotion-review.json`.
 12. Treat the uploaded `release-pointer-<environment>` artifact as the latest approved release pointer for that environment.
     The next `production` launch-candidate run can now auto-resolve its rollback image SHA from the newest non-expired `release-pointer-production` artifact when no explicit rollback SHA is supplied.
+    The workflow summary for both `Launch Candidate` and `Promotion Review` now also surfaces the release-pointer exact marketplace lane proof so reviewers can confirm the approved rollback candidate still proved the client/freelancer lane split.
 
 ## Frontend Contract
 
@@ -88,6 +89,7 @@ Required launch-candidate evidence for the narrowed launch flow:
 - review `launch-evidence-posture.json` inside the launch review artifact when triaging blockers or warnings; it is the compact canonical launch posture consumed by promotion review
 - preserve the uploaded `release-dossier` artifact, which now includes copied evidence under `evidence/` plus `release-dossier-checksums.txt`
 - preserve the uploaded `release-pointer-staging` artifact so the reviewed candidate can be referenced without reopening the full dossier
+- review the workflow summary lines for exact marketplace lane proof and client/freelancer workspace-switch posture when confirming the rollback pointer or newly generated staging pointer
 - review the generated release dossier plus daemon alert dry-run artifact alongside the underlying evidence manifest before promotion
 
 `pnpm smoke:deployed` remains read-only. The seeded canary is the default staged mutation proof, and the exact flow stays confined to explicit launch-candidate evidence runs.

@@ -74,6 +74,7 @@ Required environment contract:
     Treat a blocked `promotion-review.json` result as a promotion blocker, even if the individual smoke and launch runs were green.
     Preserve the uploaded `release-dossier` artifact from that workflow; it now copies the source evidence into one canonical folder and includes `release-dossier-checksums.txt`.
     Preserve the uploaded `release-pointer-staging` artifact too; it is the stable reviewed pointer for the latest ready staging candidate.
+    Review the workflow summary for the generated pointer and confirm it reports exact marketplace lane proof together with the client/freelancer workspace-switch posture from the exact canary.
 
 11. Preserve the evidence bundle and workflow links.
     Keep the `Launch Candidate` artifact bundle produced under `artifacts/launch-candidate/...` or uploaded by GitHub Actions.
@@ -96,6 +97,7 @@ Treat staging as proven only when all of the following are true:
 - `promotion-review.json` reports `ready` for staged promotion review and reconciles the intended candidate run, commit SHA, and image digest across smoke and launch evidence
 - the `release-dossier` artifact exists, includes copied evidence files, and has a checksum manifest for the preserved review packet
 - the `release-pointer-staging` artifact exists and resolves to the same candidate run, commit SHA, and image digest as the release dossier
+- the workflow summary for launch/promotion review confirms exact marketplace lane proof for the reviewed staging candidate
 - `promotion-record.json` reports `ready` for staging review and has no unresolved blockers
 - the artifact bundle and workflow evidence are preserved for review
 

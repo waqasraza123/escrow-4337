@@ -148,11 +148,46 @@ jobs:
 
       - name: Validate generated release pointer
         if: success()
+        id: release_pointer
         run: |
           node ./scripts/release-pointer.mjs validate \
             --pointer artifacts/release-pointer/release-pointer.json \
             --expected-environment "${{ inputs.environment }}" \
-            --require-ready-launch-posture
+            --require-ready-launch-posture \
+            --write-env "$RUNNER_TEMP/release-pointer.env"
+          cat "$RUNNER_TEMP/release-pointer.env" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize release pointer posture
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## Release Pointer"
+            echo
+            echo "- Environment: $RELEASE_POINTER_ENVIRONMENT"
+            echo "- Candidate run ID: $RELEASE_POINTER_CANDIDATE_RUN_ID"
+            echo "- Commit SHA: $RELEASE_POINTER_COMMIT_SHA"
+            echo "- Image digest: $RELEASE_POINTER_IMAGE_DIGEST"
+            echo "- Launch status: $RELEASE_POINTER_LAUNCH_STATUS"
+            echo "- Launch ready: $RELEASE_POINTER_LAUNCH_READY"
+            echo "- Launch evidence complete: $RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE"
+            echo "- Marketplace origin proof: $RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK"
+            echo "- Exact marketplace lane proof: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK"
+            echo "- Exact client lane switched: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED"
+            echo "- Exact freelancer lane switched: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RELEASE_POINTER_ENVIRONMENT: ${{ steps.release_pointer.outputs.RELEASE_POINTER_ENVIRONMENT }}
+          RELEASE_POINTER_CANDIDATE_RUN_ID: ${{ steps.release_pointer.outputs.RELEASE_POINTER_CANDIDATE_RUN_ID }}
+          RELEASE_POINTER_COMMIT_SHA: ${{ steps.release_pointer.outputs.RELEASE_POINTER_COMMIT_SHA }}
+          RELEASE_POINTER_IMAGE_DIGEST: ${{ steps.release_pointer.outputs.RELEASE_POINTER_IMAGE_DIGEST }}
+          RELEASE_POINTER_LAUNCH_STATUS: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_STATUS }}
+          RELEASE_POINTER_LAUNCH_READY: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_READY }}
+          RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED: ${{ steps.release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED }}
 
       - name: Upload promotion review artifact
         if: always()

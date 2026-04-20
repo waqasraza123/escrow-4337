@@ -180,6 +180,36 @@ jobs:
             --write-env "$RUNNER_TEMP/release-pointer.env"
           cat "$RUNNER_TEMP/release-pointer.env" >> "$GITHUB_OUTPUT"
 
+      - name: Summarize rollback release pointer posture
+        if: inputs.environment == 'production' && inputs.rollback_image_sha == ''
+        shell: bash
+        run: |
+          {
+            echo "## Rollback Release Pointer"
+            echo
+            echo "- Candidate run ID: $RELEASE_POINTER_CANDIDATE_RUN_ID"
+            echo "- Commit SHA: $RELEASE_POINTER_COMMIT_SHA"
+            echo "- Image digest: $RELEASE_POINTER_IMAGE_DIGEST"
+            echo "- Launch status: $RELEASE_POINTER_LAUNCH_STATUS"
+            echo "- Launch ready: $RELEASE_POINTER_LAUNCH_READY"
+            echo "- Launch evidence complete: $RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE"
+            echo "- Marketplace origin proof: $RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK"
+            echo "- Exact marketplace lane proof: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK"
+            echo "- Exact client lane switched: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED"
+            echo "- Exact freelancer lane switched: $RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RELEASE_POINTER_CANDIDATE_RUN_ID: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_CANDIDATE_RUN_ID }}
+          RELEASE_POINTER_COMMIT_SHA: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_COMMIT_SHA }}
+          RELEASE_POINTER_IMAGE_DIGEST: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_IMAGE_DIGEST }}
+          RELEASE_POINTER_LAUNCH_STATUS: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_STATUS }}
+          RELEASE_POINTER_LAUNCH_READY: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_READY }}
+          RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_EVIDENCE_COMPLETE }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_ORIGIN_OK }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_LANE_PROOF_OK }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_CLIENT_LANE_SWITCHED }}
+          RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED: ${{ steps.rollback_release_pointer.outputs.RELEASE_POINTER_LAUNCH_MARKETPLACE_EXACT_FREELANCER_LANE_SWITCHED }}
+
       - name: Resolve rollback image SHA
         id: rollback_image
         shell: bash
