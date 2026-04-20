@@ -147,6 +147,11 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
           confirmedModes: ['seeded', 'exact'],
           missingModes: ['seeded'],
           failedModes: ['seeded'],
+          exactLaneProof: {
+            ok: false,
+            clientSwitchedViaWorkspaceSwitcher: true,
+            freelancerSwitchedViaWorkspaceSwitcher: false,
+          },
         },
         executionTraceCoverage: {
           executionCount: 8,
@@ -178,6 +183,11 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
         confirmedModes: ['seeded'],
         missingModes: ['exact'],
         failedModes: ['exact'],
+        exactLaneProof: {
+          ok: true,
+          clientSwitchedViaWorkspaceSwitcher: false,
+          freelancerSwitchedViaWorkspaceSwitcher: true,
+        },
       },
       executionTraceCoverage: {
         executionCount: 7,
@@ -223,6 +233,9 @@ test('validateReleaseDossierInputs catches inconsistent evidence sets', () => {
     'Launch evidence posture provider failure count 1 does not match launch promotion provider failure count 0.',
     'Launch evidence posture provider warning count 2 does not match launch promotion provider warning count 1.',
     'Launch evidence posture marketplace origin proof false does not match launch promotion marketplace origin proof true.',
+    'Launch evidence posture exact marketplace lane proof true does not match launch promotion exact marketplace lane proof false.',
+    'Launch evidence posture exact marketplace client lane workspace switch false does not match launch promotion exact marketplace client lane workspace switch true.',
+    'Launch evidence posture exact marketplace freelancer lane workspace switch true does not match launch promotion exact marketplace freelancer lane workspace switch false.',
     'Launch evidence posture confirmed marketplace origin modes seeded does not match launch promotion confirmed marketplace origin modes exact, seeded.',
     'Launch evidence posture missing marketplace origin modes exact does not match launch promotion missing marketplace origin modes seeded.',
     'Launch evidence posture failed marketplace origin modes exact does not match launch promotion failed marketplace origin modes seeded.',
@@ -298,6 +311,11 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
           confirmedModes: ['seeded', 'exact'],
           missingModes: [],
           failedModes: [],
+          exactLaneProof: {
+            ok: true,
+            clientSwitchedViaWorkspaceSwitcher: false,
+            freelancerSwitchedViaWorkspaceSwitcher: true,
+          },
         },
         marketplaceSeededCanaryFailures: 0,
         marketplaceExactCanaryFailures: 0,
@@ -356,6 +374,11 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
         jobIds: ['job-123'],
         opportunityIds: ['opp-1'],
         applicationIds: ['app-1'],
+        exactLaneProof: {
+          ok: true,
+          clientSwitchedViaWorkspaceSwitcher: false,
+          freelancerSwitchedViaWorkspaceSwitcher: true,
+        },
       },
       rollback: {
         required: false,
@@ -438,6 +461,7 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.equal(record.launchEvidence.rollbackPointerArtifactId, '41');
   assert.equal(record.launchEvidence.executionTraceCoverage.executionCount, 8);
   assert.equal(record.launchEvidence.marketplaceOrigin.ok, true);
+  assert.equal(record.launchEvidence.marketplaceOrigin.exactLaneProof.ok, true);
   assert.equal(record.launchEvidence.posture.status, 'ready');
   assert.equal(record.launchEvidence.posture.providerValidation.warningCount, 1);
   assert.equal(record.workflows.deployedSmoke.selectionSource, 'artifact-search');
@@ -460,4 +484,9 @@ test('buildReleaseDossier summarizes decision and copied evidence inventory', ()
   assert.ok(markdown.includes('Selection selected at: 2026-04-13T02:00:00Z'));
   assert.ok(markdown.includes('Launch posture status: ready'));
   assert.ok(markdown.includes('Launch provider warnings: 1'));
+  assert.ok(
+    markdown.includes(
+      'Launch exact marketplace lane proof: confirmed · client switched no · freelancer switched yes',
+    ),
+  );
 });

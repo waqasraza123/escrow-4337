@@ -473,6 +473,22 @@ test('summarizeMarketplaceJourneyEvidence confirms seeded and exact marketplace-
         jobHistory: 'local_fallback',
         disputeCase: 'chain_projection',
       },
+      laneProof: {
+        client: {
+          expectedLane: 'client',
+          currentLaneConfirmed: true,
+          switchedViaWorkspaceSwitcher: false,
+          emptyStateConfirmed: true,
+          laneSurfaceConfirmed: true,
+        },
+        freelancer: {
+          expectedLane: 'freelancer',
+          currentLaneConfirmed: true,
+          switchedViaWorkspaceSwitcher: true,
+          emptyStateConfirmed: true,
+          laneSurfaceConfirmed: true,
+        },
+      },
       executionTraces: {
         executionCount: 7,
         traceCount: 7,
@@ -488,6 +504,11 @@ test('summarizeMarketplaceJourneyEvidence confirms seeded and exact marketplace-
   assert.deepEqual(summary.jobIds, ['job-seeded', 'job-exact']);
   assert.equal(summary.journeys.seeded.originConfirmed, true);
   assert.equal(summary.journeys.exact.originConfirmed, false);
+  assert.deepEqual(summary.exactLaneProof, {
+    ok: true,
+    clientSwitchedViaWorkspaceSwitcher: false,
+    freelancerSwitchedViaWorkspaceSwitcher: true,
+  });
 });
 
 test('evaluatePromotionReadiness requires rollback metadata for production and alert posture for required daemon', () => {

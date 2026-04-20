@@ -163,6 +163,7 @@ test('[@exact] deployed environment can exercise the exact marketplace publish-t
       jobId: result.jobId,
       contractPath: result.contractPath,
       opportunityTitle,
+      laneProof: result.laneProof,
       jobHistoryExport: result.exportedJobHistoryJson,
       disputeCaseExport: result.exportedDisputeCaseJson,
     });

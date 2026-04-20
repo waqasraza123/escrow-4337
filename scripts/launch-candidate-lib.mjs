@@ -384,6 +384,23 @@ export function summarizeMarketplaceJourneyEvidence(
     applicationIds: uniqueStrings(
       Object.values(journeys).map((journey) => journey.applicationId),
     ),
+    exactLaneProof: exact.present
+      ? {
+          ok:
+            exact.laneProof?.client?.expectedLane === 'client' &&
+            exact.laneProof?.client?.currentLaneConfirmed === true &&
+            exact.laneProof?.client?.emptyStateConfirmed === true &&
+            exact.laneProof?.client?.laneSurfaceConfirmed === true &&
+            exact.laneProof?.freelancer?.expectedLane === 'freelancer' &&
+            exact.laneProof?.freelancer?.currentLaneConfirmed === true &&
+            exact.laneProof?.freelancer?.emptyStateConfirmed === true &&
+            exact.laneProof?.freelancer?.laneSurfaceConfirmed === true,
+          clientSwitchedViaWorkspaceSwitcher:
+            exact.laneProof?.client?.switchedViaWorkspaceSwitcher === true,
+          freelancerSwitchedViaWorkspaceSwitcher:
+            exact.laneProof?.freelancer?.switchedViaWorkspaceSwitcher === true,
+        }
+      : null,
     journeys,
   };
 }
@@ -512,6 +529,15 @@ export function buildLaunchEvidencePosture({
           jobIds: marketplaceOrigin.jobIds ?? [],
           opportunityIds: marketplaceOrigin.opportunityIds ?? [],
           applicationIds: marketplaceOrigin.applicationIds ?? [],
+          exactLaneProof: marketplaceOrigin.exactLaneProof
+            ? {
+                ok: marketplaceOrigin.exactLaneProof.ok === true,
+                clientSwitchedViaWorkspaceSwitcher:
+                  marketplaceOrigin.exactLaneProof.clientSwitchedViaWorkspaceSwitcher === true,
+                freelancerSwitchedViaWorkspaceSwitcher:
+                  marketplaceOrigin.exactLaneProof.freelancerSwitchedViaWorkspaceSwitcher === true,
+              }
+            : null,
         }
       : null,
     canaries: {
@@ -609,6 +635,17 @@ export function buildPromotionRecord({
             failedModes: summary.marketplaceOrigin.failedModes ?? [],
             jobIds: summary.marketplaceOrigin.jobIds ?? [],
             opportunityIds: summary.marketplaceOrigin.opportunityIds ?? [],
+            exactLaneProof: summary.marketplaceOrigin.exactLaneProof
+              ? {
+                  ok: summary.marketplaceOrigin.exactLaneProof.ok === true,
+                  clientSwitchedViaWorkspaceSwitcher:
+                    summary.marketplaceOrigin.exactLaneProof
+                      .clientSwitchedViaWorkspaceSwitcher === true,
+                  freelancerSwitchedViaWorkspaceSwitcher:
+                    summary.marketplaceOrigin.exactLaneProof
+                      .freelancerSwitchedViaWorkspaceSwitcher === true,
+                }
+              : null,
           }
         : null,
     },
@@ -676,6 +713,11 @@ export function buildPromotionMarkdown(record) {
 - Marketplace origin proof: ${
     record.launchCandidate.marketplaceOrigin
       ? `${record.launchCandidate.marketplaceOrigin.ok ? 'confirmed' : 'blocked'} · confirmed ${record.launchCandidate.marketplaceOrigin.confirmedModes.join(', ') || 'none'}`
+      : 'n/a'
+  }
+- Exact marketplace lane proof: ${
+    record.launchCandidate.marketplaceOrigin?.exactLaneProof
+      ? `${record.launchCandidate.marketplaceOrigin.exactLaneProof.ok ? 'confirmed' : 'blocked'} · client switched ${record.launchCandidate.marketplaceOrigin.exactLaneProof.clientSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'} · freelancer switched ${record.launchCandidate.marketplaceOrigin.exactLaneProof.freelancerSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'}`
       : 'n/a'
   }
 - Provider validation failures: ${
@@ -956,6 +998,7 @@ function normalizeMarketplaceJourneyEvidence(mode, evidence) {
         disputeCase: null,
       },
       executionTraces: null,
+      laneProof: null,
     };
   }
 
@@ -981,6 +1024,36 @@ function normalizeMarketplaceJourneyEvidence(mode, evidence) {
       jobHistory: trimToNull(evidence.authority?.jobHistory),
       disputeCase: trimToNull(evidence.authority?.disputeCase),
     },
+    laneProof: evidence.laneProof
+      ? {
+          client: evidence.laneProof.client
+            ? {
+                expectedLane: trimToNull(evidence.laneProof.client.expectedLane),
+                currentLaneConfirmed:
+                  evidence.laneProof.client.currentLaneConfirmed === true,
+                switchedViaWorkspaceSwitcher:
+                  evidence.laneProof.client.switchedViaWorkspaceSwitcher === true,
+                emptyStateConfirmed:
+                  evidence.laneProof.client.emptyStateConfirmed === true,
+                laneSurfaceConfirmed:
+                  evidence.laneProof.client.laneSurfaceConfirmed === true,
+              }
+            : null,
+          freelancer: evidence.laneProof.freelancer
+            ? {
+                expectedLane: trimToNull(evidence.laneProof.freelancer.expectedLane),
+                currentLaneConfirmed:
+                  evidence.laneProof.freelancer.currentLaneConfirmed === true,
+                switchedViaWorkspaceSwitcher:
+                  evidence.laneProof.freelancer.switchedViaWorkspaceSwitcher === true,
+                emptyStateConfirmed:
+                  evidence.laneProof.freelancer.emptyStateConfirmed === true,
+                laneSurfaceConfirmed:
+                  evidence.laneProof.freelancer.laneSurfaceConfirmed === true,
+              }
+            : null,
+        }
+      : null,
     executionTraces: evidence.executionTraces
       ? {
           executionCount:

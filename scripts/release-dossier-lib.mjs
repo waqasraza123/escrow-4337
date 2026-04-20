@@ -357,6 +357,34 @@ export function validateReleaseDossierInputs({
     rightLabel: 'launch promotion marketplace origin proof',
     rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.ok,
   });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Launch evidence posture exact marketplace lane proof',
+    leftValue: launchEvidencePosture?.marketplaceOrigin?.exactLaneProof?.ok,
+    rightLabel: 'launch promotion exact marketplace lane proof',
+    rightValue: launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.exactLaneProof?.ok,
+  });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Launch evidence posture exact marketplace client lane workspace switch',
+    leftValue:
+      launchEvidencePosture?.marketplaceOrigin?.exactLaneProof?.clientSwitchedViaWorkspaceSwitcher,
+    rightLabel: 'launch promotion exact marketplace client lane workspace switch',
+    rightValue:
+      launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.exactLaneProof
+        ?.clientSwitchedViaWorkspaceSwitcher,
+  });
+  compareBooleanField({
+    issues,
+    leftLabel: 'Launch evidence posture exact marketplace freelancer lane workspace switch',
+    leftValue:
+      launchEvidencePosture?.marketplaceOrigin?.exactLaneProof
+        ?.freelancerSwitchedViaWorkspaceSwitcher,
+    rightLabel: 'launch promotion exact marketplace freelancer lane workspace switch',
+    rightValue:
+      launchPromotionRecord?.launchCandidate?.marketplaceOrigin?.exactLaneProof
+        ?.freelancerSwitchedViaWorkspaceSwitcher,
+  });
   compareStringListField({
     issues,
     leftLabel: 'Launch evidence posture confirmed marketplace origin modes',
@@ -538,6 +566,11 @@ export function buildReleaseDossierMarkdown(record) {
 - Launch marketplace origin proof: ${
     record.launchEvidence.marketplaceOrigin
       ? `${record.launchEvidence.marketplaceOrigin.ok ? 'confirmed' : 'blocked'}`
+      : 'n/a'
+  }
+- Launch exact marketplace lane proof: ${
+    record.launchEvidence.marketplaceOrigin?.exactLaneProof
+      ? `${record.launchEvidence.marketplaceOrigin.exactLaneProof.ok ? 'confirmed' : 'blocked'} · client switched ${record.launchEvidence.marketplaceOrigin.exactLaneProof.clientSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'} · freelancer switched ${record.launchEvidence.marketplaceOrigin.exactLaneProof.freelancerSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'}`
       : 'n/a'
   }
 - Launch marketplace seeded canary failures: ${record.launchEvidence.marketplaceSeededCanaryFailures ?? 'n/a'}

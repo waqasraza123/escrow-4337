@@ -183,6 +183,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
         authorityAuditSource: 'aggregate',
         marketplaceOrigin: {
           ok: false,
+          exactLaneProof: {
+            ok: false,
+            clientSwitchedViaWorkspaceSwitcher: true,
+            freelancerSwitchedViaWorkspaceSwitcher: false,
+          },
           missingModes: ['seeded'],
           failedModes: ['exact'],
         },
@@ -225,6 +230,11 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
       },
       marketplaceOrigin: {
         ok: false,
+        exactLaneProof: {
+          ok: true,
+          clientSwitchedViaWorkspaceSwitcher: false,
+          freelancerSwitchedViaWorkspaceSwitcher: true,
+        },
         confirmedModes: ['exact'],
         missingModes: [],
         failedModes: ['seeded'],
@@ -298,6 +308,27 @@ test('buildPromotionReview reports cross-artifact mismatches and incomplete evid
   assert.ok(
     review.blockers.includes(
       'Launch evidence posture failed marketplace origin modes ["seeded"] does not match launch candidate promotion failed marketplace origin modes ["exact"].',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture exact marketplace lane proof true does not match launch candidate promotion exact marketplace lane proof false.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture exact marketplace client lane switch false does not match launch candidate promotion exact marketplace client lane switch true.',
+    ),
+  );
+  assert.ok(
+    review.blockers.includes(
+      'Launch evidence posture exact marketplace freelancer lane switch true does not match launch candidate promotion exact marketplace freelancer lane switch false.',
+    ),
+  );
+  const markdown = buildPromotionReviewMarkdown(review);
+  assert.ok(
+    markdown.includes(
+      'Launch exact marketplace lane proof: blocked · client switched yes · freelancer switched no',
     ),
   );
 });

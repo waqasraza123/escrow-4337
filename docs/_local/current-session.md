@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Stabilize the exact Phase 1 marketplace browser canary on the built local stack so lane-aware publish/apply/hire stays green end to end.
+- Push the lane-aware exact marketplace contract into deployed launch evidence and release review so Phase 1 browser proof survives promotion artifacts, not just local Playwright runs.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,8 +64,8 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by pushing the newly stable exact local marketplace canary into the deployed and release-evidence path:
-  - mirror the same lane-aware exact contract in deployed canaries and launch-candidate expectations
+- Continue the combined Phase 0 + Phase 1 program by propagating the canonical exact-lane proof into the remaining release-facing surfaces and real staging proof:
+  - mirror the same exact lane-proof signal into `release-pointer` and any workflow/runbook consumer that still only sees coarse marketplace-origin state
   - browser-verify the deployed exact marketplace journey against real staging once secrets and URLs are ready
   - continue Phase 0 staging-proof work now that the Phase 1 workspace journey is stable enough locally for production-like canaries
 
@@ -88,6 +88,26 @@
   - `pnpm --filter web typecheck`
   - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
   - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Exact Lane Proof in Launch Evidence)
+- Extended the exact marketplace evidence contract so deployed exact journeys now emit explicit client/freelancer lane proof alongside marketplace-origin exports.
+- `tests/e2e/fixtures/marketplace-evidence.ts` now requires exact lane proof for exact-mode evidence:
+  - expected lane identity
+  - current lane confirmation
+  - empty-state confirmation
+  - lane-surface confirmation
+  - whether the workspace switcher was used
+- `tests/e2e/flows/marketplace-exact-flow.ts` now returns lane proof for both actors, and the deployed exact marketplace canary persists it into `marketplace-exact-evidence.json`.
+- `scripts/launch-candidate-lib.mjs` now carries that exact lane proof into:
+  - `marketplace-origin-summary`
+  - `launch-evidence-posture.json`
+  - `promotion-record.json`
+- `scripts/promotion-review-lib.mjs` and `scripts/release-dossier-lib.mjs` now compare exact lane proof across posture vs promotion record and surface it in markdown artifacts.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/launch-candidate-lib.test.mjs scripts/promotion-review-lib.test.mjs scripts/release-dossier-lib.test.mjs`
 - Result:
   - Passed
 

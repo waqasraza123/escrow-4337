@@ -203,6 +203,7 @@
 - Phase 7 now documents the staging and production secret contract plus rollout order, but that documentation still needs live staging evidence before it should be treated as deployment proof.
 - Launch readiness is now machine-readable, but it is still derived from runtime configuration plus persisted daemon status; it is not a substitute for live staging evidence, relay exercise, or incident-drill proof.
 - The incident playbook and launch-evidence bundle now make ownership and rollback posture explicit, but they still need a real staged run before they count as operational proof.
+- Exact marketplace launch evidence now also proves the Phase 1 lane contract. `marketplace-exact-evidence.json`, `launch-evidence-posture.json`, promotion review, and the release dossier all carry exact client/freelancer lane confirmation plus whether the workspace switcher was required, so launch review can reject marketplace-origin proof that skipped the explicit workspace split.
 - Imported `job-history` previews improve ingestion readiness and operator comparison workflows, but they still depend on externally supplied export artifacts rather than a live event indexer.
 - Browser-wallet-native wallet linking now exists in the web app, but it still depends on injected-wallet support for `eth_requestAccounts`, `eth_chainId`, and `personal_sign`; unsupported wallets still need the manual fallback.
 - The API now defaults to the Postgres persistence driver; non-test environments need `DATABASE_URL` set or startup will fail.

@@ -3,6 +3,14 @@ import { dirname } from 'node:path';
 
 type MarketplaceEvidenceMode = 'seeded' | 'exact';
 
+type MarketplaceLaneProof = {
+  expectedLane: 'client' | 'freelancer';
+  currentLaneConfirmed?: boolean;
+  switchedViaWorkspaceSwitcher?: boolean;
+  emptyStateConfirmed?: boolean;
+  laneSurfaceConfirmed?: boolean;
+};
+
 type MarketplaceExportDocument = {
   authority?: {
     source?: string | null;
@@ -74,6 +82,10 @@ export function buildMarketplaceJourneyEvidence(input: {
   jobId: string;
   contractPath: string;
   opportunityTitle: string;
+  laneProof?: {
+    client?: MarketplaceLaneProof | null;
+    freelancer?: MarketplaceLaneProof | null;
+  } | null;
   jobHistoryExport: MarketplaceExportDocument;
   disputeCaseExport: MarketplaceExportDocument;
 }) {
@@ -114,6 +126,43 @@ export function buildMarketplaceJourneyEvidence(input: {
   }
   if (!executionTraces) {
     issues.push('job-history export is missing execution trace coverage.');
+  }
+  const clientLaneProof = input.laneProof?.client ?? null;
+  const freelancerLaneProof = input.laneProof?.freelancer ?? null;
+  if (input.mode === 'exact') {
+    if (!clientLaneProof) {
+      issues.push('exact marketplace evidence is missing client lane proof.');
+    } else {
+      if (clientLaneProof.expectedLane !== 'client') {
+        issues.push('exact marketplace client lane proof must target the client lane.');
+      }
+      if (clientLaneProof.currentLaneConfirmed !== true) {
+        issues.push('exact marketplace client lane proof did not confirm the current lane.');
+      }
+      if (clientLaneProof.emptyStateConfirmed !== true) {
+        issues.push('exact marketplace client lane proof did not confirm the client empty state.');
+      }
+      if (clientLaneProof.laneSurfaceConfirmed !== true) {
+        issues.push('exact marketplace client lane proof did not confirm the client surface.');
+      }
+    }
+
+    if (!freelancerLaneProof) {
+      issues.push('exact marketplace evidence is missing freelancer lane proof.');
+    } else {
+      if (freelancerLaneProof.expectedLane !== 'freelancer') {
+        issues.push('exact marketplace freelancer lane proof must target the freelancer lane.');
+      }
+      if (freelancerLaneProof.currentLaneConfirmed !== true) {
+        issues.push('exact marketplace freelancer lane proof did not confirm the current lane.');
+      }
+      if (freelancerLaneProof.emptyStateConfirmed !== true) {
+        issues.push('exact marketplace freelancer lane proof did not confirm the freelancer empty state.');
+      }
+      if (freelancerLaneProof.laneSurfaceConfirmed !== true) {
+        issues.push('exact marketplace freelancer lane proof did not confirm the freelancer surface.');
+      }
+    }
   }
 
   return {
@@ -168,6 +217,31 @@ export function buildMarketplaceJourneyEvidence(input: {
         proposal.milestonePlanSummary.length > 0,
       estimatedStartAt: proposal.estimatedStartAt ?? null,
     },
+    laneProof:
+      input.mode === 'exact'
+        ? {
+            client: clientLaneProof
+              ? {
+                  expectedLane: clientLaneProof.expectedLane,
+                  currentLaneConfirmed: clientLaneProof.currentLaneConfirmed === true,
+                  switchedViaWorkspaceSwitcher:
+                    clientLaneProof.switchedViaWorkspaceSwitcher === true,
+                  emptyStateConfirmed: clientLaneProof.emptyStateConfirmed === true,
+                  laneSurfaceConfirmed: clientLaneProof.laneSurfaceConfirmed === true,
+                }
+              : null,
+            freelancer: freelancerLaneProof
+              ? {
+                  expectedLane: freelancerLaneProof.expectedLane,
+                  currentLaneConfirmed: freelancerLaneProof.currentLaneConfirmed === true,
+                  switchedViaWorkspaceSwitcher:
+                    freelancerLaneProof.switchedViaWorkspaceSwitcher === true,
+                  emptyStateConfirmed: freelancerLaneProof.emptyStateConfirmed === true,
+                  laneSurfaceConfirmed: freelancerLaneProof.laneSurfaceConfirmed === true,
+                }
+              : null,
+          }
+        : null,
     resolution: {
       jobStatus: input.jobHistoryExport.job?.status ?? null,
       milestoneStatuses,
@@ -183,6 +257,10 @@ export async function writeMarketplaceJourneyEvidence(input: {
   jobId: string;
   contractPath: string;
   opportunityTitle: string;
+  laneProof?: {
+    client?: MarketplaceLaneProof | null;
+    freelancer?: MarketplaceLaneProof | null;
+  } | null;
   jobHistoryExport: MarketplaceExportDocument;
   disputeCaseExport: MarketplaceExportDocument;
 }) {

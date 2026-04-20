@@ -463,6 +463,11 @@ export function buildPromotionReviewMarkdown(review) {
       ? `${review.reviews.launchCandidate.marketplaceOrigin.ok ? 'confirmed' : 'blocked'}`
       : 'n/a'
   }
+- Launch exact marketplace lane proof: ${
+    review.reviews.launchCandidate.marketplaceOrigin?.exactLaneProof
+      ? `${review.reviews.launchCandidate.marketplaceOrigin.exactLaneProof.ok ? 'confirmed' : 'blocked'} · client switched ${review.reviews.launchCandidate.marketplaceOrigin.exactLaneProof.clientSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'} · freelancer switched ${review.reviews.launchCandidate.marketplaceOrigin.exactLaneProof.freelancerSwitchedViaWorkspaceSwitcher ? 'yes' : 'no'}`
+      : 'n/a'
+  }
 
 ## Blockers
 
@@ -766,6 +771,33 @@ function validateLaunchPromotionReview({
     leftValue: evidencePosture?.marketplaceOrigin?.ok,
     rightLabel: 'launch candidate promotion marketplace origin proof',
     rightValue: record?.launchCandidate?.marketplaceOrigin?.ok,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture exact marketplace lane proof',
+    leftValue: evidencePosture?.marketplaceOrigin?.exactLaneProof?.ok,
+    rightLabel: 'launch candidate promotion exact marketplace lane proof',
+    rightValue: record?.launchCandidate?.marketplaceOrigin?.exactLaneProof?.ok,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture exact marketplace client lane switch',
+    leftValue:
+      evidencePosture?.marketplaceOrigin?.exactLaneProof?.clientSwitchedViaWorkspaceSwitcher,
+    rightLabel: 'launch candidate promotion exact marketplace client lane switch',
+    rightValue:
+      record?.launchCandidate?.marketplaceOrigin?.exactLaneProof
+        ?.clientSwitchedViaWorkspaceSwitcher,
+  });
+  compareBooleanField({
+    blockers: issues,
+    leftLabel: 'Launch evidence posture exact marketplace freelancer lane switch',
+    leftValue:
+      evidencePosture?.marketplaceOrigin?.exactLaneProof?.freelancerSwitchedViaWorkspaceSwitcher,
+    rightLabel: 'launch candidate promotion exact marketplace freelancer lane switch',
+    rightValue:
+      record?.launchCandidate?.marketplaceOrigin?.exactLaneProof
+        ?.freelancerSwitchedViaWorkspaceSwitcher,
   });
   compareStringListField({
     blockers: issues,

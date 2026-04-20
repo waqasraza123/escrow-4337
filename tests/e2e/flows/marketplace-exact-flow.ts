@@ -54,6 +54,14 @@ type MarketplaceExactFlowInput = {
   exportProbeFactory?: (jobId: string) => ExportProbe[];
 };
 
+type MarketplaceLaneProof = {
+  expectedLane: 'client' | 'freelancer';
+  currentLaneConfirmed: boolean;
+  switchedViaWorkspaceSwitcher: boolean;
+  emptyStateConfirmed: boolean;
+  laneSurfaceConfirmed: boolean;
+};
+
 async function clickWorkspaceAction(button: Locator) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -87,7 +95,7 @@ async function saveMarketplaceProfile(input: {
   page: Page;
   webBaseUrl: string;
   profile: MarketplaceProfileInput;
-}) {
+}): Promise<MarketplaceLaneProof> {
   const { page, profile, webBaseUrl } = input;
 
   await page.goto(`${webBaseUrl}/app/marketplace`);
@@ -98,31 +106,39 @@ async function saveMarketplaceProfile(input: {
   const freelancerLaneCard = page.getByTestId('marketplace-mode-card-freelancer');
   await expect(clientLaneCard).toBeVisible();
   await expect(freelancerLaneCard).toBeVisible();
+  let switchedViaWorkspaceSwitcher = false;
   if (profile.expectedLane === 'client') {
     const currentLane = clientLaneCard.getByText('Current lane');
     if ((await currentLane.count()) === 0) {
       await clickWorkspaceAction(
         clientLaneCard.getByRole('button', { name: /Hire:/ }),
       );
+      switchedViaWorkspaceSwitcher = true;
     }
     await expect(currentLane).toBeVisible();
+    await expect(page.getByText(profile.expectedEmptyState)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Create hiring spec' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Credibility profile' }),
+    ).not.toBeVisible();
+    return {
+      expectedLane: profile.expectedLane,
+      currentLaneConfirmed: true,
+      switchedViaWorkspaceSwitcher,
+      emptyStateConfirmed: true,
+      laneSurfaceConfirmed: true,
+    };
   } else {
     const currentLane = freelancerLaneCard.getByText('Current lane');
     if ((await currentLane.count()) === 0) {
       await clickWorkspaceAction(
         freelancerLaneCard.getByRole('button', { name: /Freelance:/ }),
       );
+      switchedViaWorkspaceSwitcher = true;
     }
     await expect(currentLane).toBeVisible();
   }
   await expect(page.getByText(profile.expectedEmptyState)).toBeVisible();
-  if (profile.expectedLane === 'client') {
-    await expect(page.getByRole('heading', { name: 'Create hiring spec' })).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Credibility profile' }),
-    ).not.toBeVisible();
-    return;
-  }
   await expect(page.getByRole('heading', { name: 'Credibility profile' })).toBeVisible();
   await page.getByLabel('Slug', { exact: true }).fill(profile.slug);
   await page.getByLabel('Display name', { exact: true }).fill(profile.displayName);
@@ -134,6 +150,13 @@ async function saveMarketplaceProfile(input: {
   await expect(
     page.getByText('Marketplace profile and proof artifacts saved.'),
   ).toBeVisible();
+  return {
+    expectedLane: profile.expectedLane,
+    currentLaneConfirmed: true,
+    switchedViaWorkspaceSwitcher,
+    emptyStateConfirmed: true,
+    laneSurfaceConfirmed: true,
+  };
 }
 
 export async function runAuthenticatedMarketplaceExactFlow(
@@ -159,7 +182,7 @@ export async function runAuthenticatedMarketplaceExactFlow(
     webBaseUrl,
   } = input;
 
-  await saveMarketplaceProfile({
+  const clientLaneProof = await saveMarketplaceProfile({
     page: clientPage,
     webBaseUrl,
     profile: clientProfile,
@@ -213,7 +236,7 @@ export async function runAuthenticatedMarketplaceExactFlow(
   );
   await expect(clientOpportunityCard.getByText('Public brief • Published')).toBeVisible();
 
-  await saveMarketplaceProfile({
+  const contractorLaneProof = await saveMarketplaceProfile({
     page: contractorPage,
     webBaseUrl,
     profile: contractorProfile,
@@ -386,6 +409,10 @@ export async function runAuthenticatedMarketplaceExactFlow(
     jobId,
     opportunityId,
     contractPath: clientContractPath,
+    laneProof: {
+      client: clientLaneProof,
+      freelancer: contractorLaneProof,
+    },
     exportedJobHistoryJson:
       downloadedExports.find(
         (entry) => entry.artifact === 'job-history' && entry.format === 'json',
