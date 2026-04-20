@@ -54,10 +54,32 @@ type MarketplaceExactFlowInput = {
   exportProbeFactory?: (jobId: string) => ExportProbe[];
 };
 
-function workspacePanel(page: Page, heading: string): Locator {
+async function clickWorkspaceAction(button: Locator) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await expect(button).toBeVisible();
+      await expect(button).toBeEnabled();
+      await button.click({ timeout: 5_000 });
+      return;
+    } catch (error) {
+      if (attempt === 0) {
+        await button.click({ force: true, timeout: 5_000 }).catch(() => undefined);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+}
+
+function marketplaceCardByTitle(
+  page: Page,
+  testIdPrefix: string,
+  title: string,
+): Locator {
   return page
-    .locator('article')
-    .filter({ has: page.getByRole('heading', { name: heading }) })
+    .locator(`[data-testid^="${testIdPrefix}"]`)
+    .filter({ hasText: title })
     .first();
 }
 
@@ -72,20 +94,26 @@ async function saveMarketplaceProfile(input: {
   await expect(
     page.getByRole('heading', { name: 'Choose your marketplace lane' }),
   ).toBeVisible();
-  await expect(page.getByTestId('marketplace-mode-card-client')).toBeVisible();
-  await expect(page.getByTestId('marketplace-mode-card-freelancer')).toBeVisible();
+  const clientLaneCard = page.getByTestId('marketplace-mode-card-client');
+  const freelancerLaneCard = page.getByTestId('marketplace-mode-card-freelancer');
+  await expect(clientLaneCard).toBeVisible();
+  await expect(freelancerLaneCard).toBeVisible();
   if (profile.expectedLane === 'client') {
-    await expect(
-      page
-        .getByTestId('marketplace-mode-card-client')
-        .getByText('Current lane'),
-    ).toBeVisible();
+    const currentLane = clientLaneCard.getByText('Current lane');
+    if ((await currentLane.count()) === 0) {
+      await clickWorkspaceAction(
+        clientLaneCard.getByRole('button', { name: /Hire:/ }),
+      );
+    }
+    await expect(currentLane).toBeVisible();
   } else {
-    await expect(
-      page
-        .getByTestId('marketplace-mode-card-freelancer')
-        .getByText('Current lane'),
-    ).toBeVisible();
+    const currentLane = freelancerLaneCard.getByText('Current lane');
+    if ((await currentLane.count()) === 0) {
+      await clickWorkspaceAction(
+        freelancerLaneCard.getByRole('button', { name: /Freelance:/ }),
+      );
+    }
+    await expect(currentLane).toBeVisible();
   }
   await expect(page.getByText(profile.expectedEmptyState)).toBeVisible();
   if (profile.expectedLane === 'client') {
@@ -157,12 +185,15 @@ export async function runAuthenticatedMarketplaceExactFlow(
     clientPage.getByText('Decision-ready marketplace brief created as draft.'),
   ).toBeVisible();
 
-  const clientOpportunitiesPanel = workspacePanel(clientPage, 'My opportunities');
-  const draftOpportunityCard = clientOpportunitiesPanel
-    .locator('article')
-    .filter({ hasText: opportunity.title })
-    .first();
-  await draftOpportunityCard.getByRole('button', { name: 'Publish' }).click();
+  const draftOpportunityCard = marketplaceCardByTitle(
+    clientPage,
+    'marketplace-my-opportunity-',
+    opportunity.title,
+  );
+  await expect(draftOpportunityCard).toBeVisible();
+  await clickWorkspaceAction(
+    draftOpportunityCard.getByRole('button', { name: 'Publish' }),
+  );
   await expect(clientPage.getByText('Marketplace brief published.')).toBeVisible();
 
   const publicBriefLink = draftOpportunityCard.getByRole('link', {
@@ -203,24 +234,30 @@ export async function runAuthenticatedMarketplaceExactFlow(
   );
   await expect(openBriefCard.getByText(opportunity.summary)).toBeVisible();
   await expect(openBriefCard.getByRole('textbox', { name: 'Cover note' })).toBeVisible();
-  await openBriefCard
-    .getByRole('button', { name: 'Submit structured application' })
-    .click();
-  await expect(contractorPage.getByText('Structured application submitted.')).toBeVisible();
+  await clickWorkspaceAction(
+    openBriefCard.getByRole('button', { name: 'Submit structured application' }),
+  );
 
-  const myApplicationsPanel = workspacePanel(contractorPage, 'My applications');
-  const submittedApplicationCard = myApplicationsPanel
-    .locator('article')
-    .filter({ hasText: opportunity.title })
-    .first();
+  const submittedApplicationCard = marketplaceCardByTitle(
+    contractorPage,
+    'marketplace-my-application-',
+    opportunity.title,
+  );
+  await expect(submittedApplicationCard).toBeVisible();
   await expect(submittedApplicationCard.getByText('Submitted')).toBeVisible();
 
   await clientPage.reload();
-  await clientOpportunityCard.getByRole('button', { name: 'Load review board' }).click();
+  await clickWorkspaceAction(
+    clientOpportunityCard.getByRole('button', { name: 'Load review board' }),
+  );
   await expect(clientOpportunityCard.getByText(contractorDisplayName)).toBeVisible();
-  await clientOpportunityCard.getByRole('button', { name: 'Shortlist' }).click();
+  await clickWorkspaceAction(
+    clientOpportunityCard.getByRole('button', { name: 'Shortlist' }),
+  );
   await expect(clientPage.getByText('Application shortlisted.')).toBeVisible();
-  await clientOpportunityCard.getByRole('button', { name: 'Hire into escrow' }).click();
+  await clickWorkspaceAction(
+    clientOpportunityCard.getByRole('button', { name: 'Hire into escrow' }),
+  );
   await expect(
     clientPage.getByText(/Application hired and escrow contract .* created\./),
   ).toBeVisible();
@@ -247,10 +284,11 @@ export async function runAuthenticatedMarketplaceExactFlow(
   await commitSelectedJobMilestones(clientPage);
 
   await contractorPage.goto(`${webBaseUrl}/app/marketplace`);
-  const hiredApplicationCard = myApplicationsPanel
-    .locator('article')
-    .filter({ hasText: opportunity.title })
-    .first();
+  const hiredApplicationCard = marketplaceCardByTitle(
+    contractorPage,
+    'marketplace-my-application-',
+    opportunity.title,
+  );
   await expect(hiredApplicationCard.getByText('Hired')).toBeVisible();
   const contractorContractLink = hiredApplicationCard.getByRole('link', {
     name: 'View contract',

@@ -690,8 +690,8 @@ export function MarketplaceWorkspace() {
       setMessage(workspaceMessages.messages.applicationHired(response.jobId));
     }
 
-    await handleLoadApplications(opportunityId);
     await loadWorkspace(tokens);
+    await handleLoadApplications(opportunityId);
   }
 
   function updateApplicationDraft(

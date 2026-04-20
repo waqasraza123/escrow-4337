@@ -16,6 +16,11 @@ const { mockedWebApi } = vi.hoisted(() => ({
     getMyMarketplaceProfile: vi.fn(),
     listMyMarketplaceOpportunities: vi.fn(),
     listMyMarketplaceApplications: vi.fn(),
+    listOpportunityApplications: vi.fn(),
+    listOpportunityMatches: vi.fn(),
+    shortlistMarketplaceApplication: vi.fn(),
+    rejectMarketplaceApplication: vi.fn(),
+    hireMarketplaceApplication: vi.fn(),
     createOrganization: vi.fn(),
     selectWorkspace: vi.fn(),
     listJobs: vi.fn(),
@@ -134,6 +139,17 @@ describe('marketplace workspace', () => {
         isDefault: false,
       },
       workspaces: [],
+    });
+    mockedWebApi.listOpportunityApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listOpportunityMatches.mockResolvedValue({
+      matches: [],
+    });
+    mockedWebApi.shortlistMarketplaceApplication.mockResolvedValue({});
+    mockedWebApi.rejectMarketplaceApplication.mockResolvedValue({});
+    mockedWebApi.hireMarketplaceApplication.mockResolvedValue({
+      jobId: 'job-1',
     });
   });
 
@@ -1195,6 +1211,257 @@ describe('marketplace workspace', () => {
         name: 'Submit structured application',
       }),
     ).toBeDisabled();
+  });
+
+  it('keeps the loaded client review board visible after shortlisting an applicant', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-1',
+        kind: 'client',
+        label: 'Personal client workspace',
+        slug: 'personal-client-client-1',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['client_owner'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: true,
+          reviewApplications: true,
+          manageWorkspace: true,
+        },
+        isDefault: true,
+      },
+    });
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [
+        {
+          id: 'opp-review-1',
+          title: 'Escrow-ready marketplace brief',
+          summary: 'Need one strong contractor',
+          description: 'Review and hire from the same workspace.',
+          category: 'software-development',
+          currencyAddress: '0x4444444444444444444444444444444444444444',
+          requiredSkills: ['typescript'],
+          mustHaveSkills: [],
+          outcomes: [],
+          acceptanceCriteria: [],
+          screeningQuestions: [],
+          visibility: 'public',
+          status: 'published',
+          budgetMin: '1000',
+          budgetMax: '2000',
+          timeline: '2 weeks',
+          desiredStartAt: null,
+          timezoneOverlapHours: 2,
+          engagementType: 'fixed_scope',
+          cryptoReadinessRequired: 'wallet_only',
+          publishedAt: 10,
+          hiredApplicationId: null,
+          hiredJobId: null,
+          createdAt: 10,
+          updatedAt: 10,
+          owner: {
+            userId: 'client-1',
+            organizationId: 'org-personal-1',
+            workspaceId: 'workspace-client-1',
+            workspaceKind: 'client',
+            displayName: 'Client One',
+            profileSlug: 'client-one',
+          },
+          escrowReadiness: 'ready',
+          applicationCount: 1,
+        },
+      ],
+    });
+    mockedWebApi.listOpportunityApplications
+      .mockResolvedValueOnce({
+        applications: [
+          {
+            id: 'app-review-1',
+            opportunityId: 'opp-review-1',
+            applicant: {
+              userId: 'talent-1',
+              displayName: 'Talent One',
+              profileSlug: 'talent-one',
+              headline: 'Builder',
+              specialties: ['marketplaces'],
+              verifiedWalletAddress: '0x3333333333333333333333333333333333333333',
+              verificationLevel: 'wallet_verified',
+              cryptoReadiness: 'wallet_only',
+              escrowStats: {
+                totalContracts: 0,
+                completionCount: 0,
+                disputeCount: 0,
+                completionRate: 0,
+                disputeRate: 0,
+                onTimeDeliveryRate: 0,
+                averageContractValueBand: 'unknown',
+                completedByCategory: [],
+              },
+              completedEscrowCount: 0,
+            },
+            status: 'submitted',
+            coverNote: 'I can ship this.',
+            proposedRate: null,
+            deliveryApproach: 'Structured delivery plan',
+            milestonePlanSummary: 'Milestone 1 then 2',
+            estimatedStartAt: null,
+            relevantProofArtifacts: [],
+            screeningAnswers: [],
+            fitScore: 92,
+            riskFlags: [],
+            dossier: {
+              applicationId: 'app-review-1',
+              opportunityId: 'opp-review-1',
+              recommendation: 'strong_match',
+              matchSummary: {
+                fitScore: 92,
+                requirementCoverage: 100,
+                skillOverlap: ['typescript'],
+                mustHaveSkillGaps: [],
+                riskFlags: [],
+                missingRequirements: [],
+                fitBreakdown: [],
+              },
+              whyShortlisted: ['Strong overlap'],
+            },
+            submittedAt: 10,
+            updatedAt: 10,
+          },
+        ],
+      })
+      .mockResolvedValue({
+      applications: [
+        {
+          id: 'app-review-1',
+          opportunityId: 'opp-review-1',
+          applicant: {
+            userId: 'talent-1',
+            displayName: 'Talent One',
+            profileSlug: 'talent-one',
+            headline: 'Builder',
+            specialties: ['marketplaces'],
+            verifiedWalletAddress: '0x3333333333333333333333333333333333333333',
+            verificationLevel: 'wallet_verified',
+            cryptoReadiness: 'wallet_only',
+            escrowStats: {
+              totalContracts: 0,
+              completionCount: 0,
+              disputeCount: 0,
+              completionRate: 0,
+              disputeRate: 0,
+              onTimeDeliveryRate: 0,
+              averageContractValueBand: 'unknown',
+              completedByCategory: [],
+            },
+            completedEscrowCount: 0,
+          },
+          status: 'shortlisted',
+          coverNote: 'I can ship this.',
+          proposedRate: null,
+          deliveryApproach: 'Structured delivery plan',
+          milestonePlanSummary: 'Milestone 1 then 2',
+          estimatedStartAt: null,
+          relevantProofArtifacts: [],
+          screeningAnswers: [],
+          fitScore: 92,
+          riskFlags: [],
+          dossier: {
+            applicationId: 'app-review-1',
+            opportunityId: 'opp-review-1',
+            recommendation: 'strong_match',
+            matchSummary: {
+              fitScore: 92,
+              requirementCoverage: 100,
+              skillOverlap: ['typescript'],
+              mustHaveSkillGaps: [],
+              riskFlags: [],
+              missingRequirements: [],
+              fitBreakdown: [],
+            },
+            whyShortlisted: ['Strong overlap'],
+          },
+          submittedAt: 10,
+          updatedAt: 20,
+        },
+      ],
+    });
+    mockedWebApi.listOpportunityMatches.mockResolvedValue({
+      matches: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My opportunities' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      within(screen.getByTestId('marketplace-my-opportunity-opp-review-1')).getByRole(
+        'button',
+        {
+          name: 'Load review board',
+        },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Talent One/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Shortlist' }));
+
+    await waitFor(() => {
+      expect(mockedWebApi.shortlistMarketplaceApplication).toHaveBeenCalledWith(
+        'app-review-1',
+        'access-token-123',
+      );
+      expect(screen.getByRole('button', { name: 'Hire into escrow' })).toBeInTheDocument();
+    });
   });
 
   it('renders explicit client and freelancer lane cards with workspace-switch entry points', async () => {

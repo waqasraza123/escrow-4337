@@ -73,12 +73,14 @@ const localProjectBase = {
   use: {
     ...devices['Desktop Chrome'],
     baseURL: webBaseUrl,
+    reducedMotion: 'reduce' as const,
   },
 };
 
 const deployedProjectBase = {
   use: {
     ...devices['Desktop Chrome'],
+    reducedMotion: 'reduce' as const,
   },
 };
 

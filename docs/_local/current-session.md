@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Record the shipped lane-guide and route-entry behavior in repo memory and move the next implementation step toward browser-verifying the capability-gated workspace journey end to end.
+- Stabilize the exact Phase 1 marketplace browser canary on the built local stack so lane-aware publish/apply/hire stays green end to end.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -48,26 +48,48 @@
 ## Verification Commands
 - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
 - `pnpm --filter web typecheck`
+- `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
 - `git diff --check`
-- `pnpm build`
 
 ## Verification Status
 - Passed:
   - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
   - `pnpm --filter web typecheck`
+  - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
   - `git diff --check`
-  - `pnpm build`
 - Blocked or not run:
-  - wider admin/API verification was not rerun because this step only touched the web workspace and workspace copy
+  - wider admin/API verification was not rerun because this step touched the web marketplace workspace, Playwright flow contract, and Playwright config rather than backend modules
   - real staged deployment validation against live staging secrets and URLs
   - real Phase 0 staging proof against launch-candidate evidence artifacts
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by adding organization-aware marketplace workflows on top of the new workspace baseline:
-  - browser-verify the capability-gated client/freelancer marketplace journey end to end
-  - extend Playwright marketplace coverage so the lane-guide and role-native empty states are part of the supported browser contract
-  - continue Phase 0 staging-proof work once the Phase 1 workspace journey is stable enough for deployed canaries
+- Continue the combined Phase 0 + Phase 1 program by pushing the newly stable exact local marketplace canary into the deployed and release-evidence path:
+  - mirror the same lane-aware exact contract in deployed canaries and launch-candidate expectations
+  - browser-verify the deployed exact marketplace journey against real staging once secrets and URLs are ready
+  - continue Phase 0 staging-proof work now that the Phase 1 workspace journey is stable enough locally for production-like canaries
+
+## Update (2026-04-20, Exact Marketplace Canary Stabilization)
+- Stabilized the exact Phase 1 marketplace browser canary against the built local stack.
+- Playwright/runtime changes:
+  - `playwright.config.ts` now runs local/deployed projects with `reducedMotion: 'reduce'` to keep the spatial motion layer from dominating actionability in browser canaries
+- Exact-flow changes:
+  - `tests/e2e/flows/marketplace-exact-flow.ts` now:
+    - uses `SharedCard` test-id selectors instead of stale nested `article` assumptions
+    - switches into the required client/freelancer lane through the real workspace switcher when needed
+    - retries workspace actions once across DOM replacement instead of failing on stale button handles
+    - relies on durable workflow state such as `My applications` instead of transient submit toasts where appropriate
+- Product change:
+  - `apps/web/src/app/marketplace/workspace.tsx` now reloads marketplace workspace state before rehydrating opportunity applications after shortlist/reject/hire decisions, so the client review board stays loaded and the hire action remains available in the same session
+- Regression coverage:
+  - `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` now covers the review-board persistence after shortlisting an applicant
+- Verification:
+  - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - `pnpm --filter web typecheck`
+  - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
+  - `git diff --check`
+- Result:
+  - Passed
 
 ## Update (2026-04-19, Marketplace-Origin Launch Proof)
 - Added `tests/e2e/fixtures/marketplace-evidence.ts` so deployed marketplace canaries can convert exported `job-history` and `dispute-case` JSON into explicit marketplace-origin evidence artifacts.
