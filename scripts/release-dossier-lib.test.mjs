@@ -10,6 +10,7 @@ import {
   buildChecksumsText,
   copyReleaseDossierSources,
   listReleaseDossierFiles,
+  validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
   validateReleaseDossierMetadata,
 } from './release-dossier-lib.mjs';
@@ -77,6 +78,50 @@ test('copyReleaseDossierSources copies canonical evidence files and hashes them'
 
     const checksums = buildChecksumsText(files);
     assert.ok(checksums.includes('api-image-manifest/manifest.json'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateReleaseDossierSourceDirectories reports missing reviewed evidence files explicitly', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-dossier-lib-'));
+
+  try {
+    const imageManifestDir = resolve(root, 'image');
+    const deployedSmokeDir = resolve(root, 'smoke');
+    const launchReviewDir = resolve(root, 'launch');
+    const promotionReviewDir = resolve(root, 'promotion');
+
+    mkdirSync(imageManifestDir, { recursive: true });
+    mkdirSync(deployedSmokeDir, { recursive: true });
+    mkdirSync(launchReviewDir, { recursive: true });
+    mkdirSync(promotionReviewDir, { recursive: true });
+
+    writeFileSync(resolve(imageManifestDir, 'manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(imageManifestDir, 'manifest.md'), '# image\n', 'utf8');
+    writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(deployedSmokeDir, 'deployed-smoke-record.md'), '# smoke\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'evidence-manifest.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'launch-evidence-posture.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'promotion-record.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(launchReviewDir, 'promotion-record.md'), '# launch\n', 'utf8');
+    writeFileSync(resolve(promotionReviewDir, 'promotion-review.json'), '{}\n', 'utf8');
+    writeFileSync(resolve(promotionReviewDir, 'promotion-review.md'), '# promotion\n', 'utf8');
+
+    const issues = validateReleaseDossierSourceDirectories({
+      imageManifestDir,
+      deployedSmokeReviewDir: deployedSmokeDir,
+      launchCandidateReviewDir: launchReviewDir,
+      promotionReviewDir,
+    });
+
+    assert.deepEqual(issues, [
+      'Release dossier source launch-candidate-review is missing required file marketplace-origin-summary.json.',
+      'Release dossier source launch-candidate-review is missing required file marketplace-seeded-evidence.json.',
+      'Release dossier source launch-candidate-review is missing required file marketplace-exact-evidence.json.',
+      'Release dossier source launch-candidate-review is missing required file provider-validation-summary.json.',
+      'Release dossier source launch-candidate-review is missing required file summary.md.',
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

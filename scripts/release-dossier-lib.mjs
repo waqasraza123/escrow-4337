@@ -1,4 +1,12 @@
-import { appendFileSync, copyFileSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  appendFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
 import { relative, resolve } from 'node:path';
 import { buildImageCandidateSelection } from './api-image-manifest-lib.mjs';
@@ -119,6 +127,35 @@ export function copyReleaseDossierSources({
     evidenceRoot,
     copiedFiles: copiedFiles.sort(),
   };
+}
+
+export function validateReleaseDossierSourceDirectories({
+  imageManifestDir,
+  deployedSmokeReviewDir,
+  launchCandidateReviewDir,
+  promotionReviewDir,
+}) {
+  const sourceDirs = {
+    imageManifest: resolve(imageManifestDir),
+    deployedSmokeReview: resolve(deployedSmokeReviewDir),
+    launchCandidateReview: resolve(launchCandidateReviewDir),
+    promotionReview: resolve(promotionReviewDir),
+  };
+  const issues = [];
+
+  for (const spec of releaseDossierSourceSpecs) {
+    const sourceDir = sourceDirs[spec.key];
+    for (const relativePath of spec.requiredFiles) {
+      const sourcePath = resolve(sourceDir, relativePath);
+      if (!existsSync(sourcePath)) {
+        issues.push(
+          `Release dossier source ${spec.label} is missing required file ${relativePath}.`,
+        );
+      }
+    }
+  }
+
+  return issues;
 }
 
 export function validateReleaseDossierInputs({

@@ -123,8 +123,18 @@ jobs:
             --launch-candidate-artifact-name "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_ARTIFACT_NAME }}" \
             --launch-candidate-created-at "${{ steps.review_artifacts.outputs.PROMOTION_REVIEW_LAUNCH_CANDIDATE_CREATED_AT }}"
 
-      - name: Generate release dossier
+      - name: Validate release dossier source bundles
+        id: validate_release_dossier_sources
         if: always()
+        run: |
+          node ./scripts/release-dossier.mjs validate-sources \
+            --image-manifest-dir "${{ runner.temp }}/api-image-manifest" \
+            --deployed-smoke-dir "${{ runner.temp }}/deployed-smoke-review" \
+            --launch-review-dir "${{ runner.temp }}/launch-candidate-review" \
+            --promotion-review-dir artifacts/promotion-review
+
+      - name: Generate release dossier
+        if: always() && steps.validate_release_dossier_sources.outcome == 'success'
         run: |
           node ./scripts/release-dossier.mjs \
             --image-manifest-dir "${{ runner.temp }}/api-image-manifest" \

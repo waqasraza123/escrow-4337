@@ -8,6 +8,7 @@ import {
   buildReleaseDossierMetadata,
   copyReleaseDossierSources,
   listReleaseDossierFiles,
+  validateReleaseDossierSourceDirectories,
   validateReleaseDossierInputs,
   writeGitHubStepSummary,
 } from './release-dossier-lib.mjs';
@@ -22,17 +23,52 @@ if (args.includes('--help')) {
 }
 
 try {
+  const command = args[0] === 'validate-sources' || args[0] === 'generate' ? args[0] : 'generate';
+  const commandArgs = command === 'generate' && args[0] !== 'generate' ? args : args.slice(1);
+
   const outputDir = readOptionalFlag(args, '--output-dir')
     ? resolve(repoRoot, readOptionalFlag(args, '--output-dir'))
     : resolve(repoRoot, 'artifacts', 'release-dossier');
+
+  const imageManifestDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--image-manifest-dir'));
+  const deployedSmokeReviewDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--deployed-smoke-dir'));
+  const launchCandidateReviewDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--launch-review-dir'));
+  const promotionReviewDir = resolve(repoRoot, readRequiredFlag(commandArgs, '--promotion-review-dir'));
+
+  const sourceIssues = validateReleaseDossierSourceDirectories({
+    imageManifestDir,
+    deployedSmokeReviewDir,
+    launchCandidateReviewDir,
+    promotionReviewDir,
+  });
+  if (sourceIssues.length > 0) {
+    throw new Error(
+      ['Release dossier source validation failed.', ...sourceIssues.map((issue) => `- ${issue}`)].join(
+        '\n',
+      ),
+    );
+  }
+
+  if (command === 'validate-sources') {
+    console.log(
+      JSON.stringify(
+        {
+          status: 'ready',
+          imageManifestDir,
+          deployedSmokeReviewDir,
+          launchCandidateReviewDir,
+          promotionReviewDir,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(0);
+  }
+
   mkdirSync(outputDir, {
     recursive: true,
   });
-
-  const imageManifestDir = resolve(repoRoot, readRequiredFlag(args, '--image-manifest-dir'));
-  const deployedSmokeReviewDir = resolve(repoRoot, readRequiredFlag(args, '--deployed-smoke-dir'));
-  const launchCandidateReviewDir = resolve(repoRoot, readRequiredFlag(args, '--launch-review-dir'));
-  const promotionReviewDir = resolve(repoRoot, readRequiredFlag(args, '--promotion-review-dir'));
 
   copyReleaseDossierSources({
     outputDir,
@@ -125,9 +161,10 @@ function readOptionalFlag(argv, flag) {
 
 function printHelp() {
   console.log(`Usage:
-  node ./scripts/release-dossier.mjs --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path> [--output-dir <path>]
+  node ./scripts/release-dossier.mjs generate --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path> [--output-dir <path>]
+  node ./scripts/release-dossier.mjs validate-sources --image-manifest-dir <path> --deployed-smoke-dir <path> --launch-review-dir <path> --promotion-review-dir <path>
 
 Copies the reviewed release evidence into one canonical dossier directory, writes
 release-dossier.json, release-dossier.md, and release-dossier-checksums.txt, and
-fails if the copied evidence is internally inconsistent.`);
+fails if the reviewed source bundles or copied evidence are internally inconsistent.`);
 }

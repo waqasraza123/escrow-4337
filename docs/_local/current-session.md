@@ -17,7 +17,7 @@
   - focused web tests now cover the new lane-guide cards and capability-aware client empty-state routing
 
 ## Current Step
-- Align the real GitHub launch-review artifact with the release-dossier contract so promotion review and dossier assembly consume the same preserved marketplace/provider evidence set.
+- Add explicit source-bundle validation to the promotion/release path so missing reviewed artifacts fail with a clear contract error before dossier assembly.
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
@@ -64,7 +64,7 @@
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by using the now-complete review artifact contract in real staging execution:
+- Continue the combined Phase 0 + Phase 1 program by exercising the hardened artifact contract against real staging:
   - run the deployed exact marketplace journey against real staging once secrets and URLs are ready
   - verify the GitHub `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
   - keep any further workflow consumers on canonical release-pointer/env fields instead of re-reading nested dossier JSON
@@ -154,6 +154,19 @@
 - Updated launch/deployment/staging docs so reviewers explicitly expect that fuller artifact set before trusting dossier assembly.
 - Verification:
   - `git diff --check`
+- Result:
+  - Passed
+
+## Update (2026-04-20, Release Dossier Source Validation)
+- Added `validateReleaseDossierSourceDirectories(...)` to `scripts/release-dossier-lib.mjs` and exposed `node ./scripts/release-dossier.mjs validate-sources ...` as the shared source-bundle validator for reviewed artifacts.
+- `scripts/release-dossier.mjs` now validates reviewed source bundles before copy/generation and fails with an explicit list of missing required files.
+- `Promotion Review` now runs that source validation step before `release-dossier` generation, and `release-dossier` generation itself is skipped when the validation step fails.
+- Added test coverage for missing reviewed launch files and verified the CLI emits the expected missing-file contract errors.
+- Verification:
+  - `git diff --check`
+  - `node --test scripts/release-dossier-lib.test.mjs`
+  - `node ./scripts/release-dossier.mjs validate-sources --image-manifest-dir scripts --deployed-smoke-dir scripts --launch-review-dir scripts --promotion-review-dir scripts`
+    Expected to fail with explicit missing-file errors.
 - Result:
   - Passed
 
