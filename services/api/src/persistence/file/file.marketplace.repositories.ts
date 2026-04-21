@@ -1,10 +1,14 @@
 import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
+  MarketplaceOpportunityInviteRecord,
+  MarketplaceOpportunitySearchDocument,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceSavedSearchRecord,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
+  MarketplaceTalentSearchDocument,
   MarketplaceTalentProofArtifact,
 } from '../../modules/marketplace/marketplace.types';
 import type { MarketplaceRepository } from '../persistence.types';
@@ -115,6 +119,57 @@ function normalizeAbuseReport(
   };
 }
 
+function normalizeTalentSearchDocument(
+  document: MarketplaceTalentSearchDocument,
+): MarketplaceTalentSearchDocument {
+  return {
+    ...document,
+    profileSlug: document.profileSlug.trim().toLowerCase(),
+    searchableText: document.searchableText.trim(),
+    skills: normalizeTextList(document.skills),
+    specialties: normalizeTextList(document.specialties),
+    reasons: document.reasons.map((reason) => ({
+      ...reason,
+      label: reason.label.trim(),
+    })),
+  };
+}
+
+function normalizeOpportunitySearchDocument(
+  document: MarketplaceOpportunitySearchDocument,
+): MarketplaceOpportunitySearchDocument {
+  return {
+    ...document,
+    category: document.category.trim().toLowerCase(),
+    searchableText: document.searchableText.trim(),
+    requiredSkills: normalizeTextList(document.requiredSkills),
+    mustHaveSkills: normalizeTextList(document.mustHaveSkills),
+    reasons: document.reasons.map((reason) => ({
+      ...reason,
+      label: reason.label.trim(),
+    })),
+  };
+}
+
+function normalizeSavedSearch(
+  search: MarketplaceSavedSearchRecord,
+): MarketplaceSavedSearchRecord {
+  return {
+    ...search,
+    label: search.label.trim(),
+  };
+}
+
+function normalizeOpportunityInvite(
+  invite: MarketplaceOpportunityInviteRecord,
+): MarketplaceOpportunityInviteRecord {
+  return {
+    ...invite,
+    invitedProfileSlug: invite.invitedProfileSlug.trim().toLowerCase(),
+    message: invite.message?.trim() || null,
+  };
+}
+
 export class FileMarketplaceRepository implements MarketplaceRepository {
   constructor(private readonly store: FilePersistenceStore) {}
 
@@ -151,6 +206,22 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     });
   }
 
+  async listTalentSearchDocuments() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceTalentSearchDocuments)
+        .map((document) => cloneValue(normalizeTalentSearchDocument(document)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveTalentSearchDocument(document: MarketplaceTalentSearchDocument) {
+    await this.store.write((data) => {
+      data.marketplaceTalentSearchDocuments[document.profileUserId] = cloneValue(
+        normalizeTalentSearchDocument(document),
+      );
+    });
+  }
+
   async getOpportunityById(opportunityId: string) {
     return this.store.read((data) => {
       const opportunity = data.marketplaceOpportunities[opportunityId];
@@ -174,6 +245,25 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     });
   }
 
+  async listOpportunitySearchDocuments() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceOpportunitySearchDocuments)
+        .map((document) =>
+          cloneValue(normalizeOpportunitySearchDocument(document)),
+        )
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveOpportunitySearchDocument(
+    document: MarketplaceOpportunitySearchDocument,
+  ) {
+    await this.store.write((data) => {
+      data.marketplaceOpportunitySearchDocuments[document.opportunityId] =
+        cloneValue(normalizeOpportunitySearchDocument(document));
+    });
+  }
+
   async getApplicationById(applicationId: string) {
     return this.store.read((data) => {
       const application = data.marketplaceApplications[applicationId];
@@ -193,6 +283,58 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceApplications[application.id] = cloneValue(
         normalizeApplication(application),
+      );
+    });
+  }
+
+  async getSavedSearchById(searchId: string) {
+    return this.store.read((data) => {
+      const search = data.marketplaceSavedSearches[searchId];
+      return search ? cloneValue(normalizeSavedSearch(search)) : null;
+    });
+  }
+
+  async listSavedSearches() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceSavedSearches)
+        .map((search) => cloneValue(normalizeSavedSearch(search)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveSavedSearch(search: MarketplaceSavedSearchRecord) {
+    await this.store.write((data) => {
+      data.marketplaceSavedSearches[search.id] = cloneValue(
+        normalizeSavedSearch(search),
+      );
+    });
+  }
+
+  async deleteSavedSearch(searchId: string) {
+    await this.store.write((data) => {
+      delete data.marketplaceSavedSearches[searchId];
+    });
+  }
+
+  async getOpportunityInviteById(inviteId: string) {
+    return this.store.read((data) => {
+      const invite = data.marketplaceOpportunityInvites[inviteId];
+      return invite ? cloneValue(normalizeOpportunityInvite(invite)) : null;
+    });
+  }
+
+  async listOpportunityInvites() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceOpportunityInvites)
+        .map((invite) => cloneValue(normalizeOpportunityInvite(invite)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveOpportunityInvite(invite: MarketplaceOpportunityInviteRecord) {
+    await this.store.write((data) => {
+      data.marketplaceOpportunityInvites[invite.id] = cloneValue(
+        normalizeOpportunityInvite(invite),
       );
     });
   }

@@ -1,7 +1,7 @@
 # Current Session
 
 ## Date
-- 2026-04-20
+- 2026-04-21
 
 ## Current Objective
 - Land the remaining repo-side Phase 1 identity/workspace slice on top of the Phase 0 repo-closeout work:
@@ -94,6 +94,32 @@
   - run `Launch Candidate`
   - run `Promotion Review`
   - preserve `release-dossier` and `release-pointer-staging`
+
+## Update (2026-04-21, Marketplace Search and Invite Backend Slice)
+- Added a new marketplace search/read-model backend slice on top of the current Phase 1 workspace baseline:
+  - public talent/opportunity search endpoints
+  - authenticated talent/opportunity recommendation endpoints
+  - saved-search create/list/delete support
+  - opportunity invite create/list support
+- Persistence now includes dedicated search/invite records:
+  - `marketplace_talent_search_documents`
+  - `marketplace_opportunity_search_documents`
+  - `marketplace_saved_searches`
+  - `marketplace_opportunity_invites`
+- Organization management also expanded slightly:
+  - org-scoped membership listing
+  - pending invitation revocation
+  - membership responses now expose member user/email identity for client-owner UI use
+- Changed files:
+  `apps/web/src/lib/api.ts`
+  `services/api/src/modules/{marketplace,organizations}/*`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/020_marketplace_search_phase.sql`
+- Verification:
+  - not run in this checkout before commit/push
+- Next step:
+  - run targeted API typecheck/tests for the marketplace + organizations slice
+  - then add the web/UI consumer layer for search, recommendations, saved searches, and invites
 
 ## Update (2026-04-20, Exact Marketplace Canary Stabilization)
 - Stabilized the exact Phase 1 marketplace browser canary against the built local stack.

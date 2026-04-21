@@ -16,11 +16,30 @@ export const createOrganizationSchema = z
   })
   .strict();
 
+export const createOrganizationInvitationSchema = z
+  .object({
+    email: z.string().trim().email(),
+    role: z.enum(['client_owner', 'client_recruiter']),
+  })
+  .strict();
+
 export const selectWorkspaceSchema = z
   .object({
     workspaceId: z.string().trim().min(1).max(120),
   })
   .strict();
 
+export const acceptOrganizationInvitationSchema = z
+  .object({
+    setActive: z.boolean().optional().default(true),
+  })
+  .strict();
+
 export type CreateOrganizationDto = z.infer<typeof createOrganizationSchema>;
+export type CreateOrganizationInvitationDto = z.infer<
+  typeof createOrganizationInvitationSchema
+>;
 export type SelectWorkspaceDto = z.infer<typeof selectWorkspaceSchema>;
+export type AcceptOrganizationInvitationDto = z.infer<
+  typeof acceptOrganizationInvitationSchema
+>;

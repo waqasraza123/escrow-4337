@@ -30,11 +30,14 @@ import {
 } from '../users/users.types';
 import type {
   ApplyToOpportunityDto,
+  CreateMarketplaceOpportunityInviteDto,
+  CreateMarketplaceSavedSearchDto,
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
   MarketplaceModerationReportsQueryDto,
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
+  MarketplaceSavedSearchesQueryDto,
   UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceOpportunityDto,
   UpdateMarketplaceProofsDto,
@@ -65,15 +68,31 @@ import type {
   MarketplaceMatchesResponse,
   MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
+  MarketplaceOpportunityInviteRecord,
+  MarketplaceOpportunityInviteResponse,
+  MarketplaceOpportunityInvitesResponse,
+  MarketplaceOpportunityInviteView,
+  MarketplaceOpportunitySearchDocument,
+  MarketplaceOpportunitySearchResponse,
   MarketplaceOpportunityDetailView,
   MarketplaceOpportunityRecord,
   MarketplaceOpportunityResponse,
+  MarketplaceOpportunitySearchResult,
   MarketplaceOpportunityView,
   MarketplaceOpportunitiesListResponse,
   MarketplaceProfileRecord,
   MarketplaceProfileResponse,
   MarketplaceProfilesListResponse,
   MarketplaceProfileView,
+  MarketplaceRankingFeatureSnapshot,
+  MarketplaceSavedSearchResponse,
+  MarketplaceSavedSearchesResponse,
+  MarketplaceSavedSearchRecord,
+  MarketplaceSavedSearchView,
+  MarketplaceSearchReason,
+  MarketplaceTalentSearchDocument,
+  MarketplaceTalentSearchResponse,
+  MarketplaceTalentSearchResult,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
   MarketplaceTalentProofArtifact,
@@ -131,6 +150,39 @@ function containsQuery(haystack: string, query?: string) {
   }
 
   return haystack.toLowerCase().includes(query.trim().toLowerCase());
+}
+
+function parseQueryList(value?: string) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function daysSince(timestamp: number | null | undefined, now: number) {
+  if (!timestamp) {
+    return 365;
+  }
+
+  return Math.max(0, Math.floor((now - timestamp) / (24 * hourMs)));
+}
+
+function pickFundedVolumeBand(totalContracts: number, averageBand: MarketplaceEscrowStats['averageContractValueBand']) {
+  if (totalContracts === 0) {
+    return 'none' as const;
+  }
+
+  if (averageBand === 'large') {
+    return 'large' as const;
+  }
+  if (averageBand === 'medium') {
+    return 'medium' as const;
+  }
+  return 'small' as const;
 }
 
 function compareModerationStatus(
@@ -316,69 +368,95 @@ export class MarketplaceService {
   async listProfiles(
     query: MarketplaceProfilesQueryDto,
   ): Promise<MarketplaceProfilesListResponse> {
-    const profiles = await this.marketplaceRepository.listProfiles();
-    const visibleProfiles = profiles.filter(
-      (profile) =>
-        profile.moderationStatus === 'visible' &&
-        this.isProfileComplete(profile),
-    );
-    const rankedProfiles = await Promise.all(
-      visibleProfiles.map(async (profile) => ({
-        profile,
-        view: await this.toProfileView(profile),
-      })),
-    );
+    const search = await this.searchTalent(query);
+    return {
+      profiles: search.results.map((entry) => entry.profile),
+    };
+  }
 
-    const filtered = rankedProfiles
-      .filter(({ profile }) => {
-        if (query.availability && profile.availability !== query.availability) {
-          return false;
-        }
+  async searchTalent(
+    query: MarketplaceProfilesQueryDto,
+  ): Promise<MarketplaceTalentSearchResponse> {
+    await this.refreshSearchReadModels();
+    const skills = new Set([
+      ...(query.skill ? [query.skill.trim().toLowerCase()] : []),
+      ...parseQueryList(query.skills),
+    ]);
+    const documents = await this.marketplaceRepository.listTalentSearchDocuments();
+    const inviteIndex = await this.getOpportunityInviteIndex();
+    const results = await Promise.all(
+      documents
+        .filter((document) => {
+          if (query.availability && document.availability !== query.availability) {
+            return false;
+          }
+          if (
+            query.cryptoReadiness &&
+            document.cryptoReadiness !== query.cryptoReadiness
+          ) {
+            return false;
+          }
+          if (
+            query.engagementType &&
+            !document.preferredEngagements.includes(query.engagementType)
+          ) {
+            return false;
+          }
+          if (query.timezone && document.timezone !== query.timezone.trim()) {
+            return false;
+          }
+          if (
+            query.verificationLevel &&
+            document.verificationLevel !== query.verificationLevel
+          ) {
+            return false;
+          }
+          if (skills.size > 0) {
+            const haystack = new Set(
+              [...document.skills, ...document.specialties].map((skill) =>
+                skill.toLowerCase(),
+              ),
+            );
+            for (const skill of skills) {
+              if (!haystack.has(skill)) {
+                return false;
+              }
+            }
+          }
 
-        if (
-          query.skill &&
-          ![...profile.skills, ...profile.specialties].some(
-            (skill) =>
-              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
-          )
-        ) {
-          return false;
-        }
-
-        const searchable = [
-          profile.displayName,
-          profile.headline,
-          profile.bio,
-          ...profile.skills,
-          ...profile.specialties,
-        ].join(' ');
-
-        return containsQuery(searchable, query.q);
-      })
-      .sort((left, right) => {
-        if (
-          right.view.escrowStats.completionCount !==
-          left.view.escrowStats.completionCount
-        ) {
+          return containsQuery(document.searchableText, query.q);
+        })
+        .sort((left, right) => {
+          if (query.sort === 'recent') {
+            return right.updatedAt - left.updatedAt;
+          }
           return (
-            right.view.escrowStats.completionCount -
-            left.view.escrowStats.completionCount
+            right.ranking.score - left.ranking.score ||
+            left.profileSlug.localeCompare(right.profileSlug)
           );
-        }
-        if (
-          right.view.completedEscrowCount !== left.view.completedEscrowCount
-        ) {
-          return (
-            right.view.completedEscrowCount - left.view.completedEscrowCount
+        })
+        .slice(0, query.limit)
+        .map(async (document): Promise<MarketplaceTalentSearchResult | null> => {
+          const profile = await this.marketplaceRepository.getProfileByUserId(
+            document.profileUserId,
           );
-        }
-        return right.profile.updatedAt - left.profile.updatedAt;
-      })
-      .slice(0, query.limit)
-      .map(({ view }) => view);
+          if (!profile) {
+            return null;
+          }
+
+          return {
+            profile: await this.toProfileView(profile),
+            reasons: document.reasons,
+            ranking: document.ranking,
+            inviteStatus: inviteIndex.get(document.profileUserId) ?? null,
+          };
+        }),
+    );
 
     return {
-      profiles: filtered,
+      results: results.filter((result): result is MarketplaceTalentSearchResult =>
+        result !== null,
+      ),
     };
   }
 
@@ -627,55 +705,117 @@ export class MarketplaceService {
   async listOpportunities(
     query: MarketplaceOpportunitiesQueryDto,
   ): Promise<MarketplaceOpportunitiesListResponse> {
-    const opportunities = await this.marketplaceRepository.listOpportunities();
-    const filtered = opportunities
-      .filter(
-        (opportunity) =>
-          opportunity.status === 'published' &&
-          opportunity.moderationStatus === 'visible' &&
-          opportunity.visibility === 'public',
-      )
-      .filter((opportunity) => {
-        if (
-          query.category &&
-          opportunity.category !== query.category.trim().toLowerCase()
-        ) {
-          return false;
-        }
+    const search = await this.searchOpportunities(query);
+    return {
+      opportunities: search.results.map((entry) => entry.opportunity),
+    };
+  }
 
-        if (
-          query.skill &&
-          ![...opportunity.requiredSkills, ...opportunity.mustHaveSkills].some(
-            (skill) =>
-              skill.toLowerCase() === query.skill?.trim().toLowerCase(),
-          )
-        ) {
-          return false;
-        }
+  async searchOpportunities(
+    query: MarketplaceOpportunitiesQueryDto,
+  ): Promise<MarketplaceOpportunitySearchResponse> {
+    await this.refreshSearchReadModels();
+    const skills = new Set([
+      ...(query.skill ? [query.skill.trim().toLowerCase()] : []),
+      ...parseQueryList(query.skills),
+    ]);
+    const documents =
+      await this.marketplaceRepository.listOpportunitySearchDocuments();
+    const results = await Promise.all(
+      documents
+        .filter(
+          (document) =>
+            document.status === 'published' && document.visibility === 'public',
+        )
+        .filter((document) => {
+          if (
+            query.category &&
+            document.category !== query.category.trim().toLowerCase()
+          ) {
+            return false;
+          }
+          if (
+            query.engagementType &&
+            document.engagementType !== query.engagementType
+          ) {
+            return false;
+          }
+          if (
+            query.cryptoReadinessRequired &&
+            document.cryptoReadinessRequired !==
+              query.cryptoReadinessRequired
+          ) {
+            return false;
+          }
+          if (
+            query.timezoneOverlapHours !== undefined &&
+            (document.timezoneOverlapHours ?? 0) < query.timezoneOverlapHours
+          ) {
+            return false;
+          }
+          if (query.minBudget) {
+            const maxBudget = toNumberAmount(document.budgetMax);
+            if (maxBudget !== null && maxBudget < Number(query.minBudget)) {
+              return false;
+            }
+          }
+          if (query.maxBudget) {
+            const minBudget = toNumberAmount(document.budgetMin);
+            if (minBudget !== null && minBudget > Number(query.maxBudget)) {
+              return false;
+            }
+          }
+          if (skills.size > 0) {
+            const haystack = new Set(
+              [...document.requiredSkills, ...document.mustHaveSkills].map(
+                (skill) => skill.toLowerCase(),
+              ),
+            );
+            for (const skill of skills) {
+              if (!haystack.has(skill)) {
+                return false;
+              }
+            }
+          }
 
-        const searchable = [
-          opportunity.title,
-          opportunity.summary,
-          opportunity.description,
-          opportunity.category,
-          ...opportunity.requiredSkills,
-          ...opportunity.mustHaveSkills,
-          ...opportunity.outcomes,
-        ].join(' ');
+          return containsQuery(document.searchableText, query.q);
+        })
+        .sort((left, right) => {
+          if (query.sort === 'recent') {
+            return (right.publishedAt ?? 0) - (left.publishedAt ?? 0);
+          }
+          return (
+            right.ranking.score - left.ranking.score ||
+            (right.publishedAt ?? 0) - (left.publishedAt ?? 0)
+          );
+        })
+        .slice(0, query.limit)
+        .map(
+          async (
+            document,
+          ): Promise<MarketplaceOpportunitySearchResult | null> => {
+            const opportunity =
+              await this.marketplaceRepository.getOpportunityById(
+                document.opportunityId,
+              );
+            if (!opportunity) {
+              return null;
+            }
 
-        return containsQuery(searchable, query.q);
-      })
-      .sort((left, right) => {
-        if ((right.publishedAt ?? 0) !== (left.publishedAt ?? 0)) {
-          return (right.publishedAt ?? 0) - (left.publishedAt ?? 0);
-        }
-        return right.createdAt - left.createdAt;
-      })
-      .slice(0, query.limit);
+            return {
+              opportunity: await this.toOpportunityView(opportunity),
+              reasons: document.reasons,
+              ranking: document.ranking,
+              inviteStatus: null,
+            };
+          },
+        ),
+    );
 
     return {
-      opportunities: await Promise.all(
-        filtered.map((opportunity) => this.toOpportunityView(opportunity)),
+      results: results.filter(
+        (result): result is MarketplaceOpportunitySearchResult =>
+          result !== null,
       ),
     };
   }

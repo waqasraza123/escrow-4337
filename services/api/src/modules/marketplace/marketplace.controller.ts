@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -24,6 +25,14 @@ export class MarketplaceController {
     query: marketplaceDto.MarketplaceProfilesQueryDto,
   ) {
     return this.marketplaceService.listProfiles(query);
+  }
+
+  @Get('talent/search')
+  searchTalent(
+    @Query(new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema))
+    query: marketplaceDto.MarketplaceProfilesQueryDto,
+  ) {
+    return this.marketplaceService.searchTalent(query);
   }
 
   @UseGuards(AuthGuard)
@@ -65,6 +74,70 @@ export class MarketplaceController {
     query: marketplaceDto.MarketplaceOpportunitiesQueryDto,
   ) {
     return this.marketplaceService.listOpportunities(query);
+  }
+
+  @Get('opportunities/search')
+  searchOpportunities(
+    @Query(
+      new ZodValidationPipe(marketplaceDto.marketplaceOpportunitiesQuerySchema),
+    )
+    query: marketplaceDto.MarketplaceOpportunitiesQueryDto,
+  ) {
+    return this.marketplaceService.searchOpportunities(query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('recommendations/talent')
+  getTalentRecommendations(
+    @User() user: ReqUser,
+    @Query(
+      new ZodValidationPipe(marketplaceDto.marketplaceOpportunitiesQuerySchema),
+    )
+    query: marketplaceDto.MarketplaceOpportunitiesQueryDto,
+  ) {
+    return this.marketplaceService.getTalentRecommendations(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('recommendations/opportunities')
+  getOpportunityRecommendations(
+    @User() user: ReqUser,
+    @Query(
+      new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema),
+    )
+    query: marketplaceDto.MarketplaceProfilesQueryDto,
+  ) {
+    return this.marketplaceService.getOpportunityRecommendations(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('saved-searches')
+  listSavedSearches(
+    @User() user: ReqUser,
+    @Query(
+      new ZodValidationPipe(marketplaceDto.marketplaceSavedSearchesQuerySchema),
+    )
+    query: marketplaceDto.MarketplaceSavedSearchesQueryDto,
+  ) {
+    return this.marketplaceService.listSavedSearches(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('saved-searches')
+  createSavedSearch(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.createMarketplaceSavedSearchSchema),
+    )
+    body: marketplaceDto.CreateMarketplaceSavedSearchDto,
+  ) {
+    return this.marketplaceService.createSavedSearch(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('saved-searches/:id')
+  deleteSavedSearch(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.deleteSavedSearch(user.id, id);
   }
 
   @UseGuards(AuthGuard)
@@ -142,6 +215,27 @@ export class MarketplaceController {
   @Get('opportunities/:id/matches')
   getOpportunityMatches(@User() user: ReqUser, @Param('id') id: string) {
     return this.marketplaceService.getOpportunityMatches(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('invites/mine')
+  listMyInvites(@User() user: ReqUser) {
+    return this.marketplaceService.listMyOpportunityInvites(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('opportunities/:id/invite')
+  inviteTalentToOpportunity(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.createMarketplaceOpportunityInviteSchema,
+      ),
+    )
+    body: marketplaceDto.CreateMarketplaceOpportunityInviteDto,
+  ) {
+    return this.marketplaceService.inviteTalentToOpportunity(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)

@@ -6,10 +6,19 @@ import type {
   MarketplaceApplicationRecord,
   MarketplaceCryptoReadiness,
   MarketplaceEngagementType,
+  MarketplaceOpportunityInviteRecord,
+  MarketplaceOpportunityInviteStatus,
+  MarketplaceOpportunitySearchDocument,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceRankingFeatureSnapshot,
+  MarketplaceSavedSearchAlertFrequency,
+  MarketplaceSavedSearchKind,
+  MarketplaceSavedSearchRecord,
+  MarketplaceSearchReason,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
+  MarketplaceTalentSearchDocument,
   MarketplaceTalentProofArtifact,
 } from '../../modules/marketplace/marketplace.types';
 import type { MarketplaceRepository } from '../persistence.types';
@@ -116,6 +125,76 @@ type MarketplaceAbuseReportRow = QueryResultRow & {
     | null;
   subject_moderated_by_user_id: string | null;
   subject_moderated_at_ms: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceTalentSearchDocumentRow = QueryResultRow & {
+  profile_user_id: string;
+  profile_slug: string;
+  workspace_id: string | null;
+  organization_id: string | null;
+  display_name: string;
+  headline: string;
+  searchable_text: string;
+  skills_json: string[];
+  specialties_json: string[];
+  timezone: string;
+  availability: MarketplaceProfileRecord['availability'];
+  preferred_engagements_json: MarketplaceEngagementType[];
+  crypto_readiness: MarketplaceCryptoReadiness;
+  verification_level: MarketplaceProfileRecord['moderationStatus'] | 'unverified';
+  ranking_json: MarketplaceRankingFeatureSnapshot;
+  reasons_json: MarketplaceSearchReason[];
+  updated_at_ms: string;
+};
+
+type MarketplaceOpportunitySearchDocumentRow = QueryResultRow & {
+  opportunity_id: string;
+  owner_user_id: string;
+  owner_workspace_id: string | null;
+  owner_organization_id: string | null;
+  title: string;
+  summary: string;
+  category: string;
+  searchable_text: string;
+  required_skills_json: string[];
+  must_have_skills_json: string[];
+  engagement_type: MarketplaceEngagementType;
+  crypto_readiness_required: MarketplaceCryptoReadiness;
+  timezone_overlap_hours: number | null;
+  budget_min: string | null;
+  budget_max: string | null;
+  visibility: MarketplaceOpportunityRecord['visibility'];
+  status: MarketplaceOpportunityRecord['status'];
+  ranking_json: MarketplaceRankingFeatureSnapshot;
+  reasons_json: MarketplaceSearchReason[];
+  published_at_ms: string | null;
+  updated_at_ms: string;
+};
+
+type MarketplaceSavedSearchRow = QueryResultRow & {
+  id: string;
+  user_id: string;
+  workspace_id: string | null;
+  kind: MarketplaceSavedSearchKind;
+  label: string;
+  query_json: Record<string, string | number | boolean | null>;
+  alert_frequency: MarketplaceSavedSearchAlertFrequency;
+  last_result_count: number;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceOpportunityInviteRow = QueryResultRow & {
+  id: string;
+  opportunity_id: string;
+  invited_profile_user_id: string;
+  invited_profile_slug: string;
+  invited_by_user_id: string;
+  invited_workspace_id: string | null;
+  message: string | null;
+  status: MarketplaceOpportunityInviteStatus;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -249,6 +328,92 @@ function mapAbuseReport(
   };
 }
 
+function mapTalentSearchDocument(
+  row: MarketplaceTalentSearchDocumentRow,
+): MarketplaceTalentSearchDocument {
+  return {
+    profileUserId: row.profile_user_id,
+    profileSlug: row.profile_slug,
+    workspaceId: row.workspace_id,
+    organizationId: row.organization_id,
+    displayName: row.display_name,
+    headline: row.headline,
+    searchableText: row.searchable_text,
+    skills: row.skills_json ?? [],
+    specialties: row.specialties_json ?? [],
+    timezone: row.timezone,
+    availability: row.availability,
+    preferredEngagements: row.preferred_engagements_json ?? [],
+    cryptoReadiness: row.crypto_readiness,
+    verificationLevel: row.verification_level as
+      | MarketplaceTalentSearchDocument['verificationLevel'],
+    ranking: row.ranking_json,
+    reasons: row.reasons_json ?? [],
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapOpportunitySearchDocument(
+  row: MarketplaceOpportunitySearchDocumentRow,
+): MarketplaceOpportunitySearchDocument {
+  return {
+    opportunityId: row.opportunity_id,
+    ownerUserId: row.owner_user_id,
+    ownerWorkspaceId: row.owner_workspace_id,
+    ownerOrganizationId: row.owner_organization_id,
+    title: row.title,
+    summary: row.summary,
+    category: row.category,
+    searchableText: row.searchable_text,
+    requiredSkills: row.required_skills_json ?? [],
+    mustHaveSkills: row.must_have_skills_json ?? [],
+    engagementType: row.engagement_type,
+    cryptoReadinessRequired: row.crypto_readiness_required,
+    timezoneOverlapHours: row.timezone_overlap_hours,
+    budgetMin: row.budget_min,
+    budgetMax: row.budget_max,
+    visibility: row.visibility,
+    status: row.status,
+    ranking: row.ranking_json,
+    reasons: row.reasons_json ?? [],
+    publishedAt:
+      row.published_at_ms === null ? null : Number(row.published_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapSavedSearch(row: MarketplaceSavedSearchRow): MarketplaceSavedSearchRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    label: row.label,
+    query: row.query_json ?? {},
+    alertFrequency: row.alert_frequency,
+    lastResultCount: row.last_result_count,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapOpportunityInvite(
+  row: MarketplaceOpportunityInviteRow,
+): MarketplaceOpportunityInviteRecord {
+  return {
+    id: row.id,
+    opportunityId: row.opportunity_id,
+    invitedProfileUserId: row.invited_profile_user_id,
+    invitedProfileSlug: row.invited_profile_slug,
+    invitedByUserId: row.invited_by_user_id,
+    invitedWorkspaceId: row.invited_workspace_id,
+    message: row.message,
+    status: row.status,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
 export class PostgresMarketplaceRepository implements MarketplaceRepository {
   constructor(private readonly db: PostgresDatabaseService) {}
 
@@ -363,6 +528,85 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         profile.moderationStatus,
         String(profile.createdAt),
         String(profile.updatedAt),
+      ],
+    );
+  }
+
+  async listTalentSearchDocuments() {
+    const result = await this.db.query<MarketplaceTalentSearchDocumentRow>(
+      `
+        SELECT *
+        FROM marketplace_talent_search_documents
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapTalentSearchDocument);
+  }
+
+  async saveTalentSearchDocument(document: MarketplaceTalentSearchDocument) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_talent_search_documents (
+          profile_user_id,
+          profile_slug,
+          workspace_id,
+          organization_id,
+          display_name,
+          headline,
+          searchable_text,
+          skills_json,
+          specialties_json,
+          timezone,
+          availability,
+          preferred_engagements_json,
+          crypto_readiness,
+          verification_level,
+          ranking_json,
+          reasons_json,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12::jsonb,
+          $13, $14, $15::jsonb, $16::jsonb, $17
+        )
+        ON CONFLICT (profile_user_id)
+        DO UPDATE SET
+          profile_slug = EXCLUDED.profile_slug,
+          workspace_id = EXCLUDED.workspace_id,
+          organization_id = EXCLUDED.organization_id,
+          display_name = EXCLUDED.display_name,
+          headline = EXCLUDED.headline,
+          searchable_text = EXCLUDED.searchable_text,
+          skills_json = EXCLUDED.skills_json,
+          specialties_json = EXCLUDED.specialties_json,
+          timezone = EXCLUDED.timezone,
+          availability = EXCLUDED.availability,
+          preferred_engagements_json = EXCLUDED.preferred_engagements_json,
+          crypto_readiness = EXCLUDED.crypto_readiness,
+          verification_level = EXCLUDED.verification_level,
+          ranking_json = EXCLUDED.ranking_json,
+          reasons_json = EXCLUDED.reasons_json,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        document.profileUserId,
+        document.profileSlug,
+        document.workspaceId,
+        document.organizationId,
+        document.displayName,
+        document.headline,
+        document.searchableText,
+        JSON.stringify(document.skills),
+        JSON.stringify(document.specialties),
+        document.timezone,
+        document.availability,
+        JSON.stringify(document.preferredEngagements),
+        document.cryptoReadiness,
+        document.verificationLevel,
+        JSON.stringify(document.ranking),
+        JSON.stringify(document.reasons),
+        String(document.updatedAt),
       ],
     );
   }
@@ -498,6 +742,99 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     );
   }
 
+  async listOpportunitySearchDocuments() {
+    const result = await this.db.query<MarketplaceOpportunitySearchDocumentRow>(
+      `
+        SELECT *
+        FROM marketplace_opportunity_search_documents
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapOpportunitySearchDocument);
+  }
+
+  async saveOpportunitySearchDocument(
+    document: MarketplaceOpportunitySearchDocument,
+  ) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_opportunity_search_documents (
+          opportunity_id,
+          owner_user_id,
+          owner_workspace_id,
+          owner_organization_id,
+          title,
+          summary,
+          category,
+          searchable_text,
+          required_skills_json,
+          must_have_skills_json,
+          engagement_type,
+          crypto_readiness_required,
+          timezone_overlap_hours,
+          budget_min,
+          budget_max,
+          visibility,
+          status,
+          ranking_json,
+          reasons_json,
+          published_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13,
+          $14, $15, $16, $17, $18::jsonb, $19::jsonb, $20, $21
+        )
+        ON CONFLICT (opportunity_id)
+        DO UPDATE SET
+          owner_user_id = EXCLUDED.owner_user_id,
+          owner_workspace_id = EXCLUDED.owner_workspace_id,
+          owner_organization_id = EXCLUDED.owner_organization_id,
+          title = EXCLUDED.title,
+          summary = EXCLUDED.summary,
+          category = EXCLUDED.category,
+          searchable_text = EXCLUDED.searchable_text,
+          required_skills_json = EXCLUDED.required_skills_json,
+          must_have_skills_json = EXCLUDED.must_have_skills_json,
+          engagement_type = EXCLUDED.engagement_type,
+          crypto_readiness_required = EXCLUDED.crypto_readiness_required,
+          timezone_overlap_hours = EXCLUDED.timezone_overlap_hours,
+          budget_min = EXCLUDED.budget_min,
+          budget_max = EXCLUDED.budget_max,
+          visibility = EXCLUDED.visibility,
+          status = EXCLUDED.status,
+          ranking_json = EXCLUDED.ranking_json,
+          reasons_json = EXCLUDED.reasons_json,
+          published_at_ms = EXCLUDED.published_at_ms,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        document.opportunityId,
+        document.ownerUserId,
+        document.ownerWorkspaceId,
+        document.ownerOrganizationId,
+        document.title,
+        document.summary,
+        document.category,
+        document.searchableText,
+        JSON.stringify(document.requiredSkills),
+        JSON.stringify(document.mustHaveSkills),
+        document.engagementType,
+        document.cryptoReadinessRequired,
+        document.timezoneOverlapHours,
+        document.budgetMin,
+        document.budgetMax,
+        document.visibility,
+        document.status,
+        JSON.stringify(document.ranking),
+        JSON.stringify(document.reasons),
+        document.publishedAt === null ? null : String(document.publishedAt),
+        String(document.updatedAt),
+      ],
+    );
+  }
+
   async getApplicationById(applicationId: string) {
     const result = await this.db.query<MarketplaceApplicationRow>(
       `
@@ -589,6 +926,146 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         application.hiredJobId,
         String(application.createdAt),
         String(application.updatedAt),
+      ],
+    );
+  }
+
+  async getSavedSearchById(searchId: string) {
+    const result = await this.db.query<MarketplaceSavedSearchRow>(
+      `
+        SELECT *
+        FROM marketplace_saved_searches
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [searchId],
+    );
+
+    return result.rows[0] ? mapSavedSearch(result.rows[0]) : null;
+  }
+
+  async listSavedSearches() {
+    const result = await this.db.query<MarketplaceSavedSearchRow>(
+      `
+        SELECT *
+        FROM marketplace_saved_searches
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapSavedSearch);
+  }
+
+  async saveSavedSearch(search: MarketplaceSavedSearchRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_saved_searches (
+          id,
+          user_id,
+          workspace_id,
+          kind,
+          label,
+          query_json,
+          alert_frequency,
+          last_result_count,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          workspace_id = EXCLUDED.workspace_id,
+          kind = EXCLUDED.kind,
+          label = EXCLUDED.label,
+          query_json = EXCLUDED.query_json,
+          alert_frequency = EXCLUDED.alert_frequency,
+          last_result_count = EXCLUDED.last_result_count,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        search.id,
+        search.userId,
+        search.workspaceId,
+        search.kind,
+        search.label,
+        JSON.stringify(search.query),
+        search.alertFrequency,
+        search.lastResultCount,
+        String(search.createdAt),
+        String(search.updatedAt),
+      ],
+    );
+  }
+
+  async deleteSavedSearch(searchId: string) {
+    await this.db.query(
+      `
+        DELETE FROM marketplace_saved_searches
+        WHERE id = $1
+      `,
+      [searchId],
+    );
+  }
+
+  async getOpportunityInviteById(inviteId: string) {
+    const result = await this.db.query<MarketplaceOpportunityInviteRow>(
+      `
+        SELECT *
+        FROM marketplace_opportunity_invites
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [inviteId],
+    );
+
+    return result.rows[0] ? mapOpportunityInvite(result.rows[0]) : null;
+  }
+
+  async listOpportunityInvites() {
+    const result = await this.db.query<MarketplaceOpportunityInviteRow>(
+      `
+        SELECT *
+        FROM marketplace_opportunity_invites
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapOpportunityInvite);
+  }
+
+  async saveOpportunityInvite(invite: MarketplaceOpportunityInviteRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_opportunity_invites (
+          id,
+          opportunity_id,
+          invited_profile_user_id,
+          invited_profile_slug,
+          invited_by_user_id,
+          invited_workspace_id,
+          message,
+          status,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          message = EXCLUDED.message,
+          status = EXCLUDED.status,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        invite.id,
+        invite.opportunityId,
+        invite.invitedProfileUserId,
+        invite.invitedProfileSlug,
+        invite.invitedByUserId,
+        invite.invitedWorkspaceId,
+        invite.message,
+        invite.status,
+        String(invite.createdAt),
+        String(invite.updatedAt),
       ],
     );
   }

@@ -13,10 +13,16 @@ import type { OrganizationsRepository } from '../../persistence/persistence.type
 import { UsersService } from '../users/users.service';
 import type { UserRecord } from '../users/users.types';
 import type {
+  AcceptOrganizationInvitationDto,
   CreateOrganizationDto,
+  CreateOrganizationInvitationDto,
 } from './organizations.dto';
 import {
   createEmptyWorkspaceCapabilities,
+  type OrganizationInvitationRecord,
+  type OrganizationInvitationResponse,
+  type OrganizationInvitationsListResponse,
+  type OrganizationInvitationView,
   type MembershipsListResponse,
   type OrganizationMembershipRecord,
   type OrganizationMembershipView,
@@ -40,6 +46,10 @@ function slugify(input: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return base || 'workspace';
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }
 
 @Injectable()
@@ -102,6 +112,8 @@ export class OrganizationsService {
         }
         return {
           membershipId: membership.id,
+          userId: membership.userId,
+          userEmail: user.email,
           organizationId: membership.organizationId,
           organizationName: organization.name,
           organizationSlug: organization.slug,
@@ -114,6 +126,70 @@ export class OrganizationsService {
       .filter(Boolean) as OrganizationMembershipView[];
 
     return { memberships: views };
+  }
+
+  async listOrganizationMemberships(
+    userId: string,
+    organizationId: string,
+  ): Promise<MembershipsListResponse> {
+    await this.ensurePersonalWorkspaceGraph(userId);
+    const organization = await this.requireOrganizationAccess(userId, organizationId);
+    const workspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(
+      organizationId,
+    );
+    const workspaceIds = workspaces.map((workspace) => workspace.id).sort();
+    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
+      organizationId,
+    );
+    const usersById = new Map<string, string>();
+    for (const membership of memberships) {
+      const memberUser = await this.usersService.getById(membership.userId);
+      usersById.set(membership.userId, memberUser?.email ?? membership.userId);
+    }
+    return {
+      memberships: memberships.map((membership) => ({
+        membershipId: membership.id,
+        userId: membership.userId,
+        userEmail: usersById.get(membership.userId) ?? membership.userId,
+        organizationId,
+        organizationName: organization.name,
+        organizationSlug: organization.slug,
+        organizationKind: organization.kind,
+        role: membership.role,
+        status: membership.status,
+        workspaceIds,
+      })),
+    };
+  }
+
+  async listInvitations(
+    userId: string,
+  ): Promise<OrganizationInvitationsListResponse> {
+    const user = await this.usersService.getRequiredById(userId);
+    await this.ensurePersonalWorkspaceGraph(user.id);
+    const invitations = await this.organizationsRepository.listInvitationsByUserEmail(
+      user.email,
+    );
+    const pendingInvitations = invitations.filter(
+      (invitation) => invitation.status === 'pending',
+    );
+    return {
+      invitations: await this.toInvitationViews(pendingInvitations),
+    };
+  }
+
+  async listOrganizationInvitations(
+    userId: string,
+    organizationId: string,
+  ): Promise<OrganizationInvitationsListResponse> {
+    await this.ensurePersonalWorkspaceGraph(userId);
+    await this.requireOrganizationAccess(userId, organizationId);
+    const invitations = await this.organizationsRepository.listInvitationsByOrganizationId(
+      organizationId,
+    );
+    return {
+      invitations: await this.toInvitationViews(invitations),
+    };
   }
 
   async createOrganization(
@@ -177,6 +253,144 @@ export class OrganizationsService {
           this.toWorkspaceSummary(organization, workspace, ['client_owner']),
         ],
       },
+    };
+  }
+
+  async createInvitation(
+    userId: string,
+    organizationId: string,
+    dto: CreateOrganizationInvitationDto,
+  ): Promise<OrganizationInvitationResponse> {
+    const user = await this.usersService.getRequiredById(userId);
+    await this.ensurePersonalWorkspaceGraph(user.id);
+    const organization = await this.requireOrganizationManagement(user.id, organizationId);
+
+    const invitedEmail = normalizeEmail(dto.email);
+    const existingPending = (
+      await this.organizationsRepository.listInvitationsByOrganizationId(
+        organizationId,
+      )
+    ).find(
+      (invitation) =>
+        invitation.status === 'pending' &&
+        invitation.invitedEmail === invitedEmail &&
+        invitation.role === dto.role,
+    );
+    if (existingPending) {
+      return {
+        invitation: (
+          await this.toInvitationViews([existingPending])
+        )[0] as OrganizationInvitationView,
+      };
+    }
+
+    const now = Date.now();
+    const invitation: OrganizationInvitationRecord = {
+      id: randomUUID(),
+      organizationId,
+      invitedEmail,
+      role: dto.role,
+      status: 'pending',
+      invitedByUserId: user.id,
+      acceptedByUserId: null,
+      acceptedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.organizationsRepository.saveInvitation(invitation);
+    return {
+      invitation: (await this.toInvitationViews([invitation]))[0] as OrganizationInvitationView,
+    };
+  }
+
+  async revokeInvitation(
+    userId: string,
+    organizationId: string,
+    invitationId: string,
+  ): Promise<OrganizationInvitationResponse> {
+    await this.ensurePersonalWorkspaceGraph(userId);
+    await this.requireOrganizationManagement(userId, organizationId);
+    const invitation = await this.organizationsRepository.getInvitationById(invitationId);
+    if (!invitation || invitation.organizationId !== organizationId) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.status !== 'pending') {
+      return {
+        invitation: (await this.toInvitationViews([invitation]))[0] as OrganizationInvitationView,
+      };
+    }
+    const revoked = {
+      ...invitation,
+      status: 'revoked' as const,
+      updatedAt: Date.now(),
+    };
+    await this.organizationsRepository.saveInvitation(revoked);
+    return {
+      invitation: (await this.toInvitationViews([revoked]))[0] as OrganizationInvitationView,
+    };
+  }
+
+  async acceptInvitation(
+    userId: string,
+    invitationId: string,
+    dto: AcceptOrganizationInvitationDto,
+  ): Promise<WorkspaceSelectionResponse> {
+    const user = await this.usersService.getRequiredById(userId);
+    await this.ensurePersonalWorkspaceGraph(user.id);
+    const invitation = await this.organizationsRepository.getInvitationById(
+      invitationId,
+    );
+    if (!invitation || invitation.status !== 'pending') {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (normalizeEmail(user.email) !== invitation.invitedEmail) {
+      throw new BadRequestException(
+        'Authenticated user email does not match the invitation target',
+      );
+    }
+
+    const existingMemberships = await this.organizationsRepository.listMembershipsByOrganizationId(
+      invitation.organizationId,
+    );
+    const now = Date.now();
+    const matchingMembership = existingMemberships.find(
+      (membership) =>
+        membership.userId === user.id && membership.role === invitation.role,
+    );
+    if (!matchingMembership) {
+      await this.organizationsRepository.saveMembership({
+        id: randomUUID(),
+        organizationId: invitation.organizationId,
+        userId: user.id,
+        role: invitation.role,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    await this.organizationsRepository.saveInvitation({
+      ...invitation,
+      status: 'accepted',
+      acceptedByUserId: user.id,
+      acceptedAt: now,
+      updatedAt: now,
+    });
+
+    const workspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(
+      invitation.organizationId,
+    );
+    const preferredWorkspace =
+      workspaces.find((workspace) => workspace.kind === 'client') ?? workspaces[0] ?? null;
+    if (dto.setActive !== false && preferredWorkspace) {
+      await this.usersService.setActiveWorkspace(user.id, preferredWorkspace.id);
+    }
+    const context = await this.buildWorkspaceContext(user.id);
+    if (!context.activeWorkspace) {
+      throw new NotFoundException('No active workspace is available after accepting the invitation');
+    }
+    return {
+      activeWorkspace: context.activeWorkspace,
+      workspaces: context.workspaces,
     };
   }
 
@@ -444,5 +658,101 @@ export class OrganizationsService {
     next.manageProfile = canFreelancer;
     next.applyToOpportunity = canFreelancer;
     return next;
+  }
+
+  private async requireOrganizationAccess(
+    userId: string,
+    organizationId: string,
+  ): Promise<OrganizationRecord> {
+    const organization = await this.organizationsRepository.getOrganizationById(
+      organizationId,
+    );
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
+      organizationId,
+    );
+    const hasAccess = memberships.some((membership) => membership.userId === userId);
+    if (!hasAccess) {
+      throw new NotFoundException('Organization not found for the authenticated user');
+    }
+    return organization;
+  }
+
+  private async requireOrganizationManagement(
+    userId: string,
+    organizationId: string,
+  ): Promise<OrganizationRecord> {
+    const organization = await this.requireOrganizationAccess(userId, organizationId);
+    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
+      organizationId,
+    );
+    const canManage = memberships.some(
+      (membership) =>
+        membership.userId === userId && membership.role === 'client_owner',
+    );
+    if (!canManage) {
+      throw new BadRequestException(
+        'Authenticated user cannot manage invitations for this organization',
+      );
+    }
+    return organization;
+  }
+
+  private async toInvitationViews(
+    invitations: OrganizationInvitationRecord[],
+  ): Promise<OrganizationInvitationView[]> {
+    if (invitations.length === 0) {
+      return [];
+    }
+    const organizationIds = Array.from(
+      new Set(invitations.map((invitation) => invitation.organizationId)),
+    );
+    const organizations = await Promise.all(
+      organizationIds.map((organizationId) =>
+        this.organizationsRepository.getOrganizationById(organizationId),
+      ),
+    );
+    const organizationsById = new Map(
+      organizations.filter(Boolean).map((organization) => [organization!.id, organization!]),
+    );
+    const workspaceIdsByOrg = new Map<string, string[]>();
+    await Promise.all(
+      organizationIds.map(async (organizationId) => {
+        const workspaces =
+          await this.organizationsRepository.listWorkspacesByOrganizationId(
+            organizationId,
+          );
+        workspaceIdsByOrg.set(
+          organizationId,
+          workspaces.map((workspace) => workspace.id).sort(),
+        );
+      }),
+    );
+    return invitations
+      .map((invitation) => {
+        const organization = organizationsById.get(invitation.organizationId);
+        if (!organization) {
+          return null;
+        }
+        return {
+          invitationId: invitation.id,
+          organizationId: invitation.organizationId,
+          organizationName: organization.name,
+          organizationSlug: organization.slug,
+          organizationKind: organization.kind,
+          invitedEmail: invitation.invitedEmail,
+          role: invitation.role,
+          status: invitation.status,
+          invitedByUserId: invitation.invitedByUserId,
+          acceptedByUserId: invitation.acceptedByUserId,
+          acceptedAt: invitation.acceptedAt,
+          createdAt: invitation.createdAt,
+          updatedAt: invitation.updatedAt,
+          workspaceIds: workspaceIdsByOrg.get(invitation.organizationId) ?? [],
+        } satisfies OrganizationInvitationView;
+      })
+      .filter(Boolean) as OrganizationInvitationView[];
   }
 }

@@ -84,7 +84,23 @@ export const marketplaceProfilesQuerySchema = z
   .object({
     q: z.string().trim().min(1).max(120).optional(),
     skill: z.string().trim().min(1).max(120).optional(),
+    skills: z.string().trim().min(1).max(500).optional(),
+    timezone: z.string().trim().min(1).max(80).optional(),
     availability: z.enum(['open', 'limited', 'unavailable']).optional(),
+    cryptoReadiness: z
+      .enum(['wallet_only', 'smart_account_ready', 'escrow_power_user'])
+      .optional(),
+    engagementType: z
+      .enum(['fixed_scope', 'milestone_retainer', 'advisory'])
+      .optional(),
+    verificationLevel: z
+      .enum([
+        'wallet_verified',
+        'wallet_and_escrow_history',
+        'wallet_escrow_and_delivery',
+      ])
+      .optional(),
+    sort: z.enum(['relevance', 'recent']).default('relevance'),
     limit: z.coerce.number().int().min(1).max(50).default(24),
   })
   .strict();
@@ -152,8 +168,41 @@ export const marketplaceOpportunitiesQuerySchema = z
   .object({
     q: z.string().trim().min(1).max(120).optional(),
     skill: z.string().trim().min(1).max(120).optional(),
+    skills: z.string().trim().min(1).max(500).optional(),
     category: z.string().trim().min(1).max(64).optional(),
+    engagementType: z
+      .enum(['fixed_scope', 'milestone_retainer', 'advisory'])
+      .optional(),
+    cryptoReadinessRequired: z
+      .enum(['wallet_only', 'smart_account_ready', 'escrow_power_user'])
+      .optional(),
+    minBudget: z.string().regex(amountPattern).optional(),
+    maxBudget: z.string().regex(amountPattern).optional(),
+    timezoneOverlapHours: z.coerce.number().int().min(0).max(24).optional(),
+    sort: z.enum(['relevance', 'recent']).default('relevance'),
     limit: z.coerce.number().int().min(1).max(50).default(24),
+  })
+  .strict();
+
+export const createMarketplaceSavedSearchSchema = z
+  .object({
+    kind: z.enum(['talent', 'opportunity']),
+    label: z.string().trim().min(1).max(120),
+    query: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+    alertFrequency: z.enum(['manual', 'daily', 'weekly']).default('manual'),
+  })
+  .strict();
+
+export const marketplaceSavedSearchesQuerySchema = z
+  .object({
+    kind: z.enum(['talent', 'opportunity']).optional(),
+  })
+  .strict();
+
+export const createMarketplaceOpportunityInviteSchema = z
+  .object({
+    profileSlug: slugSchema,
+    message: z.string().trim().min(1).max(1000).nullable().optional(),
   })
   .strict();
 
@@ -265,6 +314,15 @@ export type UpdateMarketplaceScreeningDto = z.infer<
 >;
 export type MarketplaceOpportunitiesQueryDto = z.infer<
   typeof marketplaceOpportunitiesQuerySchema
+>;
+export type CreateMarketplaceSavedSearchDto = z.infer<
+  typeof createMarketplaceSavedSearchSchema
+>;
+export type MarketplaceSavedSearchesQueryDto = z.infer<
+  typeof marketplaceSavedSearchesQuerySchema
+>;
+export type CreateMarketplaceOpportunityInviteDto = z.infer<
+  typeof createMarketplaceOpportunityInviteSchema
 >;
 export type ApplyToOpportunityDto = z.infer<typeof applyToOpportunitySchema>;
 export type UpdateModerationDto = z.infer<typeof updateModerationSchema>;

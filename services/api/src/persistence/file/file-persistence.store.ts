@@ -6,10 +6,11 @@ import { PersistenceConfigService } from '../persistence.config';
 
 function createInitialData(): PersistenceFileData {
   return {
-    version: 20,
+    version: 22,
     users: {},
     organizations: {},
     organizationMemberships: {},
+    organizationInvitations: {},
     workspaces: {},
     otpEntries: {},
     otpRequestThrottles: {},
@@ -19,8 +20,12 @@ function createInitialData(): PersistenceFileData {
     escrowChainEvents: {},
     escrowOnchainProjections: {},
     marketplaceProfiles: {},
+    marketplaceTalentSearchDocuments: {},
     marketplaceOpportunities: {},
+    marketplaceOpportunitySearchDocuments: {},
     marketplaceApplications: {},
+    marketplaceSavedSearches: {},
+    marketplaceOpportunityInvites: {},
     marketplaceAbuseReports: {},
     walletLinkChallenges: {},
   };
@@ -73,10 +78,11 @@ export class FilePersistenceStore {
     const parsed = JSON.parse(raw) as Partial<PersistenceFileData>;
 
     return {
-      version: 20,
+      version: 22,
       users: parsed.users ?? {},
       organizations: parsed.organizations ?? {},
       organizationMemberships: parsed.organizationMemberships ?? {},
+      organizationInvitations: parsed.organizationInvitations ?? {},
       workspaces: parsed.workspaces ?? {},
       otpEntries: parsed.otpEntries ?? {},
       otpRequestThrottles: parsed.otpRequestThrottles ?? {},
@@ -86,8 +92,15 @@ export class FilePersistenceStore {
       escrowChainEvents: parsed.escrowChainEvents ?? {},
       escrowOnchainProjections: parsed.escrowOnchainProjections ?? {},
       marketplaceProfiles: parsed.marketplaceProfiles ?? {},
+      marketplaceTalentSearchDocuments:
+        parsed.marketplaceTalentSearchDocuments ?? {},
       marketplaceOpportunities: parsed.marketplaceOpportunities ?? {},
+      marketplaceOpportunitySearchDocuments:
+        parsed.marketplaceOpportunitySearchDocuments ?? {},
       marketplaceApplications: parsed.marketplaceApplications ?? {},
+      marketplaceSavedSearches: parsed.marketplaceSavedSearches ?? {},
+      marketplaceOpportunityInvites:
+        parsed.marketplaceOpportunityInvites ?? {},
       marketplaceAbuseReports: parsed.marketplaceAbuseReports ?? {},
       walletLinkChallenges: parsed.walletLinkChallenges ?? {},
     };

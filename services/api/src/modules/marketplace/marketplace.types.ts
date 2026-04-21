@@ -65,6 +65,49 @@ export type MarketplaceAbuseReportQueuePriority =
   | 'high'
   | 'normal'
   | 'closed';
+export type MarketplaceSavedSearchKind = 'talent' | 'opportunity';
+export type MarketplaceSavedSearchAlertFrequency =
+  | 'manual'
+  | 'daily'
+  | 'weekly';
+export type MarketplaceOpportunityInviteStatus =
+  | 'pending'
+  | 'applied'
+  | 'dismissed';
+export type MarketplaceSearchReasonCode =
+  | 'strong_skill_match'
+  | 'timezone_overlap'
+  | 'escrow_backed_delivery_history'
+  | 'verified_wallet'
+  | 'smart_account_ready'
+  | 'complete_brief'
+  | 'budget_clear'
+  | 'recent_brief'
+  | 'category_match'
+  | 'must_have_coverage'
+  | 'response_ready_profile'
+  | 'invite_pending';
+
+export type MarketplaceSearchReason = {
+  code: MarketplaceSearchReasonCode;
+  label: string;
+};
+
+export type MarketplaceRankingFeatureSnapshot = {
+  score: number;
+  profileCompleteness: number;
+  skillMatchPercent: number;
+  completionRate: number;
+  disputeRate: number;
+  inviteAcceptanceRate: number;
+  responseRate: number;
+  recencyDays: number;
+  timezoneOverlapHours: number | null;
+  budgetClarity: number;
+  fitDensity: number;
+  fundedVolumeBand: 'none' | 'small' | 'medium' | 'large';
+  verificationLevel: MarketplaceVerificationLevel | 'unverified';
+};
 
 export type MarketplaceTalentProofArtifact = {
   id: string;
@@ -130,6 +173,76 @@ export type MarketplaceApplicationDossier = {
   recommendation: 'strong_match' | 'review' | 'risky';
   matchSummary: MarketplaceMatchSummary;
   whyShortlisted: string[];
+};
+
+export type MarketplaceTalentSearchDocument = {
+  profileUserId: string;
+  profileSlug: string;
+  workspaceId: string | null;
+  organizationId: string | null;
+  displayName: string;
+  headline: string;
+  searchableText: string;
+  skills: string[];
+  specialties: string[];
+  timezone: string;
+  availability: MarketplaceAvailability;
+  preferredEngagements: MarketplaceEngagementType[];
+  cryptoReadiness: MarketplaceCryptoReadiness;
+  verificationLevel: MarketplaceVerificationLevel | 'unverified';
+  ranking: MarketplaceRankingFeatureSnapshot;
+  reasons: MarketplaceSearchReason[];
+  updatedAt: number;
+};
+
+export type MarketplaceOpportunitySearchDocument = {
+  opportunityId: string;
+  ownerUserId: string;
+  ownerWorkspaceId: string | null;
+  ownerOrganizationId: string | null;
+  title: string;
+  summary: string;
+  category: string;
+  searchableText: string;
+  requiredSkills: string[];
+  mustHaveSkills: string[];
+  engagementType: MarketplaceEngagementType;
+  cryptoReadinessRequired: MarketplaceCryptoReadiness;
+  timezoneOverlapHours: number | null;
+  budgetMin: string | null;
+  budgetMax: string | null;
+  visibility: OpportunityVisibility;
+  status: OpportunityStatus;
+  ranking: MarketplaceRankingFeatureSnapshot;
+  reasons: MarketplaceSearchReason[];
+  publishedAt: number | null;
+  updatedAt: number;
+};
+
+export type MarketplaceSavedSearchRecord = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  kind: MarketplaceSavedSearchKind;
+  label: string;
+  query: Record<string, string | number | boolean | null>;
+  alertFrequency: MarketplaceSavedSearchAlertFrequency;
+  lastResultCount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceOpportunityInviteRecord = {
+  id: string;
+  opportunityId: string;
+  invitedProfileUserId: string;
+  invitedProfileSlug: string;
+  invitedByUserId: string;
+  invitedWorkspaceId: string | null;
+  message: string | null;
+  status: MarketplaceOpportunityInviteStatus;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type MarketplaceProfileRecord = {
@@ -314,6 +427,34 @@ export type MarketplaceOpportunityDetailView = MarketplaceOpportunityView & {
   applications?: MarketplaceApplicationView[];
 };
 
+export type MarketplaceSavedSearchView = MarketplaceSavedSearchRecord & {
+  activeWorkspaceId: string | null;
+};
+
+export type MarketplaceOpportunityInviteView = {
+  id: string;
+  status: MarketplaceOpportunityInviteStatus;
+  message: string | null;
+  createdAt: number;
+  updatedAt: number;
+  opportunity: MarketplaceApplicationOpportunitySummary;
+  talent: MarketplaceTalentSummary;
+};
+
+export type MarketplaceTalentSearchResult = {
+  profile: MarketplaceProfileView;
+  reasons: MarketplaceSearchReason[];
+  ranking: MarketplaceRankingFeatureSnapshot;
+  inviteStatus: MarketplaceOpportunityInviteStatus | null;
+};
+
+export type MarketplaceOpportunitySearchResult = {
+  opportunity: MarketplaceOpportunityView;
+  reasons: MarketplaceSearchReason[];
+  ranking: MarketplaceRankingFeatureSnapshot;
+  inviteStatus: MarketplaceOpportunityInviteStatus | null;
+};
+
 export type MarketplaceAbuseReportSubjectSummary =
   | {
       type: 'profile';
@@ -452,6 +593,30 @@ export type MarketplaceApplicationsListResponse = {
 
 export type MarketplaceMatchesResponse = {
   matches: MarketplaceApplicationDossier[];
+};
+
+export type MarketplaceTalentSearchResponse = {
+  results: MarketplaceTalentSearchResult[];
+};
+
+export type MarketplaceOpportunitySearchResponse = {
+  results: MarketplaceOpportunitySearchResult[];
+};
+
+export type MarketplaceSavedSearchesResponse = {
+  searches: MarketplaceSavedSearchView[];
+};
+
+export type MarketplaceSavedSearchResponse = {
+  search: MarketplaceSavedSearchView;
+};
+
+export type MarketplaceOpportunityInvitesResponse = {
+  invites: MarketplaceOpportunityInviteView[];
+};
+
+export type MarketplaceOpportunityInviteResponse = {
+  invite: MarketplaceOpportunityInviteView;
 };
 
 export type MarketplaceApplicationDossierResponse = {

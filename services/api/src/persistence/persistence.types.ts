@@ -6,6 +6,7 @@ import type {
 import type { EscrowJobRecord } from '../modules/escrow/escrow.types';
 import type {
   OrganizationMembershipRecord,
+  OrganizationInvitationRecord,
   OrganizationRecord,
   WorkspaceRecord,
 } from '../modules/organizations/organizations.types';
@@ -18,8 +19,12 @@ import type {
 import type {
   MarketplaceApplicationRecord,
   MarketplaceAbuseReportRecord,
+  MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceSavedSearchRecord,
+  MarketplaceOpportunitySearchDocument,
+  MarketplaceTalentSearchDocument,
 } from '../modules/marketplace/marketplace.types';
 import type { UserRecord } from '../modules/users/users.types';
 import type { WalletLinkChallengeRecord } from '../modules/wallet/wallet.types';
@@ -35,6 +40,7 @@ export interface UsersRepository {
 export interface OrganizationsRepository {
   getOrganizationById(id: string): Promise<OrganizationRecord | null>;
   getOrganizationBySlug(slug: string): Promise<OrganizationRecord | null>;
+  getInvitationById(id: string): Promise<OrganizationInvitationRecord | null>;
   listOrganizationsByUserId(userId: string): Promise<OrganizationRecord[]>;
   listMembershipsByUserId(
     userId: string,
@@ -42,11 +48,18 @@ export interface OrganizationsRepository {
   listMembershipsByOrganizationId(
     organizationId: string,
   ): Promise<OrganizationMembershipRecord[]>;
+  listInvitationsByUserEmail(
+    email: string,
+  ): Promise<OrganizationInvitationRecord[]>;
+  listInvitationsByOrganizationId(
+    organizationId: string,
+  ): Promise<OrganizationInvitationRecord[]>;
   listWorkspacesByUserId(userId: string): Promise<WorkspaceRecord[]>;
   listWorkspacesByOrganizationId(organizationId: string): Promise<WorkspaceRecord[]>;
   getWorkspaceById(id: string): Promise<WorkspaceRecord | null>;
   saveOrganization(organization: OrganizationRecord): Promise<void>;
   saveMembership(membership: OrganizationMembershipRecord): Promise<void>;
+  saveInvitation(invitation: OrganizationInvitationRecord): Promise<void>;
   saveWorkspace(workspace: WorkspaceRecord): Promise<void>;
 }
 
@@ -125,16 +138,35 @@ export interface MarketplaceRepository {
   getProfileBySlug(slug: string): Promise<MarketplaceProfileRecord | null>;
   listProfiles(): Promise<MarketplaceProfileRecord[]>;
   saveProfile(profile: MarketplaceProfileRecord): Promise<void>;
+  listTalentSearchDocuments(): Promise<MarketplaceTalentSearchDocument[]>;
+  saveTalentSearchDocument(
+    document: MarketplaceTalentSearchDocument,
+  ): Promise<void>;
   getOpportunityById(
     opportunityId: string,
   ): Promise<MarketplaceOpportunityRecord | null>;
   listOpportunities(): Promise<MarketplaceOpportunityRecord[]>;
   saveOpportunity(opportunity: MarketplaceOpportunityRecord): Promise<void>;
+  listOpportunitySearchDocuments(): Promise<MarketplaceOpportunitySearchDocument[]>;
+  saveOpportunitySearchDocument(
+    document: MarketplaceOpportunitySearchDocument,
+  ): Promise<void>;
   getApplicationById(
     applicationId: string,
   ): Promise<MarketplaceApplicationRecord | null>;
   listApplications(): Promise<MarketplaceApplicationRecord[]>;
   saveApplication(application: MarketplaceApplicationRecord): Promise<void>;
+  getSavedSearchById(
+    searchId: string,
+  ): Promise<MarketplaceSavedSearchRecord | null>;
+  listSavedSearches(): Promise<MarketplaceSavedSearchRecord[]>;
+  saveSavedSearch(search: MarketplaceSavedSearchRecord): Promise<void>;
+  deleteSavedSearch(searchId: string): Promise<void>;
+  getOpportunityInviteById(
+    inviteId: string,
+  ): Promise<MarketplaceOpportunityInviteRecord | null>;
+  listOpportunityInvites(): Promise<MarketplaceOpportunityInviteRecord[]>;
+  saveOpportunityInvite(invite: MarketplaceOpportunityInviteRecord): Promise<void>;
   getAbuseReportById(
     reportId: string,
   ): Promise<MarketplaceAbuseReportRecord | null>;
@@ -152,10 +184,11 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 20;
+  version: 22;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
+  organizationInvitations: Record<string, OrganizationInvitationRecord>;
   workspaces: Record<string, WorkspaceRecord>;
   otpEntries: Record<string, OtpEntry>;
   otpRequestThrottles: Record<string, OtpRequestThrottleRecord>;
@@ -165,8 +198,15 @@ export type PersistenceFileData = {
   escrowChainEvents: Record<string, EscrowChainEventRecord>;
   escrowOnchainProjections: Record<string, EscrowOnchainProjectionRecord>;
   marketplaceProfiles: Record<string, MarketplaceProfileRecord>;
+  marketplaceTalentSearchDocuments: Record<string, MarketplaceTalentSearchDocument>;
   marketplaceOpportunities: Record<string, MarketplaceOpportunityRecord>;
+  marketplaceOpportunitySearchDocuments: Record<
+    string,
+    MarketplaceOpportunitySearchDocument
+  >;
   marketplaceApplications: Record<string, MarketplaceApplicationRecord>;
+  marketplaceSavedSearches: Record<string, MarketplaceSavedSearchRecord>;
+  marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

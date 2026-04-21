@@ -84,12 +84,30 @@ export type OrganizationSummary = {
 };
 export type OrganizationMembership = {
   membershipId: string;
+  userId: string;
+  userEmail: string;
   organizationId: string;
   organizationName: string;
   organizationSlug: string;
   organizationKind: OrganizationKind;
   role: OrganizationRole;
   status: 'active';
+  workspaceIds: string[];
+};
+export type OrganizationInvitation = {
+  invitationId: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationKind: OrganizationKind;
+  invitedEmail: string;
+  role: 'client_owner' | 'client_recruiter';
+  status: 'pending' | 'accepted' | 'revoked';
+  invitedByUserId: string;
+  acceptedByUserId: string | null;
+  acceptedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
   workspaceIds: string[];
 };
 export type RoleCapabilitiesResponse = {
@@ -683,6 +701,30 @@ export const webApi = {
       accessToken,
     );
   },
+  listOrganizationMemberships(organizationId: string, accessToken: string) {
+    return requestJson<{ memberships: OrganizationMembership[] }>(
+      apiBaseUrl,
+      `/organizations/${organizationId}/memberships`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listInvitations(accessToken: string) {
+    return requestJson<{ invitations: OrganizationInvitation[] }>(
+      apiBaseUrl,
+      '/invitations',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listOrganizationInvitations(organizationId: string, accessToken: string) {
+    return requestJson<{ invitations: OrganizationInvitation[] }>(
+      apiBaseUrl,
+      `/organizations/${organizationId}/invitations`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
   getRoleCapabilities(accessToken: string) {
     return requestJson<RoleCapabilitiesResponse>(
       apiBaseUrl,
@@ -702,6 +744,58 @@ export const webApi = {
     return requestJson<{ organization: OrganizationSummary }>(
       apiBaseUrl,
       '/organizations',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  createOrganizationInvitation(
+    organizationId: string,
+    input: {
+      email: string;
+      role: 'client_owner' | 'client_recruiter';
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ invitation: OrganizationInvitation }>(
+      apiBaseUrl,
+      `/organizations/${organizationId}/invitations`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  revokeOrganizationInvitation(
+    organizationId: string,
+    invitationId: string,
+    accessToken: string,
+  ) {
+    return requestJson<{ invitation: OrganizationInvitation }>(
+      apiBaseUrl,
+      `/organizations/${organizationId}/invitations/${invitationId}/revoke`,
+      {
+        method: 'POST',
+      },
+      accessToken,
+    );
+  },
+  acceptOrganizationInvitation(
+    invitationId: string,
+    input: {
+      setActive?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{
+      activeWorkspace: WorkspaceSummary;
+      workspaces: WorkspaceSummary[];
+    }>(
+      apiBaseUrl,
+      `/invitations/${invitationId}/accept`,
       {
         method: 'POST',
         body: JSON.stringify(input),

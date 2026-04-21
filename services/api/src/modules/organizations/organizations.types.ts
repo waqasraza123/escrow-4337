@@ -7,6 +7,7 @@ export type OrganizationRole =
   | 'operator'
   | 'moderator';
 export type OrganizationMembershipStatus = 'active';
+export type OrganizationInvitationStatus = 'pending' | 'accepted' | 'revoked';
 export type WorkspaceCapabilityName =
   | 'manageProfile'
   | 'applyToOpportunity'
@@ -30,6 +31,19 @@ export type OrganizationMembershipRecord = {
   userId: string;
   role: OrganizationRole;
   status: OrganizationMembershipStatus;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type OrganizationInvitationRecord = {
+  id: string;
+  organizationId: string;
+  invitedEmail: string;
+  role: Extract<OrganizationRole, 'client_owner' | 'client_recruiter'>;
+  status: OrganizationInvitationStatus;
+  invitedByUserId: string;
+  acceptedByUserId: string | null;
+  acceptedAt: number | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -72,6 +86,8 @@ export type OrganizationSummary = {
 
 export type OrganizationMembershipView = {
   membershipId: string;
+  userId: string;
+  userEmail: string;
   organizationId: string;
   organizationName: string;
   organizationSlug: string;
@@ -102,6 +118,31 @@ export type OrganizationResponse = {
 
 export type MembershipsListResponse = {
   memberships: OrganizationMembershipView[];
+};
+
+export type OrganizationInvitationView = {
+  invitationId: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationKind: OrganizationKind;
+  invitedEmail: string;
+  role: OrganizationInvitationRecord['role'];
+  status: OrganizationInvitationStatus;
+  invitedByUserId: string;
+  acceptedByUserId: string | null;
+  acceptedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+  workspaceIds: string[];
+};
+
+export type OrganizationInvitationsListResponse = {
+  invitations: OrganizationInvitationView[];
+};
+
+export type OrganizationInvitationResponse = {
+  invitation: OrganizationInvitationView;
 };
 
 export type WorkspaceSelectionResponse = {
