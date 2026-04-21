@@ -6,6 +6,7 @@ import type {
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftRevisionRecord,
   MarketplaceContractMetadataSnapshot,
+  MarketplaceIdentityRiskReviewRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferMilestoneDraft,
@@ -14,6 +15,7 @@ import type {
   MarketplaceOpportunitySearchDocument,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceReviewRecord,
   MarketplaceSavedSearchRecord,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
@@ -278,6 +280,25 @@ function normalizeOpportunityInvite(
     ...invite,
     invitedProfileSlug: invite.invitedProfileSlug.trim().toLowerCase(),
     message: invite.message?.trim() || null,
+  };
+}
+
+function normalizeReview(review: MarketplaceReviewRecord): MarketplaceReviewRecord {
+  return {
+    ...review,
+    headline: review.headline?.trim() || null,
+    body: review.body?.trim() || null,
+    moderationNote: review.moderationNote?.trim() || null,
+  };
+}
+
+function normalizeIdentityRiskReview(
+  review: MarketplaceIdentityRiskReviewRecord,
+): MarketplaceIdentityRiskReviewRecord {
+  return {
+    ...review,
+    flags: Array.from(new Set(review.flags)),
+    operatorSummary: review.operatorSummary?.trim() || null,
   };
 }
 
@@ -614,6 +635,52 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceAbuseReports[report.id] = cloneValue(
         normalizeAbuseReport(report),
+      );
+    });
+  }
+
+  async getReviewById(reviewId: string) {
+    return this.store.read((data) => {
+      const review = data.marketplaceReviews[reviewId];
+      return review ? cloneValue(normalizeReview(review)) : null;
+    });
+  }
+
+  async listReviews() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceReviews)
+        .map((review) => cloneValue(normalizeReview(review)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveReview(review: MarketplaceReviewRecord) {
+    await this.store.write((data) => {
+      data.marketplaceReviews[review.id] = cloneValue(normalizeReview(review));
+    });
+  }
+
+  async getIdentityRiskReviewByUserId(userId: string) {
+    return this.store.read((data) => {
+      const review = Object.values(data.marketplaceIdentityRiskReviews).find(
+        (candidate) => candidate.subjectUserId === userId,
+      );
+      return review ? cloneValue(normalizeIdentityRiskReview(review)) : null;
+    });
+  }
+
+  async listIdentityRiskReviews() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceIdentityRiskReviews)
+        .map((review) => cloneValue(normalizeIdentityRiskReview(review)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveIdentityRiskReview(review: MarketplaceIdentityRiskReviewRecord) {
+    await this.store.write((data) => {
+      data.marketplaceIdentityRiskReviews[review.id] = cloneValue(
+        normalizeIdentityRiskReview(review),
       );
     });
   }

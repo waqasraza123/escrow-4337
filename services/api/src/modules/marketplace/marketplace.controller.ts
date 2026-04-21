@@ -152,6 +152,23 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('jobs/:id/reviews')
+  getJobReviews(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getJobReviews(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('jobs/:id/reviews')
+  createJobReview(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(marketplaceDto.createMarketplaceReviewSchema))
+    body: marketplaceDto.CreateMarketplaceReviewDto,
+  ) {
+    return this.marketplaceService.createJobReview(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('opportunities')
   createOpportunity(
     @User() user: ReqUser,
@@ -511,6 +528,12 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('moderation/reviews')
+  listModerationReviews(@User() user: ReqUser) {
+    return this.marketplaceService.listModerationReviews(user.id);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('moderation/profiles/:userId')
   moderateProfile(
     @User() user: ReqUser,
@@ -533,6 +556,21 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('moderation/reviews/:id')
+  updateModerationReview(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceReviewModerationSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceReviewModerationDto,
+  ) {
+    return this.marketplaceService.updateModerationReview(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('moderation/reports/:id')
   updateModerationReport(
     @User() user: ReqUser,
@@ -543,5 +581,24 @@ export class MarketplaceController {
     body: marketplaceDto.UpdateMarketplaceAbuseReportDto,
   ) {
     return this.marketplaceService.updateModerationReport(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('moderation/identity/:userId')
+  updateIdentityRiskReview(
+    @User() user: ReqUser,
+    @Param('userId') targetUserId: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceIdentityRiskReviewSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceIdentityRiskReviewDto,
+  ) {
+    return this.marketplaceService.updateIdentityRiskReview(
+      user.id,
+      targetUserId,
+      body,
+    );
   }
 }

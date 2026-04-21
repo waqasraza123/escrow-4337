@@ -659,6 +659,12 @@ export type MarketplaceContractDraftStatus =
   | 'finalized'
   | 'converted'
   | 'cancelled';
+export type MarketplaceReviewVisibilityStatus = 'visible' | 'hidden';
+export type MarketplaceIdentityConfidenceLabel =
+  | 'email_verified'
+  | 'wallet_verified'
+  | 'smart_account_ready'
+  | 'operator_reviewed_proof';
 export type MarketplaceNoHireReason =
   | 'budget_changed'
   | 'scope_changed'
@@ -691,6 +697,62 @@ export type MarketplaceOpportunitySearchResult = {
   ranking: MarketplaceRankingFeatureSnapshot;
   inviteStatus: MarketplaceOpportunityInvite['status'] | null;
 };
+export type MarketplaceReviewScores = {
+  scopeClarity: number;
+  communication: number;
+  timeliness: number;
+  outcomeQuality: number;
+};
+export type MarketplaceReview = {
+  id: string;
+  jobId: string;
+  reviewerRole: 'client' | 'worker';
+  revieweeRole: 'client' | 'worker';
+  rating: number;
+  scores: MarketplaceReviewScores;
+  headline: string | null;
+  body: string | null;
+  visibilityStatus: MarketplaceReviewVisibilityStatus;
+  moderationNote: string | null;
+  moderatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  moderatedAt: number | null;
+  reviewer: {
+    userId: string;
+    displayName: string;
+    role: 'client' | 'worker';
+  };
+  reviewee: {
+    userId: string;
+    role: 'client' | 'worker';
+  };
+  createdAt: number;
+  updatedAt: number;
+};
+export type MarketplaceReputationSnapshot = {
+  subjectUserId: string;
+  role: 'client' | 'worker';
+  identityConfidence: MarketplaceIdentityConfidenceLabel;
+  publicReviewCount: number;
+  averageRating: number | null;
+  ratingBreakdown: {
+    oneStar: number;
+    twoStar: number;
+    threeStar: number;
+    fourStar: number;
+    fiveStar: number;
+  };
+  totalContracts: number;
+  completionRate: number;
+  disputeRate: number;
+  onTimeDeliveryRate: number;
+  responseRate: number | null;
+  inviteAcceptanceRate: number | null;
+  revisionRate: number | null;
+  averageContractValueBand: MarketplaceEscrowStats['averageContractValueBand'];
+};
 
 export type MarketplaceProfile = {
   userId: string;
@@ -713,6 +775,8 @@ export type MarketplaceProfile = {
   verifiedWalletAddress: string | null;
   verificationLevel: MarketplaceVerificationLevel;
   escrowStats: MarketplaceEscrowStats;
+  reputation: MarketplaceReputationSnapshot;
+  publicReviews: MarketplaceReview[];
   completedEscrowCount: number;
   isComplete: boolean;
 };
@@ -752,6 +816,7 @@ export type MarketplaceOpportunity = {
     workspaceKind: 'client';
     displayName: string;
     profileSlug: string | null;
+    reputation: MarketplaceReputationSnapshot;
   };
   escrowReadiness: 'ready' | 'wallet_required' | 'smart_account_required';
   applicationCount: number;
@@ -789,6 +854,7 @@ export type MarketplaceApplication = {
     verificationLevel: MarketplaceVerificationLevel;
     cryptoReadiness: MarketplaceCryptoReadiness;
     escrowStats: MarketplaceEscrowStats;
+    reputation: MarketplaceReputationSnapshot;
     completedEscrowCount: number;
   };
   opportunity: {
@@ -1516,6 +1582,34 @@ export const webApi = {
     return requestJson<{ submission: ProjectSubmission }>(
       apiBaseUrl,
       `/jobs/${jobId}/project-room/milestones/${milestoneIndex}/submissions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceJobReviews(jobId: string, accessToken: string) {
+    return requestJson<{ reviews: MarketplaceReview[] }>(
+      apiBaseUrl,
+      `/marketplace/jobs/${encodeURIComponent(jobId)}/reviews`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createMarketplaceJobReview(
+    jobId: string,
+    input: {
+      rating: number;
+      scores: MarketplaceReviewScores;
+      headline?: string | null;
+      body: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ review: MarketplaceReview }>(
+      apiBaseUrl,
+      `/marketplace/jobs/${encodeURIComponent(jobId)}/reviews`,
       {
         method: 'POST',
         body: JSON.stringify(input),

@@ -56,6 +56,14 @@ const offerMilestoneDraftSchema = z
     dueAt: timestampSchema.nullable().optional(),
   })
   .strict();
+const reviewScoresSchema = z
+  .object({
+    scopeClarity: z.coerce.number().int().min(1).max(5),
+    communication: z.coerce.number().int().min(1).max(5),
+    timeliness: z.coerce.number().int().min(1).max(5),
+    outcomeQuality: z.coerce.number().int().min(1).max(5),
+  })
+  .strict();
 
 export const upsertMarketplaceProfileSchema = z
   .object({
@@ -296,6 +304,48 @@ export const reviseMarketplaceContractDraftSchema = z
 export const approveMarketplaceContractDraftSchema = z.object({}).strict();
 export const convertMarketplaceContractDraftSchema = z.object({}).strict();
 
+export const createMarketplaceReviewSchema = z
+  .object({
+    rating: z.coerce.number().int().min(1).max(5),
+    scores: reviewScoresSchema,
+    headline: z.string().trim().min(1).max(140).nullable().optional(),
+    body: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export const updateMarketplaceReviewModerationSchema = z
+  .object({
+    visibilityStatus: z.enum(['visible', 'hidden']),
+    moderationNote: z.string().trim().min(1).max(2000).nullable().optional(),
+  })
+  .strict();
+
+export const updateMarketplaceIdentityRiskReviewSchema = z
+  .object({
+    confidenceLabel: z.enum([
+      'email_verified',
+      'wallet_verified',
+      'smart_account_ready',
+      'operator_reviewed_proof',
+    ]),
+    riskLevel: z.enum(['low', 'medium', 'high']),
+    flags: z
+      .array(
+        z.enum([
+          'high_dispute_rate',
+          'repeat_abuse_reports',
+          'review_hidden_by_operator',
+          'identity_mismatch',
+          'off_platform_payment_report',
+          'revision_heavy_delivery',
+        ]),
+      )
+      .max(8)
+      .default([]),
+    operatorSummary: z.string().trim().min(1).max(2000).nullable().optional(),
+  })
+  .strict();
+
 export const updateModerationSchema = z
   .object({
     moderationStatus: z.enum(['visible', 'hidden', 'suspended']),
@@ -424,6 +474,15 @@ export type ApproveMarketplaceContractDraftDto = z.infer<
 >;
 export type ConvertMarketplaceContractDraftDto = z.infer<
   typeof convertMarketplaceContractDraftSchema
+>;
+export type CreateMarketplaceReviewDto = z.infer<
+  typeof createMarketplaceReviewSchema
+>;
+export type UpdateMarketplaceReviewModerationDto = z.infer<
+  typeof updateMarketplaceReviewModerationSchema
+>;
+export type UpdateMarketplaceIdentityRiskReviewDto = z.infer<
+  typeof updateMarketplaceIdentityRiskReviewSchema
 >;
 export type UpdateModerationDto = z.infer<typeof updateModerationSchema>;
 export type CreateMarketplaceAbuseReportDto = z.infer<

@@ -38,6 +38,8 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
       fallback: marketplaceMessages.opportunityDetail.notSpecified,
       locale: definition.langTag,
     });
+  const formatRating = (value: number | null) =>
+    value === null ? '—' : `${value.toFixed(1)} / 5`;
 
   useEffect(() => {
     let active = true;
@@ -177,6 +179,48 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                         : marketplaceMessages.opportunityDetail.hours(
                             opportunity.timezoneOverlapHours,
                           )
+                    }
+                  />
+                </FactGrid>
+              </SectionCard>
+
+              <SectionCard
+                eyebrow={marketplaceMessages.opportunityDetail.clientTrustEyebrow}
+                title={marketplaceMessages.opportunityDetail.clientTrustTitle}
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
+                headerClassName="mb-5"
+              >
+                <FactGrid>
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.averageRating}
+                    value={formatRating(opportunity.owner.reputation.averageRating)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.publicReviewCount}
+                    value={opportunity.owner.reputation.publicReviewCount}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.identityConfidence}
+                    value={
+                      marketplaceMessages.labels.identityConfidence[
+                        opportunity.owner.reputation.identityConfidence
+                      ]
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.responseRate}
+                    value={
+                      opportunity.owner.reputation.responseRate === null
+                        ? '—'
+                        : `${opportunity.owner.reputation.responseRate}%`
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.opportunityDetail.inviteAcceptanceRate}
+                    value={
+                      opportunity.owner.reputation.inviteAcceptanceRate === null
+                        ? '—'
+                        : `${opportunity.owner.reputation.inviteAcceptanceRate}%`
                     }
                   />
                 </FactGrid>

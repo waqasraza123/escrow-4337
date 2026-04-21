@@ -4,21 +4,21 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 5 execution workspace pass in one code step:
-  - contract-linked project room
-  - milestone submissions and revision loops
-  - contract-scoped messaging and activity
-  - release/dispute handoff inside the room
+- Land the repo-side Phase 6 trust/reputation/review pass in one code step:
+  - post-contract mutual reviews
+  - public reputation snapshots on profiles/opportunities
+  - operator review moderation + identity risk review
+  - project-room review capture after contract close
 
 ## Last Completed Step
-- Committed the Phase 4 handoff locally as `6d8874f` (`Implement Phase 4 marketplace contract draft conversion`).
+- Committed the Phase 5 handoff locally as `d435767` (`Implement Phase 5 project room execution workspace`).
 
 ## Current Step
-- Phase 5 execution workspace code is now implemented and intentionally unverified:
-  - `EscrowService` now persists contract-linked project-room submissions, revision requests, approvals, room messages, and room activity
-  - persistence now includes file/Postgres project-room state plus `023_escrow_project_room.sql`
-  - `apps/web` now exposes `/app/contracts/[id]/room` with milestone submission/review, messaging, and release/dispute controls
-  - marketplace and contract surfaces now deep-link into the project room after hire/conversion
+- Phase 6 trust/reputation/review code is now implemented and intentionally unverified:
+  - `MarketplaceService` now persists job reviews + operator identity reviews and derives public reputation/risk signals
+  - persistence now includes file/Postgres review + identity-review state plus `024_marketplace_reputation_and_reviews.sql`
+  - `apps/web` now exposes trust/review surfaces on public profile/opportunity detail pages and review capture inside `/app/contracts/[id]/room`
+  - `apps/admin` moderation now includes review visibility controls and operator identity-risk review controls
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -30,7 +30,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- The roadmap requires accepted marketplace proposals to become reviewable escrow-ready contracts without forcing users to re-enter scope, pricing, and milestone terms in a separate manual flow.
+- The roadmap requires completed marketplace contracts to accumulate reusable trust/reputation signals before fees/support/scale phases make the product operationally real.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -64,6 +64,12 @@
   `services/api/src/persistence/{file/file.repositories.ts,postgres/postgres.repositories.ts}`
   `services/api/src/persistence/postgres/migrations/023_escrow_project_room.sql`
   `apps/web/src/{app/project-room.tsx,app/app/contracts/[id]/room/page.tsx,app/web-console.tsx,app/marketplace/workspace.tsx,lib/api.ts,lib/i18n.tsx}`
+- Phase 6 work in progress:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/024_marketplace_reputation_and_reviews.sql`
+  `apps/web/src/{app/project-room.tsx,app/marketplace/profiles/[slug]/profile-detail.tsx,app/marketplace/opportunities/[id]/opportunity-detail.tsx,lib/api.ts,lib/i18n.tsx}`
+  `apps/admin/src/{app/marketplace/moderation-console.tsx,lib/api.ts}`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.
@@ -94,6 +100,7 @@
   - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
   - `git diff --check`
 - Blocked or not run:
+  - targeted verification for the Phase 6 trust/reputation/review pass was intentionally not run because the user explicitly asked for code and documentation only
   - targeted verification for the agency-lane completion pass was intentionally not run because the user explicitly asked for code and documentation only
   - full `pnpm build` was intentionally not pursued further after the user redirected away from build/debug work; the last repo build failure was environment-only Google Fonts fetch resolution in the sandboxed web build, not a code type/test failure
   - real staged deployment validation against live staging secrets and URLs
@@ -102,8 +109,8 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 6 trust/reputation/review work
-  - or tighten the Phase 5 room UX around artifact handling and execution history polish
+  - start Phase 7 fee/treasury/support operations work
+  - or tighten the new Phase 6 trust/review UX and moderation ergonomics
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
@@ -203,6 +210,21 @@
   - added `/app/contracts/[id]/room` plus a dedicated project-room client surface
   - marketplace workspace and contract console now deep-link into the room for converted/hired contracts
   - `apps/web/src/lib/api.ts` and `apps/web/src/lib/i18n.tsx` now include the new project-room response shapes and English/Arabic copy
+- Verification:
+  - not run by request
+
+## Update (2026-04-21, Marketplace Phase 6 Reputation, Reviews, and Trust)
+- Added the repo-side Phase 6 trust layer without running verification:
+  - persisted marketplace job reviews and operator-owned identity risk reviews
+  - derived public reputation snapshots and operator-only risk signals
+  - public profile/opportunity trust UI plus project-room review capture after contract close
+- Backend changes:
+  - added DTO/controller/service routes for authenticated job-review read/create plus operator review moderation and identity-risk review updates
+  - marketplace read models now enrich talent/client summaries with derived reputation snapshots and public reviews
+  - moderation dashboard/profile reads now include review/identity counters and operator risk posture
+- Web/admin changes:
+  - `apps/web` now renders public reputation/review cards on marketplace detail pages and review capture/listing inside the project room
+  - `apps/admin` moderation now includes review visibility actions and identity confidence/risk review controls
 - Verification:
   - not run by request
 

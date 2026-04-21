@@ -25,6 +25,7 @@ import { useWebI18n } from '../lib/i18n';
 import {
   webApi,
   type JobView,
+  type MarketplaceReview,
   type ProjectActivity,
   type ProjectRoom as ProjectRoomView,
   type ProjectSubmission,
@@ -47,6 +48,12 @@ type ExecutionDraft = {
   approvalNote: string;
   disputeReason: string;
   disputeEvidence: string;
+};
+
+type ReviewDraft = {
+  headline: string;
+  body: string;
+  rating: number;
 };
 
 function readSession(): SessionTokens | null {
@@ -79,6 +86,14 @@ function createExecutionDraft(): ExecutionDraft {
     approvalNote: '',
     disputeReason: '',
     disputeEvidence: '',
+  };
+}
+
+function createReviewDraft(): ReviewDraft {
+  return {
+    headline: '',
+    body: '',
+    rating: 5,
   };
 }
 
@@ -165,6 +180,8 @@ export function ProjectRoom(props: ProjectRoomProps) {
 
   const [tokens, setTokens] = useState<SessionTokens | null>(null);
   const [room, setRoom] = useState<ProjectRoomView | null>(null);
+  const [reviews, setReviews] = useState<MarketplaceReview[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -176,6 +193,7 @@ export function ProjectRoom(props: ProjectRoomProps) {
   const [executionDrafts, setExecutionDrafts] = useState<
     Record<number, ExecutionDraft>
   >({});
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft>(createReviewDraft());
 
   useEffect(() => {
     const session = readSession();
@@ -204,11 +222,21 @@ export function ProjectRoom(props: ProjectRoomProps) {
     setError(null);
 
     try {
-      const response = await webApi.getProjectRoom(
-        initialJobId,
-        session.accessToken,
-      );
-      setRoom(response.room);
+      const [roomResponse, meResponse] = await Promise.all([
+        webApi.getProjectRoom(initialJobId, session.accessToken),
+        webApi.me(session.accessToken),
+      ]);
+      const reviewsResponse =
+        roomResponse.room.job.status === 'completed' ||
+        roomResponse.room.job.status === 'resolved'
+          ? await webApi.getMarketplaceJobReviews(
+              initialJobId,
+              session.accessToken,
+            )
+          : { reviews: [] };
+      setRoom(roomResponse.room);
+      setCurrentUserId(meResponse.id);
+      setReviews(reviewsResponse.reviews);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : roomMessages.messages.loadFailed,
@@ -283,6 +311,12 @@ export function ProjectRoom(props: ProjectRoomProps) {
     isClient && selectedMilestone?.status === 'delivered';
   const canDisputeMilestone =
     isClient && selectedMilestone?.status === 'delivered';
+  const canLeaveReview =
+    room !== null &&
+    currentUserId !== null &&
+    (room.job.status === 'completed' || room.job.status === 'resolved') &&
+    participantRoles.length > 0 &&
+    !reviews.some((review) => review.reviewer.userId === currentUserId);
 
   async function refreshRoom() {
     if (!tokens) {
@@ -456,6 +490,37 @@ export function ProjectRoom(props: ProjectRoomProps) {
       );
       setMessageBody('');
       setNotice(roomMessages.messages.messagePosted);
+      await refreshRoom();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : roomMessages.messages.actionFailed,
+      );
+    }
+  }
+
+  async function handleSubmitReview() {
+    if (!tokens || !canLeaveReview || !reviewDraft.body.trim()) {
+      return;
+    }
+
+    try {
+      await webApi.createMarketplaceJobReview(
+        initialJobId,
+        {
+          rating: reviewDraft.rating,
+          scores: {
+            scopeClarity: reviewDraft.rating,
+            communication: reviewDraft.rating,
+            timeliness: reviewDraft.rating,
+            outcomeQuality: reviewDraft.rating,
+          },
+          headline: reviewDraft.headline.trim() || null,
+          body: reviewDraft.body,
+        },
+        tokens.accessToken,
+      );
+      setReviewDraft(createReviewDraft());
+      setNotice(roomMessages.messages.reviewSubmitted);
       await refreshRoom();
     } catch (cause) {
       setError(
@@ -997,6 +1062,102 @@ export function ProjectRoom(props: ProjectRoomProps) {
               </SectionCard>
             </RevealSection>
           </div>
+
+          <RevealSection delay={0.28}>
+            <SectionCard
+              eyebrow={roomMessages.reviewsEyebrow}
+              title={roomMessages.reviewsTitle}
+              className={styles.panel}
+              headerClassName={styles.panelHeader}
+            >
+              <div className={styles.stack}>
+                {canLeaveReview ? (
+                  <SurfaceCard className={styles.actionPanel}>
+                    <strong>{roomMessages.reviewFormTitle}</strong>
+                    <label className={styles.field}>
+                      <span>{roomMessages.fields.reviewRating}</span>
+                      <select
+                        value={String(reviewDraft.rating)}
+                        onChange={(event) =>
+                          setReviewDraft((current) => ({
+                            ...current,
+                            rating: Number(event.target.value),
+                          }))
+                        }
+                      >
+                        {[5, 4, 3, 2, 1].map((rating) => (
+                          <option key={rating} value={rating}>
+                            {rating}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.field}>
+                      <span>{roomMessages.fields.reviewHeadline}</span>
+                      <input
+                        type="text"
+                        value={reviewDraft.headline}
+                        onChange={(event) =>
+                          setReviewDraft((current) => ({
+                            ...current,
+                            headline: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{roomMessages.fields.reviewBody}</span>
+                      <textarea
+                        rows={4}
+                        value={reviewDraft.body}
+                        onChange={(event) =>
+                          setReviewDraft((current) => ({
+                            ...current,
+                            body: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <div className={styles.inlineActions}>
+                      <Button
+                        type="button"
+                        onClick={() => void handleSubmitReview()}
+                        disabled={!reviewDraft.body.trim()}
+                      >
+                        {roomMessages.actions.submitReview}
+                      </Button>
+                    </div>
+                  </SurfaceCard>
+                ) : null}
+                {reviews.length === 0 ? (
+                  <p className={styles.stateText}>{roomMessages.noReviews}</p>
+                ) : (
+                  reviews
+                    .slice()
+                    .sort((left, right) => right.createdAt - left.createdAt)
+                    .map((review) => (
+                      <article key={review.id} className={styles.timelineCard}>
+                        <div className={styles.timelineHead}>
+                          <strong>
+                            {review.reviewer.displayName} • {review.rating}/5
+                          </strong>
+                          <span className={styles.stateText}>
+                            {formatDateTime(review.createdAt)}
+                          </span>
+                        </div>
+                        <p className={styles.stateText}>
+                          {roomMessages.labels.reviewRole(review.reviewer.role)}
+                        </p>
+                        {review.headline ? (
+                          <p className={styles.stateText}>{review.headline}</p>
+                        ) : null}
+                        <p className={styles.stateText}>{review.body ?? ''}</p>
+                      </article>
+                    ))
+                )}
+              </div>
+            </SectionCard>
+          </RevealSection>
         </>
       ) : null}
     </ConsolePage>

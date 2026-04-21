@@ -96,6 +96,21 @@ export type MarketplaceContractDraftStatus =
   | 'finalized'
   | 'converted'
   | 'cancelled';
+export type MarketplaceReviewVisibilityStatus = 'visible' | 'hidden';
+export type MarketplaceIdentityConfidenceLabel =
+  | 'email_verified'
+  | 'wallet_verified'
+  | 'smart_account_ready'
+  | 'operator_reviewed_proof';
+export type MarketplaceIdentityRiskLevel = 'low' | 'medium' | 'high';
+export type MarketplaceRiskSignalSeverity = 'low' | 'medium' | 'high';
+export type MarketplaceRiskSignalCode =
+  | 'high_dispute_rate'
+  | 'repeat_abuse_reports'
+  | 'review_hidden_by_operator'
+  | 'identity_mismatch'
+  | 'off_platform_payment_report'
+  | 'revision_heavy_delivery';
 export type MarketplaceDecisionAction =
   | 'applied'
   | 'revised'
@@ -480,6 +495,45 @@ export type MarketplaceContractDraftRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceReviewScores = {
+  scopeClarity: number;
+  communication: number;
+  timeliness: number;
+  outcomeQuality: number;
+};
+
+export type MarketplaceReviewRecord = {
+  id: string;
+  jobId: string;
+  reviewerUserId: string;
+  revieweeUserId: string;
+  reviewerRole: 'client' | 'worker';
+  revieweeRole: 'client' | 'worker';
+  rating: number;
+  scores: MarketplaceReviewScores;
+  headline: string | null;
+  body: string | null;
+  visibilityStatus: MarketplaceReviewVisibilityStatus;
+  moderationNote: string | null;
+  moderatedByUserId: string | null;
+  moderatedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceIdentityRiskReviewRecord = {
+  id: string;
+  subjectUserId: string;
+  confidenceLabel: MarketplaceIdentityConfidenceLabel;
+  riskLevel: MarketplaceIdentityRiskLevel;
+  flags: MarketplaceRiskSignalCode[];
+  operatorSummary: string | null;
+  reviewedByUserId: string;
+  reviewedAt: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MarketplaceApplicationDecisionRecord = {
   id: string;
   applicationId: string;
@@ -525,12 +579,16 @@ export type MarketplaceProfileView = Omit<
   verifiedWalletAddress: string | null;
   verificationLevel: MarketplaceVerificationLevel;
   escrowStats: MarketplaceEscrowStats;
+  reputation: MarketplaceReputationSnapshot;
+  publicReviews: MarketplaceReviewView[];
   completedEscrowCount: number;
   isComplete: boolean;
 };
 
 export type MarketplaceAdminProfileView = MarketplaceProfileView & {
   moderationStatus: ModerationStatus;
+  identityReview: MarketplaceIdentityRiskReviewView | null;
+  riskSignals: MarketplaceRiskSignalView[];
 };
 
 export type MarketplaceClientSummary = {
@@ -540,6 +598,7 @@ export type MarketplaceClientSummary = {
   workspaceKind: 'client';
   displayName: string;
   profileSlug: string | null;
+  reputation: MarketplaceReputationSnapshot;
 };
 
 export type MarketplaceTalentSummary = {
@@ -555,7 +614,66 @@ export type MarketplaceTalentSummary = {
   verificationLevel: MarketplaceVerificationLevel;
   cryptoReadiness: MarketplaceCryptoReadiness;
   escrowStats: MarketplaceEscrowStats;
+  reputation: MarketplaceReputationSnapshot;
   completedEscrowCount: number;
+};
+
+export type MarketplaceReviewView = Omit<
+  MarketplaceReviewRecord,
+  'reviewerUserId' | 'revieweeUserId' | 'moderatedByUserId'
+> & {
+  reviewer: {
+    userId: string;
+    displayName: string;
+    role: 'client' | 'worker';
+  };
+  reviewee: {
+    userId: string;
+    role: 'client' | 'worker';
+  };
+  moderatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+};
+
+export type MarketplaceIdentityRiskReviewView = Omit<
+  MarketplaceIdentityRiskReviewRecord,
+  'reviewedByUserId'
+> & {
+  reviewedBy: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type MarketplaceRiskSignalView = {
+  code: MarketplaceRiskSignalCode;
+  severity: MarketplaceRiskSignalSeverity;
+  summary: string;
+};
+
+export type MarketplaceReputationSnapshot = {
+  subjectUserId: string;
+  role: 'client' | 'worker';
+  identityConfidence: MarketplaceIdentityConfidenceLabel;
+  publicReviewCount: number;
+  averageRating: number | null;
+  ratingBreakdown: {
+    oneStar: number;
+    twoStar: number;
+    threeStar: number;
+    fourStar: number;
+    fiveStar: number;
+  };
+  totalContracts: number;
+  completionRate: number;
+  disputeRate: number;
+  onTimeDeliveryRate: number;
+  responseRate: number | null;
+  inviteAcceptanceRate: number | null;
+  revisionRate: number | null;
+  averageContractValueBand: MarketplaceEscrowStats['averageContractValueBand'];
 };
 
 export type MarketplaceApplicationOpportunitySummary = {
@@ -753,6 +871,11 @@ export type MarketplaceModerationDashboard = {
     agingAbuseReports: number;
     staleAbuseReports: number;
     oldestActiveAbuseReportHours: number | null;
+    totalReviews: number;
+    visibleReviews: number;
+    hiddenReviews: number;
+    highRiskIdentityReviews: number;
+    operatorReviewedIdentities: number;
   };
   thresholds: {
     abuseReportAgingHours: number;
@@ -859,6 +982,22 @@ export type MarketplaceAbuseReportResponse = {
 
 export type MarketplaceAbuseReportsListResponse = {
   reports: MarketplaceAbuseReportView[];
+};
+
+export type MarketplaceJobReviewsResponse = {
+  reviews: MarketplaceReviewView[];
+};
+
+export type MarketplaceReviewResponse = {
+  review: MarketplaceReviewView;
+};
+
+export type MarketplaceModerationReviewsListResponse = {
+  reviews: MarketplaceReviewView[];
+};
+
+export type MarketplaceIdentityRiskReviewResponse = {
+  review: MarketplaceIdentityRiskReviewView;
 };
 
 export type HireApplicationResponse = {

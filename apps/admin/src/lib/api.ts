@@ -231,6 +231,76 @@ export type RuntimeProfile = {
 };
 
 export type MarketplaceModerationStatus = 'visible' | 'hidden' | 'suspended';
+export type MarketplaceReviewVisibilityStatus = 'visible' | 'hidden';
+export type MarketplaceIdentityConfidenceLabel =
+  | 'email_verified'
+  | 'wallet_verified'
+  | 'smart_account_ready'
+  | 'operator_reviewed_proof';
+export type MarketplaceIdentityRiskLevel = 'low' | 'medium' | 'high';
+export type MarketplaceRiskSignalCode =
+  | 'high_dispute_rate'
+  | 'repeat_abuse_reports'
+  | 'review_hidden_by_operator'
+  | 'identity_mismatch'
+  | 'off_platform_payment_report'
+  | 'revision_heavy_delivery';
+
+export type MarketplaceReview = {
+  id: string;
+  jobId: string;
+  reviewerRole: 'client' | 'worker';
+  revieweeRole: 'client' | 'worker';
+  rating: number;
+  scores: {
+    scopeClarity: number;
+    communication: number;
+    timeliness: number;
+    outcomeQuality: number;
+  };
+  headline: string | null;
+  body: string | null;
+  visibilityStatus: MarketplaceReviewVisibilityStatus;
+  moderationNote: string | null;
+  moderatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  moderatedAt: number | null;
+  reviewer: {
+    userId: string;
+    displayName: string;
+    role: 'client' | 'worker';
+  };
+  reviewee: {
+    userId: string;
+    role: 'client' | 'worker';
+  };
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceIdentityRiskReview = {
+  id: string;
+  subjectUserId: string;
+  confidenceLabel: MarketplaceIdentityConfidenceLabel;
+  riskLevel: MarketplaceIdentityRiskLevel;
+  flags: MarketplaceRiskSignalCode[];
+  operatorSummary: string | null;
+  reviewedBy: {
+    userId: string;
+    email: string;
+  };
+  reviewedAt: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceRiskSignal = {
+  code: MarketplaceRiskSignalCode;
+  severity: 'low' | 'medium' | 'high';
+  summary: string;
+};
 
 export type MarketplaceAdminProfile = {
   userId: string;
@@ -248,6 +318,8 @@ export type MarketplaceAdminProfile = {
   completedEscrowCount: number;
   isComplete: boolean;
   moderationStatus: MarketplaceModerationStatus;
+  identityReview: MarketplaceIdentityRiskReview | null;
+  riskSignals: MarketplaceRiskSignal[];
 };
 
 export type MarketplaceAdminOpportunity = {
@@ -306,6 +378,11 @@ export type MarketplaceModerationDashboard = {
     agingAbuseReports: number;
     staleAbuseReports: number;
     oldestActiveAbuseReportHours: number | null;
+    totalReviews: number;
+    visibleReviews: number;
+    hiddenReviews: number;
+    highRiskIdentityReviews: number;
+    operatorReviewedIdentities: number;
   };
   thresholds: {
     abuseReportAgingHours: number;
@@ -1362,6 +1439,52 @@ export const adminApi = {
     return requestJson<{ report: MarketplaceAbuseReport }>(
       apiBaseUrl,
       `/marketplace/moderation/reports/${encodeURIComponent(reportId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMarketplaceModerationReviews(accessToken: string) {
+    return requestJson<{ reviews: MarketplaceReview[] }>(
+      apiBaseUrl,
+      '/marketplace/moderation/reviews',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  updateMarketplaceModerationReview(
+    reviewId: string,
+    input: {
+      visibilityStatus: MarketplaceReviewVisibilityStatus;
+      moderationNote?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ review: MarketplaceReview }>(
+      apiBaseUrl,
+      `/marketplace/moderation/reviews/${encodeURIComponent(reviewId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceModerationIdentityReview(
+    userId: string,
+    input: {
+      confidenceLabel: MarketplaceIdentityConfidenceLabel;
+      riskLevel: MarketplaceIdentityRiskLevel;
+      flags: MarketplaceRiskSignalCode[];
+      operatorSummary?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ review: MarketplaceIdentityRiskReview }>(
+      apiBaseUrl,
+      `/marketplace/moderation/identity/${encodeURIComponent(userId)}`,
       {
         method: 'POST',
         body: JSON.stringify(input),

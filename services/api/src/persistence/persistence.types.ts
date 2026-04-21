@@ -22,12 +22,14 @@ import type {
   MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
   MarketplaceContractDraftRecord,
+  MarketplaceIdentityRiskReviewRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferRecord,
   MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
+  MarketplaceReviewRecord,
   MarketplaceSavedSearchRecord,
   MarketplaceOpportunitySearchDocument,
   MarketplaceTalentSearchDocument,
@@ -215,6 +217,16 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceAbuseReportRecord | null>;
   listAbuseReports(): Promise<MarketplaceAbuseReportRecord[]>;
   saveAbuseReport(report: MarketplaceAbuseReportRecord): Promise<void>;
+  getReviewById(reviewId: string): Promise<MarketplaceReviewRecord | null>;
+  listReviews(): Promise<MarketplaceReviewRecord[]>;
+  saveReview(review: MarketplaceReviewRecord): Promise<void>;
+  getIdentityRiskReviewByUserId(
+    userId: string,
+  ): Promise<MarketplaceIdentityRiskReviewRecord | null>;
+  listIdentityRiskReviews(): Promise<MarketplaceIdentityRiskReviewRecord[]>;
+  saveIdentityRiskReview(
+    review: MarketplaceIdentityRiskReviewRecord,
+  ): Promise<void>;
 }
 
 export interface WalletLinkChallengesRepository {
@@ -227,7 +239,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 24;
+  version: 25;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -266,5 +278,7 @@ export type PersistenceFileData = {
   marketplaceSavedSearches: Record<string, MarketplaceSavedSearchRecord>;
   marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
+  marketplaceReviews: Record<string, MarketplaceReviewRecord>;
+  marketplaceIdentityRiskReviews: Record<string, MarketplaceIdentityRiskReviewRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

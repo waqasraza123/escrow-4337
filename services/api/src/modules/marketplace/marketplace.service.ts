@@ -16,7 +16,10 @@ import type {
   EscrowRepository,
   MarketplaceRepository,
 } from '../../persistence/persistence.types';
-import type { EscrowMilestoneRecord } from '../escrow/escrow.types';
+import type {
+  EscrowJobRecord,
+  EscrowMilestoneRecord,
+} from '../escrow/escrow.types';
 import { EscrowService } from '../escrow/escrow.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import type { WorkspaceSummary } from '../organizations/organizations.types';
@@ -34,6 +37,7 @@ import type {
   CreateMarketplaceInterviewMessageDto,
   CreateMarketplaceOfferDto,
   CreateMarketplaceOpportunityInviteDto,
+  CreateMarketplaceReviewDto,
   CreateMarketplaceSavedSearchDto,
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
@@ -47,8 +51,10 @@ import type {
   ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
   UpdateMarketplaceAbuseReportDto,
+  UpdateMarketplaceIdentityRiskReviewDto,
   UpdateMarketplaceOpportunityDto,
   UpdateMarketplaceProofsDto,
+  UpdateMarketplaceReviewModerationDto,
   UpdateMarketplaceScreeningDto,
   UpdateModerationDto,
   UpsertMarketplaceProfileDto,
@@ -88,14 +94,19 @@ import type {
   MarketplaceCryptoReadiness,
   MarketplaceEscrowStats,
   MarketplaceFitBreakdownEntry,
+  MarketplaceIdentityRiskReviewRecord,
+  MarketplaceIdentityRiskReviewResponse,
+  MarketplaceIdentityRiskReviewView,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewMessageView,
   MarketplaceInterviewThreadRecord,
+  MarketplaceJobReviewsResponse,
   MarketplaceInterviewThreadResponse,
   MarketplaceInterviewThreadView,
   MarketplaceMatchesResponse,
   MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
+  MarketplaceModerationReviewsListResponse,
   MarketplaceNoHireReason,
   MarketplaceOfferMilestoneDraft,
   MarketplaceOfferRecord,
@@ -116,7 +127,13 @@ import type {
   MarketplaceProfileResponse,
   MarketplaceProfilesListResponse,
   MarketplaceProfileView,
+  MarketplaceReputationSnapshot,
   MarketplaceRankingFeatureSnapshot,
+  MarketplaceReviewRecord,
+  MarketplaceReviewResponse,
+  MarketplaceReviewView,
+  MarketplaceRiskSignalCode,
+  MarketplaceRiskSignalView,
   MarketplaceSavedSearchResponse,
   MarketplaceSavedSearchesResponse,
   MarketplaceSavedSearchRecord,
@@ -1132,6 +1149,91 @@ export class MarketplaceService {
     };
   }
 
+  async getJobReviews(
+    userId: string,
+    jobId: string,
+  ): Promise<MarketplaceJobReviewsResponse> {
+    const job = await this.requireReviewableJob(jobId);
+    const roles = await this.resolveEscrowParticipantRoles(
+      await this.usersService.getRequiredById(userId),
+      job,
+    );
+    if (roles.length === 0) {
+      throw new ForbiddenException(
+        'Only marketplace participants can access job reviews',
+      );
+    }
+    const reviews = (await this.marketplaceRepository.listReviews())
+      .filter((review) => review.jobId === jobId)
+      .sort((left, right) => right.createdAt - left.createdAt);
+    return {
+      reviews: await Promise.all(
+        reviews.map((review) => this.toReviewView(review)),
+      ),
+    };
+  }
+
+  async createJobReview(
+    userId: string,
+    jobId: string,
+    dto: CreateMarketplaceReviewDto,
+  ): Promise<MarketplaceReviewResponse> {
+    const reviewer = await this.usersService.getRequiredById(userId);
+    const job = await this.requireReviewableJob(jobId);
+    const participantRoles = await this.resolveEscrowParticipantRoles(
+      reviewer,
+      job,
+    );
+    if (participantRoles.length === 0) {
+      throw new ForbiddenException(
+        'Only marketplace participants can submit job reviews',
+      );
+    }
+    const reviewerRole = participantRoles.includes('client') ? 'client' : 'worker';
+    const revieweeRole = reviewerRole === 'client' ? 'worker' : 'client';
+    const revieweeUserId = await this.resolveEscrowParticipantUserId(
+      job,
+      revieweeRole,
+    );
+    if (!revieweeUserId) {
+      throw new ConflictException(
+        'The opposite marketplace participant could not be resolved for review capture',
+      );
+    }
+    if (revieweeUserId === userId) {
+      throw new ConflictException('A marketplace participant cannot review themself');
+    }
+    const existing = (await this.marketplaceRepository.listReviews()).find(
+      (review) => review.jobId === jobId && review.reviewerUserId === userId,
+    );
+    if (existing) {
+      throw new ConflictException('A marketplace review already exists for this job');
+    }
+    const now = Date.now();
+    const review: MarketplaceReviewRecord = {
+      id: randomUUID(),
+      jobId,
+      reviewerUserId: userId,
+      revieweeUserId,
+      reviewerRole,
+      revieweeRole,
+      rating: dto.rating,
+      scores: dto.scores,
+      headline: dto.headline?.trim() || null,
+      body: dto.body.trim(),
+      visibilityStatus: 'visible',
+      moderationNote: null,
+      moderatedByUserId: null,
+      moderatedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveReview(review);
+    return {
+      review: await this.toReviewView(review),
+    };
+  }
+
   async getOpportunityApplications(
     userId: string,
     opportunityId: string,
@@ -2128,6 +2230,9 @@ export class MarketplaceService {
     const opportunities = await this.marketplaceRepository.listOpportunities();
     const applications = await this.marketplaceRepository.listApplications();
     const reports = await this.marketplaceRepository.listAbuseReports();
+    const reviews = await this.marketplaceRepository.listReviews();
+    const identityReviews =
+      await this.marketplaceRepository.listIdentityRiskReviews();
     const profileMap = new Map(
       profiles.map((profile) => [profile.userId, profile]),
     );
@@ -2240,6 +2345,17 @@ export class MarketplaceService {
                   this.getAbuseReportAgeHours(report, agingNow),
                 ),
               ),
+        totalReviews: reviews.length,
+        visibleReviews: reviews.filter(
+          (review) => review.visibilityStatus === 'visible',
+        ).length,
+        hiddenReviews: reviews.filter(
+          (review) => review.visibilityStatus === 'hidden',
+        ).length,
+        highRiskIdentityReviews: identityReviews.filter(
+          (review) => review.riskLevel === 'high',
+        ).length,
+        operatorReviewedIdentities: identityReviews.length,
       },
       thresholds: {
         abuseReportAgingHours,
@@ -2276,6 +2392,11 @@ export class MarketplaceService {
           .map(async (profile) => ({
             ...(await this.toProfileView(profile)),
             moderationStatus: profile.moderationStatus,
+            identityReview: await this.getIdentityRiskReviewView(profile.userId),
+            riskSignals: await this.buildRiskSignalsForUser(
+              await this.usersService.getRequiredById(profile.userId),
+              'worker',
+            ),
           })),
       ),
     };
@@ -2359,6 +2480,70 @@ export class MarketplaceService {
           .slice(0, query.limit)
           .map((report) => this.toAbuseReportView(report)),
       ),
+    };
+  }
+
+  async listModerationReviews(
+    userId: string,
+  ): Promise<MarketplaceModerationReviewsListResponse> {
+    await this.requireModerationAccess(userId);
+    const reviews = await this.marketplaceRepository.listReviews();
+    return {
+      reviews: await Promise.all(
+        reviews
+          .sort((left, right) => right.updatedAt - left.updatedAt)
+          .map((review) => this.toReviewView(review)),
+      ),
+    };
+  }
+
+  async updateModerationReview(
+    userId: string,
+    reviewId: string,
+    dto: UpdateMarketplaceReviewModerationDto,
+  ): Promise<MarketplaceReviewResponse> {
+    await this.requireModerationAccess(userId);
+    const review = await this.marketplaceRepository.getReviewById(reviewId);
+    if (!review) {
+      throw new NotFoundException('Marketplace review not found');
+    }
+    const now = Date.now();
+    review.visibilityStatus = dto.visibilityStatus;
+    review.moderationNote = dto.moderationNote?.trim() || null;
+    review.moderatedByUserId = userId;
+    review.moderatedAt = now;
+    review.updatedAt = now;
+    await this.marketplaceRepository.saveReview(review);
+    return {
+      review: await this.toReviewView(review),
+    };
+  }
+
+  async updateIdentityRiskReview(
+    userId: string,
+    targetUserId: string,
+    dto: UpdateMarketplaceIdentityRiskReviewDto,
+  ): Promise<MarketplaceIdentityRiskReviewResponse> {
+    await this.requireModerationAccess(userId);
+    await this.usersService.getRequiredById(targetUserId);
+    const now = Date.now();
+    const existing =
+      await this.marketplaceRepository.getIdentityRiskReviewByUserId(targetUserId);
+    const review: MarketplaceIdentityRiskReviewRecord = {
+      id: existing?.id ?? randomUUID(),
+      subjectUserId: targetUserId,
+      confidenceLabel: dto.confidenceLabel,
+      riskLevel: dto.riskLevel,
+      flags: Array.from(new Set(dto.flags)),
+      operatorSummary: dto.operatorSummary?.trim() || null,
+      reviewedByUserId: userId,
+      reviewedAt: now,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveIdentityRiskReview(review);
+    return {
+      review: await this.toIdentityRiskReviewView(review),
     };
   }
 
@@ -2999,7 +3184,7 @@ export class MarketplaceService {
   ): Promise<MarketplaceProfileView> {
     const hydratedProfile = await this.ensureProfileWorkspace(profile);
     const user = await this.usersService.getRequiredById(hydratedProfile.userId);
-    const escrowStats = await this.getEscrowStats(user);
+    const escrowStats = await this.getEscrowStats(user, 'worker');
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
     return {
       ...hydratedProfile,
@@ -3009,6 +3194,8 @@ export class MarketplaceService {
         escrowStats,
       ),
       escrowStats,
+      reputation: await this.buildReputationSnapshot(user, 'worker'),
+      publicReviews: await this.listPublicReviewsForUser(user.id, 'worker'),
       completedEscrowCount: escrowStats.completionCount,
       isComplete: this.isProfileComplete(hydratedProfile),
     };
@@ -3352,6 +3539,390 @@ export class MarketplaceService {
     );
   }
 
+  private async requireReviewableJob(jobId: string) {
+    const job = await this.escrowRepository.getById(jobId);
+    if (!job) {
+      throw new NotFoundException('Escrow job not found');
+    }
+    const merged = (await this.escrowOnchainAuthority.mergeJob(job)).job;
+    if (merged.status !== 'completed' && merged.status !== 'resolved') {
+      throw new ConflictException(
+        'Marketplace reviews are available only after contract completion or resolution',
+      );
+    }
+    return merged;
+  }
+
+  private async toReviewView(
+    review: MarketplaceReviewRecord,
+  ): Promise<MarketplaceReviewView> {
+    const reviewerUser = await this.usersService.getRequiredById(review.reviewerUserId);
+    const reviewerProfile =
+      await this.marketplaceRepository.getProfileByUserId(review.reviewerUserId);
+    const moderatedBy = review.moderatedByUserId
+      ? await this.usersService.getRequiredById(review.moderatedByUserId)
+      : null;
+    return {
+      ...review,
+      reviewer: {
+        userId: reviewerUser.id,
+        displayName:
+          reviewerProfile?.displayName ?? reviewerUser.email.split('@')[0] ?? reviewerUser.id,
+        role: review.reviewerRole,
+      },
+      reviewee: {
+        userId: review.revieweeUserId,
+        role: review.revieweeRole,
+      },
+      moderatedBy: moderatedBy
+        ? {
+            userId: moderatedBy.id,
+            email: moderatedBy.email,
+          }
+        : null,
+    };
+  }
+
+  private async toIdentityRiskReviewView(
+    review: MarketplaceIdentityRiskReviewRecord,
+  ): Promise<MarketplaceIdentityRiskReviewView> {
+    const operator = await this.usersService.getRequiredById(review.reviewedByUserId);
+    return {
+      ...review,
+      reviewedBy: {
+        userId: operator.id,
+        email: operator.email,
+      },
+    };
+  }
+
+  private async getIdentityRiskReviewView(userId: string) {
+    const review =
+      await this.marketplaceRepository.getIdentityRiskReviewByUserId(userId);
+    return review ? this.toIdentityRiskReviewView(review) : null;
+  }
+
+  private getIdentityConfidence(
+    user: UserRecord,
+    identityReview?: MarketplaceIdentityRiskReviewRecord | null,
+  ) {
+    if (identityReview) {
+      return identityReview.confidenceLabel;
+    }
+    if (user.defaultExecutionWalletAddress) {
+      const wallet = this.usersService.findWallet(
+        user,
+        user.defaultExecutionWalletAddress,
+      );
+      if (wallet && isSmartAccountWallet(wallet)) {
+        return 'smart_account_ready' as const;
+      }
+    }
+    return this.getVerifiedWalletAddress(user)
+      ? ('wallet_verified' as const)
+      : ('email_verified' as const);
+  }
+
+  private async resolveEscrowParticipantUserId(
+    job: EscrowJobRecord,
+    role: 'client' | 'worker',
+  ) {
+    if (role === 'client') {
+      return (
+        (
+          await this.usersService.getByWalletAddress(job.onchain.clientAddress)
+        )?.id ?? null
+      );
+    }
+    if (job.contractorParticipation?.joinedUserId) {
+      return job.contractorParticipation.joinedUserId;
+    }
+    return (
+      (await this.usersService.getByWalletAddress(job.onchain.workerAddress))?.id ??
+      null
+    );
+  }
+
+  private async resolveEscrowParticipantRoles(
+    user: UserRecord,
+    job: EscrowJobRecord,
+  ): Promise<Array<'client' | 'worker'>> {
+    const roles = new Set<'client' | 'worker'>();
+    const normalizedWallets = new Set(
+      user.wallets.map((wallet) => normalizeEvmAddress(wallet.address)),
+    );
+    const clientUserId = await this.resolveEscrowParticipantUserId(job, 'client');
+    const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+    if (
+      clientUserId === user.id ||
+      normalizedWallets.has(normalizeEvmAddress(job.onchain.clientAddress))
+    ) {
+      roles.add('client');
+    }
+    if (
+      workerUserId === user.id ||
+      normalizedWallets.has(normalizeEvmAddress(job.onchain.workerAddress))
+    ) {
+      roles.add('worker');
+    }
+    return Array.from(roles);
+  }
+
+  private async getRoleJobs(
+    user: UserRecord,
+    role: 'client' | 'worker',
+  ): Promise<EscrowJobRecord[]> {
+    const addresses = user.wallets.map((wallet) =>
+      normalizeEvmAddress(wallet.address),
+    );
+    if (addresses.length === 0) {
+      return [];
+    }
+    const jobs = await Promise.all(
+      (await this.escrowRepository.listByParticipantAddresses(addresses)).map(
+        async (job) => (await this.escrowOnchainAuthority.mergeJob(job)).job,
+      ),
+    );
+    const seen = new Set<string>();
+    const matching: EscrowJobRecord[] = [];
+    for (const job of jobs) {
+      if (seen.has(job.id)) {
+        continue;
+      }
+      const roles = await this.resolveEscrowParticipantRoles(user, job);
+      if (roles.includes(role)) {
+        seen.add(job.id);
+        matching.push(job);
+      }
+    }
+    return matching;
+  }
+
+  private async buildReputationSnapshot(
+    user: UserRecord,
+    role: 'client' | 'worker',
+  ): Promise<MarketplaceReputationSnapshot> {
+    const escrowStats = await this.getEscrowStats(user, role);
+    const visibleReviews = (await this.marketplaceRepository.listReviews()).filter(
+      (review) =>
+        review.revieweeUserId === user.id &&
+        review.revieweeRole === role &&
+        review.visibilityStatus === 'visible',
+    );
+    const ratingBreakdown = {
+      oneStar: visibleReviews.filter((review) => review.rating === 1).length,
+      twoStar: visibleReviews.filter((review) => review.rating === 2).length,
+      threeStar: visibleReviews.filter((review) => review.rating === 3).length,
+      fourStar: visibleReviews.filter((review) => review.rating === 4).length,
+      fiveStar: visibleReviews.filter((review) => review.rating === 5).length,
+    };
+    const averageRating =
+      visibleReviews.length === 0
+        ? null
+        : Number(
+            (
+              visibleReviews.reduce((sum, review) => sum + review.rating, 0) /
+              visibleReviews.length
+            ).toFixed(1),
+          );
+    const identityReview =
+      await this.marketplaceRepository.getIdentityRiskReviewByUserId(user.id);
+    const invites = await this.marketplaceRepository.listOpportunityInvites();
+    const applications = await this.marketplaceRepository.listApplications();
+    let responseRate: number | null = null;
+    let inviteAcceptanceRate: number | null = null;
+    if (role === 'worker') {
+      const myInvites = invites.filter(
+        (invite) => invite.invitedProfileUserId === user.id,
+      );
+      if (myInvites.length > 0) {
+        responseRate = roundPercent(
+          myInvites.filter((invite) => invite.status !== 'pending').length,
+          myInvites.length,
+        );
+        inviteAcceptanceRate = roundPercent(
+          myInvites.filter((invite) => invite.status === 'applied').length,
+          myInvites.length,
+        );
+      }
+    } else {
+      const myOpportunityIds = new Set(
+        (await this.marketplaceRepository.listOpportunities())
+          .filter((opportunity) => opportunity.ownerUserId === user.id)
+          .map((opportunity) => opportunity.id),
+      );
+      const incomingApplications = applications.filter((application) =>
+        myOpportunityIds.has(application.opportunityId),
+      );
+      if (incomingApplications.length > 0) {
+        responseRate = roundPercent(
+          incomingApplications.filter(
+            (application) => application.status !== 'submitted',
+          ).length,
+          incomingApplications.length,
+        );
+      }
+      const sentInvites = invites.filter((invite) =>
+        myOpportunityIds.has(invite.opportunityId),
+      );
+      if (sentInvites.length > 0) {
+        inviteAcceptanceRate = roundPercent(
+          sentInvites.filter((invite) => invite.status === 'applied').length,
+          sentInvites.length,
+        );
+      }
+    }
+    const jobs = await this.getRoleJobs(user, role);
+    const totalSubmissions = jobs.reduce(
+      (sum, job) => sum + (job.projectRoom?.submissions.length ?? 0),
+      0,
+    );
+    const revisionRequested = jobs.reduce(
+      (sum, job) =>
+        sum +
+        (job.projectRoom?.submissions.filter(
+          (submission) => submission.revisionRequest !== null,
+        ).length ?? 0),
+      0,
+    );
+    return {
+      subjectUserId: user.id,
+      role,
+      identityConfidence: this.getIdentityConfidence(user, identityReview),
+      publicReviewCount: visibleReviews.length,
+      averageRating,
+      ratingBreakdown,
+      totalContracts: escrowStats.totalContracts,
+      completionRate: escrowStats.completionRate,
+      disputeRate: escrowStats.disputeRate,
+      onTimeDeliveryRate: escrowStats.onTimeDeliveryRate,
+      responseRate,
+      inviteAcceptanceRate,
+      revisionRate:
+        totalSubmissions > 0
+          ? roundPercent(revisionRequested, totalSubmissions)
+          : null,
+      averageContractValueBand: escrowStats.averageContractValueBand,
+    };
+  }
+
+  private async listPublicReviewsForUser(
+    userId: string,
+    revieweeRole: 'client' | 'worker',
+    limit = 5,
+  ): Promise<MarketplaceReviewView[]> {
+    const reviews = (await this.marketplaceRepository.listReviews())
+      .filter(
+        (review) =>
+          review.revieweeUserId === userId &&
+          review.revieweeRole === revieweeRole &&
+          review.visibilityStatus === 'visible',
+      )
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, limit);
+    return Promise.all(reviews.map((review) => this.toReviewView(review)));
+  }
+
+  private async buildRiskSignalsForUser(
+    user: UserRecord,
+    role: 'client' | 'worker',
+  ): Promise<MarketplaceRiskSignalView[]> {
+    const reputation = await this.buildReputationSnapshot(user, role);
+    const identityReview =
+      await this.marketplaceRepository.getIdentityRiskReviewByUserId(user.id);
+    const reviews = await this.marketplaceRepository.listReviews();
+    const hiddenReviews = reviews.filter(
+      (review) =>
+        review.revieweeUserId === user.id &&
+        review.revieweeRole === role &&
+        review.visibilityStatus === 'hidden',
+    ).length;
+    const allReports = await this.marketplaceRepository.listAbuseReports();
+    const ownedOpportunityIds =
+      role === 'client'
+        ? new Set(
+            (await this.marketplaceRepository.listOpportunities())
+              .filter((opportunity) => opportunity.ownerUserId === user.id)
+              .map((opportunity) => opportunity.id),
+          )
+        : new Set<string>();
+    const activeReports = allReports.filter((report) => {
+      if (!this.isActiveAbuseReport(report)) {
+        return false;
+      }
+      if (role === 'worker') {
+        return report.subjectType === 'profile' && report.subjectId === user.id;
+      }
+      return (
+        report.subjectType === 'opportunity' &&
+        ownedOpportunityIds.has(report.subjectId)
+      );
+    });
+    const signals: MarketplaceRiskSignalView[] = [];
+    const pushSignal = (
+      code: MarketplaceRiskSignalCode,
+      severity: MarketplaceRiskSignalView['severity'],
+      summary: string,
+    ) => {
+      if (signals.some((signal) => signal.code === code)) {
+        return;
+      }
+      signals.push({ code, severity, summary });
+    };
+    if (reputation.totalContracts >= 4 && reputation.disputeRate >= 25) {
+      pushSignal(
+        'high_dispute_rate',
+        reputation.disputeRate >= 40 ? 'high' : 'medium',
+        `Dispute rate is ${reputation.disputeRate}% across ${reputation.totalContracts} escrow contracts.`,
+      );
+    }
+    if (activeReports.length >= 2) {
+      pushSignal(
+        'repeat_abuse_reports',
+        activeReports.length >= 4 ? 'high' : 'medium',
+        `${activeReports.length} active trust-and-safety reports are open for this subject.`,
+      );
+    }
+    if (hiddenReviews > 0) {
+      pushSignal(
+        'review_hidden_by_operator',
+        hiddenReviews >= 2 ? 'medium' : 'low',
+        `${hiddenReviews} marketplace review${hiddenReviews === 1 ? ' was' : 's were'} hidden by an operator.`,
+      );
+    }
+    if (identityReview && identityReview.riskLevel !== 'low') {
+      pushSignal(
+        'identity_mismatch',
+        identityReview.riskLevel,
+        identityReview.operatorSummary ??
+          `Identity review marked this subject as ${identityReview.riskLevel} risk.`,
+      );
+    }
+    if (
+      activeReports.some((report) => report.reason === 'off_platform_payment')
+    ) {
+      pushSignal(
+        'off_platform_payment_report',
+        'high',
+        'An active off-platform payment report is open for this subject.',
+      );
+    }
+    if (
+      reputation.revisionRate !== null &&
+      reputation.revisionRate >= 35
+    ) {
+      pushSignal(
+        'revision_heavy_delivery',
+        reputation.revisionRate >= 60 ? 'high' : 'medium',
+        `Revision requests touched ${reputation.revisionRate}% of submitted milestone deliveries.`,
+      );
+    }
+    return signals.sort((left, right) => {
+      const order = { low: 0, medium: 1, high: 2 } as const;
+      return order[right.severity] - order[left.severity];
+    });
+  }
+
   private async toAbuseReportView(
     report: MarketplaceAbuseReportRecord,
   ): Promise<MarketplaceAbuseReportView> {
@@ -3479,6 +4050,7 @@ export class MarketplaceService {
       workspaceKind: 'client',
       displayName: profile?.displayName ?? user.email.split('@')[0] ?? user.id,
       profileSlug: profile?.slug ?? null,
+      reputation: await this.buildReputationSnapshot(user, 'client'),
     };
   }
 
@@ -3489,7 +4061,7 @@ export class MarketplaceService {
     const profile = rawProfile
       ? await this.ensureProfileWorkspace(rawProfile)
       : null;
-    const escrowStats = await this.getEscrowStats(user);
+    const escrowStats = await this.getEscrowStats(user, 'worker');
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
 
     return {
@@ -3509,6 +4081,7 @@ export class MarketplaceService {
       cryptoReadiness:
         profile?.cryptoReadiness ?? this.deriveCryptoReadiness(user),
       escrowStats,
+      reputation: await this.buildReputationSnapshot(user, 'worker'),
       completedEscrowCount: escrowStats.completionCount,
     };
   }
@@ -3727,11 +4300,10 @@ export class MarketplaceService {
 
   private async getEscrowStats(
     user: UserRecord,
+    role: 'client' | 'worker' = 'worker',
   ): Promise<MarketplaceEscrowStats> {
-    const addresses = user.wallets.map((wallet) =>
-      normalizeEvmAddress(wallet.address),
-    );
-    if (addresses.length === 0) {
+    const jobs = await this.getRoleJobs(user, role);
+    if (jobs.length === 0) {
       return {
         totalContracts: 0,
         completionCount: 0,
@@ -3743,16 +4315,6 @@ export class MarketplaceService {
         completedByCategory: [],
       };
     }
-
-    const jobs = await Promise.all(
-      (await this.escrowRepository.listByParticipantAddresses(addresses))
-        .filter((job) =>
-          addresses.includes(normalizeEvmAddress(job.onchain.workerAddress)),
-        )
-        .map(
-          async (job) => (await this.escrowOnchainAuthority.mergeJob(job)).job,
-        ),
-    );
     const completedJobs = jobs.filter(
       (job) => job.status === 'completed' || job.status === 'resolved',
     );

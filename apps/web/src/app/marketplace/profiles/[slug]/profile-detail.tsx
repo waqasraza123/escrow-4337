@@ -25,6 +25,10 @@ function formatPercent(value: number) {
   return `${value}%`;
 }
 
+function formatRating(value: number | null) {
+  return value === null ? '—' : `${value.toFixed(1)} / 5`;
+}
+
 export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
   const { messages } = useWebI18n();
   const marketplaceMessages = messages.publicMarketplace;
@@ -222,6 +226,90 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
             </RevealSection>
 
             <RevealSection className="fx-fade-up fx-fade-up-delay-2 grid gap-5 xl:grid-cols-2" delay={0.12}>
+              <SectionCard
+                eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
+                title={marketplaceMessages.profileDetail.trustTitle}
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
+                headerClassName="mb-5"
+              >
+                <FactGrid>
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.averageRating}
+                    value={formatRating(profile.reputation.averageRating)}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.publicReviewCount}
+                    value={profile.reputation.publicReviewCount}
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.identityConfidence}
+                    value={
+                      marketplaceMessages.labels.identityConfidence[
+                        profile.reputation.identityConfidence
+                      ]
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.responseRate}
+                    value={
+                      profile.reputation.responseRate === null
+                        ? '—'
+                        : formatPercent(profile.reputation.responseRate)
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.inviteAcceptanceRate}
+                    value={
+                      profile.reputation.inviteAcceptanceRate === null
+                        ? '—'
+                        : formatPercent(profile.reputation.inviteAcceptanceRate)
+                    }
+                  />
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.revisionRate}
+                    value={
+                      profile.reputation.revisionRate === null
+                        ? '—'
+                        : formatPercent(profile.reputation.revisionRate)
+                    }
+                  />
+                </FactGrid>
+              </SectionCard>
+
+              <SectionCard
+                eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
+                title={marketplaceMessages.profileDetail.recentReviews}
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
+                headerClassName="mb-5"
+              >
+                <div className="grid gap-4">
+                  {profile.publicReviews.length === 0 ? (
+                    <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+                      {marketplaceMessages.profileDetail.noReviews}
+                    </p>
+                  ) : (
+                    profile.publicReviews.map((review) => (
+                      <article
+                        key={review.id}
+                        className="rounded-[1.25rem] border border-[var(--surface-border)] bg-[var(--card-bg)] p-4"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
+                          {review.reviewer.displayName} • {formatRating(review.rating)}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
+                          {review.headline ?? marketplaceMessages.profileDetail.recentReviews}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-[var(--foreground-soft)]">
+                          {review.body ?? ''}
+                        </p>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </SectionCard>
+            </RevealSection>
+
+            <RevealSection className="fx-fade-up fx-fade-up-delay-3 grid gap-5 xl:grid-cols-2" delay={0.16}>
               <SectionCard
                 eyebrow={marketplaceMessages.profileDetail.proofEyebrow}
                 title={marketplaceMessages.profileDetail.walletAndProofTitle}

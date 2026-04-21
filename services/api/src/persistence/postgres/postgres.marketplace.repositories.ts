@@ -12,6 +12,9 @@ import type {
   MarketplaceContractMetadataSnapshot,
   MarketplaceCryptoReadiness,
   MarketplaceEngagementType,
+  MarketplaceIdentityConfidenceLabel,
+  MarketplaceIdentityRiskLevel,
+  MarketplaceIdentityRiskReviewRecord,
   MarketplaceInterviewMessageKind,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
@@ -26,6 +29,10 @@ import type {
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
   MarketplaceRankingFeatureSnapshot,
+  MarketplaceReviewRecord,
+  MarketplaceReviewScores,
+  MarketplaceReviewVisibilityStatus,
+  MarketplaceRiskSignalCode,
   MarketplaceSavedSearchAlertFrequency,
   MarketplaceSavedSearchKind,
   MarketplaceSavedSearchRecord,
@@ -297,6 +304,38 @@ type MarketplaceOpportunityInviteRow = QueryResultRow & {
   invited_workspace_id: string | null;
   message: string | null;
   status: MarketplaceOpportunityInviteStatus;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceReviewRow = QueryResultRow & {
+  id: string;
+  job_id: string;
+  reviewer_user_id: string;
+  reviewee_user_id: string;
+  reviewer_role: MarketplaceReviewRecord['reviewerRole'];
+  reviewee_role: MarketplaceReviewRecord['revieweeRole'];
+  rating: number;
+  scores_json: MarketplaceReviewScores;
+  headline: string | null;
+  body: string | null;
+  visibility_status: MarketplaceReviewVisibilityStatus;
+  moderation_note: string | null;
+  moderated_by_user_id: string | null;
+  moderated_at_ms: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceIdentityRiskReviewRow = QueryResultRow & {
+  id: string;
+  subject_user_id: string;
+  confidence_label: MarketplaceIdentityConfidenceLabel;
+  risk_level: MarketplaceIdentityRiskLevel;
+  flags_json: MarketplaceRiskSignalCode[];
+  operator_summary: string | null;
+  reviewed_by_user_id: string;
+  reviewed_at_ms: string;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -627,6 +666,45 @@ function mapOpportunityInvite(
     invitedWorkspaceId: row.invited_workspace_id,
     message: row.message,
     status: row.status,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapReview(row: MarketplaceReviewRow): MarketplaceReviewRecord {
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    reviewerUserId: row.reviewer_user_id,
+    revieweeUserId: row.reviewee_user_id,
+    reviewerRole: row.reviewer_role,
+    revieweeRole: row.reviewee_role,
+    rating: row.rating,
+    scores: row.scores_json,
+    headline: row.headline,
+    body: row.body,
+    visibilityStatus: row.visibility_status,
+    moderationNote: row.moderation_note,
+    moderatedByUserId: row.moderated_by_user_id,
+    moderatedAt:
+      row.moderated_at_ms === null ? null : Number(row.moderated_at_ms),
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapIdentityRiskReview(
+  row: MarketplaceIdentityRiskReviewRow,
+): MarketplaceIdentityRiskReviewRecord {
+  return {
+    id: row.id,
+    subjectUserId: row.subject_user_id,
+    confidenceLabel: row.confidence_label,
+    riskLevel: row.risk_level,
+    flags: row.flags_json ?? [],
+    operatorSummary: row.operator_summary,
+    reviewedByUserId: row.reviewed_by_user_id,
+    reviewedAt: Number(row.reviewed_at_ms),
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -1788,6 +1866,159 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           : String(report.subjectModeratedAt),
         String(report.createdAt),
         String(report.updatedAt),
+      ],
+    );
+  }
+
+  async getReviewById(reviewId: string) {
+    const result = await this.db.query<MarketplaceReviewRow>(
+      `
+        SELECT *
+        FROM marketplace_reviews
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [reviewId],
+    );
+
+    return result.rows[0] ? mapReview(result.rows[0]) : null;
+  }
+
+  async listReviews() {
+    const result = await this.db.query<MarketplaceReviewRow>(
+      `
+        SELECT *
+        FROM marketplace_reviews
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapReview);
+  }
+
+  async saveReview(review: MarketplaceReviewRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_reviews (
+          id,
+          job_id,
+          reviewer_user_id,
+          reviewee_user_id,
+          reviewer_role,
+          reviewee_role,
+          rating,
+          scores_json,
+          headline,
+          body,
+          visibility_status,
+          moderation_note,
+          moderated_by_user_id,
+          moderated_at_ms,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8::jsonb, $9, $10, $11,
+          $12, $13::uuid, $14, $15, $16
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          rating = EXCLUDED.rating,
+          scores_json = EXCLUDED.scores_json,
+          headline = EXCLUDED.headline,
+          body = EXCLUDED.body,
+          visibility_status = EXCLUDED.visibility_status,
+          moderation_note = EXCLUDED.moderation_note,
+          moderated_by_user_id = EXCLUDED.moderated_by_user_id,
+          moderated_at_ms = EXCLUDED.moderated_at_ms,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        review.id,
+        review.jobId,
+        review.reviewerUserId,
+        review.revieweeUserId,
+        review.reviewerRole,
+        review.revieweeRole,
+        review.rating,
+        JSON.stringify(review.scores),
+        review.headline,
+        review.body,
+        review.visibilityStatus,
+        review.moderationNote,
+        review.moderatedByUserId,
+        review.moderatedAt === null ? null : String(review.moderatedAt),
+        String(review.createdAt),
+        String(review.updatedAt),
+      ],
+    );
+  }
+
+  async getIdentityRiskReviewByUserId(userId: string) {
+    const result = await this.db.query<MarketplaceIdentityRiskReviewRow>(
+      `
+        SELECT *
+        FROM marketplace_identity_risk_reviews
+        WHERE subject_user_id = $1::uuid
+        LIMIT 1
+      `,
+      [userId],
+    );
+
+    return result.rows[0] ? mapIdentityRiskReview(result.rows[0]) : null;
+  }
+
+  async listIdentityRiskReviews() {
+    const result = await this.db.query<MarketplaceIdentityRiskReviewRow>(
+      `
+        SELECT *
+        FROM marketplace_identity_risk_reviews
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapIdentityRiskReview);
+  }
+
+  async saveIdentityRiskReview(review: MarketplaceIdentityRiskReviewRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_identity_risk_reviews (
+          id,
+          subject_user_id,
+          confidence_label,
+          risk_level,
+          flags_json,
+          operator_summary,
+          reviewed_by_user_id,
+          reviewed_at_ms,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2::uuid, $3, $4, $5::jsonb, $6, $7::uuid, $8, $9, $10
+        )
+        ON CONFLICT (subject_user_id)
+        DO UPDATE SET
+          confidence_label = EXCLUDED.confidence_label,
+          risk_level = EXCLUDED.risk_level,
+          flags_json = EXCLUDED.flags_json,
+          operator_summary = EXCLUDED.operator_summary,
+          reviewed_by_user_id = EXCLUDED.reviewed_by_user_id,
+          reviewed_at_ms = EXCLUDED.reviewed_at_ms,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        review.id,
+        review.subjectUserId,
+        review.confidenceLabel,
+        review.riskLevel,
+        JSON.stringify(review.flags),
+        review.operatorSummary,
+        review.reviewedByUserId,
+        String(review.reviewedAt),
+        String(review.createdAt),
+        String(review.updatedAt),
       ],
     );
   }

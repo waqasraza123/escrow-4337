@@ -24,8 +24,13 @@ import {
   type MarketplaceAbuseReportStatus,
   type MarketplaceAdminOpportunity,
   type MarketplaceAdminProfile,
+  type MarketplaceIdentityConfidenceLabel,
+  type MarketplaceIdentityRiskLevel,
   type MarketplaceModerationDashboard,
   type MarketplaceModerationStatus,
+  type MarketplaceReview,
+  type MarketplaceReviewVisibilityStatus,
+  type MarketplaceRiskSignalCode,
   type SessionTokens,
   type UserProfile,
 } from '../../lib/api';
@@ -46,6 +51,21 @@ const queuePriorityLabels: Record<MarketplaceAbuseReportQueuePriority, string> =
   normal: 'Normal',
   closed: 'Closed',
 };
+const identityConfidenceOptions: MarketplaceIdentityConfidenceLabel[] = [
+  'email_verified',
+  'wallet_verified',
+  'smart_account_ready',
+  'operator_reviewed_proof',
+];
+const identityRiskOptions: MarketplaceIdentityRiskLevel[] = ['low', 'medium', 'high'];
+const riskSignalOptions: MarketplaceRiskSignalCode[] = [
+  'high_dispute_rate',
+  'repeat_abuse_reports',
+  'review_hidden_by_operator',
+  'identity_mismatch',
+  'off_platform_payment_report',
+  'revision_heavy_delivery',
+];
 
 function readSession(): SessionTokens | null {
   if (typeof window === 'undefined') {
@@ -91,6 +111,7 @@ export function MarketplaceModerationConsole() {
     [],
   );
   const [reports, setReports] = useState<MarketplaceAbuseReport[]>([]);
+  const [reviews, setReviews] = useState<MarketplaceReview[]>([]);
   const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
   const [reportEscalationReasons, setReportEscalationReasons] = useState<
     Record<string, string>
@@ -99,6 +120,18 @@ export function MarketplaceModerationConsole() {
     useState<Record<string, string>>({});
   const [reportEvidenceReviews, setReportEvidenceReviews] = useState<
     Record<string, MarketplaceAbuseReportEvidenceReviewStatus>
+  >({});
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [identityDrafts, setIdentityDrafts] = useState<
+    Record<
+      string,
+      {
+        confidenceLabel: MarketplaceIdentityConfidenceLabel;
+        riskLevel: MarketplaceIdentityRiskLevel;
+        flags: MarketplaceRiskSignalCode[];
+        operatorSummary: string;
+      }
+    >
   >({});
   const [reportFilters, setReportFilters] = useState<{
     status?: MarketplaceAbuseReportStatus;
@@ -127,6 +160,7 @@ export function MarketplaceModerationConsole() {
       setProfiles([]);
       setOpportunities([]);
       setReports([]);
+      setReviews([]);
       return;
     }
 
@@ -143,6 +177,7 @@ export function MarketplaceModerationConsole() {
         setProfiles([]);
         setOpportunities([]);
         setReports([]);
+        setReviews([]);
         return;
       }
 
@@ -151,6 +186,7 @@ export function MarketplaceModerationConsole() {
         profilesResponse,
         opportunitiesResponse,
         reportsResponse,
+        reviewsResponse,
       ] = await Promise.all([
         adminApi.getMarketplaceModerationDashboard(nextTokens.accessToken),
         adminApi.listMarketplaceModerationProfiles(nextTokens.accessToken),
@@ -159,12 +195,14 @@ export function MarketplaceModerationConsole() {
           { ...nextReportFilters, limit: 50 },
           nextTokens.accessToken,
         ),
+        adminApi.listMarketplaceModerationReviews(nextTokens.accessToken),
       ]);
 
       setDashboard(dashboardResponse);
       setProfiles(profilesResponse.profiles);
       setOpportunities(opportunitiesResponse.opportunities);
       setReports(reportsResponse.reports);
+      setReviews(reviewsResponse.reviews);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load moderation');
     }
@@ -385,6 +423,66 @@ export function MarketplaceModerationConsole() {
     await load(tokens);
   }
 
+  function getIdentityDraft(profile: MarketplaceAdminProfile) {
+    return (
+      identityDrafts[profile.userId] ?? {
+        confidenceLabel:
+          profile.identityReview?.confidenceLabel ?? 'wallet_verified',
+        riskLevel: profile.identityReview?.riskLevel ?? 'low',
+        flags:
+          profile.identityReview?.flags ??
+          profile.riskSignals.map((signal) => signal.code),
+        operatorSummary: profile.identityReview?.operatorSummary ?? '',
+      }
+    );
+  }
+
+  async function handleUpdateIdentityReview(profile: MarketplaceAdminProfile) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
+      return;
+    }
+    const draft = getIdentityDraft(profile);
+    await adminApi.updateMarketplaceModerationIdentityReview(
+      profile.userId,
+      {
+        confidenceLabel: draft.confidenceLabel,
+        riskLevel: draft.riskLevel,
+        flags: draft.flags,
+        operatorSummary: draft.operatorSummary.trim() || null,
+      },
+      tokens.accessToken,
+    );
+    setMessage(`Identity review updated for ${profile.displayName}.`);
+    await load(tokens);
+  }
+
+  async function handleModerateReview(
+    review: MarketplaceReview,
+    visibilityStatus: MarketplaceReviewVisibilityStatus,
+  ) {
+    if (!tokens || !operator?.capabilities.marketplaceModeration.allowed) {
+      setError(
+        operator?.capabilities.marketplaceModeration.reason ??
+          'Marketplace moderation capability is required for this action.',
+      );
+      return;
+    }
+    await adminApi.updateMarketplaceModerationReview(
+      review.id,
+      {
+        visibilityStatus,
+        moderationNote: reviewNotes[review.id]?.trim() || null,
+      },
+      tokens.accessToken,
+    );
+    setMessage(`Review visibility updated to ${visibilityStatus}.`);
+    await load(tokens);
+  }
+
   return (
     <ConsolePage theme="admin">
       <PageTopBar
@@ -466,6 +564,16 @@ export function MarketplaceModerationConsole() {
               <FactItem label="Escalated reports" value={dashboard.summary.escalatedAbuseReports} />
               <FactItem label="Aging reports" value={dashboard.summary.agingAbuseReports} />
               <FactItem label="Stale reports" value={dashboard.summary.staleAbuseReports} />
+              <FactItem label="Reviews" value={dashboard.summary.totalReviews} />
+              <FactItem label="Hidden reviews" value={dashboard.summary.hiddenReviews} />
+              <FactItem
+                label="High-risk identities"
+                value={dashboard.summary.highRiskIdentityReviews}
+              />
+              <FactItem
+                label="Reviewed identities"
+                value={dashboard.summary.operatorReviewedIdentities}
+              />
               <FactItem
                 label="Oldest active report"
                 value={
@@ -492,6 +600,17 @@ export function MarketplaceModerationConsole() {
                     <p className={styles.stateText}>
                       {profile.slug} • {profile.moderationStatus} • {profile.completedEscrowCount} completed escrows
                     </p>
+                    {profile.identityReview ? (
+                      <p className={styles.stateText}>
+                        Identity review: {profile.identityReview.confidenceLabel} •{' '}
+                        {profile.identityReview.riskLevel}
+                      </p>
+                    ) : null}
+                    {profile.riskSignals.length > 0 ? (
+                      <p className={styles.stateText}>
+                        Risk signals: {profile.riskSignals.map((signal) => signal.code).join(', ')}
+                      </p>
+                    ) : null}
                     <div className={styles.inlineActions}>
                       <button
                         type="button"
@@ -512,6 +631,99 @@ export function MarketplaceModerationConsole() {
                         }
                       >
                         Suspend
+                      </button>
+                    </div>
+                    <div className={styles.fieldGrid}>
+                      <label className={styles.field}>
+                        <span>Identity confidence</span>
+                        <select
+                          value={getIdentityDraft(profile).confidenceLabel}
+                          onChange={(event) =>
+                            setIdentityDrafts((current) => ({
+                              ...current,
+                              [profile.userId]: {
+                                ...getIdentityDraft(profile),
+                                confidenceLabel:
+                                  event.target.value as MarketplaceIdentityConfidenceLabel,
+                              },
+                            }))
+                          }
+                        >
+                          {identityConfidenceOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>Risk level</span>
+                        <select
+                          value={getIdentityDraft(profile).riskLevel}
+                          onChange={(event) =>
+                            setIdentityDrafts((current) => ({
+                              ...current,
+                              [profile.userId]: {
+                                ...getIdentityDraft(profile),
+                                riskLevel:
+                                  event.target.value as MarketplaceIdentityRiskLevel,
+                              },
+                            }))
+                          }
+                        >
+                          {identityRiskOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>Identity flags</span>
+                        <input
+                          type="text"
+                          value={getIdentityDraft(profile).flags.join(', ')}
+                          onChange={(event) =>
+                            setIdentityDrafts((current) => ({
+                              ...current,
+                              [profile.userId]: {
+                                ...getIdentityDraft(profile),
+                                flags: event.target.value
+                                  .split(',')
+                                  .map((value) => value.trim())
+                                  .filter((value): value is MarketplaceRiskSignalCode =>
+                                    riskSignalOptions.includes(
+                                      value as MarketplaceRiskSignalCode,
+                                    ),
+                                  ),
+                              },
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <label className={styles.field}>
+                      <span>Operator summary</span>
+                      <textarea
+                        rows={3}
+                        value={getIdentityDraft(profile).operatorSummary}
+                        onChange={(event) =>
+                          setIdentityDrafts((current) => ({
+                            ...current,
+                            [profile.userId]: {
+                              ...getIdentityDraft(profile),
+                              operatorSummary: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        onClick={() => void handleUpdateIdentityReview(profile)}
+                      >
+                        Save identity review
                       </button>
                     </div>
                   </article>
@@ -566,6 +778,62 @@ export function MarketplaceModerationConsole() {
           </section>
 
           <section className={styles.grid}>
+            <article className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.panelEyebrow}>Reviews</span>
+                  <h2>Review moderation</h2>
+                </div>
+              </div>
+              <div className={styles.stack}>
+                {reviews.length === 0 ? (
+                  <p className={styles.stateText}>No marketplace reviews recorded yet.</p>
+                ) : (
+                  reviews.map((review) => (
+                    <article key={review.id} className={styles.timelineCard}>
+                      <strong>
+                        {review.reviewer.displayName} → {review.reviewee.userId}
+                      </strong>
+                      <p className={styles.stateText}>
+                        {review.rating}/5 • {review.visibilityStatus} • {review.jobId}
+                      </p>
+                      {review.headline ? (
+                        <p className={styles.stateText}>{review.headline}</p>
+                      ) : null}
+                      <p className={styles.stateText}>{review.body ?? ''}</p>
+                      <label className={styles.field}>
+                        <span>Moderation note</span>
+                        <textarea
+                          rows={3}
+                          value={reviewNotes[review.id] ?? review.moderationNote ?? ''}
+                          onChange={(event) =>
+                            setReviewNotes((current) => ({
+                              ...current,
+                              [review.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          onClick={() => void handleModerateReview(review, 'visible')}
+                        >
+                          Set visible
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleModerateReview(review, 'hidden')}
+                        >
+                          Hide review
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </article>
+
             <article className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div>
