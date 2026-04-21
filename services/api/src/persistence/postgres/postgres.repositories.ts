@@ -19,6 +19,7 @@ import type {
   EscrowOnchainState,
   EscrowOnchainProjectedMilestoneRecord,
   EscrowOnchainProjectionRecord,
+  EscrowProjectRoomRecord,
   EscrowProjectionDriftSummary,
   EscrowStaleWorkflowRecord,
 } from '../../modules/escrow/escrow.types';
@@ -132,6 +133,7 @@ type JobRow = QueryResultRow & {
     executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow?: EscrowStaleWorkflowRecord | null;
   } | null;
+  project_room_json: EscrowProjectRoomRecord | null;
 };
 
 type MilestoneRow = QueryResultRow & {
@@ -428,6 +430,43 @@ function mapContractorParticipation(
   };
 }
 
+function mapProjectRoom(row: JobRow): EscrowProjectRoomRecord {
+  return {
+    submissions: (row.project_room_json?.submissions ?? []).map((submission) => ({
+      ...submission,
+      artifacts: (submission.artifacts ?? []).map((artifact) => ({
+        ...artifact,
+        mimeType: artifact.mimeType ?? null,
+        byteSize: artifact.byteSize ?? null,
+        storageKind: 'external_url',
+      })),
+      revisionRequest: submission.revisionRequest
+        ? {
+            ...submission.revisionRequest,
+          }
+        : null,
+      approval: submission.approval
+        ? {
+            ...submission.approval,
+            note: submission.approval.note ?? null,
+          }
+        : null,
+      deliveredAt: submission.deliveredAt ?? null,
+    })),
+    messages: (row.project_room_json?.messages ?? []).map((message) => ({
+      ...message,
+      senderRole: message.senderRole === 'client' ? 'client' : 'worker',
+    })),
+    activity: (row.project_room_json?.activity ?? []).map((entry) => ({
+      ...entry,
+      actorRole: entry.actorRole === 'client' ? 'client' : 'worker',
+      milestoneIndex: entry.milestoneIndex ?? null,
+      relatedSubmissionId: entry.relatedSubmissionId ?? null,
+      detail: entry.detail ?? null,
+    })),
+  };
+}
+
 function mapMilestone(row: MilestoneRow): EscrowMilestoneRecord {
   return {
     title: row.title,
@@ -559,7 +598,8 @@ async function replaceEscrowAggregate(
         worker_address,
         currency_address,
         contractor_participation_json,
-        operations_json
+        operations_json,
+        project_room_json
       )
       VALUES (
         $1,
@@ -579,7 +619,8 @@ async function replaceEscrowAggregate(
         $15,
         $16,
         $17::jsonb,
-        $18::jsonb
+        $18::jsonb,
+        $19::jsonb
       )
       ON CONFLICT (id) DO UPDATE
       SET
@@ -598,7 +639,8 @@ async function replaceEscrowAggregate(
         worker_address = EXCLUDED.worker_address,
         currency_address = EXCLUDED.currency_address,
         contractor_participation_json = EXCLUDED.contractor_participation_json,
-        operations_json = EXCLUDED.operations_json
+        operations_json = EXCLUDED.operations_json,
+        project_room_json = EXCLUDED.project_room_json
     `,
     [
       job.id,
@@ -619,6 +661,7 @@ async function replaceEscrowAggregate(
       job.onchain.currencyAddress,
       JSON.stringify(job.contractorParticipation),
       JSON.stringify(job.operations),
+      JSON.stringify(job.projectRoom),
     ],
   );
 
@@ -1374,7 +1417,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             worker_address,
             currency_address,
             contractor_participation_json,
-            operations_json
+            operations_json,
+            project_room_json
           FROM escrow_jobs
           WHERE id = $1
           LIMIT 1
@@ -1466,6 +1510,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
         onchain: mapOnchain(jobRow),
         contractorParticipation: mapContractorParticipation(jobRow),
         operations: mapOperations(jobRow),
+        projectRoom: mapProjectRoom(jobRow),
         executions: executionResult.rows.map(mapExecution),
       } satisfies EscrowJobRecord;
     });
@@ -1533,7 +1578,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             worker_address,
             currency_address,
             contractor_participation_json,
-            operations_json
+            operations_json,
+            project_room_json
           FROM escrow_jobs
           ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
         `,
@@ -1620,6 +1666,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             audit: audit.rows.map(mapAudit),
             contractorParticipation: mapContractorParticipation(jobRow),
             operations: mapOperations(jobRow),
+            projectRoom: mapProjectRoom(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),
           } satisfies EscrowJobRecord;
@@ -1656,7 +1703,8 @@ export class PostgresEscrowRepository implements EscrowRepository {
             worker_address,
             currency_address,
             contractor_participation_json,
-            operations_json
+            operations_json,
+            project_room_json
           FROM escrow_jobs
           WHERE client_address = ANY($1::text[]) OR worker_address = ANY($1::text[])
           ORDER BY updated_at_ms DESC, created_at_ms DESC, id ASC
@@ -1745,6 +1793,7 @@ export class PostgresEscrowRepository implements EscrowRepository {
             audit: audit.rows.map(mapAudit),
             contractorParticipation: mapContractorParticipation(jobRow),
             operations: mapOperations(jobRow),
+            projectRoom: mapProjectRoom(jobRow),
             onchain: mapOnchain(jobRow),
             executions: executions.rows.map(mapExecution),
           } satisfies EscrowJobRecord;

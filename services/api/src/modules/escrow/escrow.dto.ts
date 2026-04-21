@@ -16,6 +16,7 @@ const emailSchema = z
   .email()
   .max(320)
   .transform((value) => value.toLowerCase());
+const sha256Schema = z.string().trim().regex(/^[a-fA-F0-9]{64}$/);
 
 export const createJobSchema = z
   .object({
@@ -99,6 +100,43 @@ export const joinContractorSchema = z
   })
   .strict();
 
+export const projectArtifactSchema = z
+  .object({
+    label: z.string().trim().min(1).max(160),
+    url: z.string().trim().url().max(2048),
+    sha256: sha256Schema,
+    mimeType: z.string().trim().min(1).max(120).nullable().optional(),
+    byteSize: z.coerce.number().int().min(0).nullable().optional(),
+  })
+  .strict();
+
+export const submitProjectMilestoneSchema = z
+  .object({
+    note: z.string().trim().min(1).max(5000),
+    artifacts: z.array(projectArtifactSchema).max(10).default([]),
+  })
+  .strict();
+
+export const requestProjectRevisionSchema = z
+  .object({
+    note: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export const approveProjectSubmissionSchema = z
+  .object({
+    note: z.string().trim().min(1).max(4000).nullable().optional(),
+  })
+  .strict();
+
+export const postProjectRoomMessageSchema = z
+  .object({
+    body: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export const deliverProjectSubmissionSchema = z.object({}).strict();
+
 export const exportArtifactQuerySchema = z
   .object({
     artifact: z.enum(['job-history', 'dispute-case']).default('job-history'),
@@ -123,3 +161,19 @@ export type ContractorJoinReadinessQueryDto = z.infer<
 >;
 export type JoinContractorDto = z.infer<typeof joinContractorSchema>;
 export type ExportArtifactQueryDto = z.infer<typeof exportArtifactQuerySchema>;
+export type ProjectArtifactDto = z.infer<typeof projectArtifactSchema>;
+export type SubmitProjectMilestoneDto = z.infer<
+  typeof submitProjectMilestoneSchema
+>;
+export type RequestProjectRevisionDto = z.infer<
+  typeof requestProjectRevisionSchema
+>;
+export type ApproveProjectSubmissionDto = z.infer<
+  typeof approveProjectSubmissionSchema
+>;
+export type PostProjectRoomMessageDto = z.infer<
+  typeof postProjectRoomMessageSchema
+>;
+export type DeliverProjectSubmissionDto = z.infer<
+  typeof deliverProjectSubmissionSchema
+>;

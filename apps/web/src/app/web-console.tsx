@@ -1922,6 +1922,14 @@ export function EscrowConsole({
               <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
                 Read the manual
               </Link>
+              {selectedJobView ? (
+                <Link
+                  href={`/app/contracts/${selectedJobView.id}/room`}
+                  className={styles.secondaryButton}
+                >
+                  {messages.common.projectRoom}
+                </Link>
+              ) : null}
               <ThemeToggle
                 className={styles.languageSwitcher}
                 labelClassName={styles.languageSwitcherLabel}

@@ -23,7 +23,11 @@ import type {
   ContractorJoinReadinessResponse,
   CreateJobResponse,
   EscrowAuditBundle,
+  EscrowProjectDeliverSubmissionResponse,
   EscrowJobsListResponse,
+  EscrowProjectMessageResponse,
+  EscrowProjectRoomResponse,
+  EscrowProjectSubmissionResponse,
   FundJobResponse,
   JoinContractorResponse,
   MilestoneMutationResponse,
@@ -110,6 +114,96 @@ export class EscrowController {
     dto: escrowDto.JoinContractorDto,
   ): Promise<JoinContractorResponse> {
     return this.escrowService.joinContractor(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':id/project-room')
+  getProjectRoom(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+  ): Promise<EscrowProjectRoomResponse> {
+    return this.escrowService.getProjectRoom(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/project-room/messages')
+  postProjectRoomMessage(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(escrowDto.postProjectRoomMessageSchema))
+    dto: escrowDto.PostProjectRoomMessageDto,
+  ): Promise<EscrowProjectMessageResponse> {
+    return this.escrowService.postProjectRoomMessage(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/project-room/milestones/:m/submissions')
+  submitProjectMilestone(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('m', ParseIntPipe) milestoneIndex: number,
+    @Body(new ZodValidationPipe(escrowDto.submitProjectMilestoneSchema))
+    dto: escrowDto.SubmitProjectMilestoneDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    return this.escrowService.submitProjectMilestone(
+      user.id,
+      id,
+      milestoneIndex,
+      dto,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/project-room/submissions/:submissionId/revision-request')
+  requestProjectRevision(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('submissionId') submissionId: string,
+    @Body(new ZodValidationPipe(escrowDto.requestProjectRevisionSchema))
+    dto: escrowDto.RequestProjectRevisionDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    return this.escrowService.requestProjectRevision(
+      user.id,
+      id,
+      submissionId,
+      dto,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/project-room/submissions/:submissionId/approve')
+  approveProjectSubmission(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('submissionId') submissionId: string,
+    @Body(new ZodValidationPipe(escrowDto.approveProjectSubmissionSchema))
+    dto: escrowDto.ApproveProjectSubmissionDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    return this.escrowService.approveProjectSubmission(
+      user.id,
+      id,
+      submissionId,
+      dto,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/project-room/submissions/:submissionId/deliver')
+  deliverProjectSubmission(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('submissionId') submissionId: string,
+    @Body(new ZodValidationPipe(escrowDto.deliverProjectSubmissionSchema))
+    dto: escrowDto.DeliverProjectSubmissionDto,
+    @RequestContext() requestContext?: RequestExecutionContext,
+  ): Promise<EscrowProjectDeliverSubmissionResponse> {
+    void dto;
+    return this.escrowService.deliverProjectSubmission(
+      user.id,
+      id,
+      submissionId,
+      requestContext,
+    );
   }
 
   @UseGuards(AuthGuard)

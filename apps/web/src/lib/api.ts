@@ -224,6 +224,110 @@ export type PublicJobView = Omit<JobView, 'contractorParticipation'> & {
   } | null;
 };
 
+export type ProjectArtifactStorageKind = 'external_url';
+
+export type ProjectArtifact = {
+  id: string;
+  label: string;
+  url: string;
+  sha256: string;
+  mimeType: string | null;
+  byteSize: number | null;
+  storageKind: ProjectArtifactStorageKind;
+  uploadedByUserId: string;
+  createdAt: number;
+};
+
+export type ProjectSubmissionStatus =
+  | 'submitted'
+  | 'revision_requested'
+  | 'approved'
+  | 'delivered';
+
+export type ProjectSubmission = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number;
+  note: string;
+  artifacts: ProjectArtifact[];
+  status: ProjectSubmissionStatus;
+  revisionRequest:
+    | {
+        note: string;
+        requestedByUserId: string;
+        requestedByEmail: string;
+        requestedAt: number;
+      }
+    | null;
+  approval:
+    | {
+        note: string | null;
+        approvedByUserId: string;
+        approvedByEmail: string;
+        approvedAt: number;
+      }
+    | null;
+  deliveredAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+  submittedBy: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type ProjectMessage = {
+  id: string;
+  jobId: string;
+  senderRole: 'client' | 'worker';
+  body: string;
+  createdAt: number;
+  sender: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type ProjectActivity =
+  | {
+      id: string;
+      source: 'room';
+      type:
+        | 'submission_posted'
+        | 'revision_requested'
+        | 'submission_approved'
+        | 'submission_delivered'
+        | 'message_posted';
+      actorRole: 'client' | 'worker';
+      milestoneIndex: number | null;
+      relatedSubmissionId: string | null;
+      summary: string;
+      detail: string | null;
+      createdAt: number;
+      actor: {
+        userId: string;
+        email: string;
+      };
+    }
+  | {
+      id: string;
+      source: 'audit';
+      type: string;
+      actorRole: 'client' | 'worker' | 'system';
+      milestoneIndex: number | null;
+      summary: string;
+      detail: string | null;
+      createdAt: number;
+    };
+
+export type ProjectRoom = {
+  job: JobView;
+  participantRoles: Array<'client' | 'worker'>;
+  submissions: ProjectSubmission[];
+  messages: ProjectMessage[];
+  activity: ProjectActivity[];
+};
+
 export type ContractorInviteResponse = {
   jobId: string;
   contractorParticipation: NonNullable<JobView['contractorParticipation']>;
@@ -1368,6 +1472,107 @@ export const webApi = {
     return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
       method: 'GET',
     });
+  },
+  getProjectRoom(jobId: string, accessToken: string) {
+    return requestJson<{ room: ProjectRoom }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  postProjectRoomMessage(
+    jobId: string,
+    input: {
+      body: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ message: ProjectMessage }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  submitProjectMilestone(
+    jobId: string,
+    milestoneIndex: number,
+    input: {
+      note: string;
+      artifacts: Array<{
+        label: string;
+        url: string;
+        sha256: string;
+        mimeType?: string | null;
+        byteSize?: number | null;
+      }>;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ submission: ProjectSubmission }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room/milestones/${milestoneIndex}/submissions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  requestProjectRevision(
+    jobId: string,
+    submissionId: string,
+    input: {
+      note: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ submission: ProjectSubmission }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room/submissions/${submissionId}/revision-request`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  approveProjectSubmission(
+    jobId: string,
+    submissionId: string,
+    input: {
+      note?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ submission: ProjectSubmission }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room/submissions/${submissionId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  deliverProjectSubmission(
+    jobId: string,
+    submissionId: string,
+    accessToken: string,
+  ) {
+    return requestJson<{ submission: ProjectSubmission; txHash: string }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/project-room/submissions/${submissionId}/deliver`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
   },
   listMarketplaceProfiles(query?: {
     q?: string;

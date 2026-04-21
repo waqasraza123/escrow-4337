@@ -18,15 +18,19 @@ import { normalizeEvmAddress } from '../../common/evm-address';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { EscrowRepository } from '../../persistence/persistence.types';
 import type {
+  ApproveProjectSubmissionDto,
   ContractorInviteDto,
   CreateJobDto,
   JoinContractorDto,
-  UpdateContractorEmailDto,
   DeliverMilestoneDto,
   DisputeMilestoneDto,
   FundJobDto,
+  PostProjectRoomMessageDto,
+  RequestProjectRevisionDto,
   ResolveMilestoneDto,
   SetMilestonesDto,
+  SubmitProjectMilestoneDto,
+  UpdateContractorEmailDto,
 } from './escrow.dto';
 import { EscrowContractGatewayError } from './onchain/escrow-contract.errors';
 import { ESCROW_CONTRACT_GATEWAY } from './onchain/escrow-contract.tokens';
@@ -45,6 +49,17 @@ import type {
   EscrowContractorParticipationPublicView,
   EscrowContractorParticipationView,
   EscrowExecutionRecord,
+  EscrowParticipantRole,
+  EscrowProjectActivityView,
+  EscrowProjectDeliverSubmissionResponse,
+  EscrowProjectMessageResponse,
+  EscrowProjectMessageView,
+  EscrowProjectRoomActivityView,
+  EscrowProjectRoomRecord,
+  EscrowProjectRoomResponse,
+  EscrowProjectSubmissionRecord,
+  EscrowProjectSubmissionResponse,
+  EscrowProjectSubmissionView,
   FundJobResponse,
   EscrowJobRecord,
   EscrowJobsListResponse,
@@ -116,6 +131,14 @@ function stableSerialize(value: unknown): string {
 
 function cloneValue<T>(value: T): T {
   return structuredClone(value);
+}
+
+function createEmptyProjectRoom(): EscrowProjectRoomRecord {
+  return {
+    submissions: [],
+    messages: [],
+    activity: [],
+  };
 }
 
 function hashToBytes32(value: unknown) {
@@ -296,6 +319,7 @@ export class EscrowService {
         executionFailureWorkflow: null,
         staleWorkflow: null,
       },
+      projectRoom: createEmptyProjectRoom(),
       onchain: {
         chainId: createdJob.chainId,
         contractAddress: createdJob.contractAddress,
@@ -686,6 +710,267 @@ export class EscrowService {
       jobId: job.id,
       contractorParticipation:
         this.toPublicContractorParticipationView(participation)!,
+    };
+  }
+
+  async getProjectRoom(
+    userId: string,
+    jobId: string,
+  ): Promise<EscrowProjectRoomResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { roles } = await this.requireProjectRoomAccess(job, userId);
+    const merged = await this.escrowOnchainAuthority.mergeJob(job);
+    return {
+      room: await this.toProjectRoomView(job, merged.job, roles),
+    };
+  }
+
+  async postProjectRoomMessage(
+    userId: string,
+    jobId: string,
+    dto: PostProjectRoomMessageDto,
+  ): Promise<EscrowProjectMessageResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user, roles } = await this.requireProjectRoomAccess(job, userId);
+    const room = this.ensureProjectRoom(job);
+    const senderRole = roles.includes('client') ? 'client' : 'worker';
+    const now = Date.now();
+    const message = {
+      id: randomUUID(),
+      jobId: job.id,
+      senderUserId: user.id,
+      senderRole,
+      body: dto.body.trim(),
+      createdAt: now,
+    } satisfies EscrowProjectRoomRecord['messages'][number];
+    room.messages.push(message);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'message_posted',
+      actorUserId: user.id,
+      actorRole: senderRole,
+      milestoneIndex: null,
+      relatedSubmissionId: null,
+      summary:
+        senderRole === 'client'
+          ? 'Client posted a project-room message'
+          : 'Worker posted a project-room message',
+      detail: message.body,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    await this.escrowRepository.save(job);
+    const emailMap = await this.buildProjectRoomEmailMap(job.projectRoom);
+    return {
+      message: this.toProjectMessageView(message, emailMap),
+    };
+  }
+
+  async submitProjectMilestone(
+    userId: string,
+    jobId: string,
+    milestoneIndex: number,
+    dto: SubmitProjectMilestoneDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user } = await this.requireProjectRoomAccess(job, userId, 'worker');
+    const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    if (milestone.status !== 'pending') {
+      throw new ConflictException(
+        'Only pending milestones can accept off-chain submissions',
+      );
+    }
+
+    const room = this.ensureProjectRoom(job);
+    const now = Date.now();
+    const submission: EscrowProjectSubmissionRecord = {
+      id: randomUUID(),
+      jobId: job.id,
+      milestoneIndex,
+      submittedByUserId: user.id,
+      note: dto.note.trim(),
+      artifacts: dto.artifacts.map((artifact) => ({
+        id: randomUUID(),
+        label: artifact.label.trim(),
+        url: artifact.url.trim(),
+        sha256: artifact.sha256.trim().toLowerCase(),
+        mimeType: artifact.mimeType?.trim() || null,
+        byteSize: artifact.byteSize ?? null,
+        storageKind: 'external_url',
+        uploadedByUserId: user.id,
+        createdAt: now,
+      })),
+      status: 'submitted',
+      revisionRequest: null,
+      approval: null,
+      deliveredAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    room.submissions.push(submission);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'submission_posted',
+      actorUserId: user.id,
+      actorRole: 'worker',
+      milestoneIndex,
+      relatedSubmissionId: submission.id,
+      summary: `Submitted milestone ${milestoneIndex + 1} for review`,
+      detail: submission.note,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    await this.escrowRepository.save(job);
+    const emailMap = await this.buildProjectRoomEmailMap(job.projectRoom);
+    return {
+      submission: this.toProjectSubmissionView(submission, emailMap),
+    };
+  }
+
+  async requestProjectRevision(
+    userId: string,
+    jobId: string,
+    submissionId: string,
+    dto: RequestProjectRevisionDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user } = await this.requireProjectRoomAccess(job, userId, 'client');
+    const submission = this.requireProjectSubmission(job, submissionId);
+    this.assertLatestSubmissionForMilestone(job, submission);
+    if (submission.status === 'delivered') {
+      throw new ConflictException(
+        'Delivered submissions cannot be moved back into revision',
+      );
+    }
+    const now = Date.now();
+    submission.status = 'revision_requested';
+    submission.revisionRequest = {
+      note: dto.note.trim(),
+      requestedByUserId: user.id,
+      requestedAt: now,
+    };
+    submission.updatedAt = now;
+    const room = this.ensureProjectRoom(job);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'revision_requested',
+      actorUserId: user.id,
+      actorRole: 'client',
+      milestoneIndex: submission.milestoneIndex,
+      relatedSubmissionId: submission.id,
+      summary: `Requested revision for milestone ${submission.milestoneIndex + 1}`,
+      detail: submission.revisionRequest.note,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    await this.escrowRepository.save(job);
+    const emailMap = await this.buildProjectRoomEmailMap(job.projectRoom);
+    return {
+      submission: this.toProjectSubmissionView(submission, emailMap),
+    };
+  }
+
+  async approveProjectSubmission(
+    userId: string,
+    jobId: string,
+    submissionId: string,
+    dto: ApproveProjectSubmissionDto,
+  ): Promise<EscrowProjectSubmissionResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user } = await this.requireProjectRoomAccess(job, userId, 'client');
+    const submission = this.requireProjectSubmission(job, submissionId);
+    this.assertLatestSubmissionForMilestone(job, submission);
+    if (submission.status === 'delivered') {
+      throw new ConflictException(
+        'Delivered submissions cannot be re-approved',
+      );
+    }
+    const now = Date.now();
+    submission.status = 'approved';
+    submission.approval = {
+      note: dto.note?.trim() || null,
+      approvedByUserId: user.id,
+      approvedAt: now,
+    };
+    submission.updatedAt = now;
+    const room = this.ensureProjectRoom(job);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'submission_approved',
+      actorUserId: user.id,
+      actorRole: 'client',
+      milestoneIndex: submission.milestoneIndex,
+      relatedSubmissionId: submission.id,
+      summary: `Approved milestone ${submission.milestoneIndex + 1} submission`,
+      detail: submission.approval.note,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    await this.escrowRepository.save(job);
+    const emailMap = await this.buildProjectRoomEmailMap(job.projectRoom);
+    return {
+      submission: this.toProjectSubmissionView(submission, emailMap),
+    };
+  }
+
+  async deliverProjectSubmission(
+    userId: string,
+    jobId: string,
+    submissionId: string,
+    requestContext?: RequestExecutionContext,
+  ): Promise<EscrowProjectDeliverSubmissionResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    await this.requireProjectRoomAccess(job, userId, 'worker');
+    const submission = this.requireProjectSubmission(job, submissionId);
+    this.assertLatestSubmissionForMilestone(job, submission);
+    if (submission.status !== 'approved') {
+      throw new ConflictException(
+        'Only approved project-room submissions can be delivered onchain',
+      );
+    }
+
+    const mutation = await this.deliverMilestone(
+      userId,
+      jobId,
+      submission.milestoneIndex,
+      {
+        note: submission.note,
+        evidenceUrls: submission.artifacts.map((artifact) => artifact.url),
+      },
+      requestContext,
+    );
+    const updatedJob = await this.getJobOrThrow(jobId);
+    const updatedSubmission = this.requireProjectSubmission(
+      updatedJob,
+      submissionId,
+    );
+    const room = this.ensureProjectRoom(updatedJob);
+    const now = Date.now();
+    updatedSubmission.status = 'delivered';
+    updatedSubmission.deliveredAt = now;
+    updatedSubmission.updatedAt = now;
+    room.activity.push({
+      id: randomUUID(),
+      jobId: updatedJob.id,
+      type: 'submission_delivered',
+      actorUserId: userId,
+      actorRole: 'worker',
+      milestoneIndex: updatedSubmission.milestoneIndex,
+      relatedSubmissionId: updatedSubmission.id,
+      summary: `Delivered milestone ${updatedSubmission.milestoneIndex + 1} onchain`,
+      detail: updatedSubmission.note,
+      createdAt: now,
+    });
+    updatedJob.updatedAt = now;
+    await this.escrowRepository.save(updatedJob);
+    const emailMap = await this.buildProjectRoomEmailMap(updatedJob.projectRoom);
+    return {
+      submission: this.toProjectSubmissionView(updatedSubmission, emailMap),
+      mutation,
     };
   }
 
@@ -1160,10 +1445,11 @@ export class EscrowService {
   }
 
   private toJobView(job: EscrowJobRecord): EscrowJobView {
-    const { audit, executions, contractorParticipation, ...jobView } =
+    const { audit, executions, contractorParticipation, projectRoom, ...jobView } =
       cloneValue(job);
     void audit;
     void executions;
+    void projectRoom;
     return {
       ...jobView,
       contractorParticipation: this.toContractorParticipationView(
@@ -1175,7 +1461,8 @@ export class EscrowService {
   private toPublicJobViewFromRecord(
     job: Omit<EscrowJobRecord, 'audit' | 'executions'>,
   ): EscrowPublicJobView {
-    const { contractorParticipation, ...jobView } = cloneValue(job);
+    const { contractorParticipation, projectRoom, ...jobView } = cloneValue(job);
+    void projectRoom;
 
     return {
       ...jobView,
@@ -1211,6 +1498,319 @@ export class EscrowService {
     return {
       status: participation.status,
       joinedAt: participation.joinedAt,
+    };
+  }
+
+  private ensureProjectRoom(job: EscrowJobRecord) {
+    if (!job.projectRoom) {
+      job.projectRoom = createEmptyProjectRoom();
+    }
+    return job.projectRoom;
+  }
+
+  private async requireProjectRoomAccess(
+    job: EscrowJobRecord,
+    userId: string,
+    requiredRole?: EscrowParticipantRole,
+  ) {
+    const user = await this.usersService.getRequiredById(userId);
+    const roles = this.resolveParticipantRoles(job, user);
+    if (roles.length === 0) {
+      throw new ForbiddenException(
+        'You do not have access to this project room',
+      );
+    }
+    if (requiredRole && !roles.includes(requiredRole)) {
+      throw new ForbiddenException(
+        `You do not have ${requiredRole} access for this project room`,
+      );
+    }
+    return { user, roles };
+  }
+
+  private requireProjectSubmission(
+    job: EscrowJobRecord,
+    submissionId: string,
+  ): EscrowProjectSubmissionRecord {
+    const submission = this.ensureProjectRoom(job).submissions.find(
+      (entry) => entry.id === submissionId,
+    );
+    if (!submission) {
+      throw new NotFoundException('Project-room submission not found');
+    }
+    return submission;
+  }
+
+  private assertLatestSubmissionForMilestone(
+    job: EscrowJobRecord,
+    submission: EscrowProjectSubmissionRecord,
+  ) {
+    const latest = this.ensureProjectRoom(job).submissions
+      .filter((entry) => entry.milestoneIndex === submission.milestoneIndex)
+      .sort((left, right) => right.createdAt - left.createdAt)[0];
+    if (!latest || latest.id !== submission.id) {
+      throw new ConflictException(
+        'Only the latest milestone submission can be updated',
+      );
+    }
+  }
+
+  private async buildProjectRoomEmailMap(
+    projectRoom: EscrowProjectRoomRecord,
+  ) {
+    const userIds = new Set<string>();
+    for (const submission of projectRoom.submissions) {
+      userIds.add(submission.submittedByUserId);
+      if (submission.revisionRequest) {
+        userIds.add(submission.revisionRequest.requestedByUserId);
+      }
+      if (submission.approval) {
+        userIds.add(submission.approval.approvedByUserId);
+      }
+    }
+    for (const message of projectRoom.messages) {
+      userIds.add(message.senderUserId);
+    }
+    for (const activity of projectRoom.activity) {
+      userIds.add(activity.actorUserId);
+    }
+
+    const emailMap = new Map<string, string>();
+    await Promise.all(
+      Array.from(userIds).map(async (id) => {
+        const user = await this.usersService.getRequiredById(id);
+        emailMap.set(id, user.email);
+      }),
+    );
+    return emailMap;
+  }
+
+  private toProjectSubmissionView(
+    submission: EscrowProjectSubmissionRecord,
+    emailMap: Map<string, string>,
+  ): EscrowProjectSubmissionView {
+    return {
+      id: submission.id,
+      jobId: submission.jobId,
+      milestoneIndex: submission.milestoneIndex,
+      note: submission.note,
+      artifacts: cloneValue(submission.artifacts),
+      status: submission.status,
+      deliveredAt: submission.deliveredAt,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+      submittedBy: {
+        userId: submission.submittedByUserId,
+        email:
+          emailMap.get(submission.submittedByUserId) ?? submission.submittedByUserId,
+      },
+      revisionRequest: submission.revisionRequest
+        ? {
+            ...submission.revisionRequest,
+            requestedByEmail:
+              emailMap.get(submission.revisionRequest.requestedByUserId) ??
+              submission.revisionRequest.requestedByUserId,
+          }
+        : null,
+      approval: submission.approval
+        ? {
+            ...submission.approval,
+            approvedByEmail:
+              emailMap.get(submission.approval.approvedByUserId) ??
+              submission.approval.approvedByUserId,
+          }
+        : null,
+    };
+  }
+
+  private toProjectMessageView(
+    message: EscrowProjectRoomRecord['messages'][number],
+    emailMap: Map<string, string>,
+  ): EscrowProjectMessageView {
+    return {
+      id: message.id,
+      jobId: message.jobId,
+      senderRole: message.senderRole,
+      body: message.body,
+      createdAt: message.createdAt,
+      sender: {
+        userId: message.senderUserId,
+        email: emailMap.get(message.senderUserId) ?? message.senderUserId,
+      },
+    };
+  }
+
+  private toProjectRoomActivityView(
+    activity: EscrowProjectRoomRecord['activity'][number],
+    emailMap: Map<string, string>,
+  ): EscrowProjectActivityView {
+    return {
+      source: 'room',
+      id: activity.id,
+      type: activity.type,
+      actorRole: activity.actorRole,
+      milestoneIndex: activity.milestoneIndex,
+      relatedSubmissionId: activity.relatedSubmissionId,
+      summary: activity.summary,
+      detail: activity.detail,
+      createdAt: activity.createdAt,
+      actor: {
+        userId: activity.actorUserId,
+        email: emailMap.get(activity.actorUserId) ?? activity.actorUserId,
+      },
+    };
+  }
+
+  private mapAuditToProjectActivity(
+    event: EscrowAuditEvent,
+  ): EscrowProjectRoomActivityView {
+    switch (event.type) {
+      case 'job.created':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-job-created`,
+          type: event.type,
+          actorRole: 'system',
+          milestoneIndex: null,
+          summary: 'Contract created',
+          detail: `Escrow id ${event.payload.escrowId}`,
+          createdAt: event.at,
+        };
+      case 'job.contractor_participation_requested':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-worker-requested`,
+          type: event.type,
+          actorRole: 'system',
+          milestoneIndex: null,
+          summary: 'Worker participation requested',
+          detail: event.payload.workerAddress,
+          createdAt: event.at,
+        };
+      case 'job.contractor_email_updated':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-contractor-email-updated`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: null,
+          summary: 'Pending contractor email updated',
+          detail: null,
+          createdAt: event.at,
+        };
+      case 'job.contractor_invite_sent':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-contractor-invite-sent`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: null,
+          summary: 'Contractor invite sent',
+          detail: `${event.payload.delivery}${event.payload.regenerated ? ' (regenerated)' : ''}`,
+          createdAt: event.at,
+        };
+      case 'job.contractor_joined':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-contractor-joined`,
+          type: event.type,
+          actorRole: 'worker',
+          milestoneIndex: null,
+          summary: 'Worker joined contract',
+          detail: event.payload.workerAddress,
+          createdAt: event.at,
+        };
+      case 'job.funded':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-job-funded`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: null,
+          summary: 'Contract funded',
+          detail: event.payload.amount,
+          createdAt: event.at,
+        };
+      case 'job.milestones_set':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-milestones-set`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: null,
+          summary: 'Milestones committed onchain',
+          detail: `${event.payload.count} milestones`,
+          createdAt: event.at,
+        };
+      case 'milestone.delivered':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-milestone-delivered-${event.payload.milestoneIndex}`,
+          type: event.type,
+          actorRole: 'worker',
+          milestoneIndex: event.payload.milestoneIndex,
+          summary: `Milestone ${event.payload.milestoneIndex + 1} delivered onchain`,
+          detail: null,
+          createdAt: event.at,
+        };
+      case 'milestone.released':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-milestone-released-${event.payload.milestoneIndex}`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: event.payload.milestoneIndex,
+          summary: `Milestone ${event.payload.milestoneIndex + 1} released`,
+          detail: null,
+          createdAt: event.at,
+        };
+      case 'milestone.disputed':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-milestone-disputed-${event.payload.milestoneIndex}`,
+          type: event.type,
+          actorRole: 'client',
+          milestoneIndex: event.payload.milestoneIndex,
+          summary: `Milestone ${event.payload.milestoneIndex + 1} disputed`,
+          detail: null,
+          createdAt: event.at,
+        };
+      case 'milestone.resolved':
+        return {
+          source: 'audit',
+          id: `audit-${event.at}-milestone-resolved-${event.payload.milestoneIndex}`,
+          type: event.type,
+          actorRole: 'system',
+          milestoneIndex: event.payload.milestoneIndex,
+          summary: `Milestone ${event.payload.milestoneIndex + 1} dispute resolved`,
+          detail: event.payload.action,
+          createdAt: event.at,
+        };
+    }
+  }
+
+  private async toProjectRoomView(
+    sourceJob: EscrowJobRecord,
+    job: EscrowJobRecord,
+    participantRoles: EscrowParticipantRole[],
+  ) {
+    const room = this.ensureProjectRoom(sourceJob);
+    const emailMap = await this.buildProjectRoomEmailMap(room);
+    return {
+      job: this.toJobView(job),
+      participantRoles,
+      submissions: room.submissions
+        .slice()
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .map((submission) => this.toProjectSubmissionView(submission, emailMap)),
+      messages: room.messages
+        .slice()
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .map((message) => this.toProjectMessageView(message, emailMap)),
+      activity: room.activity
+        .map((activity) => this.toProjectRoomActivityView(activity, emailMap))
+        .concat(sourceJob.audit.map((event) => this.mapAuditToProjectActivity(event)))
+        .sort((left, right) => right.createdAt - left.createdAt),
     };
   }
 

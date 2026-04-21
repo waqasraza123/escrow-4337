@@ -12,6 +12,7 @@ import type {
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
+  EscrowProjectRoomRecord,
   EscrowStaleWorkflowRecord,
   EscrowOnchainProjectionRecord,
 } from '../../modules/escrow/escrow.types';
@@ -53,13 +54,17 @@ function normalizeFailureWorkflowStatus(
 function normalizeEscrowJobRecord(
   job:
     | EscrowJobRecord
-    | (Omit<EscrowJobRecord, 'operations' | 'contractorParticipation'> & {
+    | (Omit<
+        EscrowJobRecord,
+        'operations' | 'contractorParticipation' | 'projectRoom'
+      > & {
         contractorParticipation?: EscrowContractorParticipationRecord | null;
         operations?: {
           chainSync?: EscrowChainSyncRecord | null;
           executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
           staleWorkflow?: EscrowStaleWorkflowRecord | null;
         };
+        projectRoom?: EscrowProjectRoomRecord | null;
       }),
 ): EscrowJobRecord {
   return {
@@ -112,6 +117,46 @@ function normalizeEscrowJobRecord(
         : null,
       staleWorkflow: job.operations?.staleWorkflow ?? null,
     },
+    projectRoom: normalizeProjectRoom(job.projectRoom),
+  };
+}
+
+function normalizeProjectRoom(
+  projectRoom?: EscrowProjectRoomRecord | null,
+): EscrowProjectRoomRecord {
+  return {
+    submissions: (projectRoom?.submissions ?? []).map((submission) => ({
+      ...submission,
+      artifacts: (submission.artifacts ?? []).map((artifact) => ({
+        ...artifact,
+        mimeType: artifact.mimeType ?? null,
+        byteSize: artifact.byteSize ?? null,
+        storageKind: 'external_url',
+      })),
+      revisionRequest: submission.revisionRequest
+        ? {
+            ...submission.revisionRequest,
+          }
+        : null,
+      approval: submission.approval
+        ? {
+            ...submission.approval,
+            note: submission.approval.note ?? null,
+          }
+        : null,
+      deliveredAt: submission.deliveredAt ?? null,
+    })),
+    messages: (projectRoom?.messages ?? []).map((message) => ({
+      ...message,
+      senderRole: message.senderRole === 'client' ? 'client' : 'worker',
+    })),
+    activity: (projectRoom?.activity ?? []).map((entry) => ({
+      ...entry,
+      actorRole: entry.actorRole === 'client' ? 'client' : 'worker',
+      milestoneIndex: entry.milestoneIndex ?? null,
+      relatedSubmissionId: entry.relatedSubmissionId ?? null,
+      detail: entry.detail ?? null,
+    })),
   };
 }
 

@@ -158,6 +158,88 @@ export type EscrowContractorParticipationPublicView = {
   joinedAt: number | null;
 };
 
+export type EscrowProjectArtifactStorageKind = 'external_url';
+
+export type EscrowProjectArtifactRecord = {
+  id: string;
+  label: string;
+  url: string;
+  sha256: string;
+  mimeType: string | null;
+  byteSize: number | null;
+  storageKind: EscrowProjectArtifactStorageKind;
+  uploadedByUserId: string;
+  createdAt: number;
+};
+
+export type EscrowProjectSubmissionStatus =
+  | 'submitted'
+  | 'revision_requested'
+  | 'approved'
+  | 'delivered';
+
+export type EscrowProjectRevisionRequestRecord = {
+  note: string;
+  requestedByUserId: string;
+  requestedAt: number;
+};
+
+export type EscrowProjectApprovalRecord = {
+  note: string | null;
+  approvedByUserId: string;
+  approvedAt: number;
+};
+
+export type EscrowProjectSubmissionRecord = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number;
+  submittedByUserId: string;
+  note: string;
+  artifacts: EscrowProjectArtifactRecord[];
+  status: EscrowProjectSubmissionStatus;
+  revisionRequest: EscrowProjectRevisionRequestRecord | null;
+  approval: EscrowProjectApprovalRecord | null;
+  deliveredAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type EscrowProjectMessageRecord = {
+  id: string;
+  jobId: string;
+  senderUserId: string;
+  senderRole: 'client' | 'worker';
+  body: string;
+  createdAt: number;
+};
+
+export type EscrowProjectActivityType =
+  | 'submission_posted'
+  | 'revision_requested'
+  | 'submission_approved'
+  | 'submission_delivered'
+  | 'message_posted';
+
+export type EscrowProjectActivityRecord = {
+  id: string;
+  jobId: string;
+  type: EscrowProjectActivityType;
+  actorUserId: string;
+  actorRole: 'client' | 'worker';
+  milestoneIndex: number | null;
+  relatedSubmissionId: string | null;
+  summary: string;
+  detail: string | null;
+  createdAt: number;
+};
+
+export type EscrowProjectRoomRecord = {
+  submissions: EscrowProjectSubmissionRecord[];
+  messages: EscrowProjectMessageRecord[];
+  activity: EscrowProjectActivityRecord[];
+};
+
 export type EscrowOnchainState = {
   chainId: number;
   contractAddress: string;
@@ -405,13 +487,14 @@ export type EscrowJobRecord = {
     executionFailureWorkflow: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow: EscrowStaleWorkflowRecord | null;
   };
+  projectRoom: EscrowProjectRoomRecord;
   onchain: EscrowOnchainState;
   executions: EscrowExecutionRecord[];
 };
 
 export type EscrowJobView = Omit<
   EscrowJobRecord,
-  'audit' | 'executions' | 'contractorParticipation'
+  'audit' | 'executions' | 'contractorParticipation' | 'projectRoom'
 > & {
   contractorParticipation: EscrowContractorParticipationView | null;
 };
@@ -424,6 +507,72 @@ export type EscrowPublicJobView = Omit<
 };
 
 export type EscrowParticipantRole = 'client' | 'worker';
+
+export type EscrowProjectArtifactView = EscrowProjectArtifactRecord;
+
+export type EscrowProjectSubmissionView = Omit<
+  EscrowProjectSubmissionRecord,
+  'submittedByUserId' | 'revisionRequest' | 'approval'
+> & {
+  submittedBy: {
+    userId: string;
+    email: string;
+  };
+  revisionRequest:
+    | (EscrowProjectRevisionRequestRecord & {
+        requestedByEmail: string;
+      })
+    | null;
+  approval:
+    | (EscrowProjectApprovalRecord & {
+        approvedByEmail: string;
+      })
+    | null;
+};
+
+export type EscrowProjectMessageView = Omit<
+  EscrowProjectMessageRecord,
+  'senderUserId'
+> & {
+  sender: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type EscrowProjectActivityView = Omit<
+  EscrowProjectActivityRecord,
+  'actorUserId'
+> & {
+  source: 'room';
+  actor: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type EscrowProjectAuditActivityView = {
+  id: string;
+  source: 'audit';
+  type: EscrowAuditEvent['type'];
+  actorRole: 'client' | 'worker' | 'system';
+  milestoneIndex: number | null;
+  summary: string;
+  detail: string | null;
+  createdAt: number;
+};
+
+export type EscrowProjectRoomActivityView =
+  | EscrowProjectActivityView
+  | EscrowProjectAuditActivityView;
+
+export type EscrowProjectRoomView = {
+  job: EscrowJobView;
+  participantRoles: EscrowParticipantRole[];
+  submissions: EscrowProjectSubmissionView[];
+  messages: EscrowProjectMessageView[];
+  activity: EscrowProjectRoomActivityView[];
+};
 
 export type EscrowContractorJoinReadinessStatus =
   | 'invite_required'
@@ -442,6 +591,18 @@ export type EscrowJobListItem = {
 
 export type EscrowJobsListResponse = {
   jobs: EscrowJobListItem[];
+};
+
+export type EscrowProjectRoomResponse = {
+  room: EscrowProjectRoomView;
+};
+
+export type EscrowProjectSubmissionResponse = {
+  submission: EscrowProjectSubmissionView;
+};
+
+export type EscrowProjectMessageResponse = {
+  message: EscrowProjectMessageView;
 };
 
 export type EscrowAuditBundle = {
@@ -618,4 +779,9 @@ export type MilestoneMutationResponse = {
   milestoneStatus: MilestoneStatus;
   jobStatus: JobStatus;
   txHash: string;
+};
+
+export type EscrowProjectDeliverSubmissionResponse = {
+  submission: EscrowProjectSubmissionView;
+  mutation: MilestoneMutationResponse;
 };

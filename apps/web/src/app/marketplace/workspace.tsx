@@ -317,6 +317,19 @@ function getWorkspaceLane(workspace: WorkspaceSummary): LaneKind {
   return workspace.organizationKind === 'agency' ? 'agency' : 'freelancer';
 }
 
+function buildProjectRoomHref(
+  contractPath: string | null,
+  jobId: string | null,
+) {
+  const basePath = contractPath ?? (jobId ? `/app/contracts/${jobId}` : null);
+  if (!basePath) {
+    return null;
+  }
+
+  const [pathname, search = ''] = basePath.split('?');
+  return `${pathname}/room${search ? `?${search}` : ''}`;
+}
+
 function getLaneFromInvitation(
   invitation: Pick<OrganizationInvitation, 'role'>,
 ): LaneKind {
@@ -1683,12 +1696,30 @@ export function MarketplaceWorkspace() {
             {draft.latestSnapshot.platformFeeLabel}
           </p>
           {draft.convertedJobId ? (
-            <Link
-              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-              href={application.contractPath ?? `/app/contracts/${draft.convertedJobId}`}
-            >
-              {workspaceMessages.viewContract}
-            </Link>
+            <div className={styles.inlineActions}>
+              <Link
+                className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                href={application.contractPath ?? `/app/contracts/${draft.convertedJobId}`}
+              >
+                {workspaceMessages.viewContract}
+              </Link>
+              {buildProjectRoomHref(
+                application.contractPath,
+                draft.convertedJobId,
+              ) ? (
+                <Link
+                  className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                  href={
+                    buildProjectRoomHref(
+                      application.contractPath,
+                      draft.convertedJobId,
+                    ) ?? `/app/contracts/${draft.convertedJobId}/room`
+                  }
+                >
+                  {messages.common.projectRoom}
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </div>
         <label className={styles.field}>
@@ -3793,15 +3824,33 @@ export function MarketplaceWorkspace() {
                       workspaceMessages.none}
                   </p>
                   {application.hiredJobId ? (
-                    <Link
-                      className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                      href={
-                        application.contractPath ??
-                        `/app/contracts/${application.hiredJobId}`
-                      }
-                    >
-                      {workspaceMessages.viewContract}
-                    </Link>
+                    <div className={styles.inlineActions}>
+                      <Link
+                        className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                        href={
+                          application.contractPath ??
+                          `/app/contracts/${application.hiredJobId}`
+                        }
+                      >
+                        {workspaceMessages.viewContract}
+                      </Link>
+                      {buildProjectRoomHref(
+                        application.contractPath,
+                        application.hiredJobId,
+                      ) ? (
+                        <Link
+                          className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                          href={
+                            buildProjectRoomHref(
+                              application.contractPath,
+                              application.hiredJobId,
+                            ) ?? `/app/contracts/${application.hiredJobId}/room`
+                          }
+                        >
+                          {messages.common.projectRoom}
+                        </Link>
+                      ) : null}
+                    </div>
                   ) : (
                     <button
                       type="button"

@@ -4,20 +4,21 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 4 proposal-to-contract conversion pass in one code step:
-  - accepted-offer contract drafts
-  - immutable metadata snapshot hashing
-  - participant approval before escrow conversion
-  - workspace draft review/edit/convert UI
+- Land the repo-side Phase 5 execution workspace pass in one code step:
+  - contract-linked project room
+  - milestone submissions and revision loops
+  - contract-scoped messaging and activity
+  - release/dispute handoff inside the room
 
 ## Last Completed Step
-- Committed the Phase 3 pipeline locally as `fe5837c` (`Implement Phase 3 marketplace proposal pipeline`).
+- Committed the Phase 4 handoff locally as `6d8874f` (`Implement Phase 4 marketplace contract draft conversion`).
 
 ## Current Step
-- Phase 4 proposal-to-contract conversion code is now implemented and intentionally unverified:
-  - `MarketplaceService` now persists accepted-offer contract drafts, approval state, metadata hashes, and finalized-draft escrow conversion
-  - persistence now includes file/Postgres contract-draft storage plus `022_marketplace_contract_drafts.sql`
-  - `apps/web` marketplace workspace now exposes contract-draft review, revise, approve, and convert flows inside the existing proposal timeline surfaces
+- Phase 5 execution workspace code is now implemented and intentionally unverified:
+  - `EscrowService` now persists contract-linked project-room submissions, revision requests, approvals, room messages, and room activity
+  - persistence now includes file/Postgres project-room state plus `023_escrow_project_room.sql`
+  - `apps/web` now exposes `/app/contracts/[id]/room` with milestone submission/review, messaging, and release/dispute controls
+  - marketplace and contract surfaces now deep-link into the project room after hire/conversion
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -58,6 +59,11 @@
   `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
   `services/api/src/persistence/postgres/migrations/022_marketplace_contract_drafts.sql`
   `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx}`
+- Phase 5 work in progress:
+  `services/api/src/modules/escrow/{escrow.controller.ts,escrow.dto.ts,escrow.service.ts,escrow.types.ts}`
+  `services/api/src/persistence/{file/file.repositories.ts,postgres/postgres.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/023_escrow_project_room.sql`
+  `apps/web/src/{app/project-room.tsx,app/app/contracts/[id]/room/page.tsx,app/web-console.tsx,app/marketplace/workspace.tsx,lib/api.ts,lib/i18n.tsx}`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.
@@ -96,8 +102,8 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 5 project-room execution workspace
-  - or tighten the current Phase 4 workspace UX around draft negotiation and contract conversion
+  - start Phase 6 trust/reputation/review work
+  - or tighten the Phase 5 room UX around artifact handling and execution history polish
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
@@ -181,6 +187,22 @@
   - `apps/web/src/app/marketplace/workspace.tsx` now renders contract-draft forms in both client and talent timeline views
   - comparison cards now show contract-draft status
   - `apps/web/src/lib/i18n.tsx` now includes Phase 4 draft and conversion copy in English and Arabic
+- Verification:
+  - not run by request
+
+## Update (2026-04-21, Marketplace Phase 5 Project Room Execution)
+- Added the repo-side Phase 5 execution workspace without running verification:
+  - contract-linked project room persisted directly on escrow jobs
+  - milestone submissions, revision requests, approvals, room messages, and merged activity feed
+  - deliver-approved-submission bridge into the existing onchain milestone lifecycle
+- Backend changes:
+  - added escrow DTO/controller/service routes for `GET /jobs/:id/project-room` and project-room mutation endpoints
+  - file/Postgres escrow persistence now reads/writes `project_room_json`
+  - added `023_escrow_project_room.sql`
+- Web changes:
+  - added `/app/contracts/[id]/room` plus a dedicated project-room client surface
+  - marketplace workspace and contract console now deep-link into the room for converted/hired contracts
+  - `apps/web/src/lib/api.ts` and `apps/web/src/lib/i18n.tsx` now include the new project-room response shapes and English/Arabic copy
 - Verification:
   - not run by request
 
