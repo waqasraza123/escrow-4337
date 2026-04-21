@@ -550,6 +550,11 @@ export type MarketplaceOfferStatus =
   | 'accepted'
   | 'declined'
   | 'withdrawn';
+export type MarketplaceContractDraftStatus =
+  | 'draft'
+  | 'finalized'
+  | 'converted'
+  | 'cancelled';
 export type MarketplaceNoHireReason =
   | 'budget_changed'
   | 'scope_changed'
@@ -763,6 +768,58 @@ export type MarketplaceOffer = {
   updatedAt: number;
 };
 
+export type MarketplaceContractMetadataSnapshot = {
+  title: string;
+  description: string;
+  category: string;
+  contractorEmail: string;
+  workerAddress: string;
+  currencyAddress: string;
+  scopeSummary: string;
+  acceptanceCriteria: string[];
+  outcomes: string[];
+  timeline: string;
+  milestones: MarketplaceOfferMilestoneDraft[];
+  reviewWindowDays: number;
+  disputeModel: string;
+  evidenceExpectation: string;
+  kickoffNote: string;
+  platformFeeBps: number;
+  platformFeeLabel: string;
+  offerId: string;
+  offerRevisionNumber: number;
+  opportunityId: string;
+  applicationId: string;
+};
+
+export type MarketplaceContractDraftRevision = {
+  revisionNumber: number;
+  snapshot: MarketplaceContractMetadataSnapshot;
+  metadataHash: string;
+  revisedByUserId: string;
+  reason: string | null;
+  createdAt: number;
+};
+
+export type MarketplaceContractDraft = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  offerId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceContractDraftStatus;
+  latestSnapshot: MarketplaceContractMetadataSnapshot;
+  metadataHash: string;
+  revisions: MarketplaceContractDraftRevision[];
+  clientApprovedAt: number | null;
+  applicantApprovedAt: number | null;
+  finalizedAt: number | null;
+  convertedJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MarketplaceApplicationDecision = {
   id: string;
   applicationId: string;
@@ -780,6 +837,7 @@ export type MarketplaceApplicationTimeline = {
   interviewThread: MarketplaceInterviewThread | null;
   offers: MarketplaceOffer[];
   decisions: MarketplaceApplicationDecision[];
+  contractDraft: MarketplaceContractDraft | null;
 };
 
 export type MarketplaceApplicationComparison = {
@@ -788,6 +846,7 @@ export type MarketplaceApplicationComparison = {
   latestOffer: MarketplaceOffer | null;
   latestMessageAt: number | null;
   decisionCount: number;
+  contractDraftStatus: MarketplaceContractDraftStatus | null;
 };
 
 export type MarketplaceOpportunityDetail = MarketplaceOpportunity & {
@@ -2030,6 +2089,64 @@ export const webApi = {
       {
         method: 'POST',
         body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceContractDraft(id: string, accessToken: string) {
+    return requestJson<{ draft: MarketplaceContractDraft }>(
+      apiBaseUrl,
+      `/marketplace/contract-drafts/${id}`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  reviseMarketplaceContractDraft(
+    id: string,
+    input: {
+      title: string;
+      description: string;
+      scopeSummary: string;
+      acceptanceCriteria: string[];
+      outcomes: string[];
+      timeline: string;
+      milestones: MarketplaceOfferMilestoneDraft[];
+      reviewWindowDays: number;
+      disputeModel: string;
+      evidenceExpectation: string;
+      kickoffNote: string;
+      reason?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ draft: MarketplaceContractDraft }>(
+      apiBaseUrl,
+      `/marketplace/contract-drafts/${id}/revise`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  approveMarketplaceContractDraft(id: string, accessToken: string) {
+    return requestJson<{ draft: MarketplaceContractDraft }>(
+      apiBaseUrl,
+      `/marketplace/contract-drafts/${id}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
+  convertMarketplaceContractDraft(id: string, accessToken: string) {
+    return requestJson<HireApplicationResponse>(
+      apiBaseUrl,
+      `/marketplace/contract-drafts/${id}/convert`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
       },
       accessToken,
     );

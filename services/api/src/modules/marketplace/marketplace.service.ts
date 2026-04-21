@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { normalizeEvmAddress } from '../../common/evm-address';
 import {
   ESCROW_REPOSITORY,
@@ -41,7 +41,10 @@ import type {
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
   MarketplaceSavedSearchesQueryDto,
+  ApproveMarketplaceContractDraftDto,
+  ConvertMarketplaceContractDraftDto,
   RespondToMarketplaceOfferDto,
+  ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
   UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceOpportunityDto,
@@ -76,6 +79,12 @@ import type {
   MarketplaceApplicationView,
   MarketplaceApplicationsListResponse,
   MarketplaceClientSummary,
+  MarketplaceContractDraftRecord,
+  MarketplaceContractDraftResponse,
+  MarketplaceContractDraftRevisionRecord,
+  MarketplaceContractDraftStatus,
+  MarketplaceContractDraftView,
+  MarketplaceContractMetadataSnapshot,
   MarketplaceCryptoReadiness,
   MarketplaceEscrowStats,
   MarketplaceFitBreakdownEntry,
@@ -176,6 +185,27 @@ function normalizeOfferMilestones(
     deliverable: milestone.deliverable.trim(),
     dueAt: milestone.dueAt ?? null,
   }));
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableSerialize(entry)).join(',')}]`;
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(
+      ([left], [right]) => left.localeCompare(right),
+    );
+    return `{${entries
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function createMetadataHash(value: unknown) {
+  return createHash('sha256').update(stableSerialize(value)).digest('hex');
 }
 
 function containsQuery(haystack: string, query?: string) {
@@ -1636,6 +1666,7 @@ export class MarketplaceService {
         reason: dto.message ?? null,
         createdAt: now,
       });
+      await this.ensureContractDraftFromAcceptedOffer(application, offer);
       return { offer };
     }
 
@@ -1689,6 +1720,132 @@ export class MarketplaceService {
     return { offer: counter };
   }
 
+  async getMarketplaceContractDraft(
+    userId: string,
+    draftId: string,
+  ): Promise<MarketplaceContractDraftResponse> {
+    const draft = await this.requireContractDraft(draftId);
+    await this.assertContractDraftAccess(userId, draft);
+    return {
+      draft: draft,
+    };
+  }
+
+  async reviseMarketplaceContractDraft(
+    userId: string,
+    draftId: string,
+    dto: ReviseMarketplaceContractDraftDto,
+  ): Promise<MarketplaceContractDraftResponse> {
+    const draft = await this.requireContractDraft(draftId);
+    await this.assertContractDraftAccess(userId, draft);
+    if (draft.status === 'converted' || draft.status === 'cancelled') {
+      throw new ConflictException(
+        'This marketplace contract draft can no longer be revised',
+      );
+    }
+
+    const nextSnapshot: MarketplaceContractMetadataSnapshot = {
+      ...draft.latestSnapshot,
+      title: dto.title,
+      description: dto.description,
+      scopeSummary: dto.scopeSummary,
+      acceptanceCriteria: normalizeTextArray(dto.acceptanceCriteria),
+      outcomes: normalizeTextArray(dto.outcomes),
+      timeline: dto.timeline,
+      milestones: normalizeOfferMilestones(dto.milestones),
+      reviewWindowDays: dto.reviewWindowDays,
+      disputeModel: dto.disputeModel.trim(),
+      evidenceExpectation: dto.evidenceExpectation.trim(),
+      kickoffNote: dto.kickoffNote.trim(),
+    };
+    const now = Date.now();
+    const revision = this.buildContractDraftRevision(
+      draft,
+      nextSnapshot,
+      userId,
+      dto.reason ?? null,
+      now,
+    );
+    draft.latestSnapshot = nextSnapshot;
+    draft.metadataHash = revision.metadataHash;
+    draft.revisions = [...draft.revisions, revision];
+    draft.clientApprovedAt = null;
+    draft.applicantApprovedAt = null;
+    draft.finalizedAt = null;
+    draft.status = 'draft';
+    draft.updatedAt = now;
+    await this.marketplaceRepository.saveContractDraft(draft);
+    return {
+      draft,
+    };
+  }
+
+  async approveMarketplaceContractDraft(
+    userId: string,
+    draftId: string,
+    dto: ApproveMarketplaceContractDraftDto,
+  ): Promise<MarketplaceContractDraftResponse> {
+    void dto;
+    const draft = await this.requireContractDraft(draftId);
+    const access = await this.getContractDraftAccess(userId, draft);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this marketplace contract draft',
+      );
+    }
+    if (draft.status === 'converted' || draft.status === 'cancelled') {
+      throw new ConflictException(
+        'This marketplace contract draft can no longer be approved',
+      );
+    }
+    const now = Date.now();
+    if (access.asOwner) {
+      draft.clientApprovedAt = now;
+    }
+    if (access.asApplicant) {
+      draft.applicantApprovedAt = now;
+    }
+    if (draft.clientApprovedAt && draft.applicantApprovedAt) {
+      draft.status = 'finalized';
+      draft.finalizedAt = now;
+    }
+    draft.updatedAt = now;
+    await this.marketplaceRepository.saveContractDraft(draft);
+    return {
+      draft,
+    };
+  }
+
+  async convertMarketplaceContractDraft(
+    userId: string,
+    draftId: string,
+    dto: ConvertMarketplaceContractDraftDto,
+  ): Promise<HireApplicationResponse> {
+    void dto;
+    const draft = await this.requireContractDraft(draftId);
+    if (draft.status !== 'finalized') {
+      throw new ConflictException(
+        'Marketplace contract draft must be finalized before escrow conversion',
+      );
+    }
+    if (!draft.clientApprovedAt || !draft.applicantApprovedAt) {
+      throw new ConflictException(
+        'Both participants must approve the marketplace contract draft first',
+      );
+    }
+    const application = await this.requireApplication(draft.applicationId);
+    const opportunity = await this.requireOpportunity(draft.opportunityId);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    if (draft.convertedJobId) {
+      return {
+        applicationId: application.id,
+        opportunityId: opportunity.id,
+        jobId: draft.convertedJobId,
+      };
+    }
+    return this.convertDraftToEscrow(userId, draft, application, opportunity);
+  }
+
   async getOpportunityApplicationComparison(
     userId: string,
     opportunityId: string,
@@ -1717,12 +1874,17 @@ export class MarketplaceService {
         const decisionCount = decisions.filter(
           (decision) => decision.applicationId === application.id,
         ).length;
+        const contractDraftStatus =
+          (await this.marketplaceRepository.getContractDraftByApplicationId(
+            application.id,
+          ))?.status ?? null;
         return {
           application: await this.toApplicationView(application, userId),
           latestRevision,
           latestOffer,
           latestMessageAt,
           decisionCount,
+          contractDraftStatus,
         } satisfies MarketplaceApplicationComparisonView;
       }),
     );
@@ -1825,6 +1987,23 @@ export class MarketplaceService {
     );
     await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
+    const contractDraft =
+      await this.marketplaceRepository.getContractDraftByApplicationId(
+        application.id,
+      );
+    if (contractDraft) {
+      if (contractDraft.status !== 'finalized') {
+        throw new ConflictException(
+          'Finalize the marketplace contract draft before converting this application into escrow',
+        );
+      }
+      return this.convertDraftToEscrow(
+        userId,
+        contractDraft,
+        application,
+        opportunity,
+      );
+    }
     const offers = (await this.marketplaceRepository.listOffers()).filter(
       (offer) => offer.applicationId === application.id,
     );
@@ -2391,6 +2570,14 @@ export class MarketplaceService {
     return offer;
   }
 
+  private async requireContractDraft(draftId: string) {
+    const draft = await this.marketplaceRepository.getContractDraftById(draftId);
+    if (!draft) {
+      throw new NotFoundException('Marketplace contract draft not found');
+    }
+    return draft;
+  }
+
   private async requireAbuseReport(reportId: string) {
     const report =
       await this.marketplaceRepository.getAbuseReportById(reportId);
@@ -2429,6 +2616,15 @@ export class MarketplaceService {
     };
   }
 
+  private async getContractDraftAccess(
+    userId: string,
+    draft: MarketplaceContractDraftRecord,
+  ) {
+    const application = await this.requireApplication(draft.applicationId);
+    const opportunity = await this.requireOpportunity(draft.opportunityId);
+    return this.getApplicationAccess(userId, application, opportunity);
+  }
+
   private async assertApplicationApplicant(
     userId: string,
     application: MarketplaceApplicationRecord,
@@ -2449,6 +2645,18 @@ export class MarketplaceService {
     if (!access.asApplicant && !access.asOwner) {
       throw new ForbiddenException(
         'You do not have access to this marketplace application timeline',
+      );
+    }
+  }
+
+  private async assertContractDraftAccess(
+    userId: string,
+    draft: MarketplaceContractDraftRecord,
+  ) {
+    const access = await this.getContractDraftAccess(userId, draft);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this marketplace contract draft',
       );
     }
   }
@@ -2492,6 +2700,102 @@ export class MarketplaceService {
       .filter((offer) => offer.applicationId === applicationId)
       .sort((left, right) => right.revisionNumber - left.revisionNumber);
     return (offers[0]?.revisionNumber ?? 0) + 1;
+  }
+
+  private buildContractDraftRevision(
+    draft: MarketplaceContractDraftRecord,
+    snapshot: MarketplaceContractMetadataSnapshot,
+    revisedByUserId: string,
+    reason: string | null,
+    createdAt: number,
+  ): MarketplaceContractDraftRevisionRecord {
+    return {
+      revisionNumber: (draft.revisions.at(-1)?.revisionNumber ?? 0) + 1,
+      snapshot,
+      metadataHash: createMetadataHash(snapshot),
+      revisedByUserId,
+      reason: reason?.trim() || null,
+      createdAt,
+    };
+  }
+
+  private async createInitialContractDraft(
+    application: MarketplaceApplicationRecord,
+    opportunity: MarketplaceOpportunityRecord,
+    offer: MarketplaceOfferRecord,
+  ) {
+    const applicant = await this.usersService.getRequiredById(
+      application.applicantUserId,
+    );
+    const snapshot: MarketplaceContractMetadataSnapshot = {
+      title: opportunity.title,
+      description: opportunity.description,
+      category: opportunity.category,
+      contractorEmail: applicant.email.toLowerCase(),
+      workerAddress: application.selectedWalletAddress,
+      currencyAddress: opportunity.currencyAddress,
+      scopeSummary: application.deliveryApproach,
+      acceptanceCriteria: normalizeTextArray(opportunity.acceptanceCriteria),
+      outcomes: normalizeTextArray(opportunity.outcomes),
+      timeline: opportunity.timeline,
+      milestones: normalizeOfferMilestones(offer.milestones),
+      reviewWindowDays: 3,
+      disputeModel: 'operator-mediation',
+      evidenceExpectation: 'delivery note plus linked evidence URLs',
+      kickoffNote: application.milestonePlanSummary,
+      platformFeeBps: 0,
+      platformFeeLabel: 'Marketplace launch fee disabled',
+      offerId: offer.id,
+      offerRevisionNumber: offer.revisionNumber,
+      opportunityId: opportunity.id,
+      applicationId: application.id,
+    };
+    const now = Date.now();
+    const seedDraft: MarketplaceContractDraftRecord = {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      offerId: offer.id,
+      clientUserId: opportunity.ownerUserId,
+      applicantUserId: application.applicantUserId,
+      status: 'draft',
+      latestSnapshot: snapshot,
+      metadataHash: createMetadataHash(snapshot),
+      revisions: [],
+      clientApprovedAt: null,
+      applicantApprovedAt: null,
+      finalizedAt: null,
+      convertedJobId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    seedDraft.revisions = [
+      this.buildContractDraftRevision(
+        seedDraft,
+        snapshot,
+        opportunity.ownerUserId,
+        'Created from accepted offer',
+        now,
+      ),
+    ];
+    seedDraft.metadataHash = seedDraft.revisions[0].metadataHash;
+    await this.marketplaceRepository.saveContractDraft(seedDraft);
+    return seedDraft;
+  }
+
+  private async ensureContractDraftFromAcceptedOffer(
+    application: MarketplaceApplicationRecord,
+    offer: MarketplaceOfferRecord,
+  ) {
+    const existing =
+      await this.marketplaceRepository.getContractDraftByApplicationId(
+        application.id,
+      );
+    if (existing) {
+      return existing;
+    }
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    return this.createInitialContractDraft(application, opportunity, offer);
   }
 
   private async recordApplicationDecision(
@@ -2584,12 +2888,109 @@ export class MarketplaceService {
     const decisions = (await this.marketplaceRepository.listApplicationDecisions())
       .filter((decision) => decision.applicationId === application.id)
       .sort((left, right) => left.createdAt - right.createdAt);
+    const contractDraft =
+      await this.marketplaceRepository.getContractDraftByApplicationId(
+        application.id,
+      );
     return {
       application: await this.toApplicationView(application, viewerUserId),
       revisions,
       interviewThread: thread ? await this.toInterviewThreadView(thread) : null,
       offers,
       decisions,
+      contractDraft,
+    };
+  }
+
+  private async convertDraftToEscrow(
+    userId: string,
+    draft: MarketplaceContractDraftRecord,
+    application: MarketplaceApplicationRecord,
+    opportunity: MarketplaceOpportunityRecord,
+  ): Promise<HireApplicationResponse> {
+    const snapshot = draft.latestSnapshot;
+    const createResponse = await this.escrowService.createJob(userId, {
+      contractorEmail: snapshot.contractorEmail,
+      workerAddress: snapshot.workerAddress,
+      currencyAddress: snapshot.currencyAddress,
+      title: snapshot.title,
+      description: snapshot.description,
+      category: snapshot.category,
+      termsJSON: {
+        marketplace: {
+          opportunityId: opportunity.id,
+          applicationId: application.id,
+          offerId: draft.offerId,
+          contractDraftId: draft.id,
+          metadataHash: draft.metadataHash,
+          sourceSnapshot: snapshot,
+          visibility: opportunity.visibility,
+        },
+        hiringSpec: {
+          outcomes: snapshot.outcomes,
+          acceptanceCriteria: snapshot.acceptanceCriteria,
+          timeline: snapshot.timeline,
+        },
+        commercialPlan: {
+          reviewWindowDays: snapshot.reviewWindowDays,
+          disputeModel: snapshot.disputeModel,
+          evidenceExpectation: snapshot.evidenceExpectation,
+          kickoffNote: snapshot.kickoffNote,
+          platformFeeBps: snapshot.platformFeeBps,
+          platformFeeLabel: snapshot.platformFeeLabel,
+          milestones: snapshot.milestones,
+        },
+      },
+    });
+
+    const now = Date.now();
+    application.status = 'hired';
+    application.hiredJobId = createResponse.jobId;
+    application.updatedAt = now;
+    opportunity.status = 'hired';
+    opportunity.hiredApplicationId = application.id;
+    opportunity.hiredJobId = createResponse.jobId;
+    opportunity.updatedAt = now;
+    draft.status = 'converted';
+    draft.convertedJobId = createResponse.jobId;
+    draft.updatedAt = now;
+
+    const allApplications = await this.marketplaceRepository.listApplications();
+    const siblingApplications = allApplications.filter(
+      (candidate) =>
+        candidate.opportunityId === opportunity.id &&
+        candidate.id !== application.id,
+    );
+
+    for (const sibling of siblingApplications) {
+      if (sibling.status === 'submitted' || sibling.status === 'shortlisted') {
+        sibling.status = 'rejected';
+        sibling.updatedAt = now;
+        await this.marketplaceRepository.saveApplication(sibling);
+        await this.recordApplicationDecision(sibling, {
+          actorUserId: userId,
+          action: 'no_hire',
+          reason: 'Another candidate moved into escrow contract formation',
+          noHireReason: 'fit_not_strong_enough',
+          createdAt: now,
+        });
+      }
+    }
+
+    await this.marketplaceRepository.saveApplication(application);
+    await this.marketplaceRepository.saveOpportunity(opportunity);
+    await this.marketplaceRepository.saveContractDraft(draft);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'hired',
+      reason: 'Escrow contract created from finalized marketplace draft',
+      createdAt: now,
+    });
+
+    return {
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      jobId: createResponse.jobId,
     };
   }
 

@@ -276,6 +276,26 @@ export const respondToMarketplaceOfferSchema = z
   })
   .strict();
 
+export const reviseMarketplaceContractDraftSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    description: z.string().trim().min(1).max(5000),
+    scopeSummary: z.string().trim().min(1).max(5000),
+    acceptanceCriteria: stringArraySchema.default([]),
+    outcomes: stringArraySchema.default([]),
+    timeline: z.string().trim().min(1).max(240),
+    milestones: z.array(offerMilestoneDraftSchema).min(1).max(12),
+    reviewWindowDays: z.coerce.number().int().min(1).max(30),
+    disputeModel: z.string().trim().min(1).max(120),
+    evidenceExpectation: z.string().trim().min(1).max(1000),
+    kickoffNote: z.string().trim().min(1).max(2000),
+    reason: z.string().trim().min(1).max(500).nullable().optional(),
+  })
+  .strict();
+
+export const approveMarketplaceContractDraftSchema = z.object({}).strict();
+export const convertMarketplaceContractDraftSchema = z.object({}).strict();
+
 export const updateModerationSchema = z
   .object({
     moderationStatus: z.enum(['visible', 'hidden', 'suspended']),
@@ -395,6 +415,15 @@ export type CreateMarketplaceOfferDto = z.infer<
 >;
 export type RespondToMarketplaceOfferDto = z.infer<
   typeof respondToMarketplaceOfferSchema
+>;
+export type ReviseMarketplaceContractDraftDto = z.infer<
+  typeof reviseMarketplaceContractDraftSchema
+>;
+export type ApproveMarketplaceContractDraftDto = z.infer<
+  typeof approveMarketplaceContractDraftSchema
+>;
+export type ConvertMarketplaceContractDraftDto = z.infer<
+  typeof convertMarketplaceContractDraftSchema
 >;
 export type UpdateModerationDto = z.infer<typeof updateModerationSchema>;
 export type CreateMarketplaceAbuseReportDto = z.infer<

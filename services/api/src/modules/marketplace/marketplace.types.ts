@@ -91,6 +91,11 @@ export type MarketplaceOfferStatus =
   | 'accepted'
   | 'declined'
   | 'withdrawn';
+export type MarketplaceContractDraftStatus =
+  | 'draft'
+  | 'finalized'
+  | 'converted'
+  | 'cancelled';
 export type MarketplaceDecisionAction =
   | 'applied'
   | 'revised'
@@ -423,6 +428,58 @@ export type MarketplaceOfferRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceContractMetadataSnapshot = {
+  title: string;
+  description: string;
+  category: string;
+  contractorEmail: string;
+  workerAddress: string;
+  currencyAddress: string;
+  scopeSummary: string;
+  acceptanceCriteria: string[];
+  outcomes: string[];
+  timeline: string;
+  milestones: MarketplaceOfferMilestoneDraft[];
+  reviewWindowDays: number;
+  disputeModel: string;
+  evidenceExpectation: string;
+  kickoffNote: string;
+  platformFeeBps: number;
+  platformFeeLabel: string;
+  offerId: string;
+  offerRevisionNumber: number;
+  opportunityId: string;
+  applicationId: string;
+};
+
+export type MarketplaceContractDraftRevisionRecord = {
+  revisionNumber: number;
+  snapshot: MarketplaceContractMetadataSnapshot;
+  metadataHash: string;
+  revisedByUserId: string;
+  reason: string | null;
+  createdAt: number;
+};
+
+export type MarketplaceContractDraftRecord = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  offerId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceContractDraftStatus;
+  latestSnapshot: MarketplaceContractMetadataSnapshot;
+  metadataHash: string;
+  revisions: MarketplaceContractDraftRevisionRecord[];
+  clientApprovedAt: number | null;
+  applicantApprovedAt: number | null;
+  finalizedAt: number | null;
+  convertedJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MarketplaceApplicationDecisionRecord = {
   id: string;
   applicationId: string;
@@ -545,6 +602,7 @@ export type MarketplaceApplicationTimelineView = {
   interviewThread: MarketplaceInterviewThreadView | null;
   offers: MarketplaceOfferView[];
   decisions: MarketplaceApplicationDecisionView[];
+  contractDraft: MarketplaceContractDraftView | null;
 };
 
 export type MarketplaceApplicationComparisonView = {
@@ -553,7 +611,10 @@ export type MarketplaceApplicationComparisonView = {
   latestOffer: MarketplaceOfferView | null;
   latestMessageAt: number | null;
   decisionCount: number;
+  contractDraftStatus: MarketplaceContractDraftStatus | null;
 };
+
+export type MarketplaceContractDraftView = MarketplaceContractDraftRecord;
 
 export type MarketplaceOpportunityView = Omit<
   MarketplaceOpportunityRecord,
@@ -786,6 +847,10 @@ export type MarketplaceInterviewThreadResponse = {
 
 export type MarketplaceOfferResponse = {
   offer: MarketplaceOfferView;
+};
+
+export type MarketplaceContractDraftResponse = {
+  draft: MarketplaceContractDraftView;
 };
 
 export type MarketplaceAbuseReportResponse = {

@@ -4,20 +4,20 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 3 proposal/interview/offer pipeline in one code pass:
-  - immutable application revisions
-  - proposal timeline and candidate comparison reads
-  - application-scoped interview messaging
-  - offer create/respond flows before hire-to-escrow
+- Land the repo-side Phase 4 proposal-to-contract conversion pass in one code step:
+  - accepted-offer contract drafts
+  - immutable metadata snapshot hashing
+  - participant approval before escrow conversion
+  - workspace draft review/edit/convert UI
 
 ## Last Completed Step
-- Committed the Phase 2 discovery/search implementation locally as `34cdb99` (`Implement Phase 2 marketplace discovery flows`).
+- Committed the Phase 3 pipeline locally as `fe5837c` (`Implement Phase 3 marketplace proposal pipeline`).
 
 ## Current Step
-- Phase 3 proposal/interview/offer code is now implemented and intentionally unverified:
-  - `MarketplaceService` now owns revision, timeline, interview, comparison, and offer transitions
-  - persistence now includes Postgres/file records for revisions, interviews, offers, and decision history
-  - `apps/web` marketplace workspace now exposes timeline loads, comparison reads, interview messaging, proposal revision, and offer create/respond actions
+- Phase 4 proposal-to-contract conversion code is now implemented and intentionally unverified:
+  - `MarketplaceService` now persists accepted-offer contract drafts, approval state, metadata hashes, and finalized-draft escrow conversion
+  - persistence now includes file/Postgres contract-draft storage plus `022_marketplace_contract_drafts.sql`
+  - `apps/web` marketplace workspace now exposes contract-draft review, revise, approve, and convert flows inside the existing proposal timeline surfaces
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -29,7 +29,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
+- The roadmap requires accepted marketplace proposals to become reviewable escrow-ready contracts without forcing users to re-enter scope, pricing, and milestone terms in a separate manual flow.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -52,6 +52,11 @@
   `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
   `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
   `services/api/src/persistence/postgres/migrations/021_marketplace_pipeline_phase.sql`
+  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx}`
+- Phase 4 work in progress:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/022_marketplace_contract_drafts.sql`
   `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx}`
 
 ## Key Constraints
@@ -91,8 +96,8 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 4 accepted-offer to escrow-contract handoff
-  - or tighten the current Phase 3 workspace UX and tests around timelines/offers/comparison
+  - start Phase 5 project-room execution workspace
+  - or tighten the current Phase 4 workspace UX around draft negotiation and contract conversion
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
@@ -160,6 +165,22 @@
   - `apps/web/src/app/marketplace/workspace.tsx` now exposes timeline load, comparison load, interview messaging, proposal revision, and offer actions in the authenticated workspace
   - `apps/web/src/lib/api.ts` now mirrors the new Phase 3 response shapes and routes
   - `apps/web/src/lib/i18n.tsx` now includes Phase 3 workspace copy in English and Arabic
+- Verification:
+  - not run by request
+
+## Update (2026-04-21, Marketplace Phase 4 Contract Draft Conversion)
+- Added the repo-side Phase 4 handoff without running verification:
+  - accepted-offer `marketplace_contract_drafts`
+  - immutable contract metadata snapshots plus metadata hashes
+  - participant approval state and finalized-draft conversion into escrow jobs
+- Backend changes:
+  - added contract-draft DTO/controller/service routes for read, revise, approve, and convert
+  - accepted offer transitions now seed a contract draft automatically
+  - hire-to-escrow now routes through finalized contract drafts when present instead of rebuilding terms ad hoc
+- Web changes:
+  - `apps/web/src/app/marketplace/workspace.tsx` now renders contract-draft forms in both client and talent timeline views
+  - comparison cards now show contract-draft status
+  - `apps/web/src/lib/i18n.tsx` now includes Phase 4 draft and conversion copy in English and Arabic
 - Verification:
   - not run by request
 

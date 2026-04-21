@@ -6,6 +6,10 @@ import type {
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceContractDraftRecord,
+  MarketplaceContractDraftRevisionRecord,
+  MarketplaceContractDraftStatus,
+  MarketplaceContractMetadataSnapshot,
   MarketplaceCryptoReadiness,
   MarketplaceEngagementType,
   MarketplaceInterviewMessageKind,
@@ -164,6 +168,25 @@ type MarketplaceOfferRow = QueryResultRow & {
   proposed_rate: string | null;
   milestones_json: MarketplaceOfferMilestoneDraft[];
   revision_number: number;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceContractDraftRow = QueryResultRow & {
+  id: string;
+  application_id: string;
+  opportunity_id: string;
+  offer_id: string;
+  client_user_id: string;
+  applicant_user_id: string;
+  status: MarketplaceContractDraftStatus;
+  latest_snapshot_json: MarketplaceContractMetadataSnapshot;
+  metadata_hash: string;
+  revisions_json: MarketplaceContractDraftRevisionRecord[];
+  client_approved_at_ms: string | null;
+  applicant_approved_at_ms: string | null;
+  finalized_at_ms: string | null;
+  converted_job_id: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -437,6 +460,34 @@ function mapOffer(row: MarketplaceOfferRow): MarketplaceOfferRecord {
     proposedRate: row.proposed_rate,
     milestones: row.milestones_json ?? [],
     revisionNumber: row.revision_number,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapContractDraft(
+  row: MarketplaceContractDraftRow,
+): MarketplaceContractDraftRecord {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    offerId: row.offer_id,
+    clientUserId: row.client_user_id,
+    applicantUserId: row.applicant_user_id,
+    status: row.status,
+    latestSnapshot: row.latest_snapshot_json,
+    metadataHash: row.metadata_hash,
+    revisions: row.revisions_json ?? [],
+    clientApprovedAt:
+      row.client_approved_at_ms === null ? null : Number(row.client_approved_at_ms),
+    applicantApprovedAt:
+      row.applicant_approved_at_ms === null
+        ? null
+        : Number(row.applicant_approved_at_ms),
+    finalizedAt:
+      row.finalized_at_ms === null ? null : Number(row.finalized_at_ms),
+    convertedJobId: row.converted_job_id,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -1339,6 +1390,95 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         offer.revisionNumber,
         String(offer.createdAt),
         String(offer.updatedAt),
+      ],
+    );
+  }
+
+  async getContractDraftById(draftId: string) {
+    const result = await this.db.query<MarketplaceContractDraftRow>(
+      `
+        SELECT *
+        FROM marketplace_contract_drafts
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [draftId],
+    );
+
+    return result.rows[0] ? mapContractDraft(result.rows[0]) : null;
+  }
+
+  async getContractDraftByApplicationId(applicationId: string) {
+    const result = await this.db.query<MarketplaceContractDraftRow>(
+      `
+        SELECT *
+        FROM marketplace_contract_drafts
+        WHERE application_id = $1
+        LIMIT 1
+      `,
+      [applicationId],
+    );
+
+    return result.rows[0] ? mapContractDraft(result.rows[0]) : null;
+  }
+
+  async listContractDrafts() {
+    const result = await this.db.query<MarketplaceContractDraftRow>(
+      `
+        SELECT *
+        FROM marketplace_contract_drafts
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapContractDraft);
+  }
+
+  async saveContractDraft(draft: MarketplaceContractDraftRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_contract_drafts (
+          id, application_id, opportunity_id, offer_id, client_user_id, applicant_user_id,
+          status, latest_snapshot_json, metadata_hash, revisions_json, client_approved_at_ms,
+          applicant_approved_at_ms, finalized_at_ms, converted_job_id, created_at_ms, updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, $8::jsonb, $9, $10::jsonb, $11,
+          $12, $13, $14, $15, $16
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          offer_id = EXCLUDED.offer_id,
+          status = EXCLUDED.status,
+          latest_snapshot_json = EXCLUDED.latest_snapshot_json,
+          metadata_hash = EXCLUDED.metadata_hash,
+          revisions_json = EXCLUDED.revisions_json,
+          client_approved_at_ms = EXCLUDED.client_approved_at_ms,
+          applicant_approved_at_ms = EXCLUDED.applicant_approved_at_ms,
+          finalized_at_ms = EXCLUDED.finalized_at_ms,
+          converted_job_id = EXCLUDED.converted_job_id,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        draft.id,
+        draft.applicationId,
+        draft.opportunityId,
+        draft.offerId,
+        draft.clientUserId,
+        draft.applicantUserId,
+        draft.status,
+        JSON.stringify(draft.latestSnapshot),
+        draft.metadataHash,
+        JSON.stringify(draft.revisions),
+        draft.clientApprovedAt === null ? null : String(draft.clientApprovedAt),
+        draft.applicantApprovedAt === null
+          ? null
+          : String(draft.applicantApprovedAt),
+        draft.finalizedAt === null ? null : String(draft.finalizedAt),
+        draft.convertedJobId,
+        String(draft.createdAt),
+        String(draft.updatedAt),
       ],
     );
   }

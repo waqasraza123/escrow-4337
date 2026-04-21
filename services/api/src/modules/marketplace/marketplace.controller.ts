@@ -422,6 +422,63 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('contract-drafts/:id')
+  getMarketplaceContractDraft(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getMarketplaceContractDraft(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('contract-drafts/:id/revise')
+  reviseMarketplaceContractDraft(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.reviseMarketplaceContractDraftSchema),
+    )
+    body: marketplaceDto.ReviseMarketplaceContractDraftDto,
+  ) {
+    return this.marketplaceService.reviseMarketplaceContractDraft(
+      user.id,
+      id,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('contract-drafts/:id/approve')
+  approveMarketplaceContractDraft(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.approveMarketplaceContractDraftSchema),
+    )
+    body: marketplaceDto.ApproveMarketplaceContractDraftDto,
+  ) {
+    return this.marketplaceService.approveMarketplaceContractDraft(
+      user.id,
+      id,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('contract-drafts/:id/convert')
+  convertMarketplaceContractDraft(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.convertMarketplaceContractDraftSchema),
+    )
+    body: marketplaceDto.ConvertMarketplaceContractDraftDto,
+  ) {
+    return this.marketplaceService.convertMarketplaceContractDraft(
+      user.id,
+      id,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
   @Get('moderation/dashboard')
   getModerationDashboard(@User() user: ReqUser) {
     return this.marketplaceService.getModerationDashboard(user.id);

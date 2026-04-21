@@ -577,6 +577,40 @@ const webMessages = {
         respondCounter: 'Counter offer',
         respondDecline: 'Decline offer',
         declineReason: 'Decline reason',
+        contractDraft: {
+          title: 'Contract draft',
+          statusLabel: 'Draft status',
+          metadataHash: 'Metadata hash',
+          approvals: (clientApproved: boolean, applicantApproved: boolean) =>
+            `Client approved: ${clientApproved ? 'yes' : 'no'} • Talent approved: ${applicantApproved ? 'yes' : 'no'}`,
+          revisionCount: (count: number) =>
+            `${count} draft revision${count === 1 ? '' : 's'}`,
+          platformFee: 'Platform fee',
+          revise: 'Update draft',
+          approve: 'Approve draft',
+          approved: 'Draft approved',
+          convert: 'Convert to escrow',
+          statusValue: {
+            draft: 'Draft',
+            finalized: 'Finalized',
+            converted: 'Converted',
+            cancelled: 'Cancelled',
+          },
+          form: {
+            title: 'Contract title',
+            description: 'Contract description',
+            scopeSummary: 'Scope summary',
+            acceptanceCriteria: 'Acceptance criteria',
+            outcomes: 'Outcomes',
+            timeline: 'Timeline',
+            milestones: 'Milestones',
+            reviewWindowDays: 'Review window days',
+            disputeModel: 'Dispute model',
+            evidenceExpectation: 'Evidence expectation',
+            kickoffNote: 'Kickoff note',
+            revisionReason: 'Draft revision reason',
+          },
+        },
         matchBoard: 'Match board',
         skillOverlap: 'Skill overlap',
         requirementGaps: 'Requirement gaps',
@@ -638,6 +672,10 @@ const webMessages = {
           offerAccepted: 'Offer accepted.',
           offerCountered: 'Offer countered.',
           offerDeclined: 'Offer declined.',
+          contractDraftUpdated: 'Marketplace contract draft updated.',
+          contractDraftApproved: 'Marketplace contract draft approved.',
+          contractDraftConverted: (jobId: string) =>
+            `Marketplace contract draft converted into escrow contract ${jobId}.`,
           laneReady: (kind: 'client' | 'freelancer' | 'agency', label: string) =>
             kind === 'client'
               ? `Client lane ready through ${label}.`
@@ -1773,6 +1811,39 @@ const webMessages = {
         respondCounter: 'عرض مقابل',
         respondDecline: 'رفض العرض',
         declineReason: 'سبب الرفض',
+        contractDraft: {
+          title: 'مسودة العقد',
+          statusLabel: 'حالة المسودة',
+          metadataHash: 'بصمة البيانات',
+          approvals: (clientApproved: boolean, applicantApproved: boolean) =>
+            `اعتماد العميل: ${clientApproved ? 'نعم' : 'لا'} • اعتماد الموهبة: ${applicantApproved ? 'نعم' : 'لا'}`,
+          revisionCount: (count: number) => `${count} مراجعة للمسودة`,
+          platformFee: 'رسوم المنصة',
+          revise: 'تحديث المسودة',
+          approve: 'اعتماد المسودة',
+          approved: 'تم اعتماد المسودة',
+          convert: 'تحويل إلى الضمان',
+          statusValue: {
+            draft: 'مسودة',
+            finalized: 'نهائية',
+            converted: 'تم التحويل',
+            cancelled: 'ملغاة',
+          },
+          form: {
+            title: 'عنوان العقد',
+            description: 'وصف العقد',
+            scopeSummary: 'ملخص النطاق',
+            acceptanceCriteria: 'معايير القبول',
+            outcomes: 'النتائج',
+            timeline: 'الجدول الزمني',
+            milestones: 'المراحل',
+            reviewWindowDays: 'أيام نافذة المراجعة',
+            disputeModel: 'نموذج النزاع',
+            evidenceExpectation: 'متطلبات الأدلة',
+            kickoffNote: 'ملاحظة البدء',
+            revisionReason: 'سبب مراجعة المسودة',
+          },
+        },
         matchBoard: 'لوحة المطابقة',
         skillOverlap: 'تداخل المهارات',
         requirementGaps: 'فجوات المتطلبات',
@@ -1834,6 +1905,10 @@ const webMessages = {
           offerAccepted: 'تم قبول العرض.',
           offerCountered: 'تم إرسال عرض مقابل.',
           offerDeclined: 'تم رفض العرض.',
+          contractDraftUpdated: 'تم تحديث مسودة عقد السوق.',
+          contractDraftApproved: 'تم اعتماد مسودة عقد السوق.',
+          contractDraftConverted: (jobId: string) =>
+            `تم تحويل مسودة عقد السوق إلى عقد ضمان ${jobId}.`,
           laneReady: (kind: 'client' | 'freelancer' | 'agency', label: string) =>
             kind === 'client'
               ? `أصبح مسار العميل جاهزاً عبر ${label}.`

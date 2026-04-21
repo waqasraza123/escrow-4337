@@ -3,6 +3,9 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceContractDraftRecord,
+  MarketplaceContractDraftRevisionRecord,
+  MarketplaceContractMetadataSnapshot,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferMilestoneDraft,
@@ -147,6 +150,49 @@ function normalizeOffer(offer: MarketplaceOfferRecord): MarketplaceOfferRecord {
     counterMessage: offer.counterMessage?.trim() || null,
     declineReason: offer.declineReason?.trim() || null,
     milestones: normalizeOfferMilestones(offer.milestones),
+  };
+}
+
+function normalizeContractSnapshot(
+  snapshot: MarketplaceContractMetadataSnapshot,
+): MarketplaceContractMetadataSnapshot {
+  return {
+    ...snapshot,
+    title: snapshot.title.trim(),
+    description: snapshot.description.trim(),
+    category: snapshot.category.trim().toLowerCase(),
+    contractorEmail: snapshot.contractorEmail.trim().toLowerCase(),
+    workerAddress: snapshot.workerAddress.trim(),
+    currencyAddress: snapshot.currencyAddress.trim(),
+    scopeSummary: snapshot.scopeSummary.trim(),
+    acceptanceCriteria: normalizeTextList(snapshot.acceptanceCriteria),
+    outcomes: normalizeTextList(snapshot.outcomes),
+    timeline: snapshot.timeline.trim(),
+    milestones: normalizeOfferMilestones(snapshot.milestones),
+    disputeModel: snapshot.disputeModel.trim(),
+    evidenceExpectation: snapshot.evidenceExpectation.trim(),
+    kickoffNote: snapshot.kickoffNote.trim(),
+    platformFeeLabel: snapshot.platformFeeLabel.trim(),
+  };
+}
+
+function normalizeContractDraftRevisions(
+  revisions: MarketplaceContractDraftRevisionRecord[],
+) {
+  return revisions.map((revision) => ({
+    ...revision,
+    snapshot: normalizeContractSnapshot(revision.snapshot),
+    reason: revision.reason?.trim() || null,
+  }));
+}
+
+function normalizeContractDraft(
+  draft: MarketplaceContractDraftRecord,
+): MarketplaceContractDraftRecord {
+  return {
+    ...draft,
+    latestSnapshot: normalizeContractSnapshot(draft.latestSnapshot),
+    revisions: normalizeContractDraftRevisions(draft.revisions),
   };
 }
 
@@ -439,6 +485,38 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async saveOffer(offer: MarketplaceOfferRecord) {
     await this.store.write((data) => {
       data.marketplaceOffers[offer.id] = cloneValue(normalizeOffer(offer));
+    });
+  }
+
+  async getContractDraftById(draftId: string) {
+    return this.store.read((data) => {
+      const draft = data.marketplaceContractDrafts[draftId];
+      return draft ? cloneValue(normalizeContractDraft(draft)) : null;
+    });
+  }
+
+  async getContractDraftByApplicationId(applicationId: string) {
+    return this.store.read((data) => {
+      const draft = Object.values(data.marketplaceContractDrafts).find(
+        (candidate) => candidate.applicationId === applicationId,
+      );
+      return draft ? cloneValue(normalizeContractDraft(draft)) : null;
+    });
+  }
+
+  async listContractDrafts() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceContractDrafts)
+        .map((draft) => cloneValue(normalizeContractDraft(draft)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveContractDraft(draft: MarketplaceContractDraftRecord) {
+    await this.store.write((data) => {
+      data.marketplaceContractDrafts[draft.id] = cloneValue(
+        normalizeContractDraft(draft),
+      );
     });
   }
 

@@ -21,6 +21,7 @@ import type {
   MarketplaceApplicationRevisionRecord,
   MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
+  MarketplaceContractDraftRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferRecord,
@@ -183,6 +184,14 @@ export interface MarketplaceRepository {
   getOfferById(offerId: string): Promise<MarketplaceOfferRecord | null>;
   listOffers(): Promise<MarketplaceOfferRecord[]>;
   saveOffer(offer: MarketplaceOfferRecord): Promise<void>;
+  getContractDraftById(
+    draftId: string,
+  ): Promise<MarketplaceContractDraftRecord | null>;
+  getContractDraftByApplicationId(
+    applicationId: string,
+  ): Promise<MarketplaceContractDraftRecord | null>;
+  listContractDrafts(): Promise<MarketplaceContractDraftRecord[]>;
+  saveContractDraft(draft: MarketplaceContractDraftRecord): Promise<void>;
   getApplicationDecisionById(
     decisionId: string,
   ): Promise<MarketplaceApplicationDecisionRecord | null>;
@@ -218,7 +227,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 23;
+  version: 24;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -249,6 +258,7 @@ export type PersistenceFileData = {
     MarketplaceInterviewMessageRecord
   >;
   marketplaceOffers: Record<string, MarketplaceOfferRecord>;
+  marketplaceContractDrafts: Record<string, MarketplaceContractDraftRecord>;
   marketplaceApplicationDecisions: Record<
     string,
     MarketplaceApplicationDecisionRecord

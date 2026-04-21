@@ -27,6 +27,8 @@ import {
   type JobView,
   type MarketplaceApplication,
   type MarketplaceApplicationComparison,
+  type MarketplaceContractDraft,
+  type MarketplaceContractDraftStatus,
   type MarketplaceApplicationDossier,
   type MarketplaceApplicationTimeline,
   type MarketplaceCryptoReadiness,
@@ -103,6 +105,21 @@ type OfferDraft = {
   proposedRate: string;
   milestones: string;
   declineReason: string;
+};
+
+type ContractDraftEdit = {
+  title: string;
+  description: string;
+  scopeSummary: string;
+  acceptanceCriteria: string;
+  outcomes: string;
+  timeline: string;
+  milestones: string;
+  reviewWindowDays: string;
+  disputeModel: string;
+  evidenceExpectation: string;
+  kickoffNote: string;
+  reason: string;
 };
 
 type OrganizationDraft = {
@@ -399,6 +416,23 @@ function createEmptyOfferDraft(): OfferDraft {
   };
 }
 
+function createContractDraftEdit(draft: MarketplaceContractDraft): ContractDraftEdit {
+  return {
+    title: draft.latestSnapshot.title,
+    description: draft.latestSnapshot.description,
+    scopeSummary: draft.latestSnapshot.scopeSummary,
+    acceptanceCriteria: draft.latestSnapshot.acceptanceCriteria.join('\n'),
+    outcomes: draft.latestSnapshot.outcomes.join('\n'),
+    timeline: draft.latestSnapshot.timeline,
+    milestones: serializeOfferMilestones(draft.latestSnapshot.milestones),
+    reviewWindowDays: String(draft.latestSnapshot.reviewWindowDays),
+    disputeModel: draft.latestSnapshot.disputeModel,
+    evidenceExpectation: draft.latestSnapshot.evidenceExpectation,
+    kickoffNote: draft.latestSnapshot.kickoffNote,
+    reason: '',
+  };
+}
+
 export function MarketplaceWorkspace() {
   const { messages } = useWebI18n();
   const marketplaceMessages = messages.publicMarketplace;
@@ -457,6 +491,9 @@ export function MarketplaceWorkspace() {
   >({});
   const [interviewDrafts, setInterviewDrafts] = useState<Record<string, string>>({});
   const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
+  const [contractDraftEdits, setContractDraftEdits] = useState<
+    Record<string, ContractDraftEdit>
+  >({});
   const [organizationDraft, setOrganizationDraft] = useState<OrganizationDraft>(
     createEmptyOrganizationDraft(),
   );
@@ -585,6 +622,8 @@ export function MarketplaceWorkspace() {
     marketplaceMessages.labels.searchReason[
       code as keyof typeof marketplaceMessages.labels.searchReason
     ] ?? code;
+  const formatContractDraftStatus = (status: MarketplaceContractDraftStatus) =>
+    workspaceMessages.contractDraft.statusValue[status];
   const renderWorkspaceAction = (
     workspace: WorkspaceSummary | null,
   ) => {
@@ -1186,7 +1225,34 @@ export function MarketplaceWorkspace() {
       ...current,
       [applicationId]: response.timeline,
     }));
+    if (response.timeline.contractDraft) {
+      const contractDraft = response.timeline.contractDraft;
+      setContractDraftEdits((current) => ({
+        ...current,
+        [contractDraft.id]:
+          current[contractDraft.id] ?? createContractDraftEdit(contractDraft),
+      }));
+    }
     setMessage(workspaceMessages.messages.timelineLoaded);
+  }
+
+  function syncContractDraftIntoTimeline(
+    applicationId: string,
+    draft: MarketplaceContractDraft,
+  ) {
+    setApplicationTimelines((current) => {
+      const existing = current[applicationId];
+      if (!existing) {
+        return current;
+      }
+      return {
+        ...current,
+        [applicationId]: {
+          ...existing,
+          contractDraft: draft,
+        },
+      };
+    });
   }
 
   async function handleLoadComparison(opportunityId: string) {
@@ -1281,6 +1347,16 @@ export function MarketplaceWorkspace() {
     setOfferDrafts((current) => ({
       ...current,
       [applicationId]: updater(current[applicationId] ?? createEmptyOfferDraft()),
+    }));
+  }
+
+  function updateContractDraftEdit(
+    draft: MarketplaceContractDraft,
+    updater: (current: ContractDraftEdit) => ContractDraftEdit,
+  ) {
+    setContractDraftEdits((current) => ({
+      ...current,
+      [draft.id]: updater(current[draft.id] ?? createContractDraftEdit(draft)),
     }));
   }
 
@@ -1420,6 +1496,7 @@ export function MarketplaceWorkspace() {
           interviewThread: response.thread,
           offers: [],
           decisions: [],
+          contractDraft: null,
         }),
         interviewThread: response.thread,
       },
@@ -1492,6 +1569,312 @@ export function MarketplaceWorkspace() {
     );
     await loadWorkspace(tokens);
     await handleLoadApplicationTimeline(applicationId);
+  }
+
+  async function handleReviseContractDraft(
+    draft: MarketplaceContractDraft,
+    applicationId: string,
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const edit = contractDraftEdits[draft.id] ?? createContractDraftEdit(draft);
+    const response = await webApi.reviseMarketplaceContractDraft(
+      draft.id,
+      {
+        title: edit.title,
+        description: edit.description,
+        scopeSummary: edit.scopeSummary,
+        acceptanceCriteria: splitList(edit.acceptanceCriteria),
+        outcomes: splitList(edit.outcomes),
+        timeline: edit.timeline,
+        milestones: parseOfferMilestones(edit.milestones),
+        reviewWindowDays: Number(edit.reviewWindowDays) || 1,
+        disputeModel: edit.disputeModel,
+        evidenceExpectation: edit.evidenceExpectation,
+        kickoffNote: edit.kickoffNote,
+        reason: edit.reason.trim() || null,
+      },
+      tokens.accessToken,
+    );
+    setContractDraftEdits((current) => ({
+      ...current,
+      [draft.id]: createContractDraftEdit(response.draft),
+    }));
+    syncContractDraftIntoTimeline(applicationId, response.draft);
+    setMessage(workspaceMessages.messages.contractDraftUpdated);
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
+  }
+
+  async function handleApproveContractDraft(
+    draft: MarketplaceContractDraft,
+    applicationId: string,
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.approveMarketplaceContractDraft(
+      draft.id,
+      tokens.accessToken,
+    );
+    setContractDraftEdits((current) => ({
+      ...current,
+      [draft.id]: createContractDraftEdit(response.draft),
+    }));
+    syncContractDraftIntoTimeline(applicationId, response.draft);
+    setMessage(workspaceMessages.messages.contractDraftApproved);
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
+  }
+
+  async function handleConvertContractDraft(
+    draft: MarketplaceContractDraft,
+    applicationId: string,
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.convertMarketplaceContractDraft(
+      draft.id,
+      tokens.accessToken,
+    );
+    setMessage(workspaceMessages.messages.contractDraftConverted(response.jobId));
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
+  }
+
+  function renderContractDraftPanel(
+    application: MarketplaceApplication,
+    draft: MarketplaceContractDraft,
+    actor: 'client' | 'talent',
+  ) {
+    const edit = contractDraftEdits[draft.id] ?? createContractDraftEdit(draft);
+    const clientApproved = draft.clientApprovedAt !== null;
+    const applicantApproved = draft.applicantApprovedAt !== null;
+    const actorApproved =
+      actor === 'client' ? clientApproved : applicantApproved;
+    const canConvert =
+      actor === 'client' &&
+      draft.status === 'finalized' &&
+      draft.clientApprovedAt !== null &&
+      draft.applicantApprovedAt !== null &&
+      draft.convertedJobId === null;
+
+    return (
+      <div className={styles.stack}>
+        <span className={styles.metaLabel}>{workspaceMessages.contractDraft.title}</span>
+        <div className={styles.walletCard}>
+          <strong>
+            {workspaceMessages.contractDraft.statusLabel}:{' '}
+            {formatContractDraftStatus(draft.status)}
+          </strong>
+          <p className={styles.stateText}>
+            {workspaceMessages.contractDraft.metadataHash}: {draft.metadataHash}
+          </p>
+          <p className={styles.stateText}>
+            {workspaceMessages.contractDraft.approvals(clientApproved, applicantApproved)}
+          </p>
+          <p className={styles.stateText}>
+            {workspaceMessages.contractDraft.revisionCount(draft.revisions.length)}
+          </p>
+          <p className={styles.stateText}>
+            {workspaceMessages.contractDraft.platformFee}:{' '}
+            {draft.latestSnapshot.platformFeeLabel}
+          </p>
+          {draft.convertedJobId ? (
+            <Link
+              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+              href={application.contractPath ?? `/app/contracts/${draft.convertedJobId}`}
+            >
+              {workspaceMessages.viewContract}
+            </Link>
+          ) : null}
+        </div>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.title}</span>
+          <input
+            value={edit.title}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                title: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.description}</span>
+          <textarea
+            rows={4}
+            value={edit.description}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                description: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.scopeSummary}</span>
+          <textarea
+            rows={3}
+            value={edit.scopeSummary}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                scopeSummary: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.acceptanceCriteria}</span>
+          <textarea
+            rows={3}
+            value={edit.acceptanceCriteria}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                acceptanceCriteria: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.outcomes}</span>
+          <textarea
+            rows={3}
+            value={edit.outcomes}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                outcomes: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.timeline}</span>
+          <input
+            value={edit.timeline}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                timeline: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.milestones}</span>
+          <textarea
+            rows={4}
+            placeholder={workspaceMessages.offerMilestonePlaceholder}
+            value={edit.milestones}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                milestones: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.reviewWindowDays}</span>
+          <input
+            value={edit.reviewWindowDays}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                reviewWindowDays: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.disputeModel}</span>
+          <input
+            value={edit.disputeModel}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                disputeModel: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.evidenceExpectation}</span>
+          <textarea
+            rows={2}
+            value={edit.evidenceExpectation}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                evidenceExpectation: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.kickoffNote}</span>
+          <textarea
+            rows={3}
+            value={edit.kickoffNote}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                kickoffNote: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className={styles.field}>
+          <span>{workspaceMessages.contractDraft.form.revisionReason}</span>
+          <input
+            value={edit.reason}
+            onChange={(event) =>
+              updateContractDraftEdit(draft, (current) => ({
+                ...current,
+                reason: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <div className={styles.inlineActions}>
+          <button
+            type="button"
+            disabled={draft.status === 'converted' || draft.status === 'cancelled'}
+            onClick={() => void handleReviseContractDraft(draft, application.id)}
+          >
+            {workspaceMessages.contractDraft.revise}
+          </button>
+          <button
+            type="button"
+            disabled={
+              actorApproved ||
+              draft.status === 'converted' ||
+              draft.status === 'cancelled'
+            }
+            onClick={() => void handleApproveContractDraft(draft, application.id)}
+          >
+            {actorApproved
+              ? workspaceMessages.contractDraft.approved
+              : workspaceMessages.contractDraft.approve}
+          </button>
+          {canConvert ? (
+            <button
+              type="button"
+              onClick={() => void handleConvertContractDraft(draft, application.id)}
+            >
+              {workspaceMessages.contractDraft.convert}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -3151,7 +3534,11 @@ export function MarketplaceWorkspace() {
                             type="button"
                             disabled={
                               !canReviewApplications ||
-                              application.dossier.matchSummary.missingRequirements.length > 0
+                              application.dossier.matchSummary.missingRequirements.length > 0 ||
+                              (applicationTimelines[application.id]?.contractDraft?.status !==
+                                undefined &&
+                                applicationTimelines[application.id]?.contractDraft
+                                  ?.status !== 'finalized')
                             }
                             onClick={() =>
                               void handleApplicationDecision(
@@ -3194,6 +3581,13 @@ export function MarketplaceWorkspace() {
                                 }
                               </p>
                             ) : null}
+                            {applicationTimelines[application.id].contractDraft
+                              ? renderContractDraftPanel(
+                                  application,
+                                  applicationTimelines[application.id].contractDraft,
+                                  'client',
+                                )
+                              : null}
                             <div className={styles.stack}>
                               <span className={styles.metaLabel}>
                                 {workspaceMessages.interviewTitle}
@@ -3331,6 +3725,12 @@ export function MarketplaceWorkspace() {
                               {candidate.latestOffer?.status ?? workspaceMessages.none}
                             </p>
                             <p className={styles.stateText}>
+                              {workspaceMessages.contractDraft.statusLabel}:{' '}
+                              {candidate.contractDraftStatus
+                                ? formatContractDraftStatus(candidate.contractDraftStatus)
+                                : workspaceMessages.none}
+                            </p>
+                            <p className={styles.stateText}>
                               {workspaceMessages.decisionCount}: {candidate.decisionCount}
                             </p>
                           </div>
@@ -3441,6 +3841,13 @@ export function MarketplaceWorkspace() {
                         {workspaceMessages.revisionsTitle}:{' '}
                         {applicationTimelines[application.id].revisions.length}
                       </p>
+                      {applicationTimelines[application.id].contractDraft
+                        ? renderContractDraftPanel(
+                            application,
+                            applicationTimelines[application.id].contractDraft,
+                            'talent',
+                          )
+                        : null}
                       {applicationTimelines[application.id].revisions.map((revision) => (
                         <p
                           key={revision.id}
