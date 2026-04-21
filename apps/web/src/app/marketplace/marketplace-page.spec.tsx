@@ -43,6 +43,7 @@ describe('marketplace page', () => {
       'href',
       '/app/marketplace',
     );
+    expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByText('مواهب مميزة')).toBeInTheDocument();
     expect(screen.getByText('لا توجد ملفات مواهب عامة بعد')).toBeInTheDocument();
     expect(screen.getByText('الفرص المفتوحة')).toBeInTheDocument();
@@ -150,6 +151,7 @@ describe('marketplace page', () => {
     expect(
       screen.getByRole('link', { name: 'Open workspace' }),
     ).toHaveAttribute('href', '/app/marketplace');
+    expect(screen.getByText('Theme')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View profile' })).toHaveAttribute(
       'href',
       '/marketplace/profiles/builder-one',

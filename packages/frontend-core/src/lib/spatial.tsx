@@ -138,7 +138,7 @@ export function AmbientBackdrop(props: {
         className={cn(
           'absolute left-[-10rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full blur-3xl',
           theme === 'web'
-            ? 'bg-[radial-gradient(circle,rgba(150,171,255,0.26),transparent_68%)]'
+            ? 'bg-[image:var(--ambient-backdrop-primary)]'
             : 'bg-[radial-gradient(circle,rgba(130,194,255,0.18),transparent_70%)]',
         )}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
@@ -152,7 +152,7 @@ export function AmbientBackdrop(props: {
         className={cn(
           'absolute bottom-[-14rem] right-[-10rem] h-[30rem] w-[30rem] rounded-full blur-3xl',
           theme === 'web'
-            ? 'bg-[radial-gradient(circle,rgba(92,245,255,0.18),transparent_70%)]'
+            ? 'bg-[image:var(--ambient-backdrop-secondary)]'
             : 'bg-[radial-gradient(circle,rgba(122,160,255,0.14),transparent_72%)]',
         )}
         transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
@@ -161,7 +161,7 @@ export function AmbientBackdrop(props: {
         className={cn(
           'absolute inset-x-0 top-0 h-[32rem]',
           theme === 'web'
-            ? 'bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_70%)]'
+            ? 'bg-[image:var(--ambient-top-overlay)]'
             : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_72%)]',
         )}
       />
@@ -358,7 +358,7 @@ export function SpotlightButton(props: SpotlightButtonProps) {
       whileHover={reducedMotion ? undefined : { y: -2, scale: 1.01 }}
       whileTap={reducedMotion ? undefined : { scale: 0.99 }}
     >
-      <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(145,205,255,0.36),transparent_72%)] opacity-60 blur-xl" />
+      <div className="pointer-events-none absolute inset-0 rounded-full bg-[image:var(--spotlight-glow)] opacity-60 blur-xl" />
       <Button className={cn('relative z-10', className)} {...rest} />
     </motion.div>
   );
@@ -444,7 +444,7 @@ export function MotionTabs(props: {
           >
             {isActive ? (
               <motion.span
-                className="absolute inset-0 rounded-full border border-[var(--surface-border-strong)] bg-[rgba(255,255,255,0.08)] shadow-[0_10px_24px_rgba(4,11,24,0.16)]"
+                className="absolute inset-0 rounded-full border border-[var(--surface-border-strong)] bg-[var(--motion-tab-active-bg)] shadow-[var(--motion-tab-active-shadow)]"
                 layoutId={`${groupId}-highlight`}
                 transition={{ type: 'spring', ...spatialSprings.panel }}
               />

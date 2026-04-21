@@ -19,6 +19,7 @@ import {
   SharedCard,
   SpotlightButton,
 } from '@escrow4334/frontend-core/spatial';
+import { ThemeToggle } from '../theme-toggle';
 import styles from '../page.styles';
 import { useWebI18n } from '../../lib/i18n';
 import {
@@ -31,6 +32,8 @@ import {
   type MarketplaceOpportunity,
   type MarketplaceProfile,
   type MarketplaceProofArtifact,
+  type OrganizationInvitation,
+  type OrganizationMembership,
   type OrganizationSummary,
   type SessionTokens,
   type UserProfile,
@@ -89,6 +92,11 @@ type ApplicationDraft = {
 type OrganizationDraft = {
   name: string;
   slug: string;
+};
+
+type InvitationDraft = {
+  email: string;
+  role: 'client_owner' | 'client_recruiter';
 };
 
 function readSession(): SessionTokens | null {
@@ -221,6 +229,13 @@ function createEmptyOrganizationDraft(): OrganizationDraft {
   };
 }
 
+function createEmptyInvitationDraft(): InvitationDraft {
+  return {
+    email: '',
+    role: 'client_recruiter',
+  };
+}
+
 function slugifyWorkspaceName(value: string) {
   return value
     .toLowerCase()
@@ -273,6 +288,13 @@ export function MarketplaceWorkspace() {
   );
   const [profile, setProfile] = useState<MarketplaceProfile | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
+  const [organizationMemberships, setOrganizationMemberships] = useState<
+    OrganizationMembership[]
+  >([]);
+  const [organizationInvitations, setOrganizationInvitations] = useState<
+    OrganizationInvitation[]
+  >([]);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(
     createEmptyProfileDraft(),
   );
@@ -290,6 +312,9 @@ export function MarketplaceWorkspace() {
   >({});
   const [organizationDraft, setOrganizationDraft] = useState<OrganizationDraft>(
     createEmptyOrganizationDraft(),
+  );
+  const [invitationDraft, setInvitationDraft] = useState<InvitationDraft>(
+    createEmptyInvitationDraft(),
   );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -316,6 +341,10 @@ export function MarketplaceWorkspace() {
   const isClientWorkspace = activeWorkspace?.kind === 'client';
   const isFreelancerWorkspace = activeWorkspace?.kind === 'freelancer';
   const availableWorkspaces = user?.workspaces ?? [];
+  const activeOrganization =
+    organizations.find(
+      (organization) => organization.id === activeWorkspace?.organizationId,
+    ) ?? null;
   const workspaceCapabilities = activeWorkspace?.capabilities ?? {
     manageProfile: false,
     applyToOpportunity: false,
@@ -405,6 +434,9 @@ export function MarketplaceWorkspace() {
         setUser(null);
         setProfile(null);
         setOrganizations([]);
+        setInvitations([]);
+        setOrganizationMemberships([]);
+        setOrganizationInvitations([]);
         setMyOpportunities([]);
         setMyApplications([]);
         setContracts([]);
@@ -413,13 +445,20 @@ export function MarketplaceWorkspace() {
         return;
       }
 
-      const [me, jobs, organizationResponse] = await Promise.all([
+      const [me, jobs, organizationResponse, invitationResponse] = await Promise.all([
         webApi.me(nextTokens.accessToken),
         webApi.listJobs(nextTokens.accessToken),
         webApi.listOrganizations(nextTokens.accessToken),
+        webApi.listInvitations(nextTokens.accessToken),
       ]);
       const nextWorkspace = me.activeWorkspace;
-      const [myProfileResult, myOpportunityResult, myApplicationResult] =
+      const [
+        myProfileResult,
+        myOpportunityResult,
+        myApplicationResult,
+        orgInvitationResponse,
+        orgMembershipResponse,
+      ] =
         await Promise.all([
           nextWorkspace?.kind === 'freelancer'
             ? webApi
@@ -432,11 +471,26 @@ export function MarketplaceWorkspace() {
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceApplications(nextTokens.accessToken)
             : Promise.resolve({ applications: [] }),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listOrganizationInvitations(
+                nextWorkspace.organizationId,
+                nextTokens.accessToken,
+              )
+            : Promise.resolve({ invitations: [] }),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listOrganizationMemberships(
+                nextWorkspace.organizationId,
+                nextTokens.accessToken,
+              )
+            : Promise.resolve({ memberships: [] }),
         ]);
 
       setUser(me);
       setProfile(myProfileResult?.profile ?? null);
       setOrganizations(organizationResponse.organizations);
+      setInvitations(invitationResponse.invitations);
+      setOrganizationMemberships(orgMembershipResponse.memberships);
+      setOrganizationInvitations(orgInvitationResponse.invitations);
       setMyOpportunities(myOpportunityResult.opportunities);
       setMyApplications(myApplicationResult.applications);
       setContracts(jobs.jobs.map((entry) => entry.job));
@@ -519,6 +573,19 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
+  async function handleEnterLane(kind: 'client' | 'freelancer') {
+    const targetWorkspace =
+      (kind === 'client'
+        ? clientAuthoringWorkspace ?? clientReviewWorkspace
+        : freelancerProfileWorkspace ?? freelancerApplicationWorkspace) ?? null;
+    if (!targetWorkspace) {
+      setError(workspaceMessages.messages.laneUnavailable(kind));
+      return;
+    }
+    await handleSelectWorkspace(targetWorkspace.workspaceId);
+    setMessage(workspaceMessages.messages.laneReady(kind, targetWorkspace.label));
+  }
+
   async function handleCreateOrganization() {
     if (!tokens) {
       setError(workspaceMessages.messages.signInBeforeCreateOrganization);
@@ -543,6 +610,62 @@ export function MarketplaceWorkspace() {
     );
     setOrganizationDraft(createEmptyOrganizationDraft());
     setMessage(workspaceMessages.messages.organizationCreated(name));
+    await loadWorkspace(tokens);
+  }
+
+  async function handleCreateInvitation() {
+    if (!tokens || !activeOrganization) {
+      setError(workspaceMessages.messages.signInBeforeInvite);
+      return;
+    }
+
+    const email = invitationDraft.email.trim().toLowerCase();
+    if (!email) {
+      setError(workspaceMessages.messages.invitationEmailRequired);
+      return;
+    }
+
+    setError(null);
+    await webApi.createOrganizationInvitation(
+      activeOrganization.id,
+      {
+        email,
+        role: invitationDraft.role,
+      },
+      tokens.accessToken,
+    );
+    setInvitationDraft(createEmptyInvitationDraft());
+    setMessage(workspaceMessages.messages.invitationCreated(email));
+    await loadWorkspace(tokens);
+  }
+
+  async function handleAcceptInvitation(invitationId: string) {
+    if (!tokens) {
+      return;
+    }
+
+    setError(null);
+    await webApi.acceptOrganizationInvitation(
+      invitationId,
+      { setActive: true },
+      tokens.accessToken,
+    );
+    setMessage(workspaceMessages.messages.invitationAccepted);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    if (!tokens || !activeOrganization) {
+      return;
+    }
+
+    setError(null);
+    await webApi.revokeOrganizationInvitation(
+      activeOrganization.id,
+      invitationId,
+      tokens.accessToken,
+    );
+    setMessage(workspaceMessages.messages.invitationRevoked);
     await loadWorkspace(tokens);
   }
 
@@ -785,6 +908,12 @@ export function MarketplaceWorkspace() {
               <Button asChild variant="secondary">
                 <Link href="/app/new-contract">{marketplaceMessages.directContractPath}</Link>
               </Button>
+              <ThemeToggle
+                className={styles.languageSwitcher}
+                labelClassName={styles.languageSwitcherLabel}
+                optionClassName={styles.languageSwitcherOption}
+                optionActiveClassName={styles.languageSwitcherOptionActive}
+              />
               {tokens ? (
                 <Button type="button" onClick={() => void handleSignOut()}>
                   {workspaceMessages.signOut}
@@ -953,6 +1082,95 @@ export function MarketplaceWorkspace() {
         </RevealSection>
       ) : null}
 
+      {!loading && tokens && activeWorkspace ? (
+        <RevealSection className={styles.grid} delay={0.075}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow={workspaceMessages.onboarding.eyebrow}
+            headerClassName={styles.panelHeader}
+            title={workspaceMessages.onboarding.title}
+          >
+            <div className={styles.summaryGrid}>
+              <SharedCard className={styles.actionPanel} interactive>
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.onboarding.client.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.onboarding.client.body}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() => void handleEnterLane('client')}
+                    >
+                      {workspaceMessages.onboarding.client.action}
+                    </button>
+                  </div>
+                </div>
+              </SharedCard>
+              <SharedCard className={styles.actionPanel} interactive>
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.onboarding.freelancer.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.onboarding.freelancer.body}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() => void handleEnterLane('freelancer')}
+                    >
+                      {workspaceMessages.onboarding.freelancer.action}
+                    </button>
+                  </div>
+                </div>
+              </SharedCard>
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
+
+      {!loading && tokens && invitations.length > 0 ? (
+        <RevealSection className={styles.grid} delay={0.077}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow={workspaceMessages.invitations.eyebrow}
+            headerClassName={styles.panelHeader}
+            title={workspaceMessages.invitations.title}
+          >
+            <div className={styles.stack}>
+              <p className={styles.stateText}>
+                {workspaceMessages.invitations.body}
+              </p>
+              {invitations.map((invitation) => (
+                <SharedCard
+                  key={invitation.invitationId}
+                  className={styles.actionPanel}
+                  data-testid={`marketplace-pending-invitation-${invitation.invitationId}`}
+                  interactive
+                >
+                  <div className={styles.stack}>
+                    <strong>{invitation.organizationName}</strong>
+                    <p className={styles.stateText}>
+                      {workspaceMessages.invitations.roleLabel}:{' '}
+                      {workspaceMessages.invitationRoles[invitation.role]}
+                    </p>
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleAcceptInvitation(invitation.invitationId)
+                        }
+                      >
+                        {workspaceMessages.invitations.accept}
+                      </button>
+                    </div>
+                  </div>
+                </SharedCard>
+              ))}
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
+
       <RevealSection className={styles.grid} delay={0.08}>
         <SectionCard
           className={styles.panel}
@@ -1099,6 +1317,129 @@ export function MarketplaceWorkspace() {
                   {workspaceMessages.organizationForm.create}
                 </button>
               </div>
+              {activeOrganization ? (
+                <>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.organizationMemberships.body(
+                      activeOrganization.name,
+                    )}
+                  </p>
+                  {organizationMemberships.length > 0 ? (
+                    <div className={styles.stack}>
+                      {organizationMemberships.map((membership) => (
+                        <SharedCard
+                          key={membership.membershipId}
+                          className={styles.actionPanel}
+                          data-testid={`marketplace-organization-membership-${membership.membershipId}`}
+                          interactive
+                        >
+                          <div className={styles.stack}>
+                            <strong>{membership.userEmail}</strong>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.organizationMemberships.roleLabel}:{' '}
+                              {workspaceMessages.organizationMemberships.roleValue(
+                                membership.role,
+                              )}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.organizationMemberships.statusLabel}:{' '}
+                              {workspaceMessages.organizationMemberships.statusValue(
+                                membership.status,
+                              )}
+                            </p>
+                          </div>
+                        </SharedCard>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className={styles.stateText}>
+                    {workspaceMessages.organizationInvitations.body(
+                      activeOrganization.name,
+                    )}
+                  </p>
+                  <label className={styles.field}>
+                    <span>{workspaceMessages.organizationInvitations.email}</span>
+                    <input
+                      disabled={!canManageWorkspace}
+                      type="email"
+                      value={invitationDraft.email}
+                      onChange={(event) =>
+                        setInvitationDraft((current) => ({
+                          ...current,
+                          email: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{workspaceMessages.organizationInvitations.role}</span>
+                    <select
+                      disabled={!canManageWorkspace}
+                      value={invitationDraft.role}
+                      onChange={(event) =>
+                        setInvitationDraft((current) => ({
+                          ...current,
+                          role: event.target.value as InvitationDraft['role'],
+                        }))
+                      }
+                    >
+                      <option value="client_recruiter">
+                        {workspaceMessages.invitationRoles.client_recruiter}
+                      </option>
+                      <option value="client_owner">
+                        {workspaceMessages.invitationRoles.client_owner}
+                      </option>
+                    </select>
+                  </label>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      disabled={!canManageWorkspace}
+                      onClick={() => void handleCreateInvitation()}
+                    >
+                      {workspaceMessages.organizationInvitations.send}
+                    </button>
+                  </div>
+                  {organizationInvitations.length > 0 ? (
+                    <div className={styles.stack}>
+                      {organizationInvitations.map((invitation) => (
+                        <SharedCard
+                          key={invitation.invitationId}
+                          className={styles.actionPanel}
+                          data-testid={`marketplace-organization-invitation-${invitation.invitationId}`}
+                          interactive
+                        >
+                          <div className={styles.stack}>
+                            <strong>{invitation.invitedEmail}</strong>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.organizationInvitations.roleLabel}:{' '}
+                              {workspaceMessages.invitationRoles[invitation.role]}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.organizationInvitations.statusLabel}:{' '}
+                              {workspaceMessages.invitationStatuses[invitation.status]}
+                            </p>
+                            {invitation.status === 'pending' && canManageWorkspace ? (
+                              <div className={styles.inlineActions}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleRevokeInvitation(
+                                      invitation.invitationId,
+                                    )
+                                  }
+                                >
+                                  {workspaceMessages.organizationInvitations.revoke}
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </SharedCard>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           </article>
         ) : null}

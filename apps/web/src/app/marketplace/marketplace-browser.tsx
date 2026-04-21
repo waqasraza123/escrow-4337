@@ -6,6 +6,7 @@ import { SectionHeading } from '@escrow4334/frontend-core';
 import { GlassPanel, RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
 import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
+import { ThemeToggle } from '../theme-toggle';
 import {
   webApi,
   type MarketplaceOpportunity,
@@ -64,12 +65,20 @@ export function MarketplaceBrowser() {
             <Link href="/trust">{messages.common.trust}</Link>
             <Link href="/app/marketplace">{marketplaceMessages.navWorkspace}</Link>
           </div>
-          <LanguageSwitcher
-            className={styles.languageSwitcher}
-            labelClassName={styles.languageSwitcherLabel}
-            optionClassName={styles.languageSwitcherOption}
-            optionActiveClassName={styles.languageSwitcherOptionActive}
-          />
+          <div className={styles.controlCluster}>
+            <ThemeToggle
+              className={styles.languageSwitcher}
+              labelClassName={styles.languageSwitcherLabel}
+              optionClassName={styles.languageSwitcherOption}
+              optionActiveClassName={styles.languageSwitcherOptionActive}
+            />
+            <LanguageSwitcher
+              className={styles.languageSwitcher}
+              labelClassName={styles.languageSwitcherLabel}
+              optionClassName={styles.languageSwitcherOption}
+              optionActiveClassName={styles.languageSwitcherOptionActive}
+            />
+          </div>
         </nav>
 
         <RevealSection className={styles.hero}>

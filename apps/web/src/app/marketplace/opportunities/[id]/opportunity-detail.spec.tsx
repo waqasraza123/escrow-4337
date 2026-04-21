@@ -70,6 +70,7 @@ describe('marketplace opportunity detail', () => {
     });
 
     expect(screen.getByText('فرصة في السوق')).toBeInTheDocument();
+    expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'افتح مساحة العمل' })).toHaveAttribute(
       'href',
       '/app/marketplace',

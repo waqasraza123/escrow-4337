@@ -62,6 +62,7 @@ import {
   type PendingLifecycleAction,
 } from './milestone-lifecycle';
 import { LanguageSwitcher } from './language-switcher';
+import { ThemeToggle } from './theme-toggle';
 import { useEscrowLaunchWalkthrough } from './launch-walkthrough';
 
 type WalletConnectionState = {
@@ -1921,6 +1922,12 @@ export function EscrowConsole({
               <Link href="/app/help/launch-flow" className={styles.secondaryButton}>
                 Read the manual
               </Link>
+              <ThemeToggle
+                className={styles.languageSwitcher}
+                labelClassName={styles.languageSwitcherLabel}
+                optionClassName={styles.languageSwitcherOption}
+                optionActiveClassName={styles.languageSwitcherOptionActive}
+              />
               <LanguageSwitcher
                 className={styles.languageSwitcher}
                 labelClassName={styles.languageSwitcherLabel}
@@ -2823,7 +2830,7 @@ export function EscrowConsole({
           <div className={styles.detailGrid}>
             <div className={styles.stack}>
               <SharedCard
-                className="rounded-[1.35rem] border border-[var(--surface-border)] bg-[rgba(7,16,30,0.44)] p-4 shadow-[var(--surface-shadow)]"
+                className="rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--surface-soft)] p-4 shadow-[var(--surface-shadow)]"
                 layoutId={`web-job-${selectedJobView.id}`}
               >
               <div className={styles.summaryGrid}>

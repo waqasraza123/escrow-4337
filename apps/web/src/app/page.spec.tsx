@@ -156,6 +156,9 @@ describe('web page', () => {
     expect(
       screen.getByRole('button', { name: 'Connect injected wallet' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(

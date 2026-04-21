@@ -4,37 +4,49 @@
 - 2026-04-20
 
 ## Current Objective
-- Implement the combined Phase 0 + Phase 1 identity/workspace baseline from the new marketplace plan:
-  - keep the Phase 0 launch/evidence hardening intact
-  - normalize marketplace ownership around organizations and workspaces
-  - split the web workspace into explicit client vs freelancer modes without forcing existing users through a migration wall
+- Land the remaining repo-side Phase 1 identity/workspace slice on top of the Phase 0 repo-closeout work:
+  - collaborative client-workspace invitations
+  - explicit hire/freelance onboarding actions in the marketplace workspace
+  - browser-proof the onboarding path through the exact marketplace journey without adding more release-path plumbing
 
 ## Last Completed Step
-- Tightened reviewed source-bundle validation from file-presence checks into semantic contract checks:
-  - `imageManifest` source validation now parses and validates `manifest.json`
-  - `deployedSmokeReview` source validation now verifies the smoke review record is a coherent ready smoke packet
-  - `launchCandidateReview` source validation now reuses the promotion-record/evidence-posture consistency checks
-  - `promotionReview` source validation now verifies coherent review structure before upload or dossier assembly
+- Added invitation-backed shared client workspaces plus explicit marketplace onboarding actions:
+  - API now persists `organization_invitations` and exposes invite create/list/accept endpoints
+  - web marketplace workspace now shows hire/freelance onboarding actions, pending invite acceptance, and owner-side collaborator invite controls
+  - the local exact marketplace browser flow now enters lanes through the onboarding actions rather than the older inline lane switch buttons
+- Extended shared client workspace management:
+  - API now exposes org-scoped member listing plus owner-side invitation revocation
+  - web marketplace ownership panel now shows accepted collaborators and lets client owners revoke pending invitations in place
 
 ## Current Step
-- Keep hardening the Phase 0 launch/release path toward real staging proof by closing any remaining workflow consumer gaps after the semantic source-bundle validation pass.
+- Pause verification churn and stay code-focused.
+- Repo work now includes:
+  - Phase 0 repo-closeout commands and docs
+  - Phase 1 client/freelancer workspace ownership, onboarding, and invitations
+  - Phase 1 owner-visible collaborator management for shared client workspaces
+- Remaining external work is still the real staged proof path:
+  - deploy the candidate with real staging secrets
+  - run `Deployed Smoke`
+  - run `Launch Candidate`
+  - run `Promotion Review`
 
 ## Why This Step Exists
 - The new roadmap explicitly says the repo is no longer a single-user escrow demo. Phase 1 requires a real marketplace identity model, but the implementation must preserve existing users through personal-workspace backfill instead of a breaking migration.
 
 ## Changed Files
-- Identity/workspace model:
+- Phase 0 repo-closeout:
+  `package.json`
+  `scripts/{staging-contract*,phase0-readiness*}.mjs`
+  `docs/{DEPLOYMENT_RUNBOOK.md,ENVIRONMENT_MATRIX.md,LAUNCH_READINESS.md,MARKETPLACE_PHASE_0_BACKLOG_V1.md,MARKETPLACE_PHASE_0_V1.md,PHASE_0_STAGING_HANDOFF.md,STAGING_EXECUTION_SEQUENCE.md}`
+- Phase 1 backend:
   `services/api/src/modules/organizations/*`
-  `services/api/src/persistence/postgres/migrations/018_organizations_workspaces.sql`
-  `services/api/src/persistence/{persistence.module.ts,persistence.tokens.ts,persistence.types.ts}`
-  `services/api/src/persistence/file/{file-persistence.store.ts,file.organizations.repositories.ts,file.repositories.ts}`
-  `services/api/src/persistence/postgres/{postgres.organizations.repositories.ts,postgres.marketplace.repositories.ts,postgres.repositories.ts}`
-- Auth/user/marketplace integration:
-  `services/api/src/modules/{auth,users,marketplace}/**/*`
-- Frontend/admin session shape and marketplace workspace:
-  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,test/fixtures.ts}`
-  `apps/admin/src/{lib/api.ts,test/fixtures.ts}`
-- Docs:
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.organizations.repositories.ts,postgres/postgres.organizations.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/{018_organizations_workspaces.sql,019_organization_invitations.sql}`
+  `services/api/test/organizations.service.spec.ts`
+- Phase 1 web/browser:
+  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx}`
+  `tests/e2e/flows/marketplace-exact-flow.ts`
+- Repo memory:
   `docs/project-state.md`
   `docs/_local/current-session.md`
 
@@ -46,6 +58,10 @@
 - Keep the implementation docs repo-specific: they should describe modules, workflows, data shape direction, verification, and UI posture in terms of the current monorepo instead of generic marketplace advice.
 
 ## Verification Commands
+- `pnpm staging:contract:validate`
+- `pnpm phase0:readiness`
+- `pnpm --filter escrow4334-api test -- --runTestsByPath test/organizations.service.spec.ts test/marketplace.service.spec.ts`
+- `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
 - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
 - `pnpm --filter web typecheck`
 - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
@@ -53,21 +69,31 @@
 
 ## Verification Status
 - Passed:
+  - `node --test scripts/staging-contract-lib.test.mjs scripts/phase0-readiness-lib.test.mjs`
+  - `pnpm staging:contract:validate`
+  - `pnpm phase0:readiness`
+  - `pnpm --filter escrow4334-api test -- --runTestsByPath test/organizations.service.spec.ts test/marketplace.service.spec.ts`
+  - `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit`
   - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
   - `pnpm --filter web typecheck`
   - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
   - `git diff --check`
 - Blocked or not run:
-  - wider admin/API verification was not rerun because this step touched the web marketplace workspace, Playwright flow contract, and Playwright config rather than backend modules
+  - full `pnpm build` was intentionally not pursued further after the user redirected away from build/debug work; the last repo build failure was environment-only Google Fonts fetch resolution in the sandboxed web build, not a code type/test failure
   - real staged deployment validation against live staging secrets and URLs
   - real Phase 0 staging proof against launch-candidate evidence artifacts
   - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
 
 ## Next Likely Step
-- Continue the combined Phase 0 + Phase 1 program by exercising the fully validated review-artifact chain against real staging:
-  - run the deployed exact marketplace journey against real staging once secrets and URLs are ready
-  - verify the GitHub `Deployed Smoke` -> `Launch Candidate` -> `Promotion Review` -> `release-dossier` path against a real staged candidate
-  - keep any further workflow consumers on canonical release-pointer/env fields instead of re-reading nested dossier JSON
+- Keep moving on code, not release ceremony:
+  - add offer/interview pipeline groundwork from Phase 3
+  - or extend the org/workspace model with recruiter removal or membership-role management now that invitations and accepted-collaborator visibility exist
+- When switching back to release work, execute the real staging proof:
+  - deploy the target candidate to staging
+  - run `Deployed Smoke`
+  - run `Launch Candidate`
+  - run `Promotion Review`
+  - preserve `release-dossier` and `release-pointer-staging`
 
 ## Update (2026-04-20, Exact Marketplace Canary Stabilization)
 - Stabilized the exact Phase 1 marketplace browser canary against the built local stack.
@@ -856,3 +882,35 @@
   - `pnpm build`
 - Next production-grade target:
   - continue Phase 0 by pushing the same correlation thread into reconciliation/launch evidence so failed execution diagnostics, exports, and release artifacts can be joined on one operator-visible trace without reading raw logs
+## Update (2026-04-21, Web Theme System And Saudi-Green Default)
+- Added a real `apps/web` theme system with cookie-backed persistence and a route-global light/dark toggle.
+- Theme changes:
+  - new default web theme is a Saudi-green light palette
+  - existing dark visual system is preserved behind `data-theme='dark'`
+  - theme persists through `escrow4334-web-theme` and is applied server-side in `apps/web/src/app/layout.tsx`
+- UI changes:
+  - added `useWebTheme` / `WebThemeProvider` under `apps/web/src/lib`
+  - added `ThemeToggle` to public navs, escrow console top bar, marketplace workspace top bar, and marketplace detail top bars
+  - refactored shared web-facing tokens/components away from hard-coded blue/violet web values into semantic CSS variables across:
+    - `apps/web/src/app/globals.css`
+    - `apps/web/src/app/{marketing.styles.ts,page.styles.ts}`
+    - `packages/frontend-core/src/lib/{ui.tsx,spatial.tsx}`
+- Test changes:
+  - added `apps/web/src/app/theme-toggle.spec.tsx`
+  - extended route specs to assert theme-toggle presence on public, console, workspace, and detail surfaces
+  - added local Playwright smoke spec `tests/e2e/specs/smoke/local/theme-toggle.spec.ts`
+- Changed files:
+  - `apps/web/src/app/{layout.tsx,spatial-shell.tsx,theme-toggle.tsx,globals.css,page.tsx,trust/page.tsx,web-console.tsx,marketing.styles.ts,page.styles.ts}`
+  - `apps/web/src/app/marketplace/{marketplace-browser.tsx,workspace.tsx,abuse-report-panel.tsx,marketplace-page.spec.tsx,marketplace-workspace.spec.tsx}`
+  - `apps/web/src/app/marketplace/profiles/[slug]/{profile-detail.tsx,profile-detail.spec.tsx}`
+  - `apps/web/src/app/marketplace/opportunities/[id]/{opportunity-detail.tsx,opportunity-detail.spec.tsx}`
+  - `apps/web/src/app/{marketing-page.spec.tsx,page.spec.tsx,theme-toggle.spec.tsx}`
+  - `apps/web/src/lib/{i18n.tsx,theme.shared.ts,theme.tsx}`
+  - `packages/frontend-core/src/lib/{ui.tsx,spatial.tsx}`
+  - `tests/e2e/specs/smoke/local/theme-toggle.spec.ts`
+- Verification:
+  - passed: `pnpm --filter web typecheck`
+  - passed: `pnpm --filter web test -- src/app/theme-toggle.spec.tsx src/app/marketing-page.spec.tsx src/app/marketplace/marketplace-page.spec.tsx 'src/app/marketplace/profiles/[slug]/profile-detail.spec.tsx' 'src/app/marketplace/opportunities/[id]/opportunity-detail.spec.tsx' src/app/page.spec.tsx src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `git diff --check`
+  - blocked: `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/smoke/local/theme-toggle.spec.ts --project=local-smoke`
+    - blocked by unrelated existing API TypeScript build failures in marketplace/organizations modules during Playwright webServer startup

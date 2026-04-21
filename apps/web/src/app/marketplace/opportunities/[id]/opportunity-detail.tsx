@@ -14,6 +14,7 @@ import {
 } from '@escrow4334/frontend-core';
 import { RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
 import { AbuseReportPanel } from '../../abuse-report-panel';
+import { ThemeToggle } from '../../../theme-toggle';
 import {
   webApi,
   type MarketplaceOpportunityDetail,
@@ -76,6 +77,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                   {marketplaceMessages.actions.backToMarketplace}
                 </Link>
               </Button>
+              <ThemeToggle />
               <Button asChild>
                 <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
               </Button>
@@ -95,7 +97,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
 
         {opportunity ? (
           <>
-            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[linear-gradient(145deg,rgba(10,22,38,0.96),rgba(4,10,19,0.98))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
+            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[image:var(--hero-bg)] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
               <SectionHeading
                 eyebrow={marketplaceMessages.opportunityDetail.briefEyebrow(
                   marketplaceMessages.labels.visibility[opportunity.visibility],
@@ -106,7 +108,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
                 descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
               />
               <SharedCard
-                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(11,24,42,0.92),rgba(7,16,30,0.96))] p-6"
+                className="rounded-[1.9rem] bg-[image:var(--card-strong-bg)] p-6"
                 layoutId={`marketplace-opportunity-${opportunity.id}`}
               >
                 <FactGrid className="md:grid-cols-1">
@@ -134,7 +136,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.opportunityDetail.scopeEyebrow}
                 title={marketplaceMessages.opportunityDetail.scopeTitle}
-                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
                 headerClassName="mb-5"
               >
                 <p className="text-sm leading-6 text-[var(--foreground-soft)]">
@@ -183,7 +185,7 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.opportunityDetail.hiringSpecEyebrow}
                 title={marketplaceMessages.opportunityDetail.fitRequirementsTitle}
-                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
                 headerClassName="mb-5"
               >
                 <div className="grid gap-4">

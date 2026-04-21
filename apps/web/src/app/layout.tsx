@@ -7,6 +7,10 @@ import {
   resolveSupportedLocale,
 } from "@escrow4334/frontend-core";
 import { WebI18nProvider } from "../lib/i18n";
+import {
+  resolveWebTheme,
+  webThemeCookieName,
+} from "../lib/theme.shared";
 import { WebSpatialShell } from "./spatial-shell";
 import "./globals.css";
 
@@ -40,6 +44,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const locale = resolveSupportedLocale(cookieStore.get(localeCookieName)?.value);
+  const theme = resolveWebTheme(cookieStore.get(webThemeCookieName)?.value);
   const localeDefinition = getLocaleDefinition(locale);
 
   return (
@@ -47,12 +52,13 @@ export default async function RootLayout({
       lang={localeDefinition.langTag}
       dir={localeDefinition.dir}
       data-locale={locale}
+      data-theme={theme}
     >
       <body
         className={`${display.variable} ${arabicDisplay.variable} ${mono.variable}`}
       >
         <WebI18nProvider initialLocale={locale}>
-          <WebSpatialShell>{children}</WebSpatialShell>
+          <WebSpatialShell initialTheme={theme}>{children}</WebSpatialShell>
         </WebI18nProvider>
       </body>
     </html>

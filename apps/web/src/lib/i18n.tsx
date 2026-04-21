@@ -28,10 +28,13 @@ const webMessages = {
       productConsole: 'Client Console',
       operatorConsole: 'Operator Console',
       currentLanguage: 'Language',
+      theme: 'Theme',
       home: 'Home',
       marketplace: 'Marketplace',
       trust: 'Trust',
       signIn: 'Sign in',
+      lightTheme: 'Light',
+      darkTheme: 'Dark',
       startEscrow: 'Start a milestone escrow',
       startContract: 'Start a contract',
       loading: 'Loading',
@@ -294,6 +297,36 @@ const webMessages = {
             body: 'Maintain your credibility profile, browse briefs, and manage applications from a freelancer workspace.',
           },
         },
+        onboarding: {
+          eyebrow: 'Onboarding',
+          title: 'Start from the right workspace',
+          client: {
+            title: 'Hire through a client workspace',
+            body: 'Use the client lane to publish briefs, invite collaborators, and review applicants before escrow.',
+            action: 'Start hiring',
+          },
+          freelancer: {
+            title: 'Freelance through a talent workspace',
+            body: 'Use the freelancer lane to shape your public credibility profile, apply to briefs, and track hired contracts.',
+            action: 'Start freelancing',
+          },
+        },
+        invitations: {
+          eyebrow: 'Invitations',
+          title: 'Pending workspace invitations',
+          body: 'Accept a pending client invitation to add the shared hiring workspace to your lane switcher.',
+          roleLabel: 'Invited role',
+          accept: 'Accept invitation',
+        },
+        invitationRoles: {
+          client_owner: 'Client owner',
+          client_recruiter: 'Client recruiter',
+        },
+        invitationStatuses: {
+          pending: 'Pending',
+          accepted: 'Accepted',
+          revoked: 'Revoked',
+        },
         capabilityNotices: {
           manageWorkspace:
             'This workspace can view organization ownership, but only a workspace with management access can create another client organization.',
@@ -371,6 +404,24 @@ const webMessages = {
           slug: 'Workspace slug',
           create: 'Create client organization',
         },
+        organizationInvitations: {
+          body: (organizationName: string) =>
+            `Invite collaborators into ${organizationName} so hiring ownership and applicant review can stay inside the shared client workspace.`,
+          email: 'Invitee email',
+          role: 'Invitee role',
+          roleLabel: 'Role',
+          statusLabel: 'Status',
+          send: 'Send invitation',
+          revoke: 'Revoke invitation',
+        },
+        organizationMemberships: {
+          body: (organizationName: string) =>
+            `Collaborators already accepted into ${organizationName} appear here so workspace ownership stays visible after onboarding.`,
+          roleLabel: 'Membership role',
+          statusLabel: 'Membership status',
+          roleValue: (role: string) => role,
+          statusValue: (status: string) => status,
+        },
         clientEyebrow: 'Client',
         hiringSpecTitle: 'Create hiring spec',
         opportunityForm: {
@@ -446,6 +497,15 @@ const webMessages = {
             'Add an organization name before creating a client workspace.',
           organizationCreated: (name: string) =>
             `Client organization ${name} created and activated.`,
+          signInBeforeInvite:
+            'Sign in through the main app before inviting a collaborator.',
+          invitationEmailRequired:
+            'Add the collaborator email before sending a workspace invitation.',
+          invitationCreated: (email: string) =>
+            `Workspace invitation prepared for ${email}.`,
+          invitationAccepted:
+            'Workspace invitation accepted and the client lane is now available.',
+          invitationRevoked: 'Workspace invitation revoked.',
           briefCreated: 'Decision-ready marketplace brief created as draft.',
           briefPublished: 'Marketplace brief published.',
           briefPaused: 'Marketplace brief paused.',
@@ -457,6 +517,14 @@ const webMessages = {
           walletRequired: 'Link a SIWE-verified wallet before applying.',
           applicationSubmitted: 'Structured application submitted.',
           applicationWithdrawn: 'Application withdrawn.',
+          laneReady: (kind: 'client' | 'freelancer', label: string) =>
+            kind === 'client'
+              ? `Client lane ready through ${label}.`
+              : `Freelancer lane ready through ${label}.`,
+          laneUnavailable: (kind: 'client' | 'freelancer') =>
+            kind === 'client'
+              ? 'No client workspace is available yet. Create or accept a client workspace first.'
+              : 'No freelancer workspace is available yet.',
         },
       },
       profileDetail: {
@@ -1033,10 +1101,13 @@ const webMessages = {
       productConsole: 'لوحة العميل',
       operatorConsole: 'لوحة المشغّل',
       currentLanguage: 'اللغة',
+      theme: 'السمة',
       home: 'الرئيسية',
       marketplace: 'السوق',
       trust: 'الثقة',
       signIn: 'تسجيل الدخول',
+      lightTheme: 'فاتح',
+      darkTheme: 'داكن',
       startEscrow: 'ابدأ ضمان المراحل',
       startContract: 'ابدأ العقد',
       loading: 'جاري التحميل',
@@ -1298,6 +1369,36 @@ const webMessages = {
             body: 'حافظ على ملف الموثوقية، وتصفح العروض، وأدر الطلبات من خلال مساحة عمل مستقل.',
           },
         },
+        onboarding: {
+          eyebrow: 'البدء',
+          title: 'ابدأ من مساحة العمل الصحيحة',
+          client: {
+            title: 'وظّف من خلال مساحة عميل',
+            body: 'استخدم مسار العميل لنشر العروض، ودعوة المتعاونين، ومراجعة المرشحين قبل تحويل العمل إلى الضمان.',
+            action: 'ابدأ التوظيف',
+          },
+          freelancer: {
+            title: 'اعمل كمستقل من خلال مساحة موهبة',
+            body: 'استخدم مسار المستقل لبناء ملف الموثوقية العام، والتقديم على العروض، ومتابعة العقود التي تم توظيفك فيها.',
+            action: 'ابدأ العمل الحر',
+          },
+        },
+        invitations: {
+          eyebrow: 'الدعوات',
+          title: 'دعوات مساحة العمل المعلّقة',
+          body: 'اقبل دعوة عميل معلّقة لإضافة مساحة التوظيف المشتركة إلى مبدّل المسارات لديك.',
+          roleLabel: 'الدور المدعو إليه',
+          accept: 'قبول الدعوة',
+        },
+        invitationRoles: {
+          client_owner: 'مالك العميل',
+          client_recruiter: 'مجند العميل',
+        },
+        invitationStatuses: {
+          pending: 'معلّقة',
+          accepted: 'مقبولة',
+          revoked: 'ملغاة',
+        },
         capabilityNotices: {
           manageWorkspace:
             'يمكن لمساحة العمل هذه عرض ملكية المنظمة، لكن إنشاء منظمة عميل جديدة يتطلب مساحة عمل تملك صلاحية الإدارة.',
@@ -1375,6 +1476,24 @@ const webMessages = {
           slug: 'معرّف مساحة العمل',
           create: 'إنشاء منظمة عميل',
         },
+        organizationInvitations: {
+          body: (organizationName: string) =>
+            `ادعُ متعاونين إلى ${organizationName} حتى تبقى ملكية التوظيف ومراجعة المرشحين داخل مساحة العميل المشتركة.`,
+          email: 'بريد المدعو',
+          role: 'دور المدعو',
+          roleLabel: 'الدور',
+          statusLabel: 'الحالة',
+          send: 'إرسال الدعوة',
+          revoke: 'إلغاء الدعوة',
+        },
+        organizationMemberships: {
+          body: (organizationName: string) =>
+            `يظهر هنا المتعاونون الذين قبلوا الانضمام إلى ${organizationName} حتى تبقى ملكية مساحة العمل واضحة بعد الإعداد.`,
+          roleLabel: 'دور العضوية',
+          statusLabel: 'حالة العضوية',
+          roleValue: (role: string) => role,
+          statusValue: (status: string) => status,
+        },
         clientEyebrow: 'العميل',
         hiringSpecTitle: 'إنشاء مواصفات التوظيف',
         opportunityForm: {
@@ -1449,6 +1568,15 @@ const webMessages = {
             'أضف اسم المنظمة قبل إنشاء مساحة عمل عميل.',
           organizationCreated: (name: string) =>
             `تم إنشاء منظمة العميل ${name} وتفعيلها.`,
+          signInBeforeInvite:
+            'سجّل الدخول من التطبيق الرئيسي قبل دعوة متعاون.',
+          invitationEmailRequired:
+            'أضف بريد المتعاون قبل إرسال دعوة مساحة العمل.',
+          invitationCreated: (email: string) =>
+            `تم تجهيز دعوة مساحة العمل إلى ${email}.`,
+          invitationAccepted:
+            'تم قبول دعوة مساحة العمل وأصبح مسار العميل متاحاً الآن.',
+          invitationRevoked: 'تم إلغاء دعوة مساحة العمل.',
           briefCreated: 'تم إنشاء عرض سوق جاهز للقرار كمسودة.',
           briefPublished: 'تم نشر عرض السوق.',
           briefPaused: 'تم إيقاف عرض السوق مؤقتاً.',
@@ -1460,6 +1588,14 @@ const webMessages = {
           walletRequired: 'اربط محفظة موثقة عبر SIWE قبل التقديم.',
           applicationSubmitted: 'تم إرسال الطلب المنظم.',
           applicationWithdrawn: 'تم سحب الطلب.',
+          laneReady: (kind: 'client' | 'freelancer', label: string) =>
+            kind === 'client'
+              ? `أصبح مسار العميل جاهزاً عبر ${label}.`
+              : `أصبح مسار المستقل جاهزاً عبر ${label}.`,
+          laneUnavailable: (kind: 'client' | 'freelancer') =>
+            kind === 'client'
+              ? 'لا توجد مساحة عميل متاحة بعد. أنشئ أو اقبل مساحة عميل أولاً.'
+              : 'لا توجد مساحة مستقل متاحة بعد.',
         },
       },
       profileDetail: {

@@ -13,6 +13,7 @@ import {
 } from '@escrow4334/frontend-core';
 import { RevealSection, SharedCard } from '@escrow4334/frontend-core/spatial';
 import { AbuseReportPanel } from '../../abuse-report-panel';
+import { ThemeToggle } from '../../../theme-toggle';
 import { webApi, type MarketplaceProfile } from '../../../../lib/api';
 import { useWebI18n } from '../../../../lib/i18n';
 
@@ -68,6 +69,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                   {marketplaceMessages.actions.backToMarketplace}
                 </Link>
               </Button>
+              <ThemeToggle />
               <Button asChild>
                 <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
               </Button>
@@ -87,7 +89,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
 
         {profile ? (
           <>
-            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[linear-gradient(145deg,rgba(10,22,38,0.96),rgba(4,10,19,0.98))] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
+            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[image:var(--hero-bg)] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
               <SectionHeading
                 eyebrow={marketplaceMessages.profileDetail.heroEyebrow}
                 title={profile.displayName}
@@ -96,7 +98,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                 descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
               />
               <SharedCard
-                className="rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(11,24,42,0.92),rgba(7,16,30,0.96))] p-6"
+                className="rounded-[1.9rem] bg-[image:var(--card-strong-bg)] p-6"
                 layoutId={`marketplace-profile-${profile.slug}`}
               >
                 <FactGrid className="md:grid-cols-1">
@@ -128,7 +130,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.profileDetail.aboutEyebrow}
                 title={marketplaceMessages.profileDetail.credibilityTitle}
-                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
                 headerClassName="mb-5"
               >
                 <p className="text-sm leading-6 text-[var(--foreground-soft)]">{profile.bio}</p>
@@ -172,7 +174,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.profileDetail.escrowSignalEyebrow}
                 title={marketplaceMessages.profileDetail.executionTitle}
-                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
                 headerClassName="mb-5"
               >
                 <FactGrid>
@@ -223,7 +225,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
               <SectionCard
                 eyebrow={marketplaceMessages.profileDetail.proofEyebrow}
                 title={marketplaceMessages.profileDetail.walletAndProofTitle}
-                className="rounded-[1.9rem] bg-[rgba(7,16,30,0.76)] p-7"
+                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
                 headerClassName="mb-5"
               >
                 <FactItem
@@ -241,7 +243,7 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                       href={artifact.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm leading-6 text-[var(--foreground)] underline decoration-[rgba(107,243,255,0.32)] underline-offset-4"
+                      className="text-sm leading-6 text-[var(--foreground)] underline decoration-[var(--status-info-border)] underline-offset-4"
                     >
                       {artifact.label} •{' '}
                       {marketplaceMessages.labels.proofArtifactKind[artifact.kind]}

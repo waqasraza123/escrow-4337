@@ -21,6 +21,9 @@ describe('marketing homepage', () => {
     expect(
       screen.getAllByRole('link', { name: 'Start a milestone escrow' })[0],
     ).toHaveAttribute('href', '/app/new-contract');
+    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
     expect(screen.getByText('Create and fund')).toBeInTheDocument();
     expect(
       screen.getByText('It is an escrow-first marketplace, not an embedded platform.'),
@@ -45,6 +48,7 @@ describe('marketing homepage', () => {
       'href',
       '/marketplace',
     );
+    expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'اطّلع على نموذج الثقة' })).toHaveAttribute(
       'href',
       '/trust',

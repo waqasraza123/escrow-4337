@@ -75,6 +75,7 @@ describe('marketplace profile detail', () => {
       'href',
       '/marketplace',
     );
+    expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'افتح مساحة العمل' })).toHaveAttribute(
       'href',
       '/app/marketplace',

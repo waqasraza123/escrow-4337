@@ -11,6 +11,7 @@ import {
 import { GlassPanel, RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
 import styles from './marketing.styles';
 import { LanguageSwitcher } from './language-switcher';
+import { ThemeToggle } from './theme-toggle';
 import { useWebI18n } from '../lib/i18n';
 
 export default function Home() {
@@ -27,7 +28,10 @@ export default function Home() {
             <Link href="/app/sign-in">{messages.common.signIn}</Link>
             <Link href="/app/new-contract">{messages.common.startEscrow}</Link>
           </div>
-          <LanguageSwitcher className={styles.languageSwitcher} theme="web" />
+          <div className={styles.controlCluster}>
+            <ThemeToggle className={styles.languageSwitcher} />
+            <LanguageSwitcher className={styles.languageSwitcher} theme="web" />
+          </div>
         </nav>
 
         <RevealSection className={styles.hero}>

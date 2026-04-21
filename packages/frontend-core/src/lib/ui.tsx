@@ -53,7 +53,7 @@ const localeSwitcherVariants = cva(
   {
     variants: {
       theme: {
-        web: 'bg-[rgba(7,17,31,0.64)] shadow-[inset_0_0_0_1px_rgba(112,170,236,0.18),0_18px_44px_rgba(4,11,24,0.28)]',
+        web: 'bg-[var(--theme-switcher-bg)] shadow-[var(--theme-switcher-shadow)]',
         admin:
           'bg-[rgba(10,15,22,0.62)] shadow-[inset_0_0_0_1px_rgba(145,164,189,0.16)]',
       },
@@ -84,7 +84,7 @@ const localeSwitcherOptionVariants = cva(
   {
     variants: {
       theme: {
-        web: 'bg-transparent text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(112,170,236,0.15)]',
+        web: 'bg-transparent text-[var(--foreground)] shadow-[var(--theme-switcher-option-shadow)]',
         admin:
           'bg-transparent text-[var(--foreground)] shadow-[inset_0_0_0_1px_rgba(145,164,189,0.16)]',
       },
@@ -98,7 +98,7 @@ const localeSwitcherOptionVariants = cva(
         theme: 'web',
         active: true,
         className:
-          'bg-[linear-gradient(135deg,#6bf3ff,#8691ff,#c86dff)] text-[#04101d] shadow-[0_16px_34px_rgba(101,181,255,0.28)]',
+          'bg-[image:var(--theme-switcher-option-active-bg)] text-[var(--theme-switcher-option-active-fg)] shadow-[var(--theme-switcher-option-active-shadow)]',
       },
       {
         theme: 'admin',
@@ -133,7 +133,7 @@ const heroPanelVariants = cva(
     variants: {
       theme: {
         web:
-          'items-start gap-7 overflow-hidden bg-[var(--surface-card-strong)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.84),transparent)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]',
+          'items-start gap-7 overflow-hidden bg-[var(--surface-card-strong)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[image:var(--panel-top-border)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]',
         admin:
           'items-end gap-6 bg-[linear-gradient(180deg,rgba(12,17,24,0.84),rgba(22,31,44,0.9))] xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]',
       },
@@ -459,7 +459,7 @@ export function FactItem(props: {
   return (
     <article
       className={cn(
-        'grid gap-2 rounded-[1.15rem] border border-[var(--surface-border)] bg-[rgba(8,18,33,0.52)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(144,190,255,0.06)] backdrop-blur-xl',
+        'grid gap-2 rounded-[1.15rem] border border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 shadow-[var(--interactive-shadow)] backdrop-blur-xl',
         className,
       )}
     >
@@ -493,7 +493,7 @@ export function FeatureCard(props: {
   return (
     <SurfaceCard
       className={cn(
-        'relative overflow-hidden rounded-[1.4rem] bg-[var(--surface-card)] p-5.5 before:absolute before:left-0 before:top-0 before:h-px before:w-full before:bg-[linear-gradient(90deg,transparent,rgba(107,243,255,0.86),transparent)]',
+        'relative overflow-hidden rounded-[1.4rem] bg-[var(--surface-card)] p-5.5 before:absolute before:left-0 before:top-0 before:h-px before:w-full before:bg-[image:var(--panel-top-border)]',
         className,
       )}
     >
