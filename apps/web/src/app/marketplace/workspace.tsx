@@ -29,9 +29,13 @@ import {
   type MarketplaceApplicationDossier,
   type MarketplaceCryptoReadiness,
   type MarketplaceEngagementType,
+  type MarketplaceOpportunityInvite,
+  type MarketplaceOpportunitySearchResult,
   type MarketplaceOpportunity,
   type MarketplaceProfile,
   type MarketplaceProofArtifact,
+  type MarketplaceSavedSearch,
+  type MarketplaceTalentSearchResult,
   type OrganizationInvitation,
   type OrganizationMembership,
   type OrganizationSummary,
@@ -102,6 +106,23 @@ type InvitationDraft = {
 };
 
 type LaneKind = 'client' | 'freelancer' | 'agency';
+
+type TalentDiscoveryDraft = {
+  q: string;
+  skill: string;
+  skills: string;
+  selectedOpportunityId: string;
+  inviteMessage: string;
+  savedSearchLabel: string;
+};
+
+type OpportunityDiscoveryDraft = {
+  q: string;
+  skill: string;
+  skills: string;
+  category: string;
+  savedSearchLabel: string;
+};
 
 function readSession(): SessionTokens | null {
   if (typeof window === 'undefined') {
@@ -265,6 +286,27 @@ function slugifyWorkspaceName(value: string) {
     .slice(0, 64);
 }
 
+function createEmptyTalentDiscoveryDraft(): TalentDiscoveryDraft {
+  return {
+    q: '',
+    skill: '',
+    skills: '',
+    selectedOpportunityId: '',
+    inviteMessage: '',
+    savedSearchLabel: '',
+  };
+}
+
+function createEmptyOpportunityDiscoveryDraft(): OpportunityDiscoveryDraft {
+  return {
+    q: '',
+    skill: '',
+    skills: '',
+    category: '',
+    savedSearchLabel: '',
+  };
+}
+
 function parseProofUrls(input: string, kind: MarketplaceProofArtifact['kind']) {
   return splitList(input).map((url, index) => ({
     id: `${kind}-${index + 1}`,
@@ -315,6 +357,16 @@ export function MarketplaceWorkspace() {
   const [organizationInvitations, setOrganizationInvitations] = useState<
     OrganizationInvitation[]
   >([]);
+  const [savedSearches, setSavedSearches] = useState<MarketplaceSavedSearch[]>([]);
+  const [marketplaceInvites, setMarketplaceInvites] = useState<
+    MarketplaceOpportunityInvite[]
+  >([]);
+  const [talentSearchResults, setTalentSearchResults] = useState<
+    MarketplaceTalentSearchResult[]
+  >([]);
+  const [opportunitySearchResults, setOpportunitySearchResults] = useState<
+    MarketplaceOpportunitySearchResult[]
+  >([]);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(
     createEmptyProfileDraft(),
   );
@@ -336,6 +388,10 @@ export function MarketplaceWorkspace() {
   const [invitationDraft, setInvitationDraft] = useState<InvitationDraft>(
     createEmptyInvitationDraft(),
   );
+  const [talentDiscoveryDraft, setTalentDiscoveryDraft] =
+    useState<TalentDiscoveryDraft>(createEmptyTalentDiscoveryDraft());
+  const [opportunityDiscoveryDraft, setOpportunityDiscoveryDraft] =
+    useState<OpportunityDiscoveryDraft>(createEmptyOpportunityDiscoveryDraft());
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -421,6 +477,10 @@ export function MarketplaceWorkspace() {
     'agency',
     'applyToOpportunity',
   );
+  const talentSavedSearches = savedSearches.filter((search) => search.kind === 'talent');
+  const opportunitySavedSearches = savedSearches.filter(
+    (search) => search.kind === 'opportunity',
+  );
   const activeOrganizationInvitable = activeOrganization?.kind === 'client' || activeOrganization?.kind === 'agency';
   const invitationRoleOptions = activeOrganization?.kind === 'agency'
     ? ([
@@ -446,6 +506,10 @@ export function MarketplaceWorkspace() {
   const formatOrganizationRole = (role: OrganizationSummary['roles'][number]) =>
     workspaceMessages.invitationRoles[role as keyof typeof workspaceMessages.invitationRoles] ??
     role;
+  const formatSearchReason = (code: string) =>
+    marketplaceMessages.labels.searchReason[
+      code as keyof typeof marketplaceMessages.labels.searchReason
+    ] ?? code;
   const renderWorkspaceAction = (
     workspace: WorkspaceSummary | null,
   ) => {
@@ -489,6 +553,10 @@ export function MarketplaceWorkspace() {
         setInvitations([]);
         setOrganizationMemberships([]);
         setOrganizationInvitations([]);
+        setSavedSearches([]);
+        setMarketplaceInvites([]);
+        setTalentSearchResults([]);
+        setOpportunitySearchResults([]);
         setMyOpportunities([]);
         setMyApplications([]);
         setContracts([]);
@@ -510,6 +578,10 @@ export function MarketplaceWorkspace() {
         myApplicationResult,
         orgInvitationResponse,
         orgMembershipResponse,
+        savedSearchResponse,
+        myMarketplaceInvitesResponse,
+        talentRecommendationResponse,
+        opportunityRecommendationResponse,
       ] =
         await Promise.all([
           nextWorkspace?.kind === 'freelancer'
@@ -537,6 +609,27 @@ export function MarketplaceWorkspace() {
                 nextTokens.accessToken,
               )
             : Promise.resolve({ memberships: [] }),
+          webApi.listMarketplaceSavedSearches(undefined, nextTokens.accessToken).catch(
+            () => ({ searches: [] }),
+          ),
+          nextWorkspace?.kind === 'freelancer'
+            ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
+                invites: [],
+              }))
+            : Promise.resolve({ invites: [] }),
+          nextWorkspace?.kind === 'client'
+            ? webApi
+                .getTalentRecommendations({ limit: 6 }, nextTokens.accessToken)
+                .catch(() => ({ results: [] }))
+            : Promise.resolve({ results: [] }),
+          nextWorkspace?.kind === 'freelancer'
+            ? webApi
+                .getOpportunityRecommendations(
+                  { limit: 6 },
+                  nextTokens.accessToken,
+                )
+                .catch(() => ({ results: [] }))
+            : Promise.resolve({ results: [] }),
         ]);
 
       setUser(me);
@@ -545,6 +638,10 @@ export function MarketplaceWorkspace() {
       setInvitations(invitationResponse.invitations);
       setOrganizationMemberships(orgMembershipResponse.memberships);
       setOrganizationInvitations(orgInvitationResponse.invitations);
+      setSavedSearches(savedSearchResponse.searches);
+      setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
+      setTalentSearchResults(talentRecommendationResponse.results);
+      setOpportunitySearchResults(opportunityRecommendationResponse.results);
       setMyOpportunities(myOpportunityResult.opportunities);
       setMyApplications(myApplicationResult.applications);
       setContracts(jobs.jobs.map((entry) => entry.job));
@@ -617,6 +714,21 @@ export function MarketplaceWorkspace() {
       return current.role === nextRole ? current : { ...current, role: nextRole };
     });
   }, [activeOrganization?.kind]);
+
+  useEffect(() => {
+    const preferredOpportunity =
+      myOpportunities.find((opportunity) => opportunity.status === 'published') ??
+      myOpportunities[0] ??
+      null;
+    setTalentDiscoveryDraft((current) =>
+      current.selectedOpportunityId || !preferredOpportunity
+        ? current
+        : {
+            ...current,
+            selectedOpportunityId: preferredOpportunity.id,
+          },
+    );
+  }, [myOpportunities]);
 
   async function handleSignOut() {
     if (tokens) {
@@ -741,6 +853,128 @@ export function MarketplaceWorkspace() {
       tokens.accessToken,
     );
     setMessage(workspaceMessages.messages.invitationRevoked);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleSearchTalentDirectory() {
+    const response = await webApi.searchMarketplaceTalent({
+      q: talentDiscoveryDraft.q || undefined,
+      skill: talentDiscoveryDraft.skill || undefined,
+      skills: talentDiscoveryDraft.skills || undefined,
+      limit: 8,
+    });
+    setTalentSearchResults(response.results);
+  }
+
+  async function handleLoadTalentRecommendations() {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.getTalentRecommendations(
+      {
+        q: talentDiscoveryDraft.q || undefined,
+        skill: talentDiscoveryDraft.skill || undefined,
+        skills: talentDiscoveryDraft.skills || undefined,
+        limit: 8,
+      },
+      tokens.accessToken,
+    );
+    setTalentSearchResults(response.results);
+  }
+
+  async function handleSearchOpportunityDirectory() {
+    const response = await webApi.searchMarketplaceOpportunities({
+      q: opportunityDiscoveryDraft.q || undefined,
+      skill: opportunityDiscoveryDraft.skill || undefined,
+      skills: opportunityDiscoveryDraft.skills || undefined,
+      category: opportunityDiscoveryDraft.category || undefined,
+      limit: 8,
+    });
+    setOpportunitySearchResults(response.results);
+  }
+
+  async function handleLoadOpportunityRecommendations() {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.getOpportunityRecommendations(
+      {
+        q: opportunityDiscoveryDraft.q || undefined,
+        skill: opportunityDiscoveryDraft.skill || undefined,
+        skills: opportunityDiscoveryDraft.skills || undefined,
+        limit: 8,
+      },
+      tokens.accessToken,
+    );
+    setOpportunitySearchResults(response.results);
+  }
+
+  async function handleSaveSearch(kind: 'talent' | 'opportunity') {
+    if (!tokens) {
+      return;
+    }
+    const label =
+      kind === 'talent'
+        ? talentDiscoveryDraft.savedSearchLabel.trim() ||
+          talentDiscoveryDraft.q.trim() ||
+          talentDiscoveryDraft.skill.trim() ||
+          'Talent search'
+        : opportunityDiscoveryDraft.savedSearchLabel.trim() ||
+          opportunityDiscoveryDraft.q.trim() ||
+          opportunityDiscoveryDraft.skill.trim() ||
+          'Opportunity search';
+    const query =
+      kind === 'talent'
+        ? {
+            q: talentDiscoveryDraft.q || null,
+            skill: talentDiscoveryDraft.skill || null,
+            skills: talentDiscoveryDraft.skills || null,
+          }
+        : {
+            q: opportunityDiscoveryDraft.q || null,
+            skill: opportunityDiscoveryDraft.skill || null,
+            skills: opportunityDiscoveryDraft.skills || null,
+            category: opportunityDiscoveryDraft.category || null,
+          };
+    await webApi.createMarketplaceSavedSearch(
+      {
+        kind,
+        label,
+        query,
+        alertFrequency: 'manual',
+      },
+      tokens.accessToken,
+    );
+    setMessage(
+      kind === 'talent'
+        ? workspaceMessages.messages.talentSearchSaved
+        : workspaceMessages.messages.opportunitySearchSaved,
+    );
+    await loadWorkspace(tokens);
+  }
+
+  async function handleDeleteSavedSearch(id: string) {
+    if (!tokens) {
+      return;
+    }
+    await webApi.deleteMarketplaceSavedSearch(id, tokens.accessToken);
+    setMessage(workspaceMessages.messages.savedSearchDeleted);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleInviteTalent(profileSlug: string) {
+    if (!tokens || !talentDiscoveryDraft.selectedOpportunityId) {
+      return;
+    }
+    await webApi.inviteTalentToMarketplaceOpportunity(
+      talentDiscoveryDraft.selectedOpportunityId,
+      {
+        profileSlug,
+        message: talentDiscoveryDraft.inviteMessage.trim() || null,
+      },
+      tokens.accessToken,
+    );
+    setMessage(workspaceMessages.messages.talentInvited);
     await loadWorkspace(tokens);
   }
 
@@ -1326,6 +1560,388 @@ export function MarketplaceWorkspace() {
           </FactGrid>
         </SectionCard>
       </RevealSection>
+
+      {!loading && tokens && activeWorkspace ? (
+        <RevealSection className={styles.grid} delay={0.1}>
+          {isClientWorkspace ? (
+            <article className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.panelEyebrow}>
+                    {workspaceMessages.discovery.eyebrow}
+                  </span>
+                  <h2>{workspaceMessages.discovery.talentTitle}</h2>
+                </div>
+              </div>
+              <div className={styles.stack}>
+                <p className={styles.stateText}>
+                  {workspaceMessages.discovery.talentBody}
+                </p>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.query}</span>
+                  <input
+                    value={talentDiscoveryDraft.q}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        q: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.skill}</span>
+                  <input
+                    value={talentDiscoveryDraft.skill}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        skill: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.skills}</span>
+                  <input
+                    value={talentDiscoveryDraft.skills}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        skills: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.selectedOpportunity}</span>
+                  <select
+                    value={talentDiscoveryDraft.selectedOpportunityId}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        selectedOpportunityId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">{workspaceMessages.discovery.noneSelected}</option>
+                    {myOpportunities.map((opportunity) => (
+                      <option key={opportunity.id} value={opportunity.id}>
+                        {opportunity.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.inviteMessage}</span>
+                  <input
+                    value={talentDiscoveryDraft.inviteMessage}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        inviteMessage: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.savedSearchLabel}</span>
+                  <input
+                    value={talentDiscoveryDraft.savedSearchLabel}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        savedSearchLabel: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className={styles.inlineActions}>
+                  <button type="button" onClick={() => void handleSearchTalentDirectory()}>
+                    {workspaceMessages.discovery.searchTalent}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLoadTalentRecommendations()}
+                  >
+                    {workspaceMessages.discovery.loadRecommendations}
+                  </button>
+                  <button type="button" onClick={() => void handleSaveSearch('talent')}>
+                    {workspaceMessages.discovery.saveSearch}
+                  </button>
+                </div>
+                {talentSavedSearches.length > 0 ? (
+                  <div className={styles.stack}>
+                    <span className={styles.metaLabel}>
+                      {workspaceMessages.discovery.savedSearchesTitle}
+                    </span>
+                    {talentSavedSearches.map((search) => (
+                      <SharedCard
+                        key={search.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{search.label}</strong>
+                          <p className={styles.stateText}>
+                            {workspaceMessages.discovery.lastResultCount}:{' '}
+                            {search.lastResultCount}
+                          </p>
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSavedSearch(search.id)}
+                            >
+                              {workspaceMessages.discovery.deleteSavedSearch}
+                            </button>
+                          </div>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+                {talentSearchResults.length === 0 ? (
+                  <p className={styles.stateText}>
+                    {workspaceMessages.discovery.noTalentResults}
+                  </p>
+                ) : (
+                  talentSearchResults.map((result) => (
+                    <SharedCard
+                      key={result.profile.userId}
+                      className={styles.actionPanel}
+                      interactive
+                    >
+                      <div className={styles.stack}>
+                        <strong>{result.profile.displayName}</strong>
+                        <p className={styles.stateText}>{result.profile.headline}</p>
+                        <p className={styles.stateText}>
+                          {workspaceMessages.discovery.ranking}: {result.ranking.score}
+                        </p>
+                        <p className={styles.stateText}>
+                          {workspaceMessages.discovery.reasons}:{' '}
+                          {result.reasons
+                            .map((reason) => formatSearchReason(reason.code))
+                            .join(' • ')}
+                        </p>
+                        <div className={styles.inlineActions}>
+                          <Link
+                            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                            href={`/marketplace/profiles/${result.profile.slug}`}
+                          >
+                            {marketplaceMessages.actions.viewProfile}
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={!talentDiscoveryDraft.selectedOpportunityId}
+                            onClick={() => void handleInviteTalent(result.profile.slug)}
+                          >
+                            {workspaceMessages.discovery.inviteToApply}
+                          </button>
+                        </div>
+                      </div>
+                    </SharedCard>
+                  ))
+                )}
+              </div>
+            </article>
+          ) : null}
+
+          {isTalentWorkspace ? (
+            <article className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.panelEyebrow}>
+                    {workspaceMessages.discovery.eyebrow}
+                  </span>
+                  <h2>{workspaceMessages.discovery.opportunityTitle}</h2>
+                </div>
+              </div>
+              <div className={styles.stack}>
+                <p className={styles.stateText}>
+                  {workspaceMessages.discovery.opportunityBody}
+                </p>
+                {marketplaceInvites.length > 0 ? (
+                  <div className={styles.stack}>
+                    <span className={styles.metaLabel}>
+                      {workspaceMessages.discovery.inboundInvitesTitle}
+                    </span>
+                    {marketplaceInvites.map((invite) => (
+                      <SharedCard
+                        key={invite.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{invite.opportunity.title}</strong>
+                          <p className={styles.stateText}>
+                            {invite.opportunity.ownerDisplayName} •{' '}
+                            {workspaceMessages.discovery.inviteStatus}:{' '}
+                            {marketplaceMessages.labels.inviteStatus[invite.status]}
+                          </p>
+                          {invite.message ? (
+                            <p className={styles.stateText}>{invite.message}</p>
+                          ) : null}
+                          <Link
+                            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                            href={`/marketplace/opportunities/${invite.opportunity.id}`}
+                          >
+                            {marketplaceMessages.actions.viewBrief}
+                          </Link>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.query}</span>
+                  <input
+                    value={opportunityDiscoveryDraft.q}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        q: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.skill}</span>
+                  <input
+                    value={opportunityDiscoveryDraft.skill}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        skill: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.skills}</span>
+                  <input
+                    value={opportunityDiscoveryDraft.skills}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        skills: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.category}</span>
+                  <input
+                    value={opportunityDiscoveryDraft.category}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.savedSearchLabel}</span>
+                  <input
+                    value={opportunityDiscoveryDraft.savedSearchLabel}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        savedSearchLabel: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    onClick={() => void handleSearchOpportunityDirectory()}
+                  >
+                    {workspaceMessages.discovery.searchOpportunities}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLoadOpportunityRecommendations()}
+                  >
+                    {workspaceMessages.discovery.loadRecommendations}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveSearch('opportunity')}
+                  >
+                    {workspaceMessages.discovery.saveSearch}
+                  </button>
+                </div>
+                {opportunitySavedSearches.length > 0 ? (
+                  <div className={styles.stack}>
+                    <span className={styles.metaLabel}>
+                      {workspaceMessages.discovery.savedSearchesTitle}
+                    </span>
+                    {opportunitySavedSearches.map((search) => (
+                      <SharedCard
+                        key={search.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{search.label}</strong>
+                          <p className={styles.stateText}>
+                            {workspaceMessages.discovery.lastResultCount}:{' '}
+                            {search.lastResultCount}
+                          </p>
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSavedSearch(search.id)}
+                            >
+                              {workspaceMessages.discovery.deleteSavedSearch}
+                            </button>
+                          </div>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+                {opportunitySearchResults.length === 0 ? (
+                  <p className={styles.stateText}>
+                    {workspaceMessages.discovery.noOpportunityResults}
+                  </p>
+                ) : (
+                  opportunitySearchResults.map((result) => (
+                    <SharedCard
+                      key={result.opportunity.id}
+                      className={styles.actionPanel}
+                      interactive
+                    >
+                      <div className={styles.stack}>
+                        <strong>{result.opportunity.title}</strong>
+                        <p className={styles.stateText}>{result.opportunity.summary}</p>
+                        <p className={styles.stateText}>
+                          {workspaceMessages.discovery.ranking}: {result.ranking.score}
+                        </p>
+                        <p className={styles.stateText}>
+                          {workspaceMessages.discovery.reasons}:{' '}
+                          {result.reasons
+                            .map((reason) => formatSearchReason(reason.code))
+                            .join(' • ')}
+                        </p>
+                        <div className={styles.inlineActions}>
+                          <Link
+                            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                            href={`/marketplace/opportunities/${result.opportunity.id}`}
+                          >
+                            {marketplaceMessages.actions.viewBrief}
+                          </Link>
+                        </div>
+                      </div>
+                    </SharedCard>
+                  ))
+                )}
+              </div>
+            </article>
+          ) : null}
+        </RevealSection>
+      ) : null}
 
       <RevealSection className={styles.grid} delay={0.12}>
         {activeWorkspace ? (

@@ -163,6 +163,35 @@ function parseQueryList(value?: string) {
     .filter(Boolean);
 }
 
+function asOptionalString(value: string | number | boolean | null | undefined) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function asOptionalEnum<T extends readonly string[]>(
+  value: string | number | boolean | null | undefined,
+  allowed: T,
+): T[number] | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  return allowed.includes(value as T[number]) ? (value as T[number]) : undefined;
+}
+
+function asPositiveInt(value: string | number | boolean | null | undefined) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function daysSince(timestamp: number | null | undefined, now: number) {
   if (!timestamp) {
     return 365;
@@ -820,6 +849,208 @@ export class MarketplaceService {
     };
   }
 
+  async getTalentRecommendations(
+    userId: string,
+    query: MarketplaceOpportunitiesQueryDto,
+  ): Promise<MarketplaceTalentSearchResponse> {
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'client',
+    );
+    const opportunities = (
+      await Promise.all(
+        (await this.marketplaceRepository.listOpportunities()).map((opportunity) =>
+          this.ensureOpportunityWorkspace(opportunity),
+        ),
+      )
+    )
+      .filter((opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId)
+      .sort(
+        (left, right) =>
+          (right.publishedAt ?? right.updatedAt) - (left.publishedAt ?? left.updatedAt),
+      );
+    const anchorOpportunity = opportunities[0] ?? null;
+
+    return this.searchTalent({
+      q: query.q,
+      skill: query.skill,
+      skills:
+        query.skills ??
+        (anchorOpportunity?.requiredSkills.length
+          ? anchorOpportunity.requiredSkills.slice(0, 5).join(', ')
+          : undefined),
+      timezone:
+        query.timezoneOverlapHours !== undefined
+          ? undefined
+          : undefined,
+      availability: undefined,
+      cryptoReadiness:
+        query.cryptoReadinessRequired ?? anchorOpportunity?.cryptoReadinessRequired,
+      engagementType:
+        query.engagementType ?? anchorOpportunity?.engagementType,
+      verificationLevel: undefined,
+      sort: 'relevance',
+      limit: query.limit,
+    });
+  }
+
+  async getOpportunityRecommendations(
+    userId: string,
+    query: MarketplaceProfilesQueryDto,
+  ): Promise<MarketplaceOpportunitySearchResponse> {
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'freelancer',
+    );
+    const profile = await this.requireProfileByUserId(userId, workspace).catch(
+      () => null,
+    );
+    const myInvites = await this.listMyOpportunityInvites(userId);
+    const inviteStatusByOpportunityId = new Map(
+      myInvites.invites.map((invite) => [invite.opportunity.id, invite.status]),
+    );
+    const search = await this.searchOpportunities({
+      q: query.q,
+      skill: query.skill,
+      skills:
+        query.skills ??
+        (profile?.skills.length ? profile.skills.slice(0, 5).join(', ') : undefined),
+      category: undefined,
+      engagementType:
+        query.engagementType ?? profile?.preferredEngagements[0],
+      cryptoReadinessRequired:
+        query.cryptoReadiness ?? profile?.cryptoReadiness,
+      minBudget: undefined,
+      maxBudget: undefined,
+      timezoneOverlapHours: undefined,
+      sort: query.sort,
+      limit: query.limit,
+    });
+
+    return {
+      results: search.results.map((result) => ({
+        ...result,
+        inviteStatus:
+          inviteStatusByOpportunityId.get(result.opportunity.id) ?? result.inviteStatus,
+      })),
+    };
+  }
+
+  async listSavedSearches(
+    userId: string,
+    query: MarketplaceSavedSearchesQueryDto,
+  ): Promise<MarketplaceSavedSearchesResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const searches = (await this.marketplaceRepository.listSavedSearches())
+      .filter(
+        (search) =>
+          search.userId === userId &&
+          (!query.kind || search.kind === query.kind),
+      )
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+
+    return {
+      searches: searches.map((search) =>
+        this.toSavedSearchView(search, context.activeWorkspace?.workspaceId ?? null),
+      ),
+    };
+  }
+
+  async createSavedSearch(
+    userId: string,
+    dto: CreateMarketplaceSavedSearchDto,
+  ): Promise<MarketplaceSavedSearchResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const normalizedQuery = this.normalizeSavedSearchQuery(dto.kind, dto.query);
+    const resultCount = await this.getSavedSearchResultCount(dto.kind, normalizedQuery);
+    const now = Date.now();
+    const record: MarketplaceSavedSearchRecord = {
+      id: randomUUID(),
+      userId,
+      workspaceId: context.activeWorkspace?.workspaceId ?? null,
+      kind: dto.kind,
+      label: dto.label.trim(),
+      query: normalizedQuery,
+      alertFrequency: dto.alertFrequency,
+      lastResultCount: resultCount,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveSavedSearch(record);
+    return {
+      search: this.toSavedSearchView(
+        record,
+        context.activeWorkspace?.workspaceId ?? null,
+      ),
+    };
+  }
+
+  async deleteSavedSearch(userId: string, searchId: string) {
+    const search = await this.marketplaceRepository.getSavedSearchById(searchId);
+    if (!search || search.userId !== userId) {
+      throw new NotFoundException('Marketplace saved search not found');
+    }
+    await this.marketplaceRepository.deleteSavedSearch(searchId);
+    return { ok: true as const };
+  }
+
+  async listMyOpportunityInvites(
+    userId: string,
+  ): Promise<MarketplaceOpportunityInvitesResponse> {
+    const invites = (await this.marketplaceRepository.listOpportunityInvites())
+      .filter((invite) => invite.invitedProfileUserId === userId)
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+
+    return {
+      invites: await Promise.all(
+        invites.map((invite) => this.toOpportunityInviteView(invite)),
+      ),
+    };
+  }
+
+  async inviteTalentToOpportunity(
+    userId: string,
+    opportunityId: string,
+    dto: CreateMarketplaceOpportunityInviteDto,
+  ): Promise<MarketplaceOpportunityInviteResponse> {
+    const opportunity = await this.requireOpportunity(opportunityId);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    const profile = await this.marketplaceRepository.getProfileBySlug(
+      dto.profileSlug.trim().toLowerCase(),
+    );
+    if (!profile || !this.isProfileComplete(profile)) {
+      throw new NotFoundException('Marketplace profile not found');
+    }
+    if (profile.userId === userId) {
+      throw new ForbiddenException(
+        'You cannot invite your own marketplace profile to apply',
+      );
+    }
+
+    const existing = (await this.marketplaceRepository.listOpportunityInvites()).find(
+      (invite) =>
+        invite.opportunityId === opportunityId &&
+        invite.invitedProfileUserId === profile.userId,
+    );
+    const now = Date.now();
+    const invite: MarketplaceOpportunityInviteRecord = {
+      id: existing?.id ?? randomUUID(),
+      opportunityId,
+      invitedProfileUserId: profile.userId,
+      invitedProfileSlug: profile.slug,
+      invitedByUserId: userId,
+      invitedWorkspaceId: opportunity.ownerWorkspaceId,
+      message: dto.message?.trim() || null,
+      status: existing?.status === 'applied' ? 'applied' : 'pending',
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveOpportunityInvite(invite);
+    return {
+      invite: await this.toOpportunityInviteView(invite),
+    };
+  }
+
   async getPublicOpportunity(
     opportunityId: string,
   ): Promise<MarketplaceOpportunityResponse> {
@@ -1014,6 +1245,19 @@ export class MarketplaceService {
       updatedAt: now,
     };
     await this.marketplaceRepository.saveApplication(application);
+    const matchingInvite = (await this.marketplaceRepository.listOpportunityInvites()).find(
+      (invite) =>
+        invite.opportunityId === opportunityId &&
+        invite.invitedProfileUserId === userId &&
+        invite.status === 'pending',
+    );
+    if (matchingInvite) {
+      await this.marketplaceRepository.saveOpportunityInvite({
+        ...matchingInvite,
+        status: 'applied',
+        updatedAt: now,
+      });
+    }
 
     return {
       opportunity: await this.toOpportunityDetailView(
@@ -1887,6 +2131,206 @@ export class MarketplaceService {
     }
 
     return `${defaultPath}?invite=${encodeURIComponent(inviteToken)}`;
+  }
+
+  private toSavedSearchView(
+    search: MarketplaceSavedSearchRecord,
+    activeWorkspaceId: string | null,
+  ): MarketplaceSavedSearchView {
+    return {
+      ...search,
+      activeWorkspaceId,
+    };
+  }
+
+  private async toOpportunityInviteView(
+    invite: MarketplaceOpportunityInviteRecord,
+  ): Promise<MarketplaceOpportunityInviteView> {
+    const opportunity = await this.requireOpportunity(invite.opportunityId);
+    const invitedUser = await this.usersService.getRequiredById(
+      invite.invitedProfileUserId,
+    );
+    const ownerUser = await this.usersService.getRequiredById(opportunity.ownerUserId);
+    const talent = await this.toTalentSummary(invitedUser);
+    return {
+      id: invite.id,
+      status: invite.status,
+      message: invite.message,
+      createdAt: invite.createdAt,
+      updatedAt: invite.updatedAt,
+      opportunity: {
+        id: opportunity.id,
+        title: opportunity.title,
+        visibility: opportunity.visibility,
+        status: opportunity.status,
+        ownerDisplayName:
+          (await this.marketplaceRepository.getProfileByUserId(ownerUser.id))
+            ?.displayName ??
+          ownerUser.email.split('@')[0] ??
+          ownerUser.id,
+        ownerWorkspaceId: opportunity.ownerWorkspaceId,
+      },
+      talent,
+    };
+  }
+
+  private async getOpportunityInviteIndex() {
+    const invites = await this.marketplaceRepository.listOpportunityInvites();
+    const latestByProfile = new Map<string, MarketplaceOpportunityInviteRecord>();
+    for (const invite of invites) {
+      const existing = latestByProfile.get(invite.invitedProfileUserId);
+      if (!existing || invite.updatedAt > existing.updatedAt) {
+        latestByProfile.set(invite.invitedProfileUserId, invite);
+      }
+    }
+    return new Map(
+      Array.from(latestByProfile.entries()).map(([profileUserId, invite]) => [
+        profileUserId,
+        invite.status,
+      ]),
+    );
+  }
+
+  private normalizeSavedSearchQuery(
+    kind: MarketplaceSavedSearchRecord['kind'],
+    query: Record<string, string | number | boolean | null>,
+  ) {
+    const normalized = Object.fromEntries(
+      Object.entries(query).filter(([, value]) => value !== null && value !== ''),
+    );
+    if (kind === 'talent') {
+      return this.compactSavedSearchQuery({
+        q: asOptionalString(normalized.q),
+        skill: asOptionalString(normalized.skill),
+        skills: asOptionalString(normalized.skills),
+        timezone: asOptionalString(normalized.timezone),
+        availability: asOptionalEnum(normalized.availability, [
+          'open',
+          'limited',
+          'unavailable',
+        ]),
+        cryptoReadiness: asOptionalEnum(normalized.cryptoReadiness, [
+          'wallet_only',
+          'smart_account_ready',
+          'escrow_power_user',
+        ]),
+        engagementType: asOptionalEnum(normalized.engagementType, [
+          'fixed_scope',
+          'milestone_retainer',
+          'advisory',
+        ]),
+        verificationLevel: asOptionalEnum(normalized.verificationLevel, [
+          'wallet_verified',
+          'wallet_and_escrow_history',
+          'wallet_escrow_and_delivery',
+        ]),
+        sort: asOptionalEnum(normalized.sort, ['relevance', 'recent']) ?? 'relevance',
+        limit: asPositiveInt(normalized.limit) ?? 24,
+      });
+    }
+    return this.compactSavedSearchQuery({
+      q: asOptionalString(normalized.q),
+      skill: asOptionalString(normalized.skill),
+      skills: asOptionalString(normalized.skills),
+      category: asOptionalString(normalized.category),
+      engagementType: asOptionalEnum(normalized.engagementType, [
+        'fixed_scope',
+        'milestone_retainer',
+        'advisory',
+      ]),
+      cryptoReadinessRequired: asOptionalEnum(
+        normalized.cryptoReadinessRequired,
+        ['wallet_only', 'smart_account_ready', 'escrow_power_user'],
+      ),
+      minBudget: asOptionalString(normalized.minBudget),
+      maxBudget: asOptionalString(normalized.maxBudget),
+      timezoneOverlapHours: asPositiveInt(normalized.timezoneOverlapHours),
+      sort: asOptionalEnum(normalized.sort, ['relevance', 'recent']) ?? 'relevance',
+      limit: asPositiveInt(normalized.limit) ?? 24,
+    });
+  }
+
+  private async getSavedSearchResultCount(
+    kind: MarketplaceSavedSearchRecord['kind'],
+    query: Record<string, string | number | boolean | null>,
+  ) {
+    if (kind === 'talent') {
+      const results = await this.searchTalent(
+        this.toTalentSearchQuery(query),
+      );
+      return results.results.length;
+    }
+    const results = await this.searchOpportunities(
+      this.toOpportunitySearchQuery(query),
+    );
+    return results.results.length;
+  }
+
+  private toTalentSearchQuery(
+    query: Record<string, string | number | boolean | null>,
+  ): MarketplaceProfilesQueryDto {
+    return {
+      q: asOptionalString(query.q),
+      skill: asOptionalString(query.skill),
+      skills: asOptionalString(query.skills),
+      timezone: asOptionalString(query.timezone),
+      availability: asOptionalEnum(query.availability, [
+        'open',
+        'limited',
+        'unavailable',
+      ]),
+      cryptoReadiness: asOptionalEnum(query.cryptoReadiness, [
+        'wallet_only',
+        'smart_account_ready',
+        'escrow_power_user',
+      ]),
+      engagementType: asOptionalEnum(query.engagementType, [
+        'fixed_scope',
+        'milestone_retainer',
+        'advisory',
+      ]),
+      verificationLevel: asOptionalEnum(query.verificationLevel, [
+        'wallet_verified',
+        'wallet_and_escrow_history',
+        'wallet_escrow_and_delivery',
+      ]),
+      sort: asOptionalEnum(query.sort, ['relevance', 'recent']) ?? 'relevance',
+      limit: asPositiveInt(query.limit) ?? 24,
+    };
+  }
+
+  private toOpportunitySearchQuery(
+    query: Record<string, string | number | boolean | null>,
+  ): MarketplaceOpportunitiesQueryDto {
+    return {
+      q: asOptionalString(query.q),
+      skill: asOptionalString(query.skill),
+      skills: asOptionalString(query.skills),
+      category: asOptionalString(query.category),
+      engagementType: asOptionalEnum(query.engagementType, [
+        'fixed_scope',
+        'milestone_retainer',
+        'advisory',
+      ]),
+      cryptoReadinessRequired: asOptionalEnum(query.cryptoReadinessRequired, [
+        'wallet_only',
+        'smart_account_ready',
+        'escrow_power_user',
+      ]),
+      minBudget: asOptionalString(query.minBudget),
+      maxBudget: asOptionalString(query.maxBudget),
+      timezoneOverlapHours: asPositiveInt(query.timezoneOverlapHours),
+      sort: asOptionalEnum(query.sort, ['relevance', 'recent']) ?? 'relevance',
+      limit: asPositiveInt(query.limit) ?? 24,
+    };
+  }
+
+  private compactSavedSearchQuery(
+    query: Record<string, string | number | boolean | null | undefined>,
+  ): Record<string, string | number | boolean | null> {
+    return Object.fromEntries(
+      Object.entries(query).filter(([, value]) => value !== undefined),
+    );
   }
 
   private async toAbuseReportView(

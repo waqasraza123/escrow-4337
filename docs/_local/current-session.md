@@ -4,21 +4,19 @@
 - 2026-04-21
 
 ## Current Objective
-- Finish the remaining repo-side Phase 1 identity/workspace coding and docs:
-  - explicit agency identity on top of the existing client/freelancer workspace model
-  - agency-aware organization creation and invitation persistence
-  - workspace/onboarding copy that matches the three-lane product model
+- Land the repo-side Phase 2 discovery/search implementation in one code pass:
+  - real public talent/opportunity directory filters
+  - workspace-side recommendations, saved searches, and invite-to-apply actions
+  - missing marketplace service methods behind the already-routed Phase 2 API surface
 
 ## Last Completed Step
-- Closed the remaining Phase 1 repo-side coding gap:
-  - API now supports client and agency organizations through the same persisted invitation-backed org model
-  - Postgres/file-backed persistence now both implement `organization_invitations`
-  - the authenticated web workspace now exposes explicit `client`, `freelancer`, and `agency` lanes
-  - organization creation in the web app is kind-aware and personal workspaces no longer behave like invite-managed shared orgs
+- Committed the completed Phase 1 repo-side identity/workspace slice locally as `374abe9` (`Complete Phase 1 workspace identity model`).
 
 ## Current Step
-- Repo-side Phase 1 coding is complete.
-- This pass was intentionally code-and-docs only:
+- Phase 2 discovery/search code is now in progress and intentionally unverified:
+  - `MarketplaceService` is being extended to implement recommendations, saved searches, and opportunity invites
+  - `apps/web` is being wired to the Phase 2 search/recommendation surface on both the public browser and authenticated workspace
+- This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
   - no release-path work was attempted
@@ -48,6 +46,9 @@
   `docs/project-state.md`
   `docs/_local/current-session.md`
   `docs/MARKETPLACE_PHASE_1_V1.md`
+- Phase 2 work in progress:
+  `services/api/src/modules/marketplace/marketplace.service.ts`
+  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketing.styles.ts,app/marketplace/{marketplace-browser.tsx,workspace.tsx}}`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.

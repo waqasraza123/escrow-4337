@@ -66,6 +66,13 @@ const styles = {
   railList: 'grid gap-3',
   railItem:
     'rounded-[1rem] border border-[var(--interactive-border)] bg-[var(--interactive-bg)] px-4 py-3 text-sm leading-6 text-[var(--foreground-soft)]',
+  filterGrid: 'grid gap-3 md:grid-cols-2 xl:grid-cols-3',
+  field:
+    'grid gap-2 [&_span]:text-[0.74rem] [&_span]:font-bold [&_span]:uppercase [&_span]:tracking-[0.12em] [&_span]:text-[var(--foreground-muted)] [&_input]:min-h-11 [&_input]:rounded-[1rem] [&_input]:border [&_input]:border-[var(--interactive-border)] [&_input]:bg-[var(--interactive-bg)] [&_input]:px-4 [&_input]:py-2.5 [&_input]:text-[var(--foreground)] [&_select]:min-h-11 [&_select]:rounded-[1rem] [&_select]:border [&_select]:border-[var(--interactive-border)] [&_select]:bg-[var(--interactive-bg)] [&_select]:px-4 [&_select]:py-2.5 [&_select]:text-[var(--foreground)]',
+  inlineActions: 'flex flex-wrap items-center gap-3',
+  chipRow: 'flex flex-wrap gap-2',
+  chip:
+    'inline-flex items-center rounded-full border border-[var(--status-info-border)] bg-[var(--status-info-bg)] px-3 py-1.5 text-[0.78rem] font-semibold text-[var(--status-info-fg)]',
 } as const;
 
 export default styles;

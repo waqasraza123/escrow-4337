@@ -472,6 +472,79 @@ export type MarketplaceApplicationDossier = {
   matchSummary: MarketplaceMatchSummary;
   whyShortlisted: string[];
 };
+export type MarketplaceSearchReasonCode =
+  | 'strong_skill_match'
+  | 'timezone_overlap'
+  | 'escrow_backed_delivery_history'
+  | 'verified_wallet'
+  | 'smart_account_ready'
+  | 'complete_brief'
+  | 'budget_clear'
+  | 'recent_brief'
+  | 'category_match'
+  | 'must_have_coverage'
+  | 'response_ready_profile'
+  | 'invite_pending';
+export type MarketplaceSearchReason = {
+  code: MarketplaceSearchReasonCode;
+  label: string;
+};
+export type MarketplaceRankingFeatureSnapshot = {
+  score: number;
+  profileCompleteness: number;
+  skillMatchPercent: number;
+  completionRate: number;
+  disputeRate: number;
+  inviteAcceptanceRate: number;
+  responseRate: number;
+  recencyDays: number;
+  timezoneOverlapHours: number | null;
+  budgetClarity: number;
+  fitDensity: number;
+  fundedVolumeBand: 'none' | 'small' | 'medium' | 'large';
+  verificationLevel: MarketplaceVerificationLevel | 'unverified';
+};
+export type MarketplaceSavedSearch = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  kind: 'talent' | 'opportunity';
+  label: string;
+  query: Record<string, string | number | boolean | null>;
+  alertFrequency: 'manual' | 'daily' | 'weekly';
+  lastResultCount: number;
+  activeWorkspaceId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+export type MarketplaceOpportunityInvite = {
+  id: string;
+  status: 'pending' | 'applied' | 'dismissed';
+  message: string | null;
+  createdAt: number;
+  updatedAt: number;
+  opportunity: {
+    id: string;
+    title: string;
+    visibility: OpportunityVisibility;
+    status: OpportunityStatus;
+    ownerDisplayName: string;
+    ownerWorkspaceId: string | null;
+  };
+  talent: MarketplaceApplication['applicant'];
+};
+export type MarketplaceTalentSearchResult = {
+  profile: MarketplaceProfile;
+  reasons: MarketplaceSearchReason[];
+  ranking: MarketplaceRankingFeatureSnapshot;
+  inviteStatus: MarketplaceOpportunityInvite['status'] | null;
+};
+export type MarketplaceOpportunitySearchResult = {
+  opportunity: MarketplaceOpportunity;
+  reasons: MarketplaceSearchReason[];
+  ranking: MarketplaceRankingFeatureSnapshot;
+  inviteStatus: MarketplaceOpportunityInvite['status'] | null;
+};
 
 export type MarketplaceProfile = {
   userId: string;
@@ -1109,13 +1182,31 @@ export const webApi = {
   listMarketplaceProfiles(query?: {
     q?: string;
     skill?: string;
+    skills?: string;
+    timezone?: string;
     availability?: MarketplaceAvailability;
+    cryptoReadiness?: MarketplaceCryptoReadiness;
+    engagementType?: MarketplaceEngagementType;
+    verificationLevel?: MarketplaceVerificationLevel;
+    sort?: 'relevance' | 'recent';
     limit?: number;
   }) {
     const search = new URLSearchParams();
     if (query?.q) search.set('q', query.q);
     if (query?.skill) search.set('skill', query.skill);
+    if (query?.skills) search.set('skills', query.skills);
+    if (query?.timezone) search.set('timezone', query.timezone);
     if (query?.availability) search.set('availability', query.availability);
+    if (query?.cryptoReadiness) {
+      search.set('cryptoReadiness', query.cryptoReadiness);
+    }
+    if (query?.engagementType) {
+      search.set('engagementType', query.engagementType);
+    }
+    if (query?.verificationLevel) {
+      search.set('verificationLevel', query.verificationLevel);
+    }
+    if (query?.sort) search.set('sort', query.sort);
     if (query?.limit) search.set('limit', String(query.limit));
     const suffix = search.toString() ? `?${search.toString()}` : '';
     return requestJson<{ profiles: MarketplaceProfile[] }>(
@@ -1186,13 +1277,33 @@ export const webApi = {
   listMarketplaceOpportunities(query?: {
     q?: string;
     skill?: string;
+    skills?: string;
     category?: string;
+    engagementType?: MarketplaceEngagementType;
+    cryptoReadinessRequired?: MarketplaceCryptoReadiness;
+    minBudget?: string;
+    maxBudget?: string;
+    timezoneOverlapHours?: number;
+    sort?: 'relevance' | 'recent';
     limit?: number;
   }) {
     const search = new URLSearchParams();
     if (query?.q) search.set('q', query.q);
     if (query?.skill) search.set('skill', query.skill);
+    if (query?.skills) search.set('skills', query.skills);
     if (query?.category) search.set('category', query.category);
+    if (query?.engagementType) {
+      search.set('engagementType', query.engagementType);
+    }
+    if (query?.cryptoReadinessRequired) {
+      search.set('cryptoReadinessRequired', query.cryptoReadinessRequired);
+    }
+    if (query?.minBudget) search.set('minBudget', query.minBudget);
+    if (query?.maxBudget) search.set('maxBudget', query.maxBudget);
+    if (query?.timezoneOverlapHours !== undefined) {
+      search.set('timezoneOverlapHours', String(query.timezoneOverlapHours));
+    }
+    if (query?.sort) search.set('sort', query.sort);
     if (query?.limit) search.set('limit', String(query.limit));
     const suffix = search.toString() ? `?${search.toString()}` : '';
     return requestJson<{ opportunities: MarketplaceOpportunity[] }>(
@@ -1329,6 +1440,225 @@ export const webApi = {
     return requestJson<{ opportunity: MarketplaceOpportunityDetail }>(
       apiBaseUrl,
       `/marketplace/opportunities/${id}/applications`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  searchMarketplaceTalent(query?: {
+    q?: string;
+    skill?: string;
+    skills?: string;
+    timezone?: string;
+    availability?: MarketplaceAvailability;
+    cryptoReadiness?: MarketplaceCryptoReadiness;
+    engagementType?: MarketplaceEngagementType;
+    verificationLevel?: MarketplaceVerificationLevel;
+    sort?: 'relevance' | 'recent';
+    limit?: number;
+  }) {
+    const search = new URLSearchParams();
+    if (query?.q) search.set('q', query.q);
+    if (query?.skill) search.set('skill', query.skill);
+    if (query?.skills) search.set('skills', query.skills);
+    if (query?.timezone) search.set('timezone', query.timezone);
+    if (query?.availability) search.set('availability', query.availability);
+    if (query?.cryptoReadiness) {
+      search.set('cryptoReadiness', query.cryptoReadiness);
+    }
+    if (query?.engagementType) {
+      search.set('engagementType', query.engagementType);
+    }
+    if (query?.verificationLevel) {
+      search.set('verificationLevel', query.verificationLevel);
+    }
+    if (query?.sort) search.set('sort', query.sort);
+    if (query?.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ results: MarketplaceTalentSearchResult[] }>(
+      apiBaseUrl,
+      `/marketplace/talent/search${suffix}`,
+      { method: 'GET' },
+    );
+  },
+  searchMarketplaceOpportunities(query?: {
+    q?: string;
+    skill?: string;
+    skills?: string;
+    category?: string;
+    engagementType?: MarketplaceEngagementType;
+    cryptoReadinessRequired?: MarketplaceCryptoReadiness;
+    minBudget?: string;
+    maxBudget?: string;
+    timezoneOverlapHours?: number;
+    sort?: 'relevance' | 'recent';
+    limit?: number;
+  }) {
+    const search = new URLSearchParams();
+    if (query?.q) search.set('q', query.q);
+    if (query?.skill) search.set('skill', query.skill);
+    if (query?.skills) search.set('skills', query.skills);
+    if (query?.category) search.set('category', query.category);
+    if (query?.engagementType) {
+      search.set('engagementType', query.engagementType);
+    }
+    if (query?.cryptoReadinessRequired) {
+      search.set('cryptoReadinessRequired', query.cryptoReadinessRequired);
+    }
+    if (query?.minBudget) search.set('minBudget', query.minBudget);
+    if (query?.maxBudget) search.set('maxBudget', query.maxBudget);
+    if (query?.timezoneOverlapHours !== undefined) {
+      search.set('timezoneOverlapHours', String(query.timezoneOverlapHours));
+    }
+    if (query?.sort) search.set('sort', query.sort);
+    if (query?.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ results: MarketplaceOpportunitySearchResult[] }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/search${suffix}`,
+      { method: 'GET' },
+    );
+  },
+  getTalentRecommendations(
+    query: {
+      q?: string;
+      skill?: string;
+      skills?: string;
+      category?: string;
+      engagementType?: MarketplaceEngagementType;
+      cryptoReadinessRequired?: MarketplaceCryptoReadiness;
+      minBudget?: string;
+      maxBudget?: string;
+      timezoneOverlapHours?: number;
+      sort?: 'relevance' | 'recent';
+      limit?: number;
+    },
+    accessToken: string,
+  ) {
+    const search = new URLSearchParams();
+    if (query.q) search.set('q', query.q);
+    if (query.skill) search.set('skill', query.skill);
+    if (query.skills) search.set('skills', query.skills);
+    if (query.category) search.set('category', query.category);
+    if (query.engagementType) search.set('engagementType', query.engagementType);
+    if (query.cryptoReadinessRequired) {
+      search.set('cryptoReadinessRequired', query.cryptoReadinessRequired);
+    }
+    if (query.minBudget) search.set('minBudget', query.minBudget);
+    if (query.maxBudget) search.set('maxBudget', query.maxBudget);
+    if (query.timezoneOverlapHours !== undefined) {
+      search.set('timezoneOverlapHours', String(query.timezoneOverlapHours));
+    }
+    if (query.sort) search.set('sort', query.sort);
+    if (query.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ results: MarketplaceTalentSearchResult[] }>(
+      apiBaseUrl,
+      `/marketplace/recommendations/talent${suffix}`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getOpportunityRecommendations(
+    query: {
+      q?: string;
+      skill?: string;
+      skills?: string;
+      timezone?: string;
+      availability?: MarketplaceAvailability;
+      cryptoReadiness?: MarketplaceCryptoReadiness;
+      engagementType?: MarketplaceEngagementType;
+      verificationLevel?: MarketplaceVerificationLevel;
+      sort?: 'relevance' | 'recent';
+      limit?: number;
+    },
+    accessToken: string,
+  ) {
+    const search = new URLSearchParams();
+    if (query.q) search.set('q', query.q);
+    if (query.skill) search.set('skill', query.skill);
+    if (query.skills) search.set('skills', query.skills);
+    if (query.timezone) search.set('timezone', query.timezone);
+    if (query.availability) search.set('availability', query.availability);
+    if (query.cryptoReadiness) {
+      search.set('cryptoReadiness', query.cryptoReadiness);
+    }
+    if (query.engagementType) search.set('engagementType', query.engagementType);
+    if (query.verificationLevel) {
+      search.set('verificationLevel', query.verificationLevel);
+    }
+    if (query.sort) search.set('sort', query.sort);
+    if (query.limit) search.set('limit', String(query.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ results: MarketplaceOpportunitySearchResult[] }>(
+      apiBaseUrl,
+      `/marketplace/recommendations/opportunities${suffix}`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  listMarketplaceSavedSearches(
+    query: { kind?: 'talent' | 'opportunity' } | undefined,
+    accessToken: string,
+  ) {
+    const search = new URLSearchParams();
+    if (query?.kind) search.set('kind', query.kind);
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return requestJson<{ searches: MarketplaceSavedSearch[] }>(
+      apiBaseUrl,
+      `/marketplace/saved-searches${suffix}`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createMarketplaceSavedSearch(
+    input: {
+      kind: 'talent' | 'opportunity';
+      label: string;
+      query: Record<string, string | number | boolean | null>;
+      alertFrequency?: 'manual' | 'daily' | 'weekly';
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ search: MarketplaceSavedSearch }>(
+      apiBaseUrl,
+      '/marketplace/saved-searches',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  deleteMarketplaceSavedSearch(id: string, accessToken: string) {
+    return requestJson<{ ok: true }>(
+      apiBaseUrl,
+      `/marketplace/saved-searches/${id}`,
+      { method: 'DELETE' },
+      accessToken,
+    );
+  },
+  listMyMarketplaceInvites(accessToken: string) {
+    return requestJson<{ invites: MarketplaceOpportunityInvite[] }>(
+      apiBaseUrl,
+      '/marketplace/invites/mine',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  inviteTalentToMarketplaceOpportunity(
+    id: string,
+    input: {
+      profileSlug: string;
+      message?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ invite: MarketplaceOpportunityInvite }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/invite`,
       {
         method: 'POST',
         body: JSON.stringify(input),

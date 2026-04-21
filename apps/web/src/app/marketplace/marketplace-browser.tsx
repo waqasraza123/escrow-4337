@@ -9,51 +9,105 @@ import { LanguageSwitcher } from '../language-switcher';
 import { ThemeToggle } from '../theme-toggle';
 import {
   webApi,
-  type MarketplaceOpportunity,
-  type MarketplaceProfile,
+  type MarketplaceOpportunitySearchResult,
+  type MarketplaceTalentSearchResult,
 } from '../../lib/api';
 import { useWebI18n } from '../../lib/i18n';
 
 export function MarketplaceBrowser() {
   const { messages } = useWebI18n();
   const marketplaceMessages = messages.publicMarketplace;
-  const [profiles, setProfiles] = useState<MarketplaceProfile[]>([]);
-  const [opportunities, setOpportunities] = useState<MarketplaceOpportunity[]>(
+  const [activeTab, setActiveTab] = useState<'talent' | 'opportunity'>('talent');
+  const [talentResults, setTalentResults] = useState<MarketplaceTalentSearchResult[]>(
     [],
   );
+  const [opportunityResults, setOpportunityResults] = useState<
+    MarketplaceOpportunitySearchResult[]
+  >([]);
+  const [talentFilters, setTalentFilters] = useState({
+    q: '',
+    skill: '',
+    availability: '',
+    verificationLevel: '',
+    engagementType: '',
+  });
+  const [opportunityFilters, setOpportunityFilters] = useState({
+    q: '',
+    skill: '',
+    category: '',
+    engagementType: '',
+    cryptoReadinessRequired: '',
+  });
   const [error, setError] = useState<string | null>(null);
 
+  async function loadDirectories() {
+    setError(null);
+    try {
+      const [talentResponse, opportunityResponse] = await Promise.all([
+        webApi.searchMarketplaceTalent({
+          q: talentFilters.q || undefined,
+          skill: talentFilters.skill || undefined,
+          availability:
+            (talentFilters.availability as
+              | 'open'
+              | 'limited'
+              | 'unavailable'
+              | '') || undefined,
+          verificationLevel:
+            (talentFilters.verificationLevel as
+              | 'wallet_verified'
+              | 'wallet_and_escrow_history'
+              | 'wallet_escrow_and_delivery'
+              | '') || undefined,
+          engagementType:
+            (talentFilters.engagementType as
+              | 'fixed_scope'
+              | 'milestone_retainer'
+              | 'advisory'
+              | '') || undefined,
+          limit: 9,
+        }),
+        webApi.searchMarketplaceOpportunities({
+          q: opportunityFilters.q || undefined,
+          skill: opportunityFilters.skill || undefined,
+          category: opportunityFilters.category || undefined,
+          engagementType:
+            (opportunityFilters.engagementType as
+              | 'fixed_scope'
+              | 'milestone_retainer'
+              | 'advisory'
+              | '') || undefined,
+          cryptoReadinessRequired:
+            (opportunityFilters.cryptoReadinessRequired as
+              | 'wallet_only'
+              | 'smart_account_ready'
+              | 'escrow_power_user'
+              | '') || undefined,
+          limit: 9,
+        }),
+      ]);
+      setTalentResults(talentResponse.results);
+      setOpportunityResults(opportunityResponse.results);
+    } catch {
+      setError(marketplaceMessages.loadFailure);
+    }
+  }
+
   useEffect(() => {
-    let active = true;
-
-    void Promise.all([
-      webApi.listMarketplaceProfiles({ limit: 6 }),
-      webApi.listMarketplaceOpportunities({ limit: 6 }),
-    ])
-      .then(([profileResponse, opportunityResponse]) => {
-        if (!active) {
-          return;
-        }
-
-        setProfiles(profileResponse.profiles);
-        setOpportunities(opportunityResponse.opportunities);
-      })
-      .catch((loadError) => {
-        if (!active) {
-          return;
-        }
-
-        setError(
-          loadError instanceof Error && loadError.message.trim().length > 0
-            ? marketplaceMessages.loadFailure
-            : marketplaceMessages.loadFailure,
-        );
-      });
-
-    return () => {
-      active = false;
-    };
+    void loadDirectories();
   }, [marketplaceMessages.loadFailure]);
+
+  const renderReasons = (reasons: Array<{ code: string; label: string }>) => (
+    <div className={styles.chipRow}>
+      {reasons.map((reason) => (
+        <span key={reason.code} className={styles.chip}>
+          {marketplaceMessages.labels.searchReason[
+            reason.code as keyof typeof marketplaceMessages.labels.searchReason
+          ] ?? reason.label}
+        </span>
+      ))}
+    </div>
+  );
 
   return (
     <main className={styles.page}>
@@ -103,7 +157,7 @@ export function MarketplaceBrowser() {
             <div className={styles.heroSignalGrid}>
               <GlassPanel className={styles.heroSignal} tone="quiet">
                 <span className={styles.heroSignalLabel}>
-                  {marketplaceMessages.stats.visibleTalentTitle(profiles.length)}
+                  {marketplaceMessages.stats.visibleTalentTitle(talentResults.length)}
                 </span>
                 <span className={styles.heroSignalValue}>
                   {marketplaceMessages.stats.visibleTalentBody}
@@ -111,7 +165,7 @@ export function MarketplaceBrowser() {
               </GlassPanel>
               <GlassPanel className={styles.heroSignal} tone="quiet">
                 <span className={styles.heroSignalLabel}>
-                  {marketplaceMessages.stats.openBriefsTitle(opportunities.length)}
+                  {marketplaceMessages.stats.openBriefsTitle(opportunityResults.length)}
                 </span>
                 <span className={styles.heroSignalValue}>
                   {marketplaceMessages.stats.openBriefsBody}
@@ -130,13 +184,13 @@ export function MarketplaceBrowser() {
           <div className={`${styles.cardStack} fx-fade-up fx-fade-up-delay-1`}>
             <SharedCard className={styles.statCard} interactive>
               <strong>
-                {marketplaceMessages.stats.visibleTalentTitle(profiles.length)}
+                {marketplaceMessages.stats.visibleTalentTitle(talentResults.length)}
               </strong>
               <p>{marketplaceMessages.stats.visibleTalentBody}</p>
             </SharedCard>
             <SharedCard className={styles.statCard} interactive>
               <strong>
-                {marketplaceMessages.stats.openBriefsTitle(opportunities.length)}
+                {marketplaceMessages.stats.openBriefsTitle(opportunityResults.length)}
               </strong>
               <p>{marketplaceMessages.stats.openBriefsBody}</p>
             </SharedCard>
@@ -157,77 +211,324 @@ export function MarketplaceBrowser() {
         <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-1`} delay={0.08}>
           <div className={styles.sectionBody}>
             <SectionHeading
-              title={marketplaceMessages.featuredTalentTitle}
-              description={marketplaceMessages.stats.visibleTalentBody}
+              eyebrow={marketplaceMessages.directory.eyebrow}
+              title={marketplaceMessages.directory.title}
+              description={marketplaceMessages.directory.body}
             />
+            <div className={styles.inlineActions}>
+              <button
+                className={styles.cardLink}
+                type="button"
+                onClick={() => setActiveTab('talent')}
+              >
+                {marketplaceMessages.directory.talentTab}
+              </button>
+              <button
+                className={styles.cardLink}
+                type="button"
+                onClick={() => setActiveTab('opportunity')}
+              >
+                {marketplaceMessages.directory.opportunityTab}
+              </button>
+            </div>
+            {activeTab === 'talent' ? (
+              <>
+                <div className={styles.filterGrid}>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.query}</span>
+                    <input
+                      value={talentFilters.q}
+                      onChange={(event) =>
+                        setTalentFilters((current) => ({
+                          ...current,
+                          q: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.skill}</span>
+                    <input
+                      value={talentFilters.skill}
+                      onChange={(event) =>
+                        setTalentFilters((current) => ({
+                          ...current,
+                          skill: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.availability}</span>
+                    <select
+                      value={talentFilters.availability}
+                      onChange={(event) =>
+                        setTalentFilters((current) => ({
+                          ...current,
+                          availability: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      <option value="open">Open</option>
+                      <option value="limited">Limited</option>
+                      <option value="unavailable">Unavailable</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.verificationLevel}</span>
+                    <select
+                      value={talentFilters.verificationLevel}
+                      onChange={(event) =>
+                        setTalentFilters((current) => ({
+                          ...current,
+                          verificationLevel: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      <option value="wallet_verified">
+                        {marketplaceMessages.labels.verificationLevel.wallet_verified}
+                      </option>
+                      <option value="wallet_and_escrow_history">
+                        {
+                          marketplaceMessages.labels.verificationLevel
+                            .wallet_and_escrow_history
+                        }
+                      </option>
+                      <option value="wallet_escrow_and_delivery">
+                        {
+                          marketplaceMessages.labels.verificationLevel
+                            .wallet_escrow_and_delivery
+                        }
+                      </option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.engagementType}</span>
+                    <select
+                      value={talentFilters.engagementType}
+                      onChange={(event) =>
+                        setTalentFilters((current) => ({
+                          ...current,
+                          engagementType: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      <option value="fixed_scope">
+                        {marketplaceMessages.labels.engagementType.fixed_scope}
+                      </option>
+                      <option value="milestone_retainer">
+                        {marketplaceMessages.labels.engagementType.milestone_retainer}
+                      </option>
+                      <option value="advisory">
+                        {marketplaceMessages.labels.engagementType.advisory}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+                <div className={styles.inlineActions}>
+                  <button className={styles.cardLink} type="button" onClick={() => void loadDirectories()}>
+                    {marketplaceMessages.directory.search}
+                  </button>
+                  <button
+                    className={styles.cardLink}
+                    type="button"
+                    onClick={() => {
+                      setTalentFilters({
+                        q: '',
+                        skill: '',
+                        availability: '',
+                        verificationLevel: '',
+                        engagementType: '',
+                      });
+                    }}
+                  >
+                    {marketplaceMessages.directory.clear}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.filterGrid}>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.query}</span>
+                    <input
+                      value={opportunityFilters.q}
+                      onChange={(event) =>
+                        setOpportunityFilters((current) => ({
+                          ...current,
+                          q: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.skill}</span>
+                    <input
+                      value={opportunityFilters.skill}
+                      onChange={(event) =>
+                        setOpportunityFilters((current) => ({
+                          ...current,
+                          skill: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.category}</span>
+                    <input
+                      value={opportunityFilters.category}
+                      onChange={(event) =>
+                        setOpportunityFilters((current) => ({
+                          ...current,
+                          category: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.engagementType}</span>
+                    <select
+                      value={opportunityFilters.engagementType}
+                      onChange={(event) =>
+                        setOpportunityFilters((current) => ({
+                          ...current,
+                          engagementType: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      <option value="fixed_scope">
+                        {marketplaceMessages.labels.engagementType.fixed_scope}
+                      </option>
+                      <option value="milestone_retainer">
+                        {marketplaceMessages.labels.engagementType.milestone_retainer}
+                      </option>
+                      <option value="advisory">
+                        {marketplaceMessages.labels.engagementType.advisory}
+                      </option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>{marketplaceMessages.directory.cryptoReadiness}</span>
+                    <select
+                      value={opportunityFilters.cryptoReadinessRequired}
+                      onChange={(event) =>
+                        setOpportunityFilters((current) => ({
+                          ...current,
+                          cryptoReadinessRequired: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      <option value="wallet_only">
+                        {marketplaceMessages.labels.cryptoReadiness.wallet_only}
+                      </option>
+                      <option value="smart_account_ready">
+                        {marketplaceMessages.labels.cryptoReadiness.smart_account_ready}
+                      </option>
+                      <option value="escrow_power_user">
+                        {marketplaceMessages.labels.cryptoReadiness.escrow_power_user}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+                <div className={styles.inlineActions}>
+                  <button className={styles.cardLink} type="button" onClick={() => void loadDirectories()}>
+                    {marketplaceMessages.directory.search}
+                  </button>
+                  <button
+                    className={styles.cardLink}
+                    type="button"
+                    onClick={() => {
+                      setOpportunityFilters({
+                        q: '',
+                        skill: '',
+                        category: '',
+                        engagementType: '',
+                        cryptoReadinessRequired: '',
+                      });
+                    }}
+                  >
+                    {marketplaceMessages.directory.clear}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           <div className={styles.steps}>
-            {profiles.length === 0 ? (
+            {activeTab === 'talent' ? (
+              talentResults.length === 0 ? (
               <article className={styles.stepCard}>
                 <strong>{marketplaceMessages.noProfilesTitle}</strong>
                 <p>{marketplaceMessages.noProfilesBody}</p>
               </article>
             ) : (
-              profiles.map((profile) => (
+              talentResults.map((result) => (
                 <SharedCard
-                  key={profile.userId}
+                  key={result.profile.userId}
                   className={styles.stepCard}
                   interactive
-                  layoutId={`marketplace-profile-${profile.slug}`}
+                  layoutId={`marketplace-profile-${result.profile.slug}`}
                 >
-                  <strong>{profile.displayName}</strong>
-                  <p>{profile.headline}</p>
+                  <strong>{result.profile.displayName}</strong>
+                  <p>{result.profile.headline}</p>
                   <p>
-                    {profile.skills.slice(0, 3).join(' • ')}
-                    {profile.skills.length > 3 ? ' • …' : ''}
+                    {result.profile.skills.slice(0, 3).join(' • ')}
+                    {result.profile.skills.length > 3 ? ' • …' : ''}
                   </p>
                   <p>
-                    Completed escrow jobs: {profile.completedEscrowCount}
-                    {profile.verifiedWalletAddress
+                    Completed escrow jobs: {result.profile.completedEscrowCount}
+                    {result.profile.verifiedWalletAddress
                       ? ` • ${marketplaceMessages.labels.verifiedWallet}`
                       : ''}
                   </p>
-                  <Link className={styles.cardLink} href={`/marketplace/profiles/${profile.slug}`}>
+                  <p>
+                    {marketplaceMessages.directory.ranking}: {result.ranking.score}
+                    {result.inviteStatus
+                      ? ` • ${marketplaceMessages.directory.inviteStatus}: ${marketplaceMessages.labels.inviteStatus[result.inviteStatus]}`
+                      : ''}
+                  </p>
+                  {renderReasons(result.reasons)}
+                  <Link className={styles.cardLink} href={`/marketplace/profiles/${result.profile.slug}`}>
                     {marketplaceMessages.actions.viewProfile}
                   </Link>
                 </SharedCard>
               ))
-            )}
-          </div>
-        </RevealSection>
-
-        <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-2`} delay={0.12}>
-          <div className={styles.sectionBody}>
-            <SectionHeading
-              title={marketplaceMessages.openOpportunitiesTitle}
-              description={marketplaceMessages.stats.openBriefsBody}
-            />
-          </div>
-          <div className={styles.steps}>
-            {opportunities.length === 0 ? (
+            )
+            ) : opportunityResults.length === 0 ? (
               <article className={styles.stepCard}>
                 <strong>{marketplaceMessages.noOpportunitiesTitle}</strong>
                 <p>{marketplaceMessages.noOpportunitiesBody}</p>
               </article>
             ) : (
-              opportunities.map((opportunity) => (
+              opportunityResults.map((result) => (
                 <SharedCard
-                  key={opportunity.id}
+                  key={result.opportunity.id}
                   className={styles.stepCard}
                   interactive
-                  layoutId={`marketplace-opportunity-${opportunity.id}`}
+                  layoutId={`marketplace-opportunity-${result.opportunity.id}`}
                 >
-                  <strong>{opportunity.title}</strong>
-                  <p>{opportunity.summary}</p>
+                  <strong>{result.opportunity.title}</strong>
+                  <p>{result.opportunity.summary}</p>
                   <p>
-                    {opportunity.category} • {opportunity.requiredSkills.slice(0, 3).join(' • ')}
+                    {result.opportunity.category} • {result.opportunity.requiredSkills.slice(0, 3).join(' • ')}
                   </p>
                   <p>
-                    {opportunity.owner.displayName} • {opportunity.applicationCount} applications
+                    {result.opportunity.owner.displayName} • {result.opportunity.applicationCount} applications
                   </p>
+                  <p>
+                    {marketplaceMessages.directory.ranking}: {result.ranking.score}
+                    {result.inviteStatus
+                      ? ` • ${marketplaceMessages.directory.inviteStatus}: ${marketplaceMessages.labels.inviteStatus[result.inviteStatus]}`
+                      : ''}
+                  </p>
+                  {renderReasons(result.reasons)}
                   <Link
                     className={styles.cardLink}
-                    href={`/marketplace/opportunities/${opportunity.id}`}
+                    href={`/marketplace/opportunities/${result.opportunity.id}`}
                   >
                     {marketplaceMessages.actions.viewBrief}
                   </Link>
