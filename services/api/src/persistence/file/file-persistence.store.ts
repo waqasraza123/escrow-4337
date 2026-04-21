@@ -6,7 +6,7 @@ import { PersistenceConfigService } from '../persistence.config';
 
 function createInitialData(): PersistenceFileData {
   return {
-    version: 22,
+    version: 23,
     users: {},
     organizations: {},
     organizationMemberships: {},
@@ -24,6 +24,11 @@ function createInitialData(): PersistenceFileData {
     marketplaceOpportunities: {},
     marketplaceOpportunitySearchDocuments: {},
     marketplaceApplications: {},
+    marketplaceApplicationRevisions: {},
+    marketplaceInterviewThreads: {},
+    marketplaceInterviewMessages: {},
+    marketplaceOffers: {},
+    marketplaceApplicationDecisions: {},
     marketplaceSavedSearches: {},
     marketplaceOpportunityInvites: {},
     marketplaceAbuseReports: {},
@@ -78,7 +83,7 @@ export class FilePersistenceStore {
     const parsed = JSON.parse(raw) as Partial<PersistenceFileData>;
 
     return {
-      version: 22,
+      version: 23,
       users: parsed.users ?? {},
       organizations: parsed.organizations ?? {},
       organizationMemberships: parsed.organizationMemberships ?? {},
@@ -98,6 +103,13 @@ export class FilePersistenceStore {
       marketplaceOpportunitySearchDocuments:
         parsed.marketplaceOpportunitySearchDocuments ?? {},
       marketplaceApplications: parsed.marketplaceApplications ?? {},
+      marketplaceApplicationRevisions:
+        parsed.marketplaceApplicationRevisions ?? {},
+      marketplaceInterviewThreads: parsed.marketplaceInterviewThreads ?? {},
+      marketplaceInterviewMessages: parsed.marketplaceInterviewMessages ?? {},
+      marketplaceOffers: parsed.marketplaceOffers ?? {},
+      marketplaceApplicationDecisions:
+        parsed.marketplaceApplicationDecisions ?? {},
       marketplaceSavedSearches: parsed.marketplaceSavedSearches ?? {},
       marketplaceOpportunityInvites:
         parsed.marketplaceOpportunityInvites ?? {},

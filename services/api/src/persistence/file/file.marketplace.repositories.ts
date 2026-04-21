@@ -1,6 +1,12 @@
 import type {
+  MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
+  MarketplaceApplicationRevisionRecord,
+  MarketplaceInterviewMessageRecord,
+  MarketplaceInterviewThreadRecord,
+  MarketplaceOfferMilestoneDraft,
+  MarketplaceOfferRecord,
   MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunitySearchDocument,
   MarketplaceOpportunityRecord,
@@ -92,6 +98,65 @@ function normalizeApplication(
     portfolioUrls: normalizeTextList(application.portfolioUrls),
     deliveryApproach: application.deliveryApproach.trim(),
     milestonePlanSummary: application.milestonePlanSummary.trim(),
+  };
+}
+
+function normalizeApplicationRevision(
+  revision: MarketplaceApplicationRevisionRecord,
+): MarketplaceApplicationRevisionRecord {
+  return {
+    ...revision,
+    screeningAnswers: normalizeScreeningAnswers(revision.screeningAnswers),
+    relevantProofArtifacts: normalizeProofArtifacts(
+      revision.relevantProofArtifacts,
+    ),
+    portfolioUrls: normalizeTextList(revision.portfolioUrls),
+    revisionReason: revision.revisionReason?.trim() || null,
+  };
+}
+
+function normalizeInterviewThread(
+  thread: MarketplaceInterviewThreadRecord,
+): MarketplaceInterviewThreadRecord {
+  return {
+    ...thread,
+  };
+}
+
+function normalizeInterviewMessage(
+  message: MarketplaceInterviewMessageRecord,
+): MarketplaceInterviewMessageRecord {
+  return {
+    ...message,
+    body: message.body.trim(),
+  };
+}
+
+function normalizeOfferMilestones(values: MarketplaceOfferMilestoneDraft[]) {
+  return values.map((milestone) => ({
+    ...milestone,
+    title: milestone.title.trim(),
+    deliverable: milestone.deliverable.trim(),
+  }));
+}
+
+function normalizeOffer(offer: MarketplaceOfferRecord): MarketplaceOfferRecord {
+  return {
+    ...offer,
+    message: offer.message?.trim() || null,
+    counterMessage: offer.counterMessage?.trim() || null,
+    declineReason: offer.declineReason?.trim() || null,
+    milestones: normalizeOfferMilestones(offer.milestones),
+  };
+}
+
+function normalizeApplicationDecision(
+  decision: MarketplaceApplicationDecisionRecord,
+): MarketplaceApplicationDecisionRecord {
+  return {
+    ...decision,
+    reason: decision.reason?.trim() || null,
+    noHireReason: decision.noHireReason ?? null,
   };
 }
 
@@ -283,6 +348,119 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceApplications[application.id] = cloneValue(
         normalizeApplication(application),
+      );
+    });
+  }
+
+  async getApplicationRevisionById(revisionId: string) {
+    return this.store.read((data) => {
+      const revision = data.marketplaceApplicationRevisions[revisionId];
+      return revision ? cloneValue(normalizeApplicationRevision(revision)) : null;
+    });
+  }
+
+  async listApplicationRevisions() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceApplicationRevisions)
+        .map((revision) => cloneValue(normalizeApplicationRevision(revision)))
+        .sort((left, right) => right.createdAt - left.createdAt),
+    );
+  }
+
+  async saveApplicationRevision(revision: MarketplaceApplicationRevisionRecord) {
+    await this.store.write((data) => {
+      data.marketplaceApplicationRevisions[revision.id] = cloneValue(
+        normalizeApplicationRevision(revision),
+      );
+    });
+  }
+
+  async getInterviewThreadById(threadId: string) {
+    return this.store.read((data) => {
+      const thread = data.marketplaceInterviewThreads[threadId];
+      return thread ? cloneValue(normalizeInterviewThread(thread)) : null;
+    });
+  }
+
+  async listInterviewThreads() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceInterviewThreads)
+        .map((thread) => cloneValue(normalizeInterviewThread(thread)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveInterviewThread(thread: MarketplaceInterviewThreadRecord) {
+    await this.store.write((data) => {
+      data.marketplaceInterviewThreads[thread.id] = cloneValue(
+        normalizeInterviewThread(thread),
+      );
+    });
+  }
+
+  async getInterviewMessageById(messageId: string) {
+    return this.store.read((data) => {
+      const message = data.marketplaceInterviewMessages[messageId];
+      return message ? cloneValue(normalizeInterviewMessage(message)) : null;
+    });
+  }
+
+  async listInterviewMessages() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceInterviewMessages)
+        .map((message) => cloneValue(normalizeInterviewMessage(message)))
+        .sort((left, right) => left.createdAt - right.createdAt),
+    );
+  }
+
+  async saveInterviewMessage(message: MarketplaceInterviewMessageRecord) {
+    await this.store.write((data) => {
+      data.marketplaceInterviewMessages[message.id] = cloneValue(
+        normalizeInterviewMessage(message),
+      );
+    });
+  }
+
+  async getOfferById(offerId: string) {
+    return this.store.read((data) => {
+      const offer = data.marketplaceOffers[offerId];
+      return offer ? cloneValue(normalizeOffer(offer)) : null;
+    });
+  }
+
+  async listOffers() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceOffers)
+        .map((offer) => cloneValue(normalizeOffer(offer)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveOffer(offer: MarketplaceOfferRecord) {
+    await this.store.write((data) => {
+      data.marketplaceOffers[offer.id] = cloneValue(normalizeOffer(offer));
+    });
+  }
+
+  async getApplicationDecisionById(decisionId: string) {
+    return this.store.read((data) => {
+      const decision = data.marketplaceApplicationDecisions[decisionId];
+      return decision ? cloneValue(normalizeApplicationDecision(decision)) : null;
+    });
+  }
+
+  async listApplicationDecisions() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceApplicationDecisions)
+        .map((decision) => cloneValue(normalizeApplicationDecision(decision)))
+        .sort((left, right) => left.createdAt - right.createdAt),
+    );
+  }
+
+  async saveApplicationDecision(decision: MarketplaceApplicationDecisionRecord) {
+    await this.store.write((data) => {
+      data.marketplaceApplicationDecisions[decision.id] = cloneValue(
+        normalizeApplicationDecision(decision),
       );
     });
   }

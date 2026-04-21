@@ -399,6 +399,11 @@ export type OpportunityStatus =
 export type ApplicationStatus =
   | 'submitted'
   | 'shortlisted'
+  | 'interviewing'
+  | 'offer_sent'
+  | 'countered'
+  | 'accepted'
+  | 'declined'
   | 'rejected'
   | 'withdrawn'
   | 'hired';
@@ -533,6 +538,38 @@ export type MarketplaceOpportunityInvite = {
   };
   talent: MarketplaceApplication['applicant'];
 };
+export type MarketplaceInterviewThreadStatus = 'open' | 'closed';
+export type MarketplaceInterviewMessageKind =
+  | 'clarification'
+  | 'interview'
+  | 'system';
+export type MarketplaceOfferStatus =
+  | 'draft'
+  | 'sent'
+  | 'countered'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn';
+export type MarketplaceNoHireReason =
+  | 'budget_changed'
+  | 'scope_changed'
+  | 'fit_not_strong_enough'
+  | 'candidate_withdrew'
+  | 'timeline_mismatch'
+  | 'other';
+export type MarketplaceDecisionAction =
+  | 'applied'
+  | 'revised'
+  | 'shortlisted'
+  | 'interview_started'
+  | 'offer_sent'
+  | 'offer_countered'
+  | 'offer_accepted'
+  | 'offer_declined'
+  | 'rejected'
+  | 'withdrawn'
+  | 'hired'
+  | 'no_hire';
 export type MarketplaceTalentSearchResult = {
   profile: MarketplaceProfile;
   reasons: MarketplaceSearchReason[];
@@ -657,6 +694,100 @@ export type MarketplaceApplication = {
   fitBreakdown: MarketplaceFitBreakdownEntry[];
   riskFlags: string[];
   dossier: MarketplaceApplicationDossier;
+};
+
+export type MarketplaceApplicationRevision = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  applicantUserId: string;
+  revisionNumber: number;
+  coverNote: string;
+  proposedRate: string | null;
+  screeningAnswers: MarketplaceScreeningAnswer[];
+  deliveryApproach: string;
+  milestonePlanSummary: string;
+  estimatedStartAt: number | null;
+  relevantProofArtifacts: MarketplaceProofArtifact[];
+  portfolioUrls: string[];
+  revisionReason: string | null;
+  createdAt: number;
+};
+
+export type MarketplaceInterviewMessage = {
+  id: string;
+  threadId: string;
+  applicationId: string;
+  opportunityId: string;
+  senderUserId: string;
+  senderWorkspaceId: string | null;
+  senderEmail: string;
+  kind: MarketplaceInterviewMessageKind;
+  body: string;
+  createdAt: number;
+};
+
+export type MarketplaceInterviewThread = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceInterviewThreadStatus;
+  createdAt: number;
+  updatedAt: number;
+  messages: MarketplaceInterviewMessage[];
+};
+
+export type MarketplaceOfferMilestoneDraft = {
+  title: string;
+  deliverable: string;
+  amount: string;
+  dueAt: number | null;
+};
+
+export type MarketplaceOffer = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceOfferStatus;
+  message: string | null;
+  counterMessage: string | null;
+  declineReason: string | null;
+  proposedRate: string | null;
+  milestones: MarketplaceOfferMilestoneDraft[];
+  revisionNumber: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceApplicationDecision = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  actorUserId: string;
+  action: MarketplaceDecisionAction;
+  reason: string | null;
+  noHireReason: MarketplaceNoHireReason | null;
+  createdAt: number;
+};
+
+export type MarketplaceApplicationTimeline = {
+  application: MarketplaceApplication;
+  revisions: MarketplaceApplicationRevision[];
+  interviewThread: MarketplaceInterviewThread | null;
+  offers: MarketplaceOffer[];
+  decisions: MarketplaceApplicationDecision[];
+};
+
+export type MarketplaceApplicationComparison = {
+  application: MarketplaceApplication;
+  latestRevision: MarketplaceApplicationRevision | null;
+  latestOffer: MarketplaceOffer | null;
+  latestMessageAt: number | null;
+  decisionCount: number;
 };
 
 export type MarketplaceOpportunityDetail = MarketplaceOpportunity & {
@@ -1720,46 +1851,185 @@ export const webApi = {
       accessToken,
     );
   },
-  withdrawMarketplaceApplication(id: string, accessToken: string) {
+  withdrawMarketplaceApplication(
+    id: string,
+    accessToken: string,
+    input?: {
+      reason?: string | null;
+      noHireReason?: MarketplaceNoHireReason | null;
+    },
+  ) {
     return requestJson<{ applications: MarketplaceApplication[] }>(
       apiBaseUrl,
       `/marketplace/applications/${id}/withdraw`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify(input ?? {}),
       },
       accessToken,
     );
   },
-  shortlistMarketplaceApplication(id: string, accessToken: string) {
+  shortlistMarketplaceApplication(
+    id: string,
+    accessToken: string,
+    input?: {
+      reason?: string | null;
+      noHireReason?: MarketplaceNoHireReason | null;
+    },
+  ) {
     return requestJson<{ applications: MarketplaceApplication[] }>(
       apiBaseUrl,
       `/marketplace/applications/${id}/shortlist`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify(input ?? {}),
       },
       accessToken,
     );
   },
-  rejectMarketplaceApplication(id: string, accessToken: string) {
+  rejectMarketplaceApplication(
+    id: string,
+    accessToken: string,
+    input?: {
+      reason?: string | null;
+      noHireReason?: MarketplaceNoHireReason | null;
+    },
+  ) {
     return requestJson<{ applications: MarketplaceApplication[] }>(
       apiBaseUrl,
       `/marketplace/applications/${id}/reject`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify(input ?? {}),
       },
       accessToken,
     );
   },
-  hireMarketplaceApplication(id: string, accessToken: string) {
+  reviseMarketplaceApplication(
+    id: string,
+    input: {
+      coverNote: string;
+      proposedRate: string | null;
+      selectedWalletAddress: string;
+      screeningAnswers: MarketplaceScreeningAnswer[];
+      deliveryApproach: string;
+      milestonePlanSummary: string;
+      estimatedStartAt: number | null;
+      relevantProofArtifacts: MarketplaceProofArtifact[];
+      portfolioUrls: string[];
+      revisionReason?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ revision: MarketplaceApplicationRevision }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/revisions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceApplicationTimeline(id: string, accessToken: string) {
+    return requestJson<{ timeline: MarketplaceApplicationTimeline }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/timeline`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getMarketplaceApplicationInterviewThread(id: string, accessToken: string) {
+    return requestJson<{ thread: MarketplaceInterviewThread }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/interview`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  postMarketplaceApplicationInterviewMessage(
+    id: string,
+    input: {
+      kind: 'clarification' | 'interview';
+      body: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ thread: MarketplaceInterviewThread }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/interview/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  createMarketplaceApplicationOffer(
+    id: string,
+    input: {
+      message?: string | null;
+      proposedRate?: string | null;
+      milestones: MarketplaceOfferMilestoneDraft[];
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ offer: MarketplaceOffer }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/offers`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  hireMarketplaceApplication(
+    id: string,
+    accessToken: string,
+    input?: {
+      reason?: string | null;
+      noHireReason?: MarketplaceNoHireReason | null;
+    },
+  ) {
     return requestJson<HireApplicationResponse>(
       apiBaseUrl,
       `/marketplace/applications/${id}/hire`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify(input ?? {}),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceOpportunityApplicationComparison(
+    id: string,
+    accessToken: string,
+  ) {
+    return requestJson<{ candidates: MarketplaceApplicationComparison[] }>(
+      apiBaseUrl,
+      `/marketplace/opportunities/${id}/compare`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  respondToMarketplaceOffer(
+    id: string,
+    input: {
+      action: 'accept' | 'counter' | 'decline';
+      message?: string | null;
+      proposedRate?: string | null;
+      milestones?: MarketplaceOfferMilestoneDraft[];
+      declineReason?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ offer: MarketplaceOffer }>(
+      apiBaseUrl,
+      `/marketplace/offers/${id}/respond`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
       },
       accessToken,
     );

@@ -289,26 +289,136 @@ export class MarketplaceController {
 
   @UseGuards(AuthGuard)
   @Post('applications/:id/withdraw')
-  withdrawApplication(@User() user: ReqUser, @Param('id') id: string) {
-    return this.marketplaceService.withdrawApplication(user.id, id);
+  withdrawApplication(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
+    )
+    body: marketplaceDto.ApplicationDecisionNoteDto,
+  ) {
+    return this.marketplaceService.withdrawApplication(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)
   @Post('applications/:id/shortlist')
-  shortlistApplication(@User() user: ReqUser, @Param('id') id: string) {
-    return this.marketplaceService.shortlistApplication(user.id, id);
+  shortlistApplication(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
+    )
+    body: marketplaceDto.ApplicationDecisionNoteDto,
+  ) {
+    return this.marketplaceService.shortlistApplication(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)
   @Post('applications/:id/reject')
-  rejectApplication(@User() user: ReqUser, @Param('id') id: string) {
-    return this.marketplaceService.rejectApplication(user.id, id);
+  rejectApplication(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
+    )
+    body: marketplaceDto.ApplicationDecisionNoteDto,
+  ) {
+    return this.marketplaceService.rejectApplication(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('applications/:id/revisions')
+  reviseApplication(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.reviseMarketplaceApplicationSchema),
+    )
+    body: marketplaceDto.ReviseMarketplaceApplicationDto,
+  ) {
+    return this.marketplaceService.reviseApplication(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('applications/:id/timeline')
+  getApplicationTimeline(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getApplicationTimeline(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('applications/:id/interview')
+  getApplicationInterviewThread(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getApplicationInterviewThread(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('applications/:id/interview/messages')
+  postApplicationInterviewMessage(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.createMarketplaceInterviewMessageSchema,
+      ),
+    )
+    body: marketplaceDto.CreateMarketplaceInterviewMessageDto,
+  ) {
+    return this.marketplaceService.postApplicationInterviewMessage(
+      user.id,
+      id,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('applications/:id/offers')
+  createApplicationOffer(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.createMarketplaceOfferSchema),
+    )
+    body: marketplaceDto.CreateMarketplaceOfferDto,
+  ) {
+    return this.marketplaceService.createApplicationOffer(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)
   @Post('applications/:id/hire')
-  hireApplication(@User() user: ReqUser, @Param('id') id: string) {
-    return this.marketplaceService.hireApplication(user.id, id);
+  hireApplication(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
+    )
+    body: marketplaceDto.ApplicationDecisionNoteDto,
+  ) {
+    return this.marketplaceService.hireApplication(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('opportunities/:id/compare')
+  getOpportunityApplicationComparison(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+  ) {
+    return this.marketplaceService.getOpportunityApplicationComparison(
+      user.id,
+      id,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('offers/:id/respond')
+  respondToMarketplaceOffer(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.respondToMarketplaceOfferSchema),
+    )
+    body: marketplaceDto.RespondToMarketplaceOfferDto,
+  ) {
+    return this.marketplaceService.respondToMarketplaceOffer(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)

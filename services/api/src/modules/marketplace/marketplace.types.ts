@@ -10,6 +10,11 @@ export type OpportunityStatus =
 export type ApplicationStatus =
   | 'submitted'
   | 'shortlisted'
+  | 'interviewing'
+  | 'offer_sent'
+  | 'countered'
+  | 'accepted'
+  | 'declined'
   | 'rejected'
   | 'withdrawn'
   | 'hired';
@@ -74,6 +79,38 @@ export type MarketplaceOpportunityInviteStatus =
   | 'pending'
   | 'applied'
   | 'dismissed';
+export type MarketplaceInterviewThreadStatus = 'open' | 'closed';
+export type MarketplaceInterviewMessageKind =
+  | 'clarification'
+  | 'interview'
+  | 'system';
+export type MarketplaceOfferStatus =
+  | 'draft'
+  | 'sent'
+  | 'countered'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn';
+export type MarketplaceDecisionAction =
+  | 'applied'
+  | 'revised'
+  | 'shortlisted'
+  | 'interview_started'
+  | 'offer_sent'
+  | 'offer_countered'
+  | 'offer_accepted'
+  | 'offer_declined'
+  | 'rejected'
+  | 'withdrawn'
+  | 'hired'
+  | 'no_hire';
+export type MarketplaceNoHireReason =
+  | 'budget_changed'
+  | 'scope_changed'
+  | 'fit_not_strong_enough'
+  | 'candidate_withdrew'
+  | 'timeline_mismatch'
+  | 'other';
 export type MarketplaceSearchReasonCode =
   | 'strong_skill_match'
   | 'timezone_overlap'
@@ -321,6 +358,82 @@ export type MarketplaceApplicationRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceApplicationRevisionRecord = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  applicantUserId: string;
+  revisionNumber: number;
+  coverNote: string;
+  proposedRate: string | null;
+  screeningAnswers: MarketplaceScreeningAnswer[];
+  deliveryApproach: string;
+  milestonePlanSummary: string;
+  estimatedStartAt: number | null;
+  relevantProofArtifacts: MarketplaceTalentProofArtifact[];
+  portfolioUrls: string[];
+  revisionReason: string | null;
+  createdAt: number;
+};
+
+export type MarketplaceInterviewThreadRecord = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceInterviewThreadStatus;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceInterviewMessageRecord = {
+  id: string;
+  threadId: string;
+  applicationId: string;
+  opportunityId: string;
+  senderUserId: string;
+  senderWorkspaceId: string | null;
+  kind: MarketplaceInterviewMessageKind;
+  body: string;
+  createdAt: number;
+};
+
+export type MarketplaceOfferMilestoneDraft = {
+  title: string;
+  deliverable: string;
+  amount: string;
+  dueAt: number | null;
+};
+
+export type MarketplaceOfferRecord = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  clientUserId: string;
+  applicantUserId: string;
+  status: MarketplaceOfferStatus;
+  message: string | null;
+  counterMessage: string | null;
+  declineReason: string | null;
+  proposedRate: string | null;
+  milestones: MarketplaceOfferMilestoneDraft[];
+  revisionNumber: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceApplicationDecisionRecord = {
+  id: string;
+  applicationId: string;
+  opportunityId: string;
+  actorUserId: string;
+  action: MarketplaceDecisionAction;
+  reason: string | null;
+  noHireReason: MarketplaceNoHireReason | null;
+  createdAt: number;
+};
+
 export type MarketplaceAbuseReportRecord = {
   id: string;
   subjectType: MarketplaceAbuseReportSubjectType;
@@ -408,6 +521,38 @@ export type MarketplaceApplicationView = Omit<
   fitBreakdown: MarketplaceFitBreakdownEntry[];
   riskFlags: string[];
   dossier: MarketplaceApplicationDossier;
+};
+
+export type MarketplaceApplicationRevisionView =
+  MarketplaceApplicationRevisionRecord;
+
+export type MarketplaceInterviewMessageView = MarketplaceInterviewMessageRecord & {
+  senderEmail: string;
+};
+
+export type MarketplaceInterviewThreadView = MarketplaceInterviewThreadRecord & {
+  messages: MarketplaceInterviewMessageView[];
+};
+
+export type MarketplaceOfferView = MarketplaceOfferRecord;
+
+export type MarketplaceApplicationDecisionView =
+  MarketplaceApplicationDecisionRecord;
+
+export type MarketplaceApplicationTimelineView = {
+  application: MarketplaceApplicationView;
+  revisions: MarketplaceApplicationRevisionView[];
+  interviewThread: MarketplaceInterviewThreadView | null;
+  offers: MarketplaceOfferView[];
+  decisions: MarketplaceApplicationDecisionView[];
+};
+
+export type MarketplaceApplicationComparisonView = {
+  application: MarketplaceApplicationView;
+  latestRevision: MarketplaceApplicationRevisionView | null;
+  latestOffer: MarketplaceOfferView | null;
+  latestMessageAt: number | null;
+  decisionCount: number;
 };
 
 export type MarketplaceOpportunityView = Omit<
@@ -591,6 +736,14 @@ export type MarketplaceApplicationsListResponse = {
   applications: MarketplaceApplicationView[];
 };
 
+export type MarketplaceApplicationTimelineResponse = {
+  timeline: MarketplaceApplicationTimelineView;
+};
+
+export type MarketplaceApplicationComparisonResponse = {
+  candidates: MarketplaceApplicationComparisonView[];
+};
+
 export type MarketplaceMatchesResponse = {
   matches: MarketplaceApplicationDossier[];
 };
@@ -621,6 +774,18 @@ export type MarketplaceOpportunityInviteResponse = {
 
 export type MarketplaceApplicationDossierResponse = {
   dossier: MarketplaceApplicationDossier;
+};
+
+export type MarketplaceApplicationRevisionResponse = {
+  revision: MarketplaceApplicationRevisionView;
+};
+
+export type MarketplaceInterviewThreadResponse = {
+  thread: MarketplaceInterviewThreadView;
+};
+
+export type MarketplaceOfferResponse = {
+  offer: MarketplaceOfferView;
 };
 
 export type MarketplaceAbuseReportResponse = {

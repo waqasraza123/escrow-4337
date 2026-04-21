@@ -1,11 +1,21 @@
 import type { QueryResultRow } from 'pg';
 import type {
+  MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
   MarketplaceAbuseReportStatus,
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
+  MarketplaceApplicationRevisionRecord,
   MarketplaceCryptoReadiness,
   MarketplaceEngagementType,
+  MarketplaceInterviewMessageKind,
+  MarketplaceInterviewMessageRecord,
+  MarketplaceInterviewThreadRecord,
+  MarketplaceInterviewThreadStatus,
+  MarketplaceNoHireReason,
+  MarketplaceOfferMilestoneDraft,
+  MarketplaceOfferRecord,
+  MarketplaceOfferStatus,
   MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunityInviteStatus,
   MarketplaceOpportunitySearchDocument,
@@ -98,6 +108,75 @@ type MarketplaceApplicationRow = QueryResultRow & {
   hired_job_id: string | null;
   created_at_ms: string;
   updated_at_ms: string;
+};
+
+type MarketplaceApplicationRevisionRow = QueryResultRow & {
+  id: string;
+  application_id: string;
+  opportunity_id: string;
+  applicant_user_id: string;
+  revision_number: number;
+  cover_note: string;
+  proposed_rate: string | null;
+  screening_answers_json: MarketplaceScreeningAnswer[];
+  delivery_approach: string;
+  milestone_plan_summary: string;
+  estimated_start_at_ms: string | null;
+  relevant_proof_artifacts_json: MarketplaceTalentProofArtifact[];
+  portfolio_urls_json: string[];
+  revision_reason: string | null;
+  created_at_ms: string;
+};
+
+type MarketplaceInterviewThreadRow = QueryResultRow & {
+  id: string;
+  application_id: string;
+  opportunity_id: string;
+  client_user_id: string;
+  applicant_user_id: string;
+  status: MarketplaceInterviewThreadStatus;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceInterviewMessageRow = QueryResultRow & {
+  id: string;
+  thread_id: string;
+  application_id: string;
+  opportunity_id: string;
+  sender_user_id: string;
+  sender_workspace_id: string | null;
+  kind: MarketplaceInterviewMessageKind;
+  body: string;
+  created_at_ms: string;
+};
+
+type MarketplaceOfferRow = QueryResultRow & {
+  id: string;
+  application_id: string;
+  opportunity_id: string;
+  client_user_id: string;
+  applicant_user_id: string;
+  status: MarketplaceOfferStatus;
+  message: string | null;
+  counter_message: string | null;
+  decline_reason: string | null;
+  proposed_rate: string | null;
+  milestones_json: MarketplaceOfferMilestoneDraft[];
+  revision_number: number;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceApplicationDecisionRow = QueryResultRow & {
+  id: string;
+  application_id: string;
+  opportunity_id: string;
+  actor_user_id: string;
+  action: MarketplaceApplicationDecisionRecord['action'];
+  reason: string | null;
+  no_hire_reason: MarketplaceNoHireReason | null;
+  created_at_ms: string;
 };
 
 type MarketplaceAbuseReportRow = QueryResultRow & {
@@ -287,6 +366,94 @@ function mapApplication(
     hiredJobId: row.hired_job_id,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapApplicationRevision(
+  row: MarketplaceApplicationRevisionRow,
+): MarketplaceApplicationRevisionRecord {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    applicantUserId: row.applicant_user_id,
+    revisionNumber: row.revision_number,
+    coverNote: row.cover_note,
+    proposedRate: row.proposed_rate,
+    screeningAnswers: row.screening_answers_json ?? [],
+    deliveryApproach: row.delivery_approach,
+    milestonePlanSummary: row.milestone_plan_summary,
+    estimatedStartAt:
+      row.estimated_start_at_ms === null ? null : Number(row.estimated_start_at_ms),
+    relevantProofArtifacts: row.relevant_proof_artifacts_json ?? [],
+    portfolioUrls: row.portfolio_urls_json ?? [],
+    revisionReason: row.revision_reason,
+    createdAt: Number(row.created_at_ms),
+  };
+}
+
+function mapInterviewThread(
+  row: MarketplaceInterviewThreadRow,
+): MarketplaceInterviewThreadRecord {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    clientUserId: row.client_user_id,
+    applicantUserId: row.applicant_user_id,
+    status: row.status,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapInterviewMessage(
+  row: MarketplaceInterviewMessageRow,
+): MarketplaceInterviewMessageRecord {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    senderUserId: row.sender_user_id,
+    senderWorkspaceId: row.sender_workspace_id,
+    kind: row.kind,
+    body: row.body,
+    createdAt: Number(row.created_at_ms),
+  };
+}
+
+function mapOffer(row: MarketplaceOfferRow): MarketplaceOfferRecord {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    clientUserId: row.client_user_id,
+    applicantUserId: row.applicant_user_id,
+    status: row.status,
+    message: row.message,
+    counterMessage: row.counter_message,
+    declineReason: row.decline_reason,
+    proposedRate: row.proposed_rate,
+    milestones: row.milestones_json ?? [],
+    revisionNumber: row.revision_number,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapApplicationDecision(
+  row: MarketplaceApplicationDecisionRow,
+): MarketplaceApplicationDecisionRecord {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    opportunityId: row.opportunity_id,
+    actorUserId: row.actor_user_id,
+    action: row.action,
+    reason: row.reason,
+    noHireReason: row.no_hire_reason,
+    createdAt: Number(row.created_at_ms),
   };
 }
 
@@ -926,6 +1093,305 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         application.hiredJobId,
         String(application.createdAt),
         String(application.updatedAt),
+      ],
+    );
+  }
+
+  async getApplicationRevisionById(revisionId: string) {
+    const result = await this.db.query<MarketplaceApplicationRevisionRow>(
+      `
+        SELECT *
+        FROM marketplace_application_revisions
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [revisionId],
+    );
+
+    return result.rows[0] ? mapApplicationRevision(result.rows[0]) : null;
+  }
+
+  async listApplicationRevisions() {
+    const result = await this.db.query<MarketplaceApplicationRevisionRow>(
+      `
+        SELECT *
+        FROM marketplace_application_revisions
+        ORDER BY created_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapApplicationRevision);
+  }
+
+  async saveApplicationRevision(revision: MarketplaceApplicationRevisionRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_application_revisions (
+          id, application_id, opportunity_id, applicant_user_id, revision_number,
+          cover_note, proposed_rate, screening_answers_json, delivery_approach,
+          milestone_plan_summary, estimated_start_at_ms, relevant_proof_artifacts_json,
+          portfolio_urls_json, revision_reason, created_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8::jsonb, $9,
+          $10, $11, $12::jsonb,
+          $13::jsonb, $14, $15
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          cover_note = EXCLUDED.cover_note,
+          proposed_rate = EXCLUDED.proposed_rate,
+          screening_answers_json = EXCLUDED.screening_answers_json,
+          delivery_approach = EXCLUDED.delivery_approach,
+          milestone_plan_summary = EXCLUDED.milestone_plan_summary,
+          estimated_start_at_ms = EXCLUDED.estimated_start_at_ms,
+          relevant_proof_artifacts_json = EXCLUDED.relevant_proof_artifacts_json,
+          portfolio_urls_json = EXCLUDED.portfolio_urls_json,
+          revision_reason = EXCLUDED.revision_reason
+      `,
+      [
+        revision.id,
+        revision.applicationId,
+        revision.opportunityId,
+        revision.applicantUserId,
+        revision.revisionNumber,
+        revision.coverNote,
+        revision.proposedRate,
+        JSON.stringify(revision.screeningAnswers),
+        revision.deliveryApproach,
+        revision.milestonePlanSummary,
+        revision.estimatedStartAt === null ? null : String(revision.estimatedStartAt),
+        JSON.stringify(revision.relevantProofArtifacts),
+        JSON.stringify(revision.portfolioUrls),
+        revision.revisionReason,
+        String(revision.createdAt),
+      ],
+    );
+  }
+
+  async getInterviewThreadById(threadId: string) {
+    const result = await this.db.query<MarketplaceInterviewThreadRow>(
+      `
+        SELECT *
+        FROM marketplace_interview_threads
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [threadId],
+    );
+
+    return result.rows[0] ? mapInterviewThread(result.rows[0]) : null;
+  }
+
+  async listInterviewThreads() {
+    const result = await this.db.query<MarketplaceInterviewThreadRow>(
+      `
+        SELECT *
+        FROM marketplace_interview_threads
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapInterviewThread);
+  }
+
+  async saveInterviewThread(thread: MarketplaceInterviewThreadRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_interview_threads (
+          id, application_id, opportunity_id, client_user_id, applicant_user_id,
+          status, created_at_ms, updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        thread.id,
+        thread.applicationId,
+        thread.opportunityId,
+        thread.clientUserId,
+        thread.applicantUserId,
+        thread.status,
+        String(thread.createdAt),
+        String(thread.updatedAt),
+      ],
+    );
+  }
+
+  async getInterviewMessageById(messageId: string) {
+    const result = await this.db.query<MarketplaceInterviewMessageRow>(
+      `
+        SELECT *
+        FROM marketplace_interview_messages
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [messageId],
+    );
+
+    return result.rows[0] ? mapInterviewMessage(result.rows[0]) : null;
+  }
+
+  async listInterviewMessages() {
+    const result = await this.db.query<MarketplaceInterviewMessageRow>(
+      `
+        SELECT *
+        FROM marketplace_interview_messages
+        ORDER BY created_at_ms ASC
+      `,
+    );
+
+    return result.rows.map(mapInterviewMessage);
+  }
+
+  async saveInterviewMessage(message: MarketplaceInterviewMessageRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_interview_messages (
+          id, thread_id, application_id, opportunity_id, sender_user_id,
+          sender_workspace_id, kind, body, created_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          body = EXCLUDED.body
+      `,
+      [
+        message.id,
+        message.threadId,
+        message.applicationId,
+        message.opportunityId,
+        message.senderUserId,
+        message.senderWorkspaceId,
+        message.kind,
+        message.body,
+        String(message.createdAt),
+      ],
+    );
+  }
+
+  async getOfferById(offerId: string) {
+    const result = await this.db.query<MarketplaceOfferRow>(
+      `
+        SELECT *
+        FROM marketplace_offers
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [offerId],
+    );
+
+    return result.rows[0] ? mapOffer(result.rows[0]) : null;
+  }
+
+  async listOffers() {
+    const result = await this.db.query<MarketplaceOfferRow>(
+      `
+        SELECT *
+        FROM marketplace_offers
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapOffer);
+  }
+
+  async saveOffer(offer: MarketplaceOfferRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_offers (
+          id, application_id, opportunity_id, client_user_id, applicant_user_id,
+          status, message, counter_message, decline_reason, proposed_rate,
+          milestones_json, revision_number, created_at_ms, updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10,
+          $11::jsonb, $12, $13, $14
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          message = EXCLUDED.message,
+          counter_message = EXCLUDED.counter_message,
+          decline_reason = EXCLUDED.decline_reason,
+          proposed_rate = EXCLUDED.proposed_rate,
+          milestones_json = EXCLUDED.milestones_json,
+          revision_number = EXCLUDED.revision_number,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        offer.id,
+        offer.applicationId,
+        offer.opportunityId,
+        offer.clientUserId,
+        offer.applicantUserId,
+        offer.status,
+        offer.message,
+        offer.counterMessage,
+        offer.declineReason,
+        offer.proposedRate,
+        JSON.stringify(offer.milestones),
+        offer.revisionNumber,
+        String(offer.createdAt),
+        String(offer.updatedAt),
+      ],
+    );
+  }
+
+  async getApplicationDecisionById(decisionId: string) {
+    const result = await this.db.query<MarketplaceApplicationDecisionRow>(
+      `
+        SELECT *
+        FROM marketplace_application_decisions
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [decisionId],
+    );
+
+    return result.rows[0] ? mapApplicationDecision(result.rows[0]) : null;
+  }
+
+  async listApplicationDecisions() {
+    const result = await this.db.query<MarketplaceApplicationDecisionRow>(
+      `
+        SELECT *
+        FROM marketplace_application_decisions
+        ORDER BY created_at_ms ASC
+      `,
+    );
+
+    return result.rows.map(mapApplicationDecision);
+  }
+
+  async saveApplicationDecision(decision: MarketplaceApplicationDecisionRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_application_decisions (
+          id, application_id, opportunity_id, actor_user_id, action,
+          reason, no_hire_reason, created_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          action = EXCLUDED.action,
+          reason = EXCLUDED.reason,
+          no_hire_reason = EXCLUDED.no_hire_reason
+      `,
+      [
+        decision.id,
+        decision.applicationId,
+        decision.opportunityId,
+        decision.actorUserId,
+        decision.action,
+        decision.reason,
+        decision.noHireReason,
+        String(decision.createdAt),
       ],
     );
   }

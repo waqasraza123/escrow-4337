@@ -48,6 +48,14 @@ const screeningAnswerSchema = z
   .strict();
 const timestampSchema = z.coerce.number().int().positive();
 const abuseEvidenceUrlsSchema = z.array(z.string().url().max(2048)).max(5);
+const offerMilestoneDraftSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    deliverable: z.string().trim().min(1).max(1000),
+    amount: z.string().regex(amountPattern),
+    dueAt: timestampSchema.nullable().optional(),
+  })
+  .strict();
 
 export const upsertMarketplaceProfileSchema = z
   .object({
@@ -220,6 +228,54 @@ export const applyToOpportunitySchema = z
   })
   .strict();
 
+export const reviseMarketplaceApplicationSchema = applyToOpportunitySchema
+  .extend({
+    revisionReason: z.string().trim().min(1).max(500).nullable().optional(),
+  })
+  .strict();
+
+export const applicationDecisionNoteSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500).nullable().optional(),
+    noHireReason: z
+      .enum([
+        'budget_changed',
+        'scope_changed',
+        'fit_not_strong_enough',
+        'candidate_withdrew',
+        'timeline_mismatch',
+        'other',
+      ])
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
+export const createMarketplaceInterviewMessageSchema = z
+  .object({
+    kind: z.enum(['clarification', 'interview']),
+    body: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export const createMarketplaceOfferSchema = z
+  .object({
+    message: z.string().trim().min(1).max(4000).nullable().optional(),
+    proposedRate: z.string().regex(amountPattern).nullable().optional(),
+    milestones: z.array(offerMilestoneDraftSchema).min(1).max(12),
+  })
+  .strict();
+
+export const respondToMarketplaceOfferSchema = z
+  .object({
+    action: z.enum(['accept', 'counter', 'decline']),
+    message: z.string().trim().min(1).max(4000).nullable().optional(),
+    proposedRate: z.string().regex(amountPattern).nullable().optional(),
+    milestones: z.array(offerMilestoneDraftSchema).max(12).optional(),
+    declineReason: z.string().trim().min(1).max(500).nullable().optional(),
+  })
+  .strict();
+
 export const updateModerationSchema = z
   .object({
     moderationStatus: z.enum(['visible', 'hidden', 'suspended']),
@@ -325,6 +381,21 @@ export type CreateMarketplaceOpportunityInviteDto = z.infer<
   typeof createMarketplaceOpportunityInviteSchema
 >;
 export type ApplyToOpportunityDto = z.infer<typeof applyToOpportunitySchema>;
+export type ReviseMarketplaceApplicationDto = z.infer<
+  typeof reviseMarketplaceApplicationSchema
+>;
+export type ApplicationDecisionNoteDto = z.infer<
+  typeof applicationDecisionNoteSchema
+>;
+export type CreateMarketplaceInterviewMessageDto = z.infer<
+  typeof createMarketplaceInterviewMessageSchema
+>;
+export type CreateMarketplaceOfferDto = z.infer<
+  typeof createMarketplaceOfferSchema
+>;
+export type RespondToMarketplaceOfferDto = z.infer<
+  typeof respondToMarketplaceOfferSchema
+>;
 export type UpdateModerationDto = z.infer<typeof updateModerationSchema>;
 export type CreateMarketplaceAbuseReportDto = z.infer<
   typeof createMarketplaceAbuseReportSchema

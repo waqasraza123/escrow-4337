@@ -26,9 +26,12 @@ import {
   webApi,
   type JobView,
   type MarketplaceApplication,
+  type MarketplaceApplicationComparison,
   type MarketplaceApplicationDossier,
+  type MarketplaceApplicationTimeline,
   type MarketplaceCryptoReadiness,
   type MarketplaceEngagementType,
+  type MarketplaceOfferMilestoneDraft,
   type MarketplaceOpportunityInvite,
   type MarketplaceOpportunitySearchResult,
   type MarketplaceOpportunity,
@@ -92,6 +95,14 @@ type ApplicationDraft = {
   estimatedStartAt: string;
   relevantProofUrls: string;
   screeningAnswers: Record<string, string>;
+  revisionReason: string;
+};
+
+type OfferDraft = {
+  message: string;
+  proposedRate: string;
+  milestones: string;
+  declineReason: string;
 };
 
 type OrganizationDraft = {
@@ -244,6 +255,26 @@ function createApplicationDraft(
         .map((artifact) => artifact.url)
         .join('\n') ?? '',
     screeningAnswers,
+    revisionReason: '',
+  };
+}
+
+function createApplicationRevisionDraft(
+  application: MarketplaceApplication,
+): ApplicationDraft {
+  return {
+    coverNote: application.coverNote,
+    proposedRate: application.proposedRate ?? '',
+    deliveryApproach: application.deliveryApproach,
+    milestonePlanSummary: application.milestonePlanSummary,
+    estimatedStartAt: toDateInput(application.estimatedStartAt),
+    relevantProofUrls: application.relevantProofArtifacts
+      .map((artifact) => artifact.url)
+      .join('\n'),
+    screeningAnswers: Object.fromEntries(
+      application.screeningAnswers.map((answer) => [answer.questionId, answer.answer]),
+    ),
+    revisionReason: '',
   };
 }
 
@@ -332,6 +363,42 @@ function formatPercent(value: number) {
   return `${value}%`;
 }
 
+function serializeOfferMilestones(milestones: MarketplaceOfferMilestoneDraft[]) {
+  return milestones
+    .map((milestone) =>
+      [
+        milestone.title,
+        milestone.deliverable,
+        milestone.amount,
+        milestone.dueAt ? new Date(milestone.dueAt).toISOString().slice(0, 10) : '',
+      ].join(' | '),
+    )
+    .join('\n');
+}
+
+function parseOfferMilestones(input: string) {
+  return splitList(input).map((line) => {
+    const [title = '', deliverable = '', amount = '', dueAtRaw = ''] = line
+      .split('|')
+      .map((value) => value.trim());
+    return {
+      title,
+      deliverable,
+      amount,
+      dueAt: dueAtRaw ? Date.parse(dueAtRaw) || null : null,
+    } satisfies MarketplaceOfferMilestoneDraft;
+  });
+}
+
+function createEmptyOfferDraft(): OfferDraft {
+  return {
+    message: '',
+    proposedRate: '',
+    milestones: '',
+    declineReason: '',
+  };
+}
+
 export function MarketplaceWorkspace() {
   const { messages } = useWebI18n();
   const marketplaceMessages = messages.publicMarketplace;
@@ -379,9 +446,17 @@ export function MarketplaceWorkspace() {
   const [matchesByOpportunity, setMatchesByOpportunity] = useState<
     Record<string, MarketplaceApplicationDossier[]>
   >({});
+  const [applicationTimelines, setApplicationTimelines] = useState<
+    Record<string, MarketplaceApplicationTimeline>
+  >({});
+  const [comparisonsByOpportunity, setComparisonsByOpportunity] = useState<
+    Record<string, MarketplaceApplicationComparison[]>
+  >({});
   const [applicationDrafts, setApplicationDrafts] = useState<
     Record<string, ApplicationDraft>
   >({});
+  const [interviewDrafts, setInterviewDrafts] = useState<Record<string, string>>({});
+  const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
   const [organizationDraft, setOrganizationDraft] = useState<OrganizationDraft>(
     createEmptyOrganizationDraft(),
   );
@@ -1099,6 +1174,36 @@ export function MarketplaceWorkspace() {
     }));
   }
 
+  async function handleLoadApplicationTimeline(applicationId: string) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.getMarketplaceApplicationTimeline(
+      applicationId,
+      tokens.accessToken,
+    );
+    setApplicationTimelines((current) => ({
+      ...current,
+      [applicationId]: response.timeline,
+    }));
+    setMessage(workspaceMessages.messages.timelineLoaded);
+  }
+
+  async function handleLoadComparison(opportunityId: string) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.getMarketplaceOpportunityApplicationComparison(
+      opportunityId,
+      tokens.accessToken,
+    );
+    setComparisonsByOpportunity((current) => ({
+      ...current,
+      [opportunityId]: response.candidates,
+    }));
+    setMessage(workspaceMessages.messages.comparisonLoaded);
+  }
+
   async function handleApplicationDecision(
     action: 'shortlist' | 'reject' | 'hire',
     applicationId: string,
@@ -1124,6 +1229,7 @@ export function MarketplaceWorkspace() {
 
     await loadWorkspace(tokens);
     await handleLoadApplications(opportunityId);
+    await handleLoadApplicationTimeline(applicationId);
   }
 
   function updateApplicationDraft(
@@ -1142,6 +1248,40 @@ export function MarketplaceWorkspace() {
         [opportunityId]: updater(existing),
       };
     });
+  }
+
+  function updateRevisionDraft(
+    application: MarketplaceApplication,
+    updater: (draft: ApplicationDraft) => ApplicationDraft,
+  ) {
+    setApplicationDrafts((current) => {
+      const existing =
+        current[application.id] ?? createApplicationRevisionDraft(application);
+      return {
+        ...current,
+        [application.id]: updater(existing),
+      };
+    });
+  }
+
+  function updateInterviewDraft(
+    applicationId: string,
+    updater: (draft: string) => string,
+  ) {
+    setInterviewDrafts((current) => ({
+      ...current,
+      [applicationId]: updater(current[applicationId] ?? ''),
+    }));
+  }
+
+  function updateOfferDraft(
+    applicationId: string,
+    updater: (draft: OfferDraft) => OfferDraft,
+  ) {
+    setOfferDrafts((current) => ({
+      ...current,
+      [applicationId]: updater(current[applicationId] ?? createEmptyOfferDraft()),
+    }));
   }
 
   async function handleApplyToOpportunity(opportunity: MarketplaceOpportunity) {
@@ -1191,6 +1331,56 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
+  async function handleReviseApplication(application: MarketplaceApplication) {
+    if (!tokens || !user) {
+      setError(workspaceMessages.messages.signInBeforeApply);
+      return;
+    }
+
+    const selectedWalletAddress =
+      user.wallets.find(
+        (wallet) =>
+          wallet.walletKind === 'eoa' && wallet.verificationMethod === 'siwe',
+      )?.address ?? '';
+    if (!selectedWalletAddress) {
+      setError(workspaceMessages.messages.walletRequired);
+      return;
+    }
+
+    const draft =
+      applicationDrafts[application.id] ??
+      createApplicationRevisionDraft(application);
+    await webApi.reviseMarketplaceApplication(
+      application.id,
+      {
+        coverNote: draft.coverNote,
+        proposedRate: draft.proposedRate || null,
+        selectedWalletAddress,
+        screeningAnswers: application.screeningAnswers.map((answer) => ({
+          questionId: answer.questionId,
+          answer: draft.screeningAnswers[answer.questionId]?.trim() ?? '',
+        })),
+        deliveryApproach: draft.deliveryApproach,
+        milestonePlanSummary: draft.milestonePlanSummary,
+        estimatedStartAt: fromDateInput(draft.estimatedStartAt),
+        relevantProofArtifacts: parseProofUrls(
+          draft.relevantProofUrls,
+          'external_case_study',
+        ),
+        portfolioUrls: profile?.portfolioUrls ?? application.portfolioUrls,
+        revisionReason: draft.revisionReason || null,
+      },
+      tokens.accessToken,
+    );
+    setMessage(workspaceMessages.messages.applicationRevised);
+    setApplicationDrafts((current) => ({
+      ...current,
+      [application.id]: createApplicationRevisionDraft(application),
+    }));
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(application.id);
+  }
+
   async function handleWithdrawApplication(applicationId: string) {
     if (!tokens) {
       return;
@@ -1199,6 +1389,109 @@ export function MarketplaceWorkspace() {
     await webApi.withdrawMarketplaceApplication(applicationId, tokens.accessToken);
     setMessage(workspaceMessages.messages.applicationWithdrawn);
     await loadWorkspace(tokens);
+  }
+
+  async function handleSendInterviewMessage(applicationId: string) {
+    if (!tokens) {
+      return;
+    }
+    const body = interviewDrafts[applicationId]?.trim();
+    if (!body) {
+      return;
+    }
+    const response = await webApi.postMarketplaceApplicationInterviewMessage(
+      applicationId,
+      {
+        kind: 'clarification',
+        body,
+      },
+      tokens.accessToken,
+    );
+    setApplicationTimelines((current) => ({
+      ...current,
+      [applicationId]: {
+        ...(current[applicationId] ?? {
+          application:
+            myApplications.find((entry) => entry.id === applicationId) ??
+            Object.values(applicationsByOpportunity)
+              .flat()
+              .find((entry) => entry.id === applicationId)!,
+          revisions: [],
+          interviewThread: response.thread,
+          offers: [],
+          decisions: [],
+        }),
+        interviewThread: response.thread,
+      },
+    }));
+    setInterviewDrafts((current) => ({
+      ...current,
+      [applicationId]: '',
+    }));
+    setMessage(workspaceMessages.messages.interviewMessageSent);
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
+  }
+
+  async function handleCreateOffer(applicationId: string) {
+    if (!tokens) {
+      return;
+    }
+    const draft = offerDrafts[applicationId] ?? createEmptyOfferDraft();
+    await webApi.createMarketplaceApplicationOffer(
+      applicationId,
+      {
+        message: draft.message || null,
+        proposedRate: draft.proposedRate || null,
+        milestones: parseOfferMilestones(draft.milestones),
+      },
+      tokens.accessToken,
+    );
+    setOfferDrafts((current) => ({
+      ...current,
+      [applicationId]: createEmptyOfferDraft(),
+    }));
+    setMessage(workspaceMessages.messages.offerCreated);
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
+  }
+
+  async function handleRespondToOffer(
+    applicationId: string,
+    offerId: string,
+    action: 'accept' | 'counter' | 'decline',
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const draft = offerDrafts[applicationId] ?? createEmptyOfferDraft();
+    await webApi.respondToMarketplaceOffer(
+      offerId,
+      {
+        action,
+        message: draft.message || null,
+        proposedRate: draft.proposedRate || null,
+        milestones:
+          action === 'counter' && draft.milestones.trim()
+            ? parseOfferMilestones(draft.milestones)
+            : undefined,
+        declineReason: draft.declineReason || null,
+      },
+      tokens.accessToken,
+    );
+    setOfferDrafts((current) => ({
+      ...current,
+      [applicationId]: createEmptyOfferDraft(),
+    }));
+    setMessage(
+      action === 'accept'
+        ? workspaceMessages.messages.offerAccepted
+        : action === 'counter'
+          ? workspaceMessages.messages.offerCountered
+          : workspaceMessages.messages.offerDeclined,
+    );
+    await loadWorkspace(tokens);
+    await handleLoadApplicationTimeline(applicationId);
   }
 
   return (
@@ -2776,6 +3069,13 @@ export function MarketplaceWorkspace() {
                       >
                         {workspaceMessages.loadReviewBoard}
                       </button>
+                      <button
+                        type="button"
+                        disabled={!canReviewApplications}
+                        onClick={() => void handleLoadComparison(opportunity.id)}
+                      >
+                        {workspaceMessages.compareCandidates}
+                      </button>
                       {opportunity.status === 'draft' || opportunity.status === 'paused' ? (
                         <button
                           type="button"
@@ -2863,7 +3163,126 @@ export function MarketplaceWorkspace() {
                           >
                             {workspaceMessages.hireIntoEscrow}
                           </button>
+                          <button
+                            type="button"
+                            disabled={!canReviewApplications}
+                            onClick={() => void handleLoadApplicationTimeline(application.id)}
+                          >
+                            {workspaceMessages.loadTimeline}
+                          </button>
                         </div>
+                        {applicationTimelines[application.id] ? (
+                          <div className={styles.stack}>
+                            <span className={styles.metaLabel}>
+                              {workspaceMessages.proposalTimeline}
+                            </span>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.revisionsTitle}:{' '}
+                              {applicationTimelines[application.id].revisions.length}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.decisionCount}:{' '}
+                              {applicationTimelines[application.id].decisions.length}
+                            </p>
+                            {applicationTimelines[application.id].offers.length > 0 ? (
+                              <p className={styles.stateText}>
+                                {workspaceMessages.latestOffer}:{' '}
+                                {
+                                  applicationTimelines[application.id].offers[
+                                    applicationTimelines[application.id].offers.length - 1
+                                  ].status
+                                }
+                              </p>
+                            ) : null}
+                            <div className={styles.stack}>
+                              <span className={styles.metaLabel}>
+                                {workspaceMessages.interviewTitle}
+                              </span>
+                              {applicationTimelines[application.id].interviewThread?.messages.map(
+                                (message) => (
+                                  <p key={message.id} className={styles.stateText}>
+                                    <strong>{message.senderEmail}</strong>: {message.body}
+                                  </p>
+                                ),
+                              ) ?? null}
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.messageBody}</span>
+                                <textarea
+                                  rows={2}
+                                  value={interviewDrafts[application.id] ?? ''}
+                                  onChange={(event) =>
+                                    updateInterviewDraft(
+                                      application.id,
+                                      () => event.target.value,
+                                    )
+                                  }
+                                />
+                              </label>
+                              <div className={styles.inlineActions}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleSendInterviewMessage(application.id)
+                                  }
+                                >
+                                  {workspaceMessages.sendClarification}
+                                </button>
+                              </div>
+                            </div>
+                            <div className={styles.stack}>
+                              <span className={styles.metaLabel}>
+                                {workspaceMessages.createOffer}
+                              </span>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerMessage}</span>
+                                <textarea
+                                  rows={2}
+                                  value={offerDrafts[application.id]?.message ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      message: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerRate}</span>
+                                <input
+                                  value={offerDrafts[application.id]?.proposedRate ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      proposedRate: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerMilestones}</span>
+                                <textarea
+                                  rows={3}
+                                  placeholder={workspaceMessages.offerMilestonePlaceholder}
+                                  value={offerDrafts[application.id]?.milestones ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      milestones: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <div className={styles.inlineActions}>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCreateOffer(application.id)}
+                                >
+                                  {workspaceMessages.createOffer}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                     {(matchesByOpportunity[opportunity.id] ?? []).length > 0 ? (
@@ -2884,6 +3303,35 @@ export function MarketplaceWorkspace() {
                               {workspaceMessages.requirementGaps}:{' '}
                               {match.matchSummary.mustHaveSkillGaps.join(' • ') ||
                                 workspaceMessages.none}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {(comparisonsByOpportunity[opportunity.id] ?? []).length > 0 ? (
+                      <div className={styles.stack}>
+                        <span className={styles.metaLabel}>
+                          {workspaceMessages.compareSummary}
+                        </span>
+                        {(comparisonsByOpportunity[opportunity.id] ?? []).map((candidate) => (
+                          <div
+                            key={candidate.application.id}
+                            className={styles.walletCard}
+                          >
+                            <strong>
+                              {candidate.application.applicant.displayName} •{' '}
+                              {workspaceMessages.fitScore(candidate.application.fitScore)}
+                            </strong>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.revisionsTitle}:{' '}
+                              {candidate.latestRevision?.revisionNumber ?? 0}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.latestOffer}:{' '}
+                              {candidate.latestOffer?.status ?? workspaceMessages.none}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.decisionCount}: {candidate.decisionCount}
                             </p>
                           </div>
                         ))}
@@ -2963,6 +3411,269 @@ export function MarketplaceWorkspace() {
                       {workspaceMessages.withdraw}
                     </button>
                   )}
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      disabled={!canApplyToOpportunity}
+                      onClick={() => void handleLoadApplicationTimeline(application.id)}
+                    >
+                      {workspaceMessages.loadTimeline}
+                    </button>
+                    {application.status !== 'withdrawn' &&
+                    application.status !== 'rejected' &&
+                    application.status !== 'declined' &&
+                    application.status !== 'hired' ? (
+                      <button
+                        type="button"
+                        disabled={!canApplyToOpportunity}
+                        onClick={() => void handleReviseApplication(application)}
+                      >
+                        {workspaceMessages.reviseApplication}
+                      </button>
+                    ) : null}
+                  </div>
+                  {applicationTimelines[application.id] ? (
+                    <div className={styles.stack}>
+                      <span className={styles.metaLabel}>
+                        {workspaceMessages.proposalTimeline}
+                      </span>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.revisionsTitle}:{' '}
+                        {applicationTimelines[application.id].revisions.length}
+                      </p>
+                      {applicationTimelines[application.id].revisions.map((revision) => (
+                        <p
+                          key={revision.id}
+                          className={styles.stateText}
+                        >{`#${revision.revisionNumber} • ${revision.revisionReason ?? revision.coverNote.slice(0, 80)}`}</p>
+                      ))}
+                      <div className={styles.stack}>
+                        <span className={styles.metaLabel}>
+                          {workspaceMessages.reviseApplication}
+                        </span>
+                        <label className={styles.field}>
+                          <span>{workspaceMessages.coverNote}</span>
+                          <textarea
+                            rows={3}
+                            value={
+                              (
+                                applicationDrafts[application.id] ??
+                                createApplicationRevisionDraft(application)
+                              ).coverNote
+                            }
+                            onChange={(event) =>
+                              updateRevisionDraft(application, (current) => ({
+                                ...current,
+                                coverNote: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className={styles.field}>
+                          <span>{workspaceMessages.deliveryApproach}</span>
+                          <textarea
+                            rows={3}
+                            value={
+                              (
+                                applicationDrafts[application.id] ??
+                                createApplicationRevisionDraft(application)
+                              ).deliveryApproach
+                            }
+                            onChange={(event) =>
+                              updateRevisionDraft(application, (current) => ({
+                                ...current,
+                                deliveryApproach: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className={styles.field}>
+                          <span>{workspaceMessages.milestonePlanSummary}</span>
+                          <textarea
+                            rows={3}
+                            value={
+                              (
+                                applicationDrafts[application.id] ??
+                                createApplicationRevisionDraft(application)
+                              ).milestonePlanSummary
+                            }
+                            onChange={(event) =>
+                              updateRevisionDraft(application, (current) => ({
+                                ...current,
+                                milestonePlanSummary: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className={styles.field}>
+                          <span>{workspaceMessages.revisionReason}</span>
+                          <input
+                            value={
+                              (
+                                applicationDrafts[application.id] ??
+                                createApplicationRevisionDraft(application)
+                              ).revisionReason
+                            }
+                            onChange={(event) =>
+                              updateRevisionDraft(application, (current) => ({
+                                ...current,
+                                revisionReason: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className={styles.stack}>
+                        <span className={styles.metaLabel}>
+                          {workspaceMessages.interviewTitle}
+                        </span>
+                        {applicationTimelines[application.id].interviewThread?.messages.map(
+                          (message) => (
+                            <p key={message.id} className={styles.stateText}>
+                              <strong>{message.senderEmail}</strong>: {message.body}
+                            </p>
+                          ),
+                        ) ?? null}
+                        <label className={styles.field}>
+                          <span>{workspaceMessages.messageBody}</span>
+                          <textarea
+                            rows={2}
+                            value={interviewDrafts[application.id] ?? ''}
+                            onChange={(event) =>
+                              updateInterviewDraft(
+                                application.id,
+                                () => event.target.value,
+                              )
+                            }
+                          />
+                        </label>
+                        <div className={styles.inlineActions}>
+                          <button
+                            type="button"
+                            onClick={() => void handleSendInterviewMessage(application.id)}
+                          >
+                            {workspaceMessages.sendClarification}
+                          </button>
+                        </div>
+                      </div>
+                      {applicationTimelines[application.id].offers.length > 0 ? (
+                        <div className={styles.stack}>
+                          <span className={styles.metaLabel}>
+                            {workspaceMessages.latestOffer}
+                          </span>
+                          {applicationTimelines[application.id].offers.map((offer) => (
+                            <div key={offer.id} className={styles.walletCard}>
+                              <strong>{offer.status}</strong>
+                              <p className={styles.stateText}>
+                                {offer.message ?? offer.counterMessage ?? workspaceMessages.none}
+                              </p>
+                              <p className={styles.stateText}>
+                                {workspaceMessages.offerRate}:{' '}
+                                {offer.proposedRate ?? workspaceMessages.none}
+                              </p>
+                              <p className={styles.stateText}>
+                                {workspaceMessages.offerMilestones}:{' '}
+                                {offer.milestones.map((entry) => entry.title).join(' • ') ||
+                                  workspaceMessages.none}
+                              </p>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerMessage}</span>
+                                <textarea
+                                  rows={2}
+                                  value={offerDrafts[application.id]?.message ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      message: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerRate}</span>
+                                <input
+                                  value={offerDrafts[application.id]?.proposedRate ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      proposedRate: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.offerMilestones}</span>
+                                <textarea
+                                  rows={3}
+                                  placeholder={workspaceMessages.offerMilestonePlaceholder}
+                                  value={
+                                    offerDrafts[application.id]?.milestones ??
+                                    serializeOfferMilestones(offer.milestones)
+                                  }
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      milestones: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className={styles.field}>
+                                <span>{workspaceMessages.declineReason}</span>
+                                <input
+                                  value={offerDrafts[application.id]?.declineReason ?? ''}
+                                  onChange={(event) =>
+                                    updateOfferDraft(application.id, (current) => ({
+                                      ...current,
+                                      declineReason: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <div className={styles.inlineActions}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleRespondToOffer(
+                                      application.id,
+                                      offer.id,
+                                      'accept',
+                                    )
+                                  }
+                                >
+                                  {workspaceMessages.respondAccept}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleRespondToOffer(
+                                      application.id,
+                                      offer.id,
+                                      'counter',
+                                    )
+                                  }
+                                >
+                                  {workspaceMessages.respondCounter}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleRespondToOffer(
+                                      application.id,
+                                      offer.id,
+                                      'decline',
+                                    )
+                                  }
+                                >
+                                  {workspaceMessages.respondDecline}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </article>
               ))
             )}

@@ -29,7 +29,10 @@ import {
   type UserRecord,
 } from '../users/users.types';
 import type {
+  ApplicationDecisionNoteDto,
   ApplyToOpportunityDto,
+  CreateMarketplaceInterviewMessageDto,
+  CreateMarketplaceOfferDto,
   CreateMarketplaceOpportunityInviteDto,
   CreateMarketplaceSavedSearchDto,
   CreateMarketplaceAbuseReportDto,
@@ -38,6 +41,8 @@ import type {
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
   MarketplaceSavedSearchesQueryDto,
+  RespondToMarketplaceOfferDto,
+  ReviseMarketplaceApplicationDto,
   UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceOpportunityDto,
   UpdateMarketplaceProofsDto,
@@ -56,18 +61,36 @@ import type {
   MarketplaceAbuseReportStatus,
   MarketplaceAbuseReportSubjectSummary,
   MarketplaceAbuseReportView,
+  MarketplaceApplicationComparisonResponse,
+  MarketplaceApplicationComparisonView,
+  MarketplaceApplicationDecisionRecord,
+  MarketplaceApplicationDecisionView,
   MarketplaceApplicationDossier,
   MarketplaceApplicationDossierResponse,
   MarketplaceApplicationRecord,
+  MarketplaceApplicationRevisionRecord,
+  MarketplaceApplicationRevisionResponse,
+  MarketplaceApplicationRevisionView,
+  MarketplaceApplicationTimelineResponse,
+  MarketplaceApplicationTimelineView,
   MarketplaceApplicationView,
   MarketplaceApplicationsListResponse,
   MarketplaceClientSummary,
   MarketplaceCryptoReadiness,
   MarketplaceEscrowStats,
   MarketplaceFitBreakdownEntry,
+  MarketplaceInterviewMessageRecord,
+  MarketplaceInterviewMessageView,
+  MarketplaceInterviewThreadRecord,
+  MarketplaceInterviewThreadResponse,
+  MarketplaceInterviewThreadView,
   MarketplaceMatchesResponse,
   MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
+  MarketplaceNoHireReason,
+  MarketplaceOfferMilestoneDraft,
+  MarketplaceOfferRecord,
+  MarketplaceOfferResponse,
   MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunityInviteResponse,
   MarketplaceOpportunityInvitesResponse,
@@ -141,6 +164,17 @@ function normalizeScreeningAnswers(values: MarketplaceScreeningAnswer[]) {
     ...answer,
     questionId: answer.questionId.trim(),
     answer: answer.answer.trim(),
+  }));
+}
+
+function normalizeOfferMilestones(
+  values: MarketplaceOfferMilestoneDraft[],
+): MarketplaceOfferMilestoneDraft[] {
+  return values.map((milestone) => ({
+    ...milestone,
+    title: milestone.title.trim(),
+    deliverable: milestone.deliverable.trim(),
+    dueAt: milestone.dueAt ?? null,
   }));
 }
 
@@ -1245,6 +1279,20 @@ export class MarketplaceService {
       updatedAt: now,
     };
     await this.marketplaceRepository.saveApplication(application);
+    await this.marketplaceRepository.saveApplicationRevision(
+      this.toApplicationRevisionRecord(
+        application,
+        await this.getNextApplicationRevisionNumber(application.id),
+        null,
+        now,
+      ),
+    );
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'applied',
+      reason: existing ? 'Resubmitted application' : null,
+      createdAt: now,
+    });
     const matchingInvite = (await this.marketplaceRepository.listOpportunityInvites()).find(
       (invite) =>
         invite.opportunityId === opportunityId &&
@@ -1357,38 +1405,368 @@ export class MarketplaceService {
     };
   }
 
+  async reviseApplication(
+    userId: string,
+    applicationId: string,
+    dto: ReviseMarketplaceApplicationDto,
+  ): Promise<MarketplaceApplicationRevisionResponse> {
+    const application = await this.requireApplication(applicationId);
+    await this.assertApplicationApplicant(userId, application);
+    if (
+      application.status === 'withdrawn' ||
+      application.status === 'rejected' ||
+      application.status === 'declined' ||
+      application.status === 'hired'
+    ) {
+      throw new ConflictException(
+        'This marketplace application can no longer be revised',
+      );
+    }
+
+    const applicant = await this.usersService.getRequiredById(userId);
+    const selectedWallet = this.usersService.findWallet(
+      applicant,
+      dto.selectedWalletAddress,
+    );
+    if (
+      !selectedWallet ||
+      !isEoaWallet(selectedWallet) ||
+      selectedWallet.verificationMethod !== 'siwe'
+    ) {
+      throw new ForbiddenException(
+        'Applications require a linked SIWE-verified wallet',
+      );
+    }
+
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const profile = await this.requireProfileByUserId(userId);
+    this.validateScreeningAnswers(
+      opportunity.screeningQuestions,
+      dto.screeningAnswers,
+    );
+
+    const now = Date.now();
+    application.coverNote = dto.coverNote;
+    application.proposedRate = dto.proposedRate ?? null;
+    application.selectedWalletAddress = selectedWallet.address;
+    application.screeningAnswers = normalizeScreeningAnswers(dto.screeningAnswers);
+    application.deliveryApproach = dto.deliveryApproach;
+    application.milestonePlanSummary = dto.milestonePlanSummary;
+    application.estimatedStartAt = dto.estimatedStartAt ?? null;
+    application.relevantProofArtifacts = normalizeProofArtifacts(
+      dto.relevantProofArtifacts,
+    );
+    application.portfolioUrls =
+      dto.portfolioUrls.length > 0
+        ? normalizeTextArray(dto.portfolioUrls)
+        : profile.proofArtifacts
+            .filter((artifact) => artifact.kind === 'portfolio')
+            .map((artifact) => artifact.url);
+    application.updatedAt = now;
+    await this.marketplaceRepository.saveApplication(application);
+
+    const revision = this.toApplicationRevisionRecord(
+      application,
+      await this.getNextApplicationRevisionNumber(application.id),
+      dto.revisionReason ?? null,
+      now,
+    );
+    await this.marketplaceRepository.saveApplicationRevision(revision);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'revised',
+      reason: dto.revisionReason ?? null,
+      createdAt: now,
+    });
+
+    return {
+      revision: revision,
+    };
+  }
+
+  async getApplicationTimeline(
+    userId: string,
+    applicationId: string,
+  ): Promise<MarketplaceApplicationTimelineResponse> {
+    const application = await this.requireApplication(applicationId);
+    await this.assertApplicationTimelineAccess(userId, application);
+    return {
+      timeline: await this.buildApplicationTimeline(application, userId),
+    };
+  }
+
+  async getApplicationInterviewThread(
+    userId: string,
+    applicationId: string,
+  ): Promise<MarketplaceInterviewThreadResponse> {
+    const application = await this.requireApplication(applicationId);
+    await this.assertApplicationTimelineAccess(userId, application);
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const thread = await this.getOrCreateInterviewThread(application, opportunity);
+    return {
+      thread: await this.toInterviewThreadView(thread),
+    };
+  }
+
+  async postApplicationInterviewMessage(
+    userId: string,
+    applicationId: string,
+    dto: CreateMarketplaceInterviewMessageDto,
+  ): Promise<MarketplaceInterviewThreadResponse> {
+    const application = await this.requireApplication(applicationId);
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const access = await this.getApplicationAccess(userId, application, opportunity);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this marketplace interview thread',
+      );
+    }
+
+    const thread = await this.getOrCreateInterviewThread(application, opportunity);
+    const senderWorkspaceId = access.asOwner
+      ? opportunity.ownerWorkspaceId
+      : application.applicantWorkspaceId;
+    const now = Date.now();
+    const message: MarketplaceInterviewMessageRecord = {
+      id: randomUUID(),
+      threadId: thread.id,
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      senderUserId: userId,
+      senderWorkspaceId: senderWorkspaceId ?? null,
+      kind: dto.kind,
+      body: dto.body.trim(),
+      createdAt: now,
+    };
+    await this.marketplaceRepository.saveInterviewMessage(message);
+    thread.status = 'open';
+    thread.updatedAt = now;
+    await this.marketplaceRepository.saveInterviewThread(thread);
+    if (application.status === 'submitted' || application.status === 'shortlisted') {
+      application.status = 'interviewing';
+      application.updatedAt = now;
+      await this.marketplaceRepository.saveApplication(application);
+      await this.recordApplicationDecision(application, {
+        actorUserId: userId,
+        action: 'interview_started',
+        reason: dto.kind === 'clarification' ? 'Clarification thread opened' : null,
+        createdAt: now,
+      });
+    }
+
+    return {
+      thread: await this.toInterviewThreadView(thread),
+    };
+  }
+
+  async createApplicationOffer(
+    userId: string,
+    applicationId: string,
+    dto: CreateMarketplaceOfferDto,
+  ): Promise<MarketplaceOfferResponse> {
+    const application = await this.requireApplication(applicationId);
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    this.assertOpportunityOpenForDecision(opportunity);
+    if (
+      application.status === 'rejected' ||
+      application.status === 'withdrawn' ||
+      application.status === 'declined' ||
+      application.status === 'hired'
+    ) {
+      throw new ConflictException(
+        'This marketplace application is no longer eligible for offers',
+      );
+    }
+
+    const now = Date.now();
+    const offer: MarketplaceOfferRecord = {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      clientUserId: userId,
+      applicantUserId: application.applicantUserId,
+      status: 'sent',
+      message: dto.message?.trim() ?? null,
+      counterMessage: null,
+      declineReason: null,
+      proposedRate: dto.proposedRate ?? application.proposedRate,
+      milestones: normalizeOfferMilestones(dto.milestones),
+      revisionNumber: await this.getNextOfferRevisionNumber(application.id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveOffer(offer);
+    application.status = 'offer_sent';
+    application.updatedAt = now;
+    await this.marketplaceRepository.saveApplication(application);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'offer_sent',
+      reason: dto.message ?? null,
+      createdAt: now,
+    });
+
+    return {
+      offer,
+    };
+  }
+
+  async respondToMarketplaceOffer(
+    userId: string,
+    offerId: string,
+    dto: RespondToMarketplaceOfferDto,
+  ): Promise<MarketplaceOfferResponse> {
+    const offer = await this.requireOffer(offerId);
+    const application = await this.requireApplication(offer.applicationId);
+    await this.assertApplicationApplicant(userId, application);
+    const now = Date.now();
+
+    if (dto.action === 'accept') {
+      offer.status = 'accepted';
+      offer.counterMessage = dto.message?.trim() ?? offer.counterMessage;
+      offer.updatedAt = now;
+      await this.marketplaceRepository.saveOffer(offer);
+      application.status = 'accepted';
+      application.updatedAt = now;
+      await this.marketplaceRepository.saveApplication(application);
+      await this.recordApplicationDecision(application, {
+        actorUserId: userId,
+        action: 'offer_accepted',
+        reason: dto.message ?? null,
+        createdAt: now,
+      });
+      return { offer };
+    }
+
+    if (dto.action === 'decline') {
+      offer.status = 'declined';
+      offer.declineReason =
+        dto.declineReason?.trim() ?? dto.message?.trim() ?? offer.declineReason;
+      offer.updatedAt = now;
+      await this.marketplaceRepository.saveOffer(offer);
+      application.status = 'declined';
+      application.updatedAt = now;
+      await this.marketplaceRepository.saveApplication(application);
+      await this.recordApplicationDecision(application, {
+        actorUserId: userId,
+        action: 'offer_declined',
+        reason: offer.declineReason,
+        createdAt: now,
+      });
+      return { offer };
+    }
+
+    const counter: MarketplaceOfferRecord = {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: offer.opportunityId,
+      clientUserId: offer.clientUserId,
+      applicantUserId: userId,
+      status: 'countered',
+      message: offer.message,
+      counterMessage: dto.message?.trim() ?? null,
+      declineReason: null,
+      proposedRate: dto.proposedRate ?? offer.proposedRate,
+      milestones: normalizeOfferMilestones(dto.milestones ?? offer.milestones),
+      revisionNumber: await this.getNextOfferRevisionNumber(application.id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    offer.status = 'countered';
+    offer.updatedAt = now;
+    await this.marketplaceRepository.saveOffer(offer);
+    await this.marketplaceRepository.saveOffer(counter);
+    application.status = 'countered';
+    application.updatedAt = now;
+    await this.marketplaceRepository.saveApplication(application);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'offer_countered',
+      reason: dto.message ?? null,
+      createdAt: now,
+    });
+    return { offer: counter };
+  }
+
+  async getOpportunityApplicationComparison(
+    userId: string,
+    opportunityId: string,
+  ): Promise<MarketplaceApplicationComparisonResponse> {
+    const opportunity = await this.requireOpportunity(opportunityId);
+    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    const applications = (await this.marketplaceRepository.listApplications()).filter(
+      (application) => application.opportunityId === opportunityId,
+    );
+    const revisions = await this.marketplaceRepository.listApplicationRevisions();
+    const messages = await this.marketplaceRepository.listInterviewMessages();
+    const offers = await this.marketplaceRepository.listOffers();
+    const decisions = await this.marketplaceRepository.listApplicationDecisions();
+
+    const candidates = await Promise.all(
+      applications.map(async (application) => {
+        const latestRevision = revisions
+          .filter((revision) => revision.applicationId === application.id)
+          .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null;
+        const latestOffer = offers
+          .filter((entry) => entry.applicationId === application.id)
+          .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null;
+        const latestMessageAt = messages
+          .filter((entry) => entry.applicationId === application.id)
+          .sort((left, right) => right.createdAt - left.createdAt)[0]?.createdAt ?? null;
+        const decisionCount = decisions.filter(
+          (decision) => decision.applicationId === application.id,
+        ).length;
+        return {
+          application: await this.toApplicationView(application, userId),
+          latestRevision,
+          latestOffer,
+          latestMessageAt,
+          decisionCount,
+        } satisfies MarketplaceApplicationComparisonView;
+      }),
+    );
+
+    return {
+      candidates: candidates.sort(
+        (left, right) =>
+          right.application.fitScore - left.application.fitScore ||
+          right.application.updatedAt - left.application.updatedAt,
+      ),
+    };
+  }
+
   async withdrawApplication(
     userId: string,
     applicationId: string,
+    dto: ApplicationDecisionNoteDto,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
-    const hydrated = await this.ensureApplicationWorkspace(application);
-    if (
-      !hydrated.applicantWorkspaceId ||
-      !(await this.organizationsService.findAccessibleWorkspace(
-        userId,
-        hydrated.applicantWorkspaceId,
-      ))
-    ) {
-      throw new ForbiddenException(
-        'Only the applicant can withdraw this application',
-      );
-    }
+    await this.assertApplicationApplicant(userId, application);
     if (application.status === 'hired') {
       throw new ConflictException(
         'Hired marketplace applications cannot be withdrawn',
       );
     }
 
+    const now = Date.now();
     application.status = 'withdrawn';
-    application.updatedAt = Date.now();
+    application.updatedAt = now;
     await this.marketplaceRepository.saveApplication(application);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'withdrawn',
+      reason: dto.reason ?? null,
+      noHireReason: dto.noHireReason ?? 'candidate_withdrew',
+      createdAt: now,
+    });
     return this.listMyApplications(userId);
   }
 
   async shortlistApplication(
     userId: string,
     applicationId: string,
+    dto: ApplicationDecisionNoteDto,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
     const opportunity = await this.requireOpportunity(
@@ -1397,15 +1775,23 @@ export class MarketplaceService {
     await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
 
+    const now = Date.now();
     application.status = 'shortlisted';
-    application.updatedAt = Date.now();
+    application.updatedAt = now;
     await this.marketplaceRepository.saveApplication(application);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'shortlisted',
+      reason: dto.reason ?? null,
+      createdAt: now,
+    });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
 
   async rejectApplication(
     userId: string,
     applicationId: string,
+    dto: ApplicationDecisionNoteDto,
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
     const opportunity = await this.requireOpportunity(
@@ -1414,15 +1800,24 @@ export class MarketplaceService {
     await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
 
+    const now = Date.now();
     application.status = 'rejected';
-    application.updatedAt = Date.now();
+    application.updatedAt = now;
     await this.marketplaceRepository.saveApplication(application);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'rejected',
+      reason: dto.reason ?? null,
+      noHireReason: dto.noHireReason ?? null,
+      createdAt: now,
+    });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
 
   async hireApplication(
     userId: string,
     applicationId: string,
+    dto: ApplicationDecisionNoteDto,
   ): Promise<HireApplicationResponse> {
     const application = await this.requireApplication(applicationId);
     const opportunity = await this.requireOpportunity(
@@ -1430,6 +1825,15 @@ export class MarketplaceService {
     );
     await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
     this.assertOpportunityOpenForDecision(opportunity);
+    const offers = (await this.marketplaceRepository.listOffers()).filter(
+      (offer) => offer.applicationId === application.id,
+    );
+    const hasAcceptedOffer = offers.some((offer) => offer.status === 'accepted');
+    if (offers.length > 0 && !hasAcceptedOffer) {
+      throw new ConflictException(
+        'An accepted marketplace offer is required before creating the escrow contract',
+      );
+    }
 
     const dossier = await this.buildApplicationDossier(application);
     if (dossier.matchSummary.missingRequirements.length > 0) {
@@ -1511,11 +1915,24 @@ export class MarketplaceService {
         sibling.status = 'rejected';
         sibling.updatedAt = now;
         await this.marketplaceRepository.saveApplication(sibling);
+        await this.recordApplicationDecision(sibling, {
+          actorUserId: userId,
+          action: 'no_hire',
+          reason: 'Another candidate moved forward to escrow creation',
+          noHireReason: 'fit_not_strong_enough',
+          createdAt: now,
+        });
       }
     }
 
     await this.marketplaceRepository.saveApplication(application);
     await this.marketplaceRepository.saveOpportunity(opportunity);
+    await this.recordApplicationDecision(application, {
+      actorUserId: userId,
+      action: 'hired',
+      reason: dto.reason ?? null,
+      createdAt: now,
+    });
 
     return {
       applicationId: application.id,
@@ -1966,6 +2383,14 @@ export class MarketplaceService {
     return this.ensureApplicationWorkspace(application);
   }
 
+  private async requireOffer(offerId: string) {
+    const offer = await this.marketplaceRepository.getOfferById(offerId);
+    if (!offer) {
+      throw new NotFoundException('Marketplace offer not found');
+    }
+    return offer;
+  }
+
   private async requireAbuseReport(reportId: string) {
     const report =
       await this.marketplaceRepository.getAbuseReportById(reportId);
@@ -1973,6 +2398,199 @@ export class MarketplaceService {
       throw new NotFoundException('Marketplace abuse report not found');
     }
     return report;
+  }
+
+  private async getApplicationAccess(
+    userId: string,
+    application: MarketplaceApplicationRecord,
+    opportunity?: MarketplaceOpportunityRecord,
+  ) {
+    const hydratedApplication = await this.ensureApplicationWorkspace(application);
+    const hydratedOpportunity =
+      opportunity ?? (await this.requireOpportunity(hydratedApplication.opportunityId));
+    const asApplicant =
+      hydratedApplication.applicantWorkspaceId !== null &&
+      (
+        await this.organizationsService.findAccessibleWorkspace(
+          userId,
+          hydratedApplication.applicantWorkspaceId,
+        )
+      ) !== null;
+    const asOwner = await this.canAccessOpportunityAsOwner(
+      userId,
+      hydratedOpportunity,
+      'reviewApplications',
+    );
+    return {
+      asApplicant,
+      asOwner,
+      application: hydratedApplication,
+      opportunity: hydratedOpportunity,
+    };
+  }
+
+  private async assertApplicationApplicant(
+    userId: string,
+    application: MarketplaceApplicationRecord,
+  ) {
+    const access = await this.getApplicationAccess(userId, application);
+    if (!access.asApplicant) {
+      throw new ForbiddenException(
+        'Only the applicant can manage this marketplace application',
+      );
+    }
+  }
+
+  private async assertApplicationTimelineAccess(
+    userId: string,
+    application: MarketplaceApplicationRecord,
+  ) {
+    const access = await this.getApplicationAccess(userId, application);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this marketplace application timeline',
+      );
+    }
+  }
+
+  private toApplicationRevisionRecord(
+    application: MarketplaceApplicationRecord,
+    revisionNumber: number,
+    revisionReason: string | null,
+    createdAt: number,
+  ): MarketplaceApplicationRevisionRecord {
+    return {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: application.opportunityId,
+      applicantUserId: application.applicantUserId,
+      revisionNumber,
+      coverNote: application.coverNote,
+      proposedRate: application.proposedRate,
+      screeningAnswers: normalizeScreeningAnswers(application.screeningAnswers),
+      deliveryApproach: application.deliveryApproach,
+      milestonePlanSummary: application.milestonePlanSummary,
+      estimatedStartAt: application.estimatedStartAt,
+      relevantProofArtifacts: normalizeProofArtifacts(
+        application.relevantProofArtifacts,
+      ),
+      portfolioUrls: normalizeTextArray(application.portfolioUrls),
+      revisionReason: revisionReason?.trim() || null,
+      createdAt,
+    };
+  }
+
+  private async getNextApplicationRevisionNumber(applicationId: string) {
+    const revisions = (await this.marketplaceRepository.listApplicationRevisions())
+      .filter((revision) => revision.applicationId === applicationId)
+      .sort((left, right) => right.revisionNumber - left.revisionNumber);
+    return (revisions[0]?.revisionNumber ?? 0) + 1;
+  }
+
+  private async getNextOfferRevisionNumber(applicationId: string) {
+    const offers = (await this.marketplaceRepository.listOffers())
+      .filter((offer) => offer.applicationId === applicationId)
+      .sort((left, right) => right.revisionNumber - left.revisionNumber);
+    return (offers[0]?.revisionNumber ?? 0) + 1;
+  }
+
+  private async recordApplicationDecision(
+    application: MarketplaceApplicationRecord,
+    input: {
+      actorUserId: string;
+      action: MarketplaceApplicationDecisionRecord['action'];
+      reason?: string | null;
+      noHireReason?: MarketplaceNoHireReason | null;
+      createdAt?: number;
+    },
+  ) {
+    const decision: MarketplaceApplicationDecisionRecord = {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: application.opportunityId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      reason: input.reason?.trim() || null,
+      noHireReason: input.noHireReason ?? null,
+      createdAt: input.createdAt ?? Date.now(),
+    };
+    await this.marketplaceRepository.saveApplicationDecision(decision);
+    return decision;
+  }
+
+  private async getOrCreateInterviewThread(
+    application: MarketplaceApplicationRecord,
+    opportunity: MarketplaceOpportunityRecord,
+  ) {
+    const existing = (await this.marketplaceRepository.listInterviewThreads())
+      .filter((thread) => thread.applicationId === application.id)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0];
+    if (existing) {
+      return existing;
+    }
+    const now = Date.now();
+    const thread: MarketplaceInterviewThreadRecord = {
+      id: randomUUID(),
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      clientUserId: opportunity.ownerUserId,
+      applicantUserId: application.applicantUserId,
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveInterviewThread(thread);
+    return thread;
+  }
+
+  private async toInterviewThreadView(
+    thread: MarketplaceInterviewThreadRecord,
+  ): Promise<MarketplaceInterviewThreadView> {
+    const messages = (await this.marketplaceRepository.listInterviewMessages())
+      .filter((message) => message.threadId === thread.id)
+      .sort((left, right) => left.createdAt - right.createdAt);
+    const messageViews = await Promise.all(
+      messages.map(async (message) => {
+        const sender = await this.usersService.getRequiredById(message.senderUserId);
+        return {
+          ...message,
+          senderEmail: sender.email,
+        } satisfies MarketplaceInterviewMessageView;
+      }),
+    );
+    return {
+      ...thread,
+      messages: messageViews,
+    };
+  }
+
+  private async buildApplicationTimeline(
+    application: MarketplaceApplicationRecord,
+    viewerUserId?: string,
+  ): Promise<MarketplaceApplicationTimelineView> {
+    const revisions = (await this.marketplaceRepository.listApplicationRevisions())
+      .filter((revision) => revision.applicationId === application.id)
+      .sort((left, right) => left.revisionNumber - right.revisionNumber);
+    const thread = (await this.marketplaceRepository.listInterviewThreads())
+      .filter((entry) => entry.applicationId === application.id)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
+    const offers = (await this.marketplaceRepository.listOffers())
+      .filter((offer) => offer.applicationId === application.id)
+      .sort(
+        (left, right) =>
+          left.revisionNumber - right.revisionNumber ||
+          left.createdAt - right.createdAt,
+      );
+    const decisions = (await this.marketplaceRepository.listApplicationDecisions())
+      .filter((decision) => decision.applicationId === application.id)
+      .sort((left, right) => left.createdAt - right.createdAt);
+    return {
+      application: await this.toApplicationView(application, viewerUserId),
+      revisions,
+      interviewThread: thread ? await this.toInterviewThreadView(thread) : null,
+      offers,
+      decisions,
+    };
   }
 
   private async toProfileView(

@@ -18,7 +18,12 @@ import type {
 } from '../modules/escrow/escrow.types';
 import type {
   MarketplaceApplicationRecord,
+  MarketplaceApplicationRevisionRecord,
+  MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
+  MarketplaceInterviewMessageRecord,
+  MarketplaceInterviewThreadRecord,
+  MarketplaceOfferRecord,
   MarketplaceOpportunityInviteRecord,
   MarketplaceOpportunityRecord,
   MarketplaceProfileRecord,
@@ -156,6 +161,35 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceApplicationRecord | null>;
   listApplications(): Promise<MarketplaceApplicationRecord[]>;
   saveApplication(application: MarketplaceApplicationRecord): Promise<void>;
+  getApplicationRevisionById(
+    revisionId: string,
+  ): Promise<MarketplaceApplicationRevisionRecord | null>;
+  listApplicationRevisions(): Promise<MarketplaceApplicationRevisionRecord[]>;
+  saveApplicationRevision(
+    revision: MarketplaceApplicationRevisionRecord,
+  ): Promise<void>;
+  getInterviewThreadById(
+    threadId: string,
+  ): Promise<MarketplaceInterviewThreadRecord | null>;
+  listInterviewThreads(): Promise<MarketplaceInterviewThreadRecord[]>;
+  saveInterviewThread(thread: MarketplaceInterviewThreadRecord): Promise<void>;
+  getInterviewMessageById(
+    messageId: string,
+  ): Promise<MarketplaceInterviewMessageRecord | null>;
+  listInterviewMessages(): Promise<MarketplaceInterviewMessageRecord[]>;
+  saveInterviewMessage(
+    message: MarketplaceInterviewMessageRecord,
+  ): Promise<void>;
+  getOfferById(offerId: string): Promise<MarketplaceOfferRecord | null>;
+  listOffers(): Promise<MarketplaceOfferRecord[]>;
+  saveOffer(offer: MarketplaceOfferRecord): Promise<void>;
+  getApplicationDecisionById(
+    decisionId: string,
+  ): Promise<MarketplaceApplicationDecisionRecord | null>;
+  listApplicationDecisions(): Promise<MarketplaceApplicationDecisionRecord[]>;
+  saveApplicationDecision(
+    decision: MarketplaceApplicationDecisionRecord,
+  ): Promise<void>;
   getSavedSearchById(
     searchId: string,
   ): Promise<MarketplaceSavedSearchRecord | null>;
@@ -184,7 +218,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 22;
+  version: 23;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -205,6 +239,20 @@ export type PersistenceFileData = {
     MarketplaceOpportunitySearchDocument
   >;
   marketplaceApplications: Record<string, MarketplaceApplicationRecord>;
+  marketplaceApplicationRevisions: Record<
+    string,
+    MarketplaceApplicationRevisionRecord
+  >;
+  marketplaceInterviewThreads: Record<string, MarketplaceInterviewThreadRecord>;
+  marketplaceInterviewMessages: Record<
+    string,
+    MarketplaceInterviewMessageRecord
+  >;
+  marketplaceOffers: Record<string, MarketplaceOfferRecord>;
+  marketplaceApplicationDecisions: Record<
+    string,
+    MarketplaceApplicationDecisionRecord
+  >;
   marketplaceSavedSearches: Record<string, MarketplaceSavedSearchRecord>;
   marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;

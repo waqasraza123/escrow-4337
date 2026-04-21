@@ -4,18 +4,20 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 2 discovery/search implementation in one code pass:
-  - real public talent/opportunity directory filters
-  - workspace-side recommendations, saved searches, and invite-to-apply actions
-  - missing marketplace service methods behind the already-routed Phase 2 API surface
+- Land the repo-side Phase 3 proposal/interview/offer pipeline in one code pass:
+  - immutable application revisions
+  - proposal timeline and candidate comparison reads
+  - application-scoped interview messaging
+  - offer create/respond flows before hire-to-escrow
 
 ## Last Completed Step
-- Committed the completed Phase 1 repo-side identity/workspace slice locally as `374abe9` (`Complete Phase 1 workspace identity model`).
+- Committed the Phase 2 discovery/search implementation locally as `34cdb99` (`Implement Phase 2 marketplace discovery flows`).
 
 ## Current Step
-- Phase 2 discovery/search code is now in progress and intentionally unverified:
-  - `MarketplaceService` is being extended to implement recommendations, saved searches, and opportunity invites
-  - `apps/web` is being wired to the Phase 2 search/recommendation surface on both the public browser and authenticated workspace
+- Phase 3 proposal/interview/offer code is now implemented and intentionally unverified:
+  - `MarketplaceService` now owns revision, timeline, interview, comparison, and offer transitions
+  - persistence now includes Postgres/file records for revisions, interviews, offers, and decision history
+  - `apps/web` marketplace workspace now exposes timeline loads, comparison reads, interview messaging, proposal revision, and offer create/respond actions
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -46,9 +48,11 @@
   `docs/project-state.md`
   `docs/_local/current-session.md`
   `docs/MARKETPLACE_PHASE_1_V1.md`
-- Phase 2 work in progress:
-  `services/api/src/modules/marketplace/marketplace.service.ts`
-  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketing.styles.ts,app/marketplace/{marketplace-browser.tsx,workspace.tsx}}`
+- Phase 3 work in progress:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/021_marketplace_pipeline_phase.sql`
+  `apps/web/src/{lib/api.ts,lib/i18n.tsx,app/marketplace/workspace.tsx}`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.
@@ -87,8 +91,8 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 3 offer/interview pipeline groundwork
-  - or add explicit membership-role editing/removal for shared organizations
+  - start Phase 4 accepted-offer to escrow-contract handoff
+  - or tighten the current Phase 3 workspace UX and tests around timelines/offers/comparison
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
@@ -141,6 +145,23 @@
 - Next step:
   - run targeted API typecheck/tests for the marketplace + organizations slice
   - then add the web/UI consumer layer for search, recommendations, saved searches, and invites
+
+## Update (2026-04-21, Marketplace Phase 3 Pipeline)
+- Added the repo-side Phase 3 pipeline without running verification:
+  - immutable `marketplace_application_revisions`
+  - `marketplace_interview_threads` and `marketplace_interview_messages`
+  - `marketplace_offers`
+  - `marketplace_application_decisions`
+- Backend changes:
+  - added DTO/controller/service support for application revise, timeline, interview message, offer create/respond, and opportunity comparison routes
+  - application apply/withdraw/shortlist/reject/hire flows now also persist timeline/decision records
+  - Postgres and file persistence now both implement the new pipeline records
+- Web changes:
+  - `apps/web/src/app/marketplace/workspace.tsx` now exposes timeline load, comparison load, interview messaging, proposal revision, and offer actions in the authenticated workspace
+  - `apps/web/src/lib/api.ts` now mirrors the new Phase 3 response shapes and routes
+  - `apps/web/src/lib/i18n.tsx` now includes Phase 3 workspace copy in English and Arabic
+- Verification:
+  - not run by request
 
 ## Update (2026-04-20, Exact Marketplace Canary Stabilization)
 - Stabilized the exact Phase 1 marketplace browser canary against the built local stack.
