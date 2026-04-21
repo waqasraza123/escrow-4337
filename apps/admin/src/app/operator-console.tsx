@@ -45,6 +45,8 @@ import {
   type EscrowJobHistoryImportReport,
   type RuntimeProfile,
   type SessionTokens,
+  type SupportCase,
+  type SupportOperationsDashboard,
   type UserProfile,
   type WalletLinkChallenge,
 } from '../lib/api';
@@ -562,6 +564,17 @@ export function OperatorConsole({
   const [chainSyncBatchLimit, setChainSyncBatchLimit] = useState('10');
   const [chainSyncBatchReport, setChainSyncBatchReport] =
     useState<EscrowChainSyncBatchReport | null>(null);
+  const [supportOperations, setSupportOperations] =
+    useState<SupportOperationsDashboard | null>(null);
+  const [supportOperationNotes, setSupportOperationNotes] = useState<Record<string, string>>(
+    {},
+  );
+  const [supportOperationFeeDecisions, setSupportOperationFeeDecisions] = useState<
+    Record<
+      string,
+      'default' | 'waive_open_and_future' | 'refund_realized_and_waive' | 'manual_review'
+    >
+  >({});
   const [chainIngestionStatus, setChainIngestionStatus] =
     useState<EscrowChainIngestionStatus | null>(null);
   const [chainSyncDaemonHealth, setChainSyncDaemonHealth] =
@@ -578,6 +591,8 @@ export function OperatorConsole({
   const [chainSyncBatchState, setChainSyncBatchState] = useState<AsyncState>(createIdleState());
   const [chainIngestionState, setChainIngestionState] = useState<AsyncState>(createIdleState());
   const [chainSyncDaemonState, setChainSyncDaemonState] = useState<AsyncState>(createIdleState());
+  const [supportOperationsState, setSupportOperationsState] =
+    useState<AsyncState>(createIdleState());
   const [walletActionState, setWalletActionState] = useState<AsyncState>(createIdleState());
   const [resolutionState, setResolutionState] = useState<AsyncState>(createIdleState());
   const [exportState, setExportState] = useState<AsyncState>(createIdleState());
@@ -767,6 +782,8 @@ export function OperatorConsole({
     setChallenge(null);
     setEscrowHealth(null);
     setHealthState(createIdleState());
+    setSupportOperations(null);
+    setSupportOperationsState(createIdleState());
     setChainSyncDaemonHealth(null);
     setChainSyncDaemonState(createIdleState());
     setReconciliationImportReport(null);
@@ -910,6 +927,8 @@ export function OperatorConsole({
     if (!accessToken) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setSupportOperations(null);
+      setSupportOperationsState(createIdleState());
       setChainIngestionStatus(null);
       setChainIngestionState(createIdleState());
       setChainSyncDaemonHealth(null);
@@ -927,6 +946,8 @@ export function OperatorConsole({
     if (!canAccessOperations) {
       setEscrowHealth(null);
       setHealthState(createIdleState());
+      setSupportOperations(null);
+      setSupportOperationsState(createIdleState());
       setChainIngestionStatus(null);
       setChainIngestionState(createIdleState());
       setChainSyncDaemonHealth(null);
@@ -942,6 +963,7 @@ export function OperatorConsole({
     }
 
     void loadEscrowHealth(accessToken, healthReasonFilter);
+    void loadSupportOperations(accessToken);
     void loadChainIngestionStatus(accessToken);
     void loadChainSyncDaemonStatus(accessToken);
   }, [accessToken, canAccessOperations, healthReasonFilter]);
@@ -1033,6 +1055,31 @@ export function OperatorConsole({
     } catch (error) {
       setEscrowHealth(null);
       setHealthState(createErrorState(error, 'Failed to load escrow operations health'));
+    }
+  }
+
+  async function loadSupportOperations(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setSupportOperationsState(
+      createWorkingState('Loading fee, treasury, and support operations...'),
+    );
+
+    try {
+      const dashboard = await adminApi.listSupportOperations(token);
+      setSupportOperations(dashboard);
+      setSupportOperationsState(
+        createSuccessState(
+          `Loaded ${dashboard.summary.openCaseCount} open support cases across ${dashboard.jobs.length} jobs.`,
+        ),
+      );
+    } catch (error) {
+      setSupportOperations(null);
+      setSupportOperationsState(
+        createErrorState(error, 'Failed to load fee and support operations'),
+      );
     }
   }
 
@@ -1399,6 +1446,47 @@ export function OperatorConsole({
       await loadEscrowHealth(accessToken, healthReasonFilter);
     } catch (error) {
       setStaleWorkflowState(jobId, createErrorState(error, 'Failed to release stale job workflow'));
+    }
+  }
+
+  async function handleUpdateSupportCase(
+    supportCase: SupportCase & { jobTitle?: string; jobStatus?: string },
+    input: {
+      status?:
+        | 'open'
+        | 'investigating'
+        | 'waiting_on_client'
+        | 'waiting_on_worker'
+        | 'resolved';
+      assignToSelf?: boolean;
+      feeDecision?:
+        | 'default'
+        | 'waive_open_and_future'
+        | 'refund_realized_and_waive'
+        | 'manual_review';
+    },
+  ) {
+    if (!accessToken) {
+      return;
+    }
+
+    setSupportOperationsState(createWorkingState('Updating support case...'));
+
+    try {
+      await adminApi.updateSupportCase(
+        supportCase.jobId,
+        supportCase.id,
+        {
+          ...input,
+          feeDecisionNote: supportOperationNotes[supportCase.id]?.trim() || null,
+          internalNote: supportOperationNotes[supportCase.id]?.trim() || null,
+        },
+        accessToken,
+      );
+      await loadSupportOperations(accessToken);
+      setSupportOperationsState(createSuccessState('Support case updated.'));
+    } catch (error) {
+      setSupportOperationsState(createErrorState(error, 'Failed to update support case'));
     }
   }
 
@@ -2918,6 +3006,192 @@ export function OperatorConsole({
         </section>
         </RevealSection>
       ) : null}
+
+      <RevealSection delay={0.26}>
+      <section className={styles.panel}>
+        <header className={styles.panelHeader}>
+          <div>
+            <p className={styles.panelEyebrow}>Fee and Support</p>
+            <h2>Operational support queue</h2>
+          </div>
+          {canAccessOperations && accessToken ? (
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => void loadSupportOperations(accessToken)}
+            >
+              Reload queue
+            </button>
+          ) : null}
+        </header>
+        {!canAccessOperations ? (
+          <EmptyStateCard
+            title="Operator capability required"
+            message={
+              operationsCapabilityReason ??
+              'The support queue is only available after the operator session is granted operations capability.'
+            }
+            className={styles.emptyCard}
+            messageClassName={styles.stateText}
+          />
+        ) : (
+          <div className={styles.stack}>
+            <StatusNotice
+              message={supportOperationsState.message}
+              messageClassName={styles.stateText}
+            />
+            <FactGrid className={styles.summaryGrid}>
+              <FactItem label="Open cases" value={supportOperations?.summary.openCaseCount ?? '0'} />
+              <FactItem
+                label="Critical cases"
+                value={supportOperations?.summary.criticalCaseCount ?? '0'}
+              />
+              <FactItem
+                label="Reconciliation attention"
+                value={supportOperations?.summary.reconciliationAttentionCount ?? '0'}
+              />
+              <FactItem
+                label="Realized fees"
+                value={supportOperations?.summary.totalRealizedFees ?? '0'}
+              />
+              <FactItem
+                label="Worker payouts"
+                value={supportOperations?.summary.totalWorkerPayouts ?? '0'}
+              />
+              <FactItem
+                label="Client refunds"
+                value={supportOperations?.summary.totalClientRefunds ?? '0'}
+              />
+            </FactGrid>
+            {supportOperations?.cases.length ? (
+              supportOperations.cases.slice(0, 8).map((supportCase) => (
+                <article key={supportCase.id} className={styles.timelineCard}>
+                  <div className={styles.timelineHead}>
+                    <strong>{`${supportCase.jobTitle} • ${supportCase.subject}`}</strong>
+                    <span>{`${supportCase.status} • ${supportCase.severity}`}</span>
+                  </div>
+                  <p>{supportCase.description}</p>
+                  <small>{`${supportCase.reason} • owner ${supportCase.ownerEmail ?? 'unassigned'}`}</small>
+                  <small>{`Fee impact ${supportCase.feeImpactAmount ?? '0'} • updated ${formatDate(
+                    supportCase.updatedAt,
+                  )}`}</small>
+                  <div className={styles.fieldGrid}>
+                    <label className={styles.field}>
+                      <span>Fee decision</span>
+                      <select
+                        value={
+                          supportOperationFeeDecisions[supportCase.id] ??
+                          supportCase.feeDecision ??
+                          'manual_review'
+                        }
+                        onChange={(event) =>
+                          setSupportOperationFeeDecisions((current) => ({
+                            ...current,
+                            [supportCase.id]: event.target.value as NonNullable<
+                              SupportCase['feeDecision']
+                            >,
+                          }))
+                        }
+                      >
+                        <option value="default">default</option>
+                        <option value="waive_open_and_future">waive_open_and_future</option>
+                        <option value="refund_realized_and_waive">
+                          refund_realized_and_waive
+                        </option>
+                        <option value="manual_review">manual_review</option>
+                      </select>
+                    </label>
+                    <label className={styles.field}>
+                      <span>Internal note</span>
+                      <textarea
+                        rows={3}
+                        value={supportOperationNotes[supportCase.id] ?? ''}
+                        onChange={(event) =>
+                          setSupportOperationNotes((current) => ({
+                            ...current,
+                            [supportCase.id]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleUpdateSupportCase(supportCase, {
+                          assignToSelf: true,
+                        })
+                      }
+                    >
+                      Assign to me
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() =>
+                        void handleUpdateSupportCase(supportCase, {
+                          status: 'investigating',
+                          feeDecision:
+                            supportOperationFeeDecisions[supportCase.id] ?? undefined,
+                        })
+                      }
+                    >
+                      Mark investigating
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() =>
+                        void handleUpdateSupportCase(supportCase, {
+                          status: 'resolved',
+                          feeDecision:
+                            supportOperationFeeDecisions[supportCase.id] ?? undefined,
+                        })
+                      }
+                    >
+                      Resolve case
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleLookup(supportCase.jobId)}
+                    >
+                      Open case
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyStateCard
+                title="Support queue clear"
+                message="No support cases are currently open."
+                className={styles.emptyCard}
+                messageClassName={styles.stateText}
+              />
+            )}
+            {supportOperations?.jobs.some(
+              (job) => job.commercial.reconciliation?.status === 'attention',
+            ) ? (
+              supportOperations.jobs
+                .filter((job) => job.commercial.reconciliation?.status === 'attention')
+                .slice(0, 6)
+                .map((job) => (
+                  <article key={job.jobId} className={styles.boundaryCard}>
+                    <strong>{job.title}</strong>
+                    <p className={styles.stateText}>
+                      {job.commercial.reconciliation?.issues
+                        .map((issue) => issue.summary)
+                        .join(' | ') || 'No reconciliation issues'}
+                    </p>
+                    <small>{`Fees ${job.commercial.reconciliation?.recordedRealizedFees ?? '0'} • payouts ${job.commercial.reconciliation?.recordedReleasedAmount ?? '0'} • refunds ${job.commercial.reconciliation?.recordedRefundedAmount ?? '0'}`}</small>
+                  </article>
+                ))
+            ) : null}
+          </div>
+        )}
+      </section>
+      </RevealSection>
 
       <RevealSection delay={0.28}>
       <section className={styles.panel} data-walkthrough-id="operator-case-lookup">

@@ -30,6 +30,7 @@ import {
   type ProjectRoom as ProjectRoomView,
   type ProjectSubmission,
   type SessionTokens,
+  type SupportCase,
 } from '../lib/api';
 
 const sessionStorageKey = 'escrow4337.web.session';
@@ -54,6 +55,13 @@ type ReviewDraft = {
   headline: string;
   body: string;
   rating: number;
+};
+
+type SupportDraft = {
+  reason: SupportCase['reason'];
+  subject: string;
+  description: string;
+  reply: string;
 };
 
 function readSession(): SessionTokens | null {
@@ -94,6 +102,15 @@ function createReviewDraft(): ReviewDraft {
     headline: '',
     body: '',
     rating: 5,
+  };
+}
+
+function createSupportDraft(): SupportDraft {
+  return {
+    reason: 'general_help',
+    subject: '',
+    description: '',
+    reply: '',
   };
 }
 
@@ -194,6 +211,7 @@ export function ProjectRoom(props: ProjectRoomProps) {
     Record<number, ExecutionDraft>
   >({});
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>(createReviewDraft());
+  const [supportDraft, setSupportDraft] = useState<SupportDraft>(createSupportDraft());
 
   useEffect(() => {
     const session = readSession();
@@ -317,6 +335,9 @@ export function ProjectRoom(props: ProjectRoomProps) {
     (room.job.status === 'completed' || room.job.status === 'resolved') &&
     participantRoles.length > 0 &&
     !reviews.some((review) => review.reviewer.userId === currentUserId);
+  const supportCases = room?.supportCases ?? [];
+  const latestSupportCase = supportCases[0] ?? null;
+  const openSupportCases = supportCases.filter((supportCase) => supportCase.status !== 'resolved');
 
   async function refreshRoom() {
     if (!tokens) {
@@ -495,6 +516,55 @@ export function ProjectRoom(props: ProjectRoomProps) {
       setError(
         cause instanceof Error ? cause.message : roomMessages.messages.actionFailed,
       );
+    }
+  }
+
+  async function handleCreateSupportCase() {
+    if (!tokens) {
+      return;
+    }
+
+    try {
+      await webApi.createSupportCase(
+        initialJobId,
+        {
+          reason: supportDraft.reason,
+          milestoneIndex: selectedMilestone ? selectedMilestoneIndex : null,
+          subject: supportDraft.subject,
+          description: supportDraft.description,
+        },
+        tokens.accessToken,
+      );
+      setSupportDraft(createSupportDraft());
+      setNotice('Support case opened.');
+      await refreshRoom();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : roomMessages.messages.actionFailed);
+    }
+  }
+
+  async function handleReplyToSupportCase(caseId: string) {
+    if (!tokens || !supportDraft.reply.trim()) {
+      return;
+    }
+
+    try {
+      await webApi.postSupportCaseMessage(
+        initialJobId,
+        caseId,
+        {
+          body: supportDraft.reply,
+        },
+        tokens.accessToken,
+      );
+      setSupportDraft((current) => ({
+        ...current,
+        reply: '',
+      }));
+      setNotice('Support reply posted.');
+      await refreshRoom();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : roomMessages.messages.actionFailed);
     }
   }
 
@@ -680,6 +750,24 @@ export function ProjectRoom(props: ProjectRoomProps) {
                   label={roomMessages.labels.roomPath}
                   value={buildProjectRoomPath(initialJobId)}
                   dir="ltr"
+                />
+                <FactItem
+                  label="Platform fee"
+                  value={
+                    room.job.operations.commercial?.feePolicy.platformFeeLabel ??
+                    'Not configured'
+                  }
+                />
+                <FactItem
+                  label="Realized fees"
+                  value={
+                    room.job.operations.commercial?.reconciliation?.recordedRealizedFees ??
+                    '0'
+                  }
+                />
+                <FactItem
+                  label="Support cases"
+                  value={String(openSupportCases.length)}
                 />
               </FactGrid>
             </SectionCard>
@@ -1062,6 +1150,152 @@ export function ProjectRoom(props: ProjectRoomProps) {
               </SectionCard>
             </RevealSection>
           </div>
+
+          <RevealSection delay={0.26}>
+            <SectionCard
+              eyebrow="Support"
+              title="Support and fee operations"
+              className={styles.panel}
+              headerClassName={styles.panelHeader}
+            >
+              <div className={styles.stack}>
+                <p className={styles.stateText}>
+                  Open support for funding blockers, fee exceptions, release delays, or dispute
+                  follow-up. Internal operator notes stay out of this room, but case status and
+                  external replies remain visible here.
+                </p>
+                <div className={styles.summaryGrid}>
+                  <article>
+                    <span className={styles.metaLabel}>Open cases</span>
+                    <strong>{openSupportCases.length}</strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Latest case</span>
+                    <strong>{latestSupportCase?.subject ?? 'No active case'}</strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Fee posture</span>
+                    <strong>
+                      {room.job.operations.commercial?.reconciliation?.status ?? 'balanced'}
+                    </strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Realized fees</span>
+                    <strong>
+                      {room.job.operations.commercial?.reconciliation?.recordedRealizedFees ?? '0'}
+                    </strong>
+                  </article>
+                </div>
+                <SurfaceCard className={styles.actionPanel}>
+                  <strong>Open a support case</strong>
+                  <label className={styles.field}>
+                    <span>Reason</span>
+                    <select
+                      value={supportDraft.reason}
+                      onChange={(event) =>
+                        setSupportDraft((current) => ({
+                          ...current,
+                          reason: event.target.value as SupportCase['reason'],
+                        }))
+                      }
+                    >
+                      <option value="general_help">general_help</option>
+                      <option value="fee_question">fee_question</option>
+                      <option value="fee_exception">fee_exception</option>
+                      <option value="stuck_funding">stuck_funding</option>
+                      <option value="dispute_followup">dispute_followup</option>
+                      <option value="release_delay">release_delay</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>Subject</span>
+                    <input
+                      type="text"
+                      value={supportDraft.subject}
+                      onChange={(event) =>
+                        setSupportDraft((current) => ({
+                          ...current,
+                          subject: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Description</span>
+                    <textarea
+                      rows={4}
+                      value={supportDraft.description}
+                      onChange={(event) =>
+                        setSupportDraft((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className={styles.inlineActions}>
+                    <Button
+                      type="button"
+                      onClick={() => void handleCreateSupportCase()}
+                      disabled={!supportDraft.subject.trim() || !supportDraft.description.trim()}
+                    >
+                      Open support case
+                    </Button>
+                  </div>
+                </SurfaceCard>
+                {supportCases.length > 0 ? (
+                  supportCases.map((supportCase) => (
+                    <article key={supportCase.id} className={styles.timelineCard}>
+                      <div className={styles.timelineHead}>
+                        <strong>{supportCase.subject}</strong>
+                        <span>{`${supportCase.status} • ${supportCase.severity}`}</span>
+                      </div>
+                      <p className={styles.stateText}>{supportCase.description}</p>
+                      <p className={styles.stateText}>
+                        {supportCase.createdBy.email}
+                        {supportCase.ownerEmail ? ` • owner ${supportCase.ownerEmail}` : ''}
+                      </p>
+                      {supportCase.messages.length > 0 ? (
+                        <div className={styles.stack}>
+                          {supportCase.messages.map((message) => (
+                            <article key={message.id} className={styles.statusBanner}>
+                              <strong>{`${message.authorRole} • ${message.author.email}`}</strong>
+                              <p className={styles.stateText}>{message.body}</p>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+                      <label className={styles.field}>
+                        <span>Reply</span>
+                        <textarea
+                          rows={3}
+                          value={supportDraft.reply}
+                          onChange={(event) =>
+                            setSupportDraft((current) => ({
+                              ...current,
+                              reply: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className={styles.inlineActions}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void handleReplyToSupportCase(supportCase.id)}
+                          disabled={!supportDraft.reply.trim()}
+                        >
+                          Send support reply
+                        </Button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.stateText}>No support cases yet.</p>
+                )}
+              </div>
+            </SectionCard>
+          </RevealSection>
 
           <RevealSection delay={0.28}>
             <SectionCard

@@ -4,21 +4,21 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 6 trust/reputation/review pass in one code step:
-  - post-contract mutual reviews
-  - public reputation snapshots on profiles/opportunities
-  - operator review moderation + identity risk review
-  - project-room review capture after contract close
+- Land the repo-side Phase 7 fee/treasury/support operations pass in one code step:
+  - contract-linked fee-policy snapshots and off-chain fee/payout ledgers
+  - reconciliation posture on escrow jobs
+  - participant support-case workflows in contract and project-room surfaces
+  - operator fee/support queue management in admin
 
 ## Last Completed Step
-- Committed the Phase 5 handoff locally as `d435767` (`Implement Phase 5 project room execution workspace`).
+- Committed the Phase 6 handoff locally as `a7970c5` (`Implement Phase 6 marketplace reputation and review trust layer`).
 
 ## Current Step
-- Phase 6 trust/reputation/review code is now implemented and intentionally unverified:
-  - `MarketplaceService` now persists job reviews + operator identity reviews and derives public reputation/risk signals
-  - persistence now includes file/Postgres review + identity-review state plus `024_marketplace_reputation_and_reviews.sql`
-  - `apps/web` now exposes trust/review surfaces on public profile/opportunity detail pages and review capture inside `/app/contracts/[id]/room`
-  - `apps/admin` moderation now includes review visibility controls and operator identity-risk review controls
+- Phase 7 fee/treasury/support code is now implemented and intentionally unverified:
+  - `EscrowService` now seeds contract commercial policy snapshots, records off-chain fee/payout ledger entries on release/refund outcomes, derives reconciliation posture, and persists project-room-linked support cases
+  - new protected escrow routes now expose per-job support operations, participant support-case create/reply flows, operator support-case triage, and a global `/jobs/support-operations` queue
+  - `apps/web` now surfaces fee disclosure and support entry points on the contract console and project room
+  - `apps/admin` now surfaces the fee/support queue with assignment, fee-decision, and resolution controls
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -70,6 +70,13 @@
   `services/api/src/persistence/postgres/migrations/024_marketplace_reputation_and_reviews.sql`
   `apps/web/src/{app/project-room.tsx,app/marketplace/profiles/[slug]/profile-detail.tsx,app/marketplace/opportunities/[id]/opportunity-detail.tsx,lib/api.ts,lib/i18n.tsx}`
   `apps/admin/src/{app/marketplace/moderation-console.tsx,lib/api.ts}`
+- Phase 7 work in progress:
+  `services/api/src/modules/escrow/{escrow.controller.ts,escrow.dto.ts,escrow.service.ts,escrow.types.ts}`
+  `services/api/src/modules/marketplace/marketplace.service.ts`
+  `services/api/src/persistence/{file/file.repositories.ts,postgres/postgres.repositories.ts}`
+  `apps/web/src/{app/project-room.tsx,app/web-console.tsx,lib/api.ts}`
+  `apps/admin/src/{app/operator-console.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.
@@ -109,8 +116,8 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 7 fee/treasury/support operations work
-  - or tighten the new Phase 6 trust/review UX and moderation ergonomics
+  - start Phase 8 ranking/scale/conversion work
+  - or tighten the new Phase 7 fee/support UX and operator ergonomics
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`

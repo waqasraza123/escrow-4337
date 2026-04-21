@@ -215,6 +215,37 @@ export type JobView = {
     workerAddress: string;
     currencyAddress: string;
   };
+  operations: {
+    chainSync: {
+      lastAttemptedAt: number;
+      lastOutcome: 'succeeded' | 'failed' | 'blocked';
+      lastMode: 'preview' | 'persisted';
+      lastSuccessfulAt?: number;
+      lastPersistedAt?: number;
+      lastSyncedBlock?: number;
+      lastIssueCount: number;
+      lastCriticalIssueCount: number;
+      lastReconciliationIssueCount: number;
+      lastErrorMessage?: string;
+    } | null;
+    executionFailureWorkflow: {
+      claimedByUserId: string;
+      claimedByEmail: string;
+      claimedAt: number;
+      status: 'investigating' | 'blocked_external' | 'ready_to_retry' | 'monitoring';
+      acknowledgedFailureAt?: number;
+      note?: string;
+      updatedAt: number;
+    } | null;
+    staleWorkflow: {
+      claimedByUserId: string;
+      claimedByEmail: string;
+      claimedAt: number;
+      note?: string;
+      updatedAt: number;
+    } | null;
+    commercial: JobCommercial | null;
+  };
 };
 
 export type PublicJobView = Omit<JobView, 'contractorParticipation'> & {
@@ -288,6 +319,141 @@ export type ProjectMessage = {
   };
 };
 
+export type JobCommercial = {
+  feePolicy: {
+    scheduleId: string;
+    feeMode: 'client_platform_fee';
+    realizationTrigger: 'milestone_release_or_resolution';
+    refundTreatment: 'no_fee_on_refund';
+    defaultPlatformFeeBps: number;
+    effectivePlatformFeeBps: number;
+    platformFeeLabel: string;
+    treasuryAccountRef: string;
+    feeDisclosure: string;
+    feeDecision:
+      | 'default'
+      | 'waive_open_and_future'
+      | 'refund_realized_and_waive'
+      | 'manual_review';
+    feeDecisionNote: string | null;
+    approvedByUserId: string | null;
+    approvedAt: number | null;
+    updatedAt: number;
+  };
+  treasuryAccount: {
+    accountRef: string;
+    label: string;
+    settlementAsset: string;
+    network: 'base';
+    destinationAddress: string;
+    reconciliationMode: 'offchain_ledger';
+    lastReviewedAt: number | null;
+  };
+  feeLedger: Array<{
+    id: string;
+    jobId: string;
+    milestoneIndex: number | null;
+    kind: 'platform_fee_accrued' | 'platform_fee_reversed';
+    source:
+      | 'milestone_release'
+      | 'dispute_resolution_release'
+      | 'support_fee_refund';
+    amount: string;
+    currencyAddress: string;
+    treasuryAccountRef: string;
+    note: string | null;
+    createdAt: number;
+  }>;
+  payoutLedger: Array<{
+    id: string;
+    jobId: string;
+    milestoneIndex: number;
+    kind: 'worker_payout' | 'client_refund';
+    source:
+      | 'milestone_release'
+      | 'dispute_resolution_release'
+      | 'dispute_refund';
+    amount: string;
+    currencyAddress: string;
+    note: string | null;
+    createdAt: number;
+  }>;
+  reconciliation: {
+    status: 'balanced' | 'attention';
+    expectedReleasedAmount: string;
+    expectedRefundedAmount: string;
+    expectedRealizedFees: string;
+    recordedReleasedAmount: string;
+    recordedRefundedAmount: string;
+    recordedRealizedFees: string;
+    openSupportCaseCount: number;
+    activeFeeException: boolean;
+    issueCount: number;
+    issues: Array<{
+      code:
+        | 'fee_mismatch'
+        | 'payout_mismatch'
+        | 'stuck_funding'
+        | 'support_followup'
+        | 'unowned_support_case';
+      severity: 'warning' | 'critical';
+      summary: string;
+      detail: string | null;
+    }>;
+    lastComputedAt: number;
+  } | null;
+};
+
+export type SupportCase = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number | null;
+  reason:
+    | 'general_help'
+    | 'fee_question'
+    | 'fee_exception'
+    | 'stuck_funding'
+    | 'dispute_followup'
+    | 'release_delay';
+  status:
+    | 'open'
+    | 'investigating'
+    | 'waiting_on_client'
+    | 'waiting_on_worker'
+    | 'resolved';
+  severity: 'routine' | 'elevated' | 'critical';
+  subject: string;
+  description: string;
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  feeDecision:
+    | 'default'
+    | 'waive_open_and_future'
+    | 'refund_realized_and_waive'
+    | 'manual_review'
+    | null;
+  feeDecisionNote: string | null;
+  feeImpactAmount: string | null;
+  openedAt: number;
+  updatedAt: number;
+  resolvedAt: number | null;
+  createdBy: {
+    userId: string;
+    email: string;
+  };
+  messages: Array<{
+    id: string;
+    authorRole: 'client' | 'worker' | 'operator';
+    visibility: 'external' | 'internal';
+    body: string;
+    createdAt: number;
+    author: {
+      userId: string;
+      email: string;
+    };
+  }>;
+};
+
 export type ProjectActivity =
   | {
       id: string;
@@ -297,7 +463,10 @@ export type ProjectActivity =
         | 'revision_requested'
         | 'submission_approved'
         | 'submission_delivered'
-        | 'message_posted';
+        | 'message_posted'
+        | 'support_case_opened'
+        | 'support_case_message_posted'
+        | 'support_case_status_updated';
       actorRole: 'client' | 'worker';
       milestoneIndex: number | null;
       relatedSubmissionId: string | null;
@@ -326,6 +495,7 @@ export type ProjectRoom = {
   submissions: ProjectSubmission[];
   messages: ProjectMessage[];
   activity: ProjectActivity[];
+  supportCases: SupportCase[];
 };
 
 export type ContractorInviteResponse = {
@@ -1544,6 +1714,57 @@ export const webApi = {
       apiBaseUrl,
       `/jobs/${jobId}/project-room`,
       { method: 'GET' },
+      accessToken,
+    );
+  },
+  getJobSupportOperations(jobId: string, accessToken: string) {
+    return requestJson<{
+      commercial: JobCommercial;
+      supportCases: SupportCase[];
+    }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/support-operations`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createSupportCase(
+    jobId: string,
+    input: {
+      reason: SupportCase['reason'];
+      severity?: SupportCase['severity'];
+      milestoneIndex?: number | null;
+      subject: string;
+      description: string;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ supportCase: SupportCase }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/support-cases`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  postSupportCaseMessage(
+    jobId: string,
+    caseId: string,
+    input: {
+      body: string;
+      visibility?: 'external' | 'internal';
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ supportCase: SupportCase }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/support-cases/${caseId}/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
       accessToken,
     );
   },

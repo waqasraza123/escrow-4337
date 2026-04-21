@@ -23,11 +23,14 @@ import type {
   ContractorJoinReadinessResponse,
   CreateJobResponse,
   EscrowAuditBundle,
+  EscrowJobSupportOperationsResponse,
   EscrowProjectDeliverSubmissionResponse,
   EscrowJobsListResponse,
   EscrowProjectMessageResponse,
   EscrowProjectRoomResponse,
   EscrowProjectSubmissionResponse,
+  EscrowSupportCaseResponse,
+  EscrowSupportOperationsDashboardResponse,
   FundJobResponse,
   JoinContractorResponse,
   MilestoneMutationResponse,
@@ -43,6 +46,14 @@ export class EscrowController {
   @Get()
   list(@User() user: ReqUser): Promise<EscrowJobsListResponse> {
     return this.escrowService.listJobsForUser(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('support-operations')
+  listSupportOperations(
+    @User() user: ReqUser,
+  ): Promise<EscrowSupportOperationsDashboardResponse> {
+    return this.escrowService.listSupportOperations(user.id);
   }
 
   @UseGuards(AuthGuard)
@@ -123,6 +134,50 @@ export class EscrowController {
     @Param('id') id: string,
   ): Promise<EscrowProjectRoomResponse> {
     return this.escrowService.getProjectRoom(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':id/support-operations')
+  getJobSupportOperations(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+  ): Promise<EscrowJobSupportOperationsResponse> {
+    return this.escrowService.getJobSupportOperations(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/support-cases')
+  createSupportCase(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(escrowDto.createSupportCaseSchema))
+    dto: escrowDto.CreateSupportCaseDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    return this.escrowService.createSupportCase(user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/support-cases/:caseId/messages')
+  postSupportCaseMessage(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('caseId') caseId: string,
+    @Body(new ZodValidationPipe(escrowDto.postSupportCaseMessageSchema))
+    dto: escrowDto.PostSupportCaseMessageDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    return this.escrowService.postSupportCaseMessage(user.id, id, caseId, dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/support-cases/:caseId/admin')
+  updateSupportCase(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Param('caseId') caseId: string,
+    @Body(new ZodValidationPipe(escrowDto.updateSupportCaseSchema))
+    dto: escrowDto.UpdateSupportCaseDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    return this.escrowService.updateSupportCase(user.id, id, caseId, dto);
   }
 
   @UseGuards(AuthGuard)

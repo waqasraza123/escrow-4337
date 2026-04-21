@@ -30,7 +30,7 @@
 
 ## Current Roadmap
 
-- Continue the marketplace implementation set into Phase 7 fees, treasury, and support operations: add fee policy snapshots, fee/support ledgers, support-case workflows, and contract-linked intervention tooling on top of the new Phase 6 trust/reputation layer.
+- Continue the marketplace implementation set into Phase 8 scale, ranking quality, and conversion optimization on top of the now in-repo Phase 7 fee, treasury, and support operations layer.
 - Browser-verify the capability-gated client/freelancer/agency marketplace journey against the current workspace baseline, and keep tightening workspace-aware copy/navigation and lane-entry behavior across the new pipeline surfaces.
 - Execute the new API deployment validation flow against real staging or production-like infrastructure, including deployed Postgres migration checks, live relay or provider reachability, bundler or paymaster chain validation, and deployed ingress or proxy validation.
 - Run the new launch-candidate gate against a real staged environment, capture launch-readiness evidence from the deployed backend, and treat any failed launch-readiness check or unowned incident as a blocker before promotion.
@@ -99,6 +99,7 @@
 - Escrow operations health now derives provider-aware remediation guidance per failed job and lets operators persist a structured failure-workflow status such as investigating, blocked externally, ready to retry, or monitoring.
 - Escrow operations health now runs a replay-backed persisted-timeline reconciliation pass and surfaces bounded `reconciliation_drift` findings when aggregate job state no longer matches its audit or confirmed execution history, including invalid audit transitions and projected snapshot deltas.
 - Operations now support protected `job-history` import previews that normalize imported timeline order, replay the imported snapshot, and compare it to the local persisted job without mutating local escrow state.
+- Escrow jobs now also persist a Phase 7 commercial/support layer: fee-policy snapshots, off-chain fee and payout ledgers, reconciliation summaries, project-room-linked support cases, participant support entry points, and an operator-visible `/jobs/support-operations` queue for fee exceptions, stuck-funding follow-up, and treasury review.
 - Web and admin now share a dedicated `@escrow4334/frontend-core` workspace package for normalized API requests, async state transitions, formatting, persisted list utilities, and consistent status or empty-state primitives.
 - Web and admin now also share `@escrow4334/frontend-core` locale primitives for cookie-backed language selection, typed locale metadata, and document-level `lang`/`dir` synchronization; product copy remains app-local so future locales extend catalogs without coupling frontend-core to app wording.
 - Walkthrough primitives in `frontend-core` must stay off the root barrel so shared server-component imports never pull hook-based modules into Next layouts by accident.
@@ -169,7 +170,7 @@
 
 ## Deferred / Not Yet Implemented
 
-- Marketplace still lacks advanced ranking, search indexing, chat or off-platform communication controls, full fee/support operations, open bidding, and multi-contractor escrow composition.
+- Marketplace still lacks advanced ranking, search indexing, richer in-product communication controls, open bidding, and multi-contractor escrow composition.
 - Marketplace fit scoring is deterministic and explainable, but it is still rules-based; there is no richer ranking UI in admin, no saved search or recommendation loop, and no live browser canary yet covering dossier review end to end.
 - Live end-to-end validation of the configured email relay against real environments.
 - Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.

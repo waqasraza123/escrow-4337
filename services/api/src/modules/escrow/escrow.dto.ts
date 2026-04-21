@@ -137,6 +137,58 @@ export const postProjectRoomMessageSchema = z
 
 export const deliverProjectSubmissionSchema = z.object({}).strict();
 
+export const createSupportCaseSchema = z
+  .object({
+    reason: z.enum([
+      'general_help',
+      'fee_question',
+      'fee_exception',
+      'stuck_funding',
+      'dispute_followup',
+      'release_delay',
+    ]),
+    severity: z
+      .enum(['routine', 'elevated', 'critical'])
+      .optional(),
+    milestoneIndex: z.number().int().min(0).nullable().optional(),
+    subject: z.string().trim().min(1).max(160),
+    description: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export const postSupportCaseMessageSchema = z
+  .object({
+    body: z.string().trim().min(1).max(4000),
+    visibility: z.enum(['external', 'internal']).optional(),
+  })
+  .strict();
+
+export const updateSupportCaseSchema = z
+  .object({
+    status: z
+      .enum([
+        'open',
+        'investigating',
+        'waiting_on_client',
+        'waiting_on_worker',
+        'resolved',
+      ])
+      .optional(),
+    severity: z.enum(['routine', 'elevated', 'critical']).optional(),
+    assignToSelf: z.boolean().optional(),
+    feeDecision: z
+      .enum([
+        'default',
+        'waive_open_and_future',
+        'refund_realized_and_waive',
+        'manual_review',
+      ])
+      .optional(),
+    feeDecisionNote: z.string().trim().min(1).max(4000).nullable().optional(),
+    internalNote: z.string().trim().min(1).max(4000).nullable().optional(),
+  })
+  .strict();
+
 export const exportArtifactQuerySchema = z
   .object({
     artifact: z.enum(['job-history', 'dispute-case']).default('job-history'),
@@ -177,3 +229,8 @@ export type PostProjectRoomMessageDto = z.infer<
 export type DeliverProjectSubmissionDto = z.infer<
   typeof deliverProjectSubmissionSchema
 >;
+export type CreateSupportCaseDto = z.infer<typeof createSupportCaseSchema>;
+export type PostSupportCaseMessageDto = z.infer<
+  typeof postSupportCaseMessageSchema
+>;
+export type UpdateSupportCaseDto = z.infer<typeof updateSupportCaseSchema>;

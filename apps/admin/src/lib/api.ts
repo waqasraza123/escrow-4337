@@ -1003,6 +1003,172 @@ export type AuditBundle = {
   };
 };
 
+export type JobCommercial = {
+  feePolicy: {
+    scheduleId: string;
+    feeMode: 'client_platform_fee';
+    realizationTrigger: 'milestone_release_or_resolution';
+    refundTreatment: 'no_fee_on_refund';
+    defaultPlatformFeeBps: number;
+    effectivePlatformFeeBps: number;
+    platformFeeLabel: string;
+    treasuryAccountRef: string;
+    feeDisclosure: string;
+    feeDecision:
+      | 'default'
+      | 'waive_open_and_future'
+      | 'refund_realized_and_waive'
+      | 'manual_review';
+    feeDecisionNote: string | null;
+    approvedByUserId: string | null;
+    approvedAt: number | null;
+    updatedAt: number;
+  };
+  treasuryAccount: {
+    accountRef: string;
+    label: string;
+    settlementAsset: string;
+    network: 'base';
+    destinationAddress: string;
+    reconciliationMode: 'offchain_ledger';
+    lastReviewedAt: number | null;
+  };
+  feeLedger: Array<{
+    id: string;
+    jobId: string;
+    milestoneIndex: number | null;
+    kind: 'platform_fee_accrued' | 'platform_fee_reversed';
+    source:
+      | 'milestone_release'
+      | 'dispute_resolution_release'
+      | 'support_fee_refund';
+    amount: string;
+    currencyAddress: string;
+    treasuryAccountRef: string;
+    note: string | null;
+    createdAt: number;
+  }>;
+  payoutLedger: Array<{
+    id: string;
+    jobId: string;
+    milestoneIndex: number;
+    kind: 'worker_payout' | 'client_refund';
+    source:
+      | 'milestone_release'
+      | 'dispute_resolution_release'
+      | 'dispute_refund';
+    amount: string;
+    currencyAddress: string;
+    note: string | null;
+    createdAt: number;
+  }>;
+  reconciliation: {
+    status: 'balanced' | 'attention';
+    expectedReleasedAmount: string;
+    expectedRefundedAmount: string;
+    expectedRealizedFees: string;
+    recordedReleasedAmount: string;
+    recordedRefundedAmount: string;
+    recordedRealizedFees: string;
+    openSupportCaseCount: number;
+    activeFeeException: boolean;
+    issueCount: number;
+    issues: Array<{
+      code:
+        | 'fee_mismatch'
+        | 'payout_mismatch'
+        | 'stuck_funding'
+        | 'support_followup'
+        | 'unowned_support_case';
+      severity: 'warning' | 'critical';
+      summary: string;
+      detail: string | null;
+    }>;
+    lastComputedAt: number;
+  } | null;
+};
+
+export type SupportCase = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number | null;
+  reason:
+    | 'general_help'
+    | 'fee_question'
+    | 'fee_exception'
+    | 'stuck_funding'
+    | 'dispute_followup'
+    | 'release_delay';
+  status:
+    | 'open'
+    | 'investigating'
+    | 'waiting_on_client'
+    | 'waiting_on_worker'
+    | 'resolved';
+  severity: 'routine' | 'elevated' | 'critical';
+  subject: string;
+  description: string;
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  feeDecision:
+    | 'default'
+    | 'waive_open_and_future'
+    | 'refund_realized_and_waive'
+    | 'manual_review'
+    | null;
+  feeDecisionNote: string | null;
+  feeImpactAmount: string | null;
+  openedAt: number;
+  updatedAt: number;
+  resolvedAt: number | null;
+  createdBy: {
+    userId: string;
+    email: string;
+  };
+  messages: Array<{
+    id: string;
+    authorRole: 'client' | 'worker' | 'operator';
+    visibility: 'external' | 'internal';
+    body: string;
+    createdAt: number;
+    author: {
+      userId: string;
+      email: string;
+    };
+  }>;
+};
+
+export type SupportOperationsDashboard = {
+  summary: {
+    openCaseCount: number;
+    criticalCaseCount: number;
+    reconciliationAttentionCount: number;
+    totalRealizedFees: string;
+    totalWorkerPayouts: string;
+    totalClientRefunds: string;
+  };
+  jobs: Array<{
+    jobId: string;
+    title: string;
+    status: string;
+    updatedAt: number;
+    fundedAmount: string | null;
+    supportSummary: {
+      openCaseCount: number;
+      criticalCaseCount: number;
+      latestCaseAt: number | null;
+      unresolvedFeeDecisions: number;
+    };
+    commercial: JobCommercial;
+  }>;
+  cases: Array<
+    SupportCase & {
+      jobTitle: string;
+      jobStatus: string;
+    }
+  >;
+};
+
 const apiBaseUrl = resolveApiBaseUrl(
   process.env.NEXT_PUBLIC_API_BASE_URL,
   resolveLocalApiBaseUrl(process.env.NEXT_PUBLIC_API_PORT),
@@ -1294,6 +1460,46 @@ export const adminApi = {
     return requestJson<AuditBundle>(apiBaseUrl, `/jobs/${jobId}/audit`, {
       method: 'GET',
     });
+  },
+  listSupportOperations(accessToken: string) {
+    return requestJson<SupportOperationsDashboard>(
+      apiBaseUrl,
+      '/jobs/support-operations',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  updateSupportCase(
+    jobId: string,
+    caseId: string,
+    input: {
+      status?:
+        | 'open'
+        | 'investigating'
+        | 'waiting_on_client'
+        | 'waiting_on_worker'
+        | 'resolved';
+      severity?: 'routine' | 'elevated' | 'critical';
+      assignToSelf?: boolean;
+      feeDecision?:
+        | 'default'
+        | 'waive_open_and_future'
+        | 'refund_realized_and_waive'
+        | 'manual_review';
+      feeDecisionNote?: string | null;
+      internalNote?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ supportCase: SupportCase }>(
+      apiBaseUrl,
+      `/jobs/${jobId}/support-cases/${caseId}/admin`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
   },
   downloadCaseExport(
     jobId: string,

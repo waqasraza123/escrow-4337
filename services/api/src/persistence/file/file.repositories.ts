@@ -63,6 +63,7 @@ function normalizeEscrowJobRecord(
           chainSync?: EscrowChainSyncRecord | null;
           executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
           staleWorkflow?: EscrowStaleWorkflowRecord | null;
+          commercial?: EscrowJobRecord['operations']['commercial'] | null;
         };
         projectRoom?: EscrowProjectRoomRecord | null;
       }),
@@ -116,6 +117,9 @@ function normalizeEscrowJobRecord(
           }
         : null,
       staleWorkflow: job.operations?.staleWorkflow ?? null,
+      commercial: job.operations?.commercial
+        ? cloneValue(job.operations.commercial)
+        : null,
     },
     projectRoom: normalizeProjectRoom(job.projectRoom),
   };
@@ -156,6 +160,26 @@ function normalizeProjectRoom(
       milestoneIndex: entry.milestoneIndex ?? null,
       relatedSubmissionId: entry.relatedSubmissionId ?? null,
       detail: entry.detail ?? null,
+    })),
+    supportCases: (projectRoom?.supportCases ?? []).map((supportCase) => ({
+      ...supportCase,
+      milestoneIndex: supportCase.milestoneIndex ?? null,
+      ownerUserId: supportCase.ownerUserId ?? null,
+      ownerEmail: supportCase.ownerEmail ?? null,
+      feeDecision: supportCase.feeDecision ?? null,
+      feeDecisionNote: supportCase.feeDecisionNote ?? null,
+      feeImpactAmount: supportCase.feeImpactAmount ?? null,
+      resolvedAt: supportCase.resolvedAt ?? null,
+      messages: (supportCase.messages ?? []).map((message) => ({
+        ...message,
+        authorRole:
+          message.authorRole === 'operator'
+            ? 'operator'
+            : message.authorRole === 'client'
+              ? 'client'
+              : 'worker',
+        visibility: message.visibility === 'internal' ? 'internal' : 'external',
+      })),
     })),
   };
 }

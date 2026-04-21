@@ -20,15 +20,18 @@ import type { EscrowRepository } from '../../persistence/persistence.types';
 import type {
   ApproveProjectSubmissionDto,
   ContractorInviteDto,
+  CreateSupportCaseDto,
   CreateJobDto,
   JoinContractorDto,
   DeliverMilestoneDto,
   DisputeMilestoneDto,
   FundJobDto,
+  PostSupportCaseMessageDto,
   PostProjectRoomMessageDto,
   RequestProjectRevisionDto,
   ResolveMilestoneDto,
   SetMilestonesDto,
+  UpdateSupportCaseDto,
   SubmitProjectMilestoneDto,
   UpdateContractorEmailDto,
 } from './escrow.dto';
@@ -48,6 +51,8 @@ import type {
   EscrowAuditEvent,
   EscrowContractorParticipationPublicView,
   EscrowContractorParticipationView,
+  EscrowCommercialRecord,
+  EscrowCommercialIssueRecord,
   EscrowExecutionRecord,
   EscrowParticipantRole,
   EscrowProjectActivityView,
@@ -60,8 +65,14 @@ import type {
   EscrowProjectSubmissionRecord,
   EscrowProjectSubmissionResponse,
   EscrowProjectSubmissionView,
+  EscrowSupportCaseResponse,
+  EscrowSupportCaseSeverity,
+  EscrowSupportCaseStatus,
+  EscrowSupportCaseView,
+  EscrowSupportOperationsDashboardResponse,
   FundJobResponse,
   EscrowJobRecord,
+  EscrowJobSupportOperationsResponse,
   EscrowJobsListResponse,
   EscrowJobView,
   EscrowPublicJobView,
@@ -138,6 +149,80 @@ function createEmptyProjectRoom(): EscrowProjectRoomRecord {
     submissions: [],
     messages: [],
     activity: [],
+    supportCases: [],
+  };
+}
+
+function readPlatformFeeConfig(
+  termsJSON: Record<string, unknown>,
+): Pick<
+  EscrowCommercialRecord['feePolicy'],
+  'defaultPlatformFeeBps' | 'effectivePlatformFeeBps' | 'platformFeeLabel'
+> {
+  const commercialPlan =
+    termsJSON.commercialPlan &&
+    typeof termsJSON.commercialPlan === 'object' &&
+    !Array.isArray(termsJSON.commercialPlan)
+      ? (termsJSON.commercialPlan as Record<string, unknown>)
+      : null;
+  const platformFeeBps =
+    typeof commercialPlan?.platformFeeBps === 'number' &&
+    Number.isFinite(commercialPlan.platformFeeBps)
+      ? Math.max(0, Math.trunc(commercialPlan.platformFeeBps))
+      : 250;
+  const platformFeeLabel =
+    typeof commercialPlan?.platformFeeLabel === 'string' &&
+    commercialPlan.platformFeeLabel.trim().length > 0
+      ? commercialPlan.platformFeeLabel.trim()
+      : `${(platformFeeBps / 100).toFixed(platformFeeBps % 100 === 0 ? 0 : 2)}% client platform fee realized on released milestone amounts.`;
+
+  return {
+    defaultPlatformFeeBps: platformFeeBps,
+    effectivePlatformFeeBps: platformFeeBps,
+    platformFeeLabel,
+  };
+}
+
+function createInitialCommercial(
+  job: Pick<EscrowJobRecord, 'termsJSON' | 'onchain'>,
+  now: number,
+): EscrowCommercialRecord {
+  const feeConfig = readPlatformFeeConfig(job.termsJSON);
+  const settlementAsset =
+    typeof job.termsJSON.currency === 'string' && job.termsJSON.currency.trim()
+      ? job.termsJSON.currency.trim()
+      : 'USDC';
+
+  return {
+    feePolicy: {
+      scheduleId: 'marketplace-phase7-v1',
+      feeMode: 'client_platform_fee',
+      realizationTrigger: 'milestone_release_or_resolution',
+      refundTreatment: 'no_fee_on_refund',
+      defaultPlatformFeeBps: feeConfig.defaultPlatformFeeBps,
+      effectivePlatformFeeBps: feeConfig.effectivePlatformFeeBps,
+      platformFeeLabel: feeConfig.platformFeeLabel,
+      treasuryAccountRef: 'ops.base.usdc.primary',
+      feeDisclosure:
+        'Platform fees are accounted for off-chain and realized only when milestone value is released to the worker.',
+      feeDecision: 'default',
+      feeDecisionNote: null,
+      approvedByUserId: null,
+      approvedAt: null,
+      updatedAt: now,
+    },
+    treasuryAccount: {
+      accountRef: 'ops.base.usdc.primary',
+      label: 'Primary Base USDC treasury',
+      settlementAsset,
+      network: 'base',
+      destinationAddress: job.onchain.clientAddress,
+      reconciliationMode: 'offchain_ledger',
+      lastReviewedAt: null,
+    },
+    feeLedger: [],
+    payoutLedger: [],
+    reconciliation: null,
   };
 }
 
@@ -173,6 +258,55 @@ function buildExecutionCorrelationId(input: {
     )
     .digest('hex')
     .slice(0, 24)}`;
+}
+
+function formatMinorUnits(minorUnits: bigint): string {
+  const normalized = minorUnits < 0n ? 0n : minorUnits;
+  const wholeUnits = normalized / MINOR_UNIT_SCALE;
+  const fractionalUnits = (normalized % MINOR_UNIT_SCALE)
+    .toString()
+    .padStart(6, '0')
+    .replace(/0+$/, '');
+
+  return fractionalUnits.length > 0
+    ? `${wholeUnits.toString()}.${fractionalUnits}`
+    : wholeUnits.toString();
+}
+
+function addAmounts(left: string, right: string): string {
+  return formatMinorUnits(
+    parseAmountToMinorUnits(left) + parseAmountToMinorUnits(right),
+  );
+}
+
+function subtractAmounts(left: string, right: string): string {
+  const value =
+    parseAmountToMinorUnits(left) - parseAmountToMinorUnits(right);
+  return formatMinorUnits(value > 0n ? value : 0n);
+}
+
+function sumAmounts(values: Array<string | null | undefined>): string {
+  return formatMinorUnits(
+    values.reduce((total, value) => {
+      if (!value) {
+        return total;
+      }
+      return total + parseAmountToMinorUnits(value);
+    }, 0n),
+  );
+}
+
+function amountsEqual(left: string, right: string) {
+  return parseAmountToMinorUnits(left) === parseAmountToMinorUnits(right);
+}
+
+function calculatePlatformFeeAmount(amount: string, feeBps: number): string {
+  if (feeBps <= 0) {
+    return '0';
+  }
+  const amountMinorUnits = parseAmountToMinorUnits(amount);
+  const feeMinorUnits = (amountMinorUnits * BigInt(feeBps)) / 10_000n;
+  return formatMinorUnits(feeMinorUnits);
 }
 
 @Injectable()
@@ -318,6 +452,7 @@ export class EscrowService {
         chainSync: null,
         executionFailureWorkflow: null,
         staleWorkflow: null,
+        commercial: null,
       },
       projectRoom: createEmptyProjectRoom(),
       onchain: {
@@ -330,6 +465,8 @@ export class EscrowService {
       },
       executions: [],
     };
+    job.operations.commercial = createInitialCommercial(job, now);
+    this.refreshCommercialReconciliation(job, now);
 
     this.appendAudit(job, {
       type: 'job.created',
@@ -624,17 +761,19 @@ export class EscrowService {
           requestContext: gatewayRequestContext,
         }),
       onConfirmed: () => {
+        const now = Date.now();
         job.fundedAmount = fundedAmount;
-        job.updatedAt = Date.now();
+        job.updatedAt = now;
         this.syncJobStatus(job);
         this.appendAudit(job, {
           type: 'job.funded',
-          at: Date.now(),
+          at: now,
           payload: {
             jobId,
             amount: fundedAmount,
           },
         });
+        this.refreshCommercialReconciliation(job, now);
       },
     });
 
@@ -722,6 +861,283 @@ export class EscrowService {
     const merged = await this.escrowOnchainAuthority.mergeJob(job);
     return {
       room: await this.toProjectRoomView(job, merged.job, roles),
+    };
+  }
+
+  async getJobSupportOperations(
+    userId: string,
+    jobId: string,
+  ): Promise<EscrowJobSupportOperationsResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const access = await this.requireJobSupportAccess(job, userId);
+    return {
+      commercial: cloneValue(this.requireCommercial(job)),
+      supportCases: await this.toSupportCaseViews(job, access.operatorAccess),
+    };
+  }
+
+  async listSupportOperations(
+    userId: string,
+  ): Promise<EscrowSupportOperationsDashboardResponse> {
+    await this.userCapabilities.requireCapability(userId, 'escrowOperations');
+    const jobs = await this.escrowRepository.listAll();
+    const cases = await Promise.all(
+      jobs.flatMap((job) =>
+        this.ensureProjectRoom(job).supportCases.map(async (supportCase) => ({
+          ...(await this.toSupportCaseView(job, supportCase, true)),
+          jobTitle: job.title,
+          jobStatus: job.status,
+        })),
+      ),
+    );
+    const jobViews = jobs
+      .map((job) => {
+        const room = this.ensureProjectRoom(job);
+        const commercial = this.requireCommercial(job);
+        const openCases = room.supportCases.filter(
+          (supportCase) => supportCase.status !== 'resolved',
+        );
+        return {
+          jobId: job.id,
+          title: job.title,
+          status: job.status,
+          updatedAt: job.updatedAt,
+          fundedAmount: job.fundedAmount,
+          supportSummary: {
+            openCaseCount: openCases.length,
+            criticalCaseCount: openCases.filter(
+              (supportCase) => supportCase.severity === 'critical',
+            ).length,
+            latestCaseAt: room.supportCases.reduce<number | null>(
+              (latest, supportCase) =>
+                latest === null || supportCase.updatedAt > latest
+                  ? supportCase.updatedAt
+                  : latest,
+              null,
+            ),
+            unresolvedFeeDecisions: openCases.filter(
+              (supportCase) => supportCase.reason === 'fee_exception',
+            ).length,
+          },
+          commercial: cloneValue(commercial),
+        };
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+
+    return {
+      summary: {
+        openCaseCount: cases.filter((supportCase) => supportCase.status !== 'resolved')
+          .length,
+        criticalCaseCount: cases.filter(
+          (supportCase) =>
+            supportCase.status !== 'resolved' &&
+            supportCase.severity === 'critical',
+        ).length,
+        reconciliationAttentionCount: jobViews.filter(
+          (job) => job.commercial.reconciliation?.status === 'attention',
+        ).length,
+        totalRealizedFees: sumAmounts(
+          jobViews.map(
+            (job) =>
+              job.commercial.reconciliation?.recordedRealizedFees ?? '0',
+          ),
+        ),
+        totalWorkerPayouts: sumAmounts(
+          jobViews.map((job) =>
+            sumAmounts(
+              job.commercial.payoutLedger
+                .filter((entry) => entry.kind === 'worker_payout')
+                .map((entry) => entry.amount),
+            ),
+          ),
+        ),
+        totalClientRefunds: sumAmounts(
+          jobViews.map((job) =>
+            sumAmounts(
+              job.commercial.payoutLedger
+                .filter((entry) => entry.kind === 'client_refund')
+                .map((entry) => entry.amount),
+            ),
+          ),
+        ),
+      },
+      jobs: jobViews,
+      cases: cases.sort((left, right) => right.updatedAt - left.updatedAt),
+    };
+  }
+
+  async createSupportCase(
+    userId: string,
+    jobId: string,
+    dto: CreateSupportCaseDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user, role } = await this.requireJobSupportAccess(job, userId);
+    const room = this.ensureProjectRoom(job);
+    const now = Date.now();
+    const supportCase = {
+      id: randomUUID(),
+      jobId: job.id,
+      milestoneIndex: dto.milestoneIndex ?? null,
+      reason: dto.reason,
+      status: 'open',
+      severity:
+        dto.severity ?? this.defaultSupportSeverity(dto.reason, job.fundedAmount),
+      subject: dto.subject.trim(),
+      description: dto.description.trim(),
+      createdByUserId: user.id,
+      createdByRole: role,
+      ownerUserId: null,
+      ownerEmail: null,
+      feeDecision: null,
+      feeDecisionNote: null,
+      feeImpactAmount: this.estimateSupportFeeImpact(job, dto.milestoneIndex ?? null),
+      openedAt: now,
+      updatedAt: now,
+      resolvedAt: null,
+      messages: [
+        {
+          id: randomUUID(),
+          authorUserId: user.id,
+          authorRole: role,
+          visibility: 'external',
+          body: dto.description.trim(),
+          createdAt: now,
+        },
+      ],
+    } satisfies EscrowJobRecord['projectRoom']['supportCases'][number];
+    room.supportCases.push(supportCase);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'support_case_opened',
+      actorUserId: user.id,
+      actorRole: role === 'operator' ? 'client' : role,
+      milestoneIndex: supportCase.milestoneIndex,
+      relatedSubmissionId: null,
+      summary: `Support case opened: ${supportCase.subject}`,
+      detail: supportCase.reason,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    this.refreshCommercialReconciliation(job, now);
+    await this.escrowRepository.save(job);
+    return {
+      supportCase: await this.toSupportCaseView(job, supportCase, false),
+    };
+  }
+
+  async postSupportCaseMessage(
+    userId: string,
+    jobId: string,
+    caseId: string,
+    dto: PostSupportCaseMessageDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const { user, role, operatorAccess } = await this.requireJobSupportAccess(
+      job,
+      userId,
+    );
+    const supportCase = this.requireSupportCase(job, caseId);
+    const visibility =
+      dto.visibility === 'internal'
+        ? operatorAccess
+          ? 'internal'
+          : null
+        : 'external';
+    if (!visibility) {
+      throw new ForbiddenException('Only operators can post internal support notes');
+    }
+    const now = Date.now();
+    supportCase.messages.push({
+      id: randomUUID(),
+      authorUserId: user.id,
+      authorRole: role,
+      visibility,
+      body: dto.body.trim(),
+      createdAt: now,
+    });
+    supportCase.updatedAt = now;
+    const room = this.ensureProjectRoom(job);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'support_case_message_posted',
+      actorUserId: user.id,
+      actorRole: role === 'operator' ? 'client' : role,
+      milestoneIndex: supportCase.milestoneIndex,
+      relatedSubmissionId: null,
+      summary: `Support case updated: ${supportCase.subject}`,
+      detail: visibility === 'internal' ? 'internal note' : dto.body.trim(),
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    this.refreshCommercialReconciliation(job, now);
+    await this.escrowRepository.save(job);
+    return {
+      supportCase: await this.toSupportCaseView(job, supportCase, operatorAccess),
+    };
+  }
+
+  async updateSupportCase(
+    userId: string,
+    jobId: string,
+    caseId: string,
+    dto: UpdateSupportCaseDto,
+  ): Promise<EscrowSupportCaseResponse> {
+    const job = await this.getJobOrThrow(jobId);
+    const operator = await this.usersService.getRequiredById(userId);
+    await this.userCapabilities.requireCapability(userId, 'escrowOperations');
+    const supportCase = this.requireSupportCase(job, caseId);
+    const now = Date.now();
+
+    if (dto.status) {
+      supportCase.status = dto.status;
+      supportCase.resolvedAt = dto.status === 'resolved' ? now : null;
+    }
+    if (dto.severity) {
+      supportCase.severity = dto.severity;
+    }
+    if (dto.assignToSelf) {
+      supportCase.ownerUserId = operator.id;
+      supportCase.ownerEmail = operator.email;
+    }
+    if (dto.feeDecision) {
+      supportCase.feeDecision = dto.feeDecision;
+      supportCase.feeDecisionNote = dto.feeDecisionNote?.trim() || null;
+      this.applyFeeDecision(job, supportCase, operator.id, now);
+    } else if (dto.feeDecisionNote !== undefined) {
+      supportCase.feeDecisionNote = dto.feeDecisionNote?.trim() || null;
+    }
+    if (dto.internalNote?.trim()) {
+      supportCase.messages.push({
+        id: randomUUID(),
+        authorUserId: operator.id,
+        authorRole: 'operator',
+        visibility: 'internal',
+        body: dto.internalNote.trim(),
+        createdAt: now,
+      });
+    }
+    supportCase.updatedAt = now;
+    const room = this.ensureProjectRoom(job);
+    room.activity.push({
+      id: randomUUID(),
+      jobId: job.id,
+      type: 'support_case_status_updated',
+      actorUserId: operator.id,
+      actorRole: 'client',
+      milestoneIndex: supportCase.milestoneIndex,
+      relatedSubmissionId: null,
+      summary: `Support case triaged: ${supportCase.subject}`,
+      detail: supportCase.status,
+      createdAt: now,
+    });
+    job.updatedAt = now;
+    this.refreshCommercialReconciliation(job, now);
+    await this.escrowRepository.save(job);
+    return {
+      supportCase: await this.toSupportCaseView(job, supportCase, true),
     };
   }
 
@@ -1219,6 +1635,13 @@ export class EscrowService {
         milestone.status = 'released';
         milestone.releasedAt = now;
         job.updatedAt = now;
+        this.recordCommercialMilestoneOutcome(
+          job,
+          milestoneIndex,
+          'milestone_release',
+          'release',
+          now,
+        );
         this.syncJobStatus(job);
         this.appendAudit(job, {
           type: 'milestone.released',
@@ -1395,6 +1818,15 @@ export class EscrowService {
           milestone.releasedAt = now;
         }
         job.updatedAt = now;
+        this.recordCommercialMilestoneOutcome(
+          job,
+          milestoneIndex,
+          dto.action === 'release'
+            ? 'dispute_resolution_release'
+            : 'dispute_refund',
+          dto.action,
+          now,
+        );
         this.syncJobStatus(job);
         this.appendAudit(job, {
           type: 'milestone.resolved',
@@ -1505,7 +1937,18 @@ export class EscrowService {
     if (!job.projectRoom) {
       job.projectRoom = createEmptyProjectRoom();
     }
+    if (!job.projectRoom.supportCases) {
+      job.projectRoom.supportCases = [];
+    }
     return job.projectRoom;
+  }
+
+  private requireCommercial(job: EscrowJobRecord) {
+    if (!job.operations.commercial) {
+      job.operations.commercial = createInitialCommercial(job, Date.now());
+      this.refreshCommercialReconciliation(job, Date.now());
+    }
+    return job.operations.commercial;
   }
 
   private async requireProjectRoomAccess(
@@ -1526,6 +1969,27 @@ export class EscrowService {
       );
     }
     return { user, roles };
+  }
+
+  private async requireJobSupportAccess(job: EscrowJobRecord, userId: string) {
+    const user = await this.usersService.getRequiredById(userId);
+    const roles = this.resolveParticipantRoles(job, user);
+    const operatorAccess =
+      (
+        await this.userCapabilities.getCapabilitiesForUser(userId)
+      ).escrowOperations.allowed;
+    if (roles.length === 0 && !operatorAccess) {
+      throw new ForbiddenException('You do not have access to this support queue');
+    }
+    return {
+      user,
+      role:
+        operatorAccess && roles.length === 0
+          ? ('operator' as const)
+          : (roles[0] ?? 'client'),
+      roles,
+      operatorAccess,
+    };
   }
 
   private requireProjectSubmission(
@@ -1573,6 +2037,15 @@ export class EscrowService {
     }
     for (const activity of projectRoom.activity) {
       userIds.add(activity.actorUserId);
+    }
+    for (const supportCase of projectRoom.supportCases) {
+      userIds.add(supportCase.createdByUserId);
+      if (supportCase.ownerUserId) {
+        userIds.add(supportCase.ownerUserId);
+      }
+      for (const message of supportCase.messages) {
+        userIds.add(message.authorUserId);
+      }
     }
 
     const emailMap = new Map<string, string>();
@@ -1659,6 +2132,77 @@ export class EscrowService {
         email: emailMap.get(activity.actorUserId) ?? activity.actorUserId,
       },
     };
+  }
+
+  private requireSupportCase(job: EscrowJobRecord, caseId: string) {
+    const supportCase = this.ensureProjectRoom(job).supportCases.find(
+      (entry) => entry.id === caseId,
+    );
+    if (!supportCase) {
+      throw new NotFoundException('Support case not found');
+    }
+    return supportCase;
+  }
+
+  private async toSupportCaseView(
+    job: EscrowJobRecord,
+    supportCase: EscrowJobRecord['projectRoom']['supportCases'][number],
+    includeInternal: boolean,
+  ): Promise<EscrowSupportCaseView> {
+    const emailMap = await this.buildProjectRoomEmailMap(this.ensureProjectRoom(job));
+    return {
+      id: supportCase.id,
+      jobId: supportCase.jobId,
+      milestoneIndex: supportCase.milestoneIndex,
+      reason: supportCase.reason,
+      status: supportCase.status,
+      severity: supportCase.severity,
+      subject: supportCase.subject,
+      description: supportCase.description,
+      ownerUserId: supportCase.ownerUserId,
+      ownerEmail: supportCase.ownerEmail,
+      feeDecision: supportCase.feeDecision,
+      feeDecisionNote: supportCase.feeDecisionNote,
+      feeImpactAmount: supportCase.feeImpactAmount,
+      openedAt: supportCase.openedAt,
+      updatedAt: supportCase.updatedAt,
+      resolvedAt: supportCase.resolvedAt,
+      createdBy: {
+        userId: supportCase.createdByUserId,
+        email:
+          emailMap.get(supportCase.createdByUserId) ??
+          supportCase.createdByUserId,
+      },
+      messages: supportCase.messages
+        .slice()
+        .filter((message) => includeInternal || message.visibility === 'external')
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .map((message) => ({
+          id: message.id,
+          authorRole: message.authorRole,
+          visibility: message.visibility,
+          body: message.body,
+          createdAt: message.createdAt,
+          author: {
+            userId: message.authorUserId,
+            email: emailMap.get(message.authorUserId) ?? message.authorUserId,
+          },
+        })),
+    };
+  }
+
+  private async toSupportCaseViews(
+    job: EscrowJobRecord,
+    includeInternal: boolean,
+  ) {
+    return Promise.all(
+      this.ensureProjectRoom(job).supportCases
+        .slice()
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .map((supportCase) =>
+          this.toSupportCaseView(job, supportCase, includeInternal),
+        ),
+    );
   }
 
   private mapAuditToProjectActivity(
@@ -1811,7 +2355,311 @@ export class EscrowService {
         .map((activity) => this.toProjectRoomActivityView(activity, emailMap))
         .concat(sourceJob.audit.map((event) => this.mapAuditToProjectActivity(event)))
         .sort((left, right) => right.createdAt - left.createdAt),
+      supportCases: await this.toSupportCaseViews(sourceJob, false),
     };
+  }
+
+  private defaultSupportSeverity(
+    reason: CreateSupportCaseDto['reason'],
+    fundedAmount: string | null,
+  ): EscrowSupportCaseSeverity {
+    switch (reason) {
+      case 'stuck_funding':
+        return fundedAmount ? 'critical' : 'elevated';
+      case 'fee_exception':
+      case 'release_delay':
+        return 'elevated';
+      case 'dispute_followup':
+        return 'critical';
+      case 'fee_question':
+      case 'general_help':
+      default:
+        return 'routine';
+    }
+  }
+
+  private estimateSupportFeeImpact(
+    job: EscrowJobRecord,
+    milestoneIndex: number | null,
+  ): string | null {
+    const commercial = this.requireCommercial(job);
+    if (milestoneIndex === null) {
+      return commercial.reconciliation?.recordedRealizedFees ?? '0';
+    }
+    const milestone = job.milestones[milestoneIndex];
+    if (!milestone) {
+      return null;
+    }
+    return calculatePlatformFeeAmount(
+      milestone.amount,
+      commercial.feePolicy.effectivePlatformFeeBps,
+    );
+  }
+
+  private recordCommercialMilestoneOutcome(
+    job: EscrowJobRecord,
+    milestoneIndex: number,
+    source:
+      | 'milestone_release'
+      | 'dispute_resolution_release'
+      | 'dispute_refund',
+    action: 'release' | 'refund',
+    at: number,
+  ) {
+    const commercial = this.requireCommercial(job);
+    const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
+    if (
+      commercial.payoutLedger.some(
+        (entry) => entry.milestoneIndex === milestoneIndex,
+      )
+    ) {
+      this.refreshCommercialReconciliation(job, at);
+      return;
+    }
+
+    commercial.payoutLedger.push({
+      id: randomUUID(),
+      jobId: job.id,
+      milestoneIndex,
+      kind: action === 'release' ? 'worker_payout' : 'client_refund',
+      source,
+      amount: milestone.amount,
+      currencyAddress: job.onchain.currencyAddress,
+      note: null,
+      createdAt: at,
+    });
+
+    if (action === 'release') {
+      const feeAmount = calculatePlatformFeeAmount(
+        milestone.amount,
+        this.getPlatformFeeBpsForMilestone(commercial, milestone, at),
+      );
+      if (!amountsEqual(feeAmount, '0')) {
+        commercial.feeLedger.push({
+          id: randomUUID(),
+          jobId: job.id,
+          milestoneIndex,
+          kind: 'platform_fee_accrued',
+          source,
+          amount: feeAmount,
+          currencyAddress: job.onchain.currencyAddress,
+          treasuryAccountRef: commercial.treasuryAccount.accountRef,
+          note: commercial.feePolicy.platformFeeLabel,
+          createdAt: at,
+        });
+      }
+    }
+
+    this.refreshCommercialReconciliation(job, at);
+  }
+
+  private applyFeeDecision(
+    job: EscrowJobRecord,
+    supportCase: EscrowJobRecord['projectRoom']['supportCases'][number],
+    operatorUserId: string,
+    at: number,
+  ) {
+    const commercial = this.requireCommercial(job);
+    const decision = supportCase.feeDecision;
+    if (!decision) {
+      return;
+    }
+
+    commercial.feePolicy.feeDecision = decision;
+    commercial.feePolicy.feeDecisionNote = supportCase.feeDecisionNote;
+    commercial.feePolicy.approvedByUserId = operatorUserId;
+    commercial.feePolicy.approvedAt = at;
+    commercial.feePolicy.updatedAt = at;
+
+    if (decision === 'default' || decision === 'manual_review') {
+      commercial.feePolicy.effectivePlatformFeeBps =
+        commercial.feePolicy.defaultPlatformFeeBps;
+      this.refreshCommercialReconciliation(job, at);
+      return;
+    }
+
+    commercial.feePolicy.effectivePlatformFeeBps = 0;
+
+    if (decision === 'refund_realized_and_waive') {
+      const realizedFees = subtractAmounts(
+        sumAmounts(
+          commercial.feeLedger
+            .filter((entry) => entry.kind === 'platform_fee_accrued')
+            .map((entry) => entry.amount),
+        ),
+        sumAmounts(
+          commercial.feeLedger
+            .filter((entry) => entry.kind === 'platform_fee_reversed')
+            .map((entry) => entry.amount),
+        ),
+      );
+      if (!amountsEqual(realizedFees, '0')) {
+        commercial.feeLedger.push({
+          id: randomUUID(),
+          jobId: job.id,
+          milestoneIndex: supportCase.milestoneIndex,
+          kind: 'platform_fee_reversed',
+          source: 'support_fee_refund',
+          amount: realizedFees,
+          currencyAddress: job.onchain.currencyAddress,
+          treasuryAccountRef: commercial.treasuryAccount.accountRef,
+          note: supportCase.feeDecisionNote,
+          createdAt: at,
+        });
+      }
+    }
+
+    this.refreshCommercialReconciliation(job, at);
+  }
+
+  private refreshCommercialReconciliation(job: EscrowJobRecord, at: number) {
+    const commercial = this.requireCommercial(job);
+    const expectedReleasedAmount = sumAmounts(
+      job.milestones
+        .filter((milestone) => milestone.status === 'released')
+        .map((milestone) => milestone.amount),
+    );
+    const expectedRefundedAmount = sumAmounts(
+      job.milestones
+        .filter((milestone) => milestone.status === 'refunded')
+        .map((milestone) => milestone.amount),
+    );
+    const expectedRealizedFees = sumAmounts(
+      job.milestones
+        .filter((milestone) => milestone.status === 'released')
+        .map((milestone) =>
+          calculatePlatformFeeAmount(
+            milestone.amount,
+            this.getPlatformFeeBpsForMilestone(
+              commercial,
+              milestone,
+              milestone.releasedAt ?? milestone.resolvedAt ?? at,
+            ),
+          ),
+        ),
+    );
+    const recordedReleasedAmount = sumAmounts(
+      commercial.payoutLedger
+        .filter((entry) => entry.kind === 'worker_payout')
+        .map((entry) => entry.amount),
+    );
+    const recordedRefundedAmount = sumAmounts(
+      commercial.payoutLedger
+        .filter((entry) => entry.kind === 'client_refund')
+        .map((entry) => entry.amount),
+    );
+    const recordedRealizedFees = subtractAmounts(
+      sumAmounts(
+        commercial.feeLedger
+          .filter((entry) => entry.kind === 'platform_fee_accrued')
+          .map((entry) => entry.amount),
+      ),
+      sumAmounts(
+        commercial.feeLedger
+          .filter((entry) => entry.kind === 'platform_fee_reversed')
+          .map((entry) => entry.amount),
+      ),
+    );
+    const room = this.ensureProjectRoom(job);
+    const openCases = room.supportCases.filter(
+      (supportCase) => supportCase.status !== 'resolved',
+    );
+    const issues: EscrowCommercialIssueRecord[] = [];
+
+    if (!amountsEqual(expectedReleasedAmount, recordedReleasedAmount)) {
+      issues.push({
+        code: 'payout_mismatch',
+        severity: 'critical',
+        summary: 'Worker payout ledger does not match released milestone value.',
+        detail: `${recordedReleasedAmount} recorded vs ${expectedReleasedAmount} expected.`,
+      });
+    }
+    if (!amountsEqual(expectedRefundedAmount, recordedRefundedAmount)) {
+      issues.push({
+        code: 'payout_mismatch',
+        severity: 'critical',
+        summary: 'Client refund ledger does not match refunded milestone value.',
+        detail: `${recordedRefundedAmount} recorded vs ${expectedRefundedAmount} expected.`,
+      });
+    }
+    if (!amountsEqual(expectedRealizedFees, recordedRealizedFees)) {
+      issues.push({
+        code: 'fee_mismatch',
+        severity: 'warning',
+        summary: 'Fee ledger diverges from the currently effective fee policy.',
+        detail: `${recordedRealizedFees} recorded vs ${expectedRealizedFees} expected.`,
+      });
+    }
+    if (job.status === 'draft' && job.fundedAmount === null) {
+      issues.push({
+        code: 'stuck_funding',
+        severity: 'warning',
+        summary: 'Contract has not been funded yet.',
+        detail: 'Use support workflows for funding blockers or wallet friction.',
+      });
+    }
+    if (
+      openCases.some((supportCase) => supportCase.reason === 'fee_exception')
+    ) {
+      issues.push({
+        code: 'support_followup',
+        severity: 'warning',
+        summary: 'An unresolved fee exception request still needs operator review.',
+        detail: null,
+      });
+    }
+    if (openCases.some((supportCase) => !supportCase.ownerUserId)) {
+      issues.push({
+        code: 'unowned_support_case',
+        severity: 'warning',
+        summary: 'One or more open support cases are unassigned.',
+        detail: null,
+      });
+    }
+
+    commercial.reconciliation = {
+      status: issues.length > 0 ? 'attention' : 'balanced',
+      expectedReleasedAmount,
+      expectedRefundedAmount,
+      expectedRealizedFees,
+      recordedReleasedAmount,
+      recordedRefundedAmount,
+      recordedRealizedFees,
+      openSupportCaseCount: openCases.length,
+      activeFeeException:
+        commercial.feePolicy.feeDecision !== 'default' &&
+        commercial.feePolicy.feeDecision !== 'manual_review',
+      issueCount: issues.length,
+      issues,
+      lastComputedAt: at,
+    };
+  }
+
+  private getPlatformFeeBpsForMilestone(
+    commercial: EscrowCommercialRecord,
+    milestone: EscrowJobRecord['milestones'][number],
+    at: number,
+  ) {
+    if (
+      commercial.feePolicy.feeDecision === 'default' ||
+      commercial.feePolicy.feeDecision === 'manual_review'
+    ) {
+      return commercial.feePolicy.defaultPlatformFeeBps;
+    }
+
+    if (
+      commercial.feePolicy.feeDecision === 'waive_open_and_future' ||
+      commercial.feePolicy.feeDecision === 'refund_realized_and_waive'
+    ) {
+      const approvedAt = commercial.feePolicy.approvedAt;
+      const releasedAt = milestone.releasedAt ?? milestone.resolvedAt ?? at;
+      if (approvedAt !== null && releasedAt < approvedAt) {
+        return commercial.feePolicy.defaultPlatformFeeBps;
+      }
+      return 0;
+    }
+
+    return commercial.feePolicy.effectivePlatformFeeBps;
   }
 
   private resolveParticipantRoles(

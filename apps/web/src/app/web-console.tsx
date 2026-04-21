@@ -26,10 +26,12 @@ import type {
   ContractorJoinReadiness,
   EscrowAuthorityStatus,
   JobView,
+  JobCommercial,
   JobsListResponse,
   PublicJobView,
   RuntimeProfile,
   SessionTokens,
+  SupportCase,
   SmartAccountProvisionResponse,
   UserProfile,
   WalletLinkChallenge,
@@ -113,6 +115,13 @@ type TaskBoardCard = {
   context?: string;
 };
 
+type SupportCaseDraft = {
+  reason: SupportCase['reason'];
+  subject: string;
+  description: string;
+  message: string;
+};
+
 export type EscrowConsoleView =
   | 'overview'
   | 'sign-in'
@@ -153,6 +162,15 @@ function createInitialJobComposerState(): JobComposerState {
     disputeModel: 'operator-mediation',
     evidenceExpectation: 'delivery note plus linked evidence URLs',
     kickoffNote: 'Milestones should be accepted or disputed explicitly at each delivery checkpoint.',
+  };
+}
+
+function createSupportCaseDraft(): SupportCaseDraft {
+  return {
+    reason: 'general_help',
+    subject: '',
+    description: '',
+    message: '',
   };
 }
 
@@ -424,6 +442,10 @@ export function EscrowConsole({
   const [jobsResponse, setJobsResponse] = useState<JobsListResponse>({ jobs: [] });
   const [selectedJobId, setSelectedJobId] = useState<string | null>(initialJobId);
   const [auditBundle, setAuditBundle] = useState<AuditBundle | null>(null);
+  const [jobSupportOps, setJobSupportOps] = useState<{
+    commercial: JobCommercial;
+    supportCases: SupportCase[];
+  } | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [startState, setStartState] = useState<AsyncState>(createIdleState());
@@ -435,12 +457,18 @@ export function EscrowConsole({
   const [jobActionState, setJobActionState] = useState<AsyncState>(
     createIdleState(),
   );
+  const [jobSupportState, setJobSupportState] = useState<AsyncState>(
+    createIdleState(),
+  );
   const [auditState, setAuditState] = useState<AsyncState>(createIdleState());
   const [challenge, setChallenge] = useState<WalletLinkChallenge | null>(null);
   const [linkAddress, setLinkAddress] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [linkChainId, setLinkChainId] = useState('84532');
   const [walletSignature, setWalletSignature] = useState('');
+  const [supportCaseDraft, setSupportCaseDraft] = useState<SupportCaseDraft>(
+    createSupportCaseDraft(),
+  );
   const [walletConnection, setWalletConnection] = useState<WalletConnectionState>({
     status: 'checking',
     address: null,
@@ -544,6 +572,10 @@ export function EscrowConsole({
   const reviewWindowDays = getNumericTerm(selectedJobView, 'reviewWindowDays');
   const disputeModel = getStringTerm(selectedJobView, 'disputeModel');
   const evidenceExpectation = getStringTerm(selectedJobView, 'evidenceExpectation');
+  const commercial = jobSupportOps?.commercial ?? selectedJobView?.operations.commercial ?? null;
+  const supportCases = jobSupportOps?.supportCases ?? [];
+  const openSupportCases = supportCases.filter((supportCase) => supportCase.status !== 'resolved');
+  const latestSupportCase = supportCases[0] ?? null;
   const contractorJoined = selectedContractorParticipation?.status === 'joined';
   const deliverySubmitted = Boolean(
     selectedMilestone &&
@@ -897,12 +929,15 @@ export function EscrowConsole({
     if (!selectedJobId) {
       setAuditBundle(null);
       setAuditState(createIdleState());
+      setJobSupportOps(null);
+      setJobSupportState(createIdleState());
       return;
     }
 
     setAuditBundle(null);
     void loadAudit(selectedJobId);
-  }, [selectedJobId]);
+    void loadJobSupportOperations(selectedJobId);
+  }, [selectedJobId, accessToken]);
 
   useEffect(() => {
     setDeliveryNote('');
@@ -914,6 +949,7 @@ export function EscrowConsole({
     setJoinLinkState(createIdleState());
     setJoinReadiness(null);
     setJoinReadinessState(createIdleState());
+    setSupportCaseDraft(createSupportCaseDraft());
   }, [selectedJobId]);
 
   useEffect(() => {
@@ -1041,6 +1077,28 @@ export function EscrowConsole({
     }
   }
 
+  async function loadJobSupportOperations(
+    jobId: string,
+    token = accessToken,
+  ) {
+    if (!token) {
+      setJobSupportOps(null);
+      setJobSupportState(createIdleState());
+      return;
+    }
+
+    setJobSupportState(createWorkingState('Loading fee and support operations...'));
+
+    try {
+      const response = await webApi.getJobSupportOperations(jobId, token);
+      setJobSupportOps(response);
+      setJobSupportState(createIdleState());
+    } catch (error) {
+      setJobSupportOps(null);
+      setJobSupportState(createErrorState(error, 'Failed to load fee and support operations'));
+    }
+  }
+
   async function refreshSelectedJobContext(targetJobId: string | null) {
     if (!targetJobId) {
       return;
@@ -1049,7 +1107,10 @@ export function EscrowConsole({
     if (accessToken) {
       await refreshConsole(accessToken);
     }
-    await loadAudit(targetJobId);
+    await Promise.all([
+      loadAudit(targetJobId),
+      loadJobSupportOperations(targetJobId, accessToken),
+    ]);
   }
 
   async function runLifecycleMutation<T>(input: {
@@ -1151,6 +1212,8 @@ export function EscrowConsole({
     setJobsResponse({ jobs: [] });
     setSelectedJobId(null);
     setAuditBundle(null);
+    setJobSupportOps(null);
+    setJobSupportState(createIdleState());
     writeSession(null);
   }
 
@@ -1282,6 +1345,59 @@ export function EscrowConsole({
       setJoinLinkState(
         createErrorState(error, 'Failed to update pending contractor email'),
       );
+    }
+  }
+
+  async function handleCreateSupportCase() {
+    if (!accessToken || !selectedJobView) {
+      return;
+    }
+
+    setJobSupportState(createWorkingState('Creating support case...'));
+
+    try {
+      await webApi.createSupportCase(
+        selectedJobView.id,
+        {
+          reason: supportCaseDraft.reason,
+          milestoneIndex: selectedMilestone ? selectedMilestoneIndex : null,
+          subject: supportCaseDraft.subject,
+          description: supportCaseDraft.description,
+        },
+        accessToken,
+      );
+      setSupportCaseDraft(createSupportCaseDraft());
+      await loadJobSupportOperations(selectedJobView.id, accessToken);
+      setJobSupportState(createSuccessState('Support case opened.'));
+    } catch (error) {
+      setJobSupportState(createErrorState(error, 'Failed to create support case'));
+    }
+  }
+
+  async function handlePostSupportMessage(caseId: string) {
+    if (!accessToken || !selectedJobView || !supportCaseDraft.message.trim()) {
+      return;
+    }
+
+    setJobSupportState(createWorkingState('Posting support reply...'));
+
+    try {
+      await webApi.postSupportCaseMessage(
+        selectedJobView.id,
+        caseId,
+        {
+          body: supportCaseDraft.message,
+        },
+        accessToken,
+      );
+      setSupportCaseDraft((current) => ({
+        ...current,
+        message: '',
+      }));
+      await loadJobSupportOperations(selectedJobView.id, accessToken);
+      setJobSupportState(createSuccessState('Support reply posted.'));
+    } catch (error) {
+      setJobSupportState(createErrorState(error, 'Failed to post support reply'));
     }
   }
 
@@ -2912,6 +3028,196 @@ export function EscrowConsole({
                   </strong>
                 </article>
               </div>
+              {commercial ? (
+                <article className={styles.timelineCard}>
+                  <div className={styles.timelineHead}>
+                    <strong>Fee and treasury posture</strong>
+                    <span>
+                      {commercial.reconciliation?.status === 'attention'
+                        ? 'Needs review'
+                        : 'Balanced'}
+                    </span>
+                  </div>
+                  <div className={styles.summaryGrid}>
+                    <article>
+                      <span className={styles.metaLabel}>Fee policy</span>
+                      <strong>{commercial.feePolicy.platformFeeLabel}</strong>
+                    </article>
+                    <article>
+                      <span className={styles.metaLabel}>Effective fee</span>
+                      <strong>{`${(
+                        commercial.feePolicy.effectivePlatformFeeBps / 100
+                      ).toFixed(
+                        commercial.feePolicy.effectivePlatformFeeBps % 100 === 0
+                          ? 0
+                          : 2,
+                      )}%`}</strong>
+                    </article>
+                    <article>
+                      <span className={styles.metaLabel}>Realized fees</span>
+                      <strong>{commercial.reconciliation?.recordedRealizedFees ?? '0'}</strong>
+                    </article>
+                    <article>
+                      <span className={styles.metaLabel}>Worker payouts</span>
+                      <strong>{commercial.reconciliation?.recordedReleasedAmount ?? '0'}</strong>
+                    </article>
+                    <article>
+                      <span className={styles.metaLabel}>Client refunds</span>
+                      <strong>{commercial.reconciliation?.recordedRefundedAmount ?? '0'}</strong>
+                    </article>
+                    <article>
+                      <span className={styles.metaLabel}>Treasury</span>
+                      <strong>{commercial.treasuryAccount.label}</strong>
+                    </article>
+                  </div>
+                  <p className={styles.muted}>{commercial.feePolicy.feeDisclosure}</p>
+                  {commercial.reconciliation?.issues.length ? (
+                    <div className={styles.stack}>
+                      {commercial.reconciliation.issues.map((issue) => (
+                        <article key={`${issue.code}-${issue.summary}`} className={styles.statusBanner}>
+                          <strong>{issue.summary}</strong>
+                          {issue.detail ? (
+                            <p className={styles.stateText}>{issue.detail}</p>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ) : null}
+              <article className={styles.timelineCard}>
+                <div className={styles.timelineHead}>
+                  <strong>Support operations</strong>
+                  <span>{openSupportCases.length} open</span>
+                </div>
+                <p className={styles.muted}>
+                  Use support when funding is blocked, a fee exception is needed, or a dispute or
+                  release needs operator follow-up.
+                </p>
+                <div className={styles.summaryGrid}>
+                  <article>
+                    <span className={styles.metaLabel}>Latest case</span>
+                    <strong>{latestSupportCase?.subject ?? 'No support cases yet'}</strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Latest status</span>
+                    <strong>{latestSupportCase?.status ?? 'clear'}</strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Fee exceptions</span>
+                    <strong>
+                      {supportCases.filter((supportCase) => supportCase.reason === 'fee_exception')
+                        .length}
+                    </strong>
+                  </article>
+                  <article>
+                    <span className={styles.metaLabel}>Critical support</span>
+                    <strong>
+                      {
+                        openSupportCases.filter(
+                          (supportCase) => supportCase.severity === 'critical',
+                        ).length
+                      }
+                    </strong>
+                  </article>
+                </div>
+                <div className={styles.stack}>
+                  <label className={styles.field}>
+                    <span>Support reason</span>
+                    <select
+                      value={supportCaseDraft.reason}
+                      onChange={(event) =>
+                        setSupportCaseDraft((current) => ({
+                          ...current,
+                          reason: event.target.value as SupportCase['reason'],
+                        }))
+                      }
+                    >
+                      <option value="general_help">general_help</option>
+                      <option value="fee_question">fee_question</option>
+                      <option value="fee_exception">fee_exception</option>
+                      <option value="stuck_funding">stuck_funding</option>
+                      <option value="dispute_followup">dispute_followup</option>
+                      <option value="release_delay">release_delay</option>
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span>Support subject</span>
+                    <input
+                      type="text"
+                      value={supportCaseDraft.subject}
+                      onChange={(event) =>
+                        setSupportCaseDraft((current) => ({
+                          ...current,
+                          subject: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Support description</span>
+                    <textarea
+                      rows={4}
+                      value={supportCaseDraft.description}
+                      onChange={(event) =>
+                        setSupportCaseDraft((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateSupportCase()}
+                      disabled={
+                        !supportCaseDraft.subject.trim() ||
+                        !supportCaseDraft.description.trim()
+                      }
+                    >
+                      Open support case
+                    </button>
+                  </div>
+                  {latestSupportCase ? (
+                    <>
+                      <label className={styles.field}>
+                        <span>Reply to latest case</span>
+                        <textarea
+                          rows={3}
+                          value={supportCaseDraft.message}
+                          onChange={(event) =>
+                            setSupportCaseDraft((current) => ({
+                              ...current,
+                              message: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => void handlePostSupportMessage(latestSupportCase.id)}
+                          disabled={!supportCaseDraft.message.trim()}
+                        >
+                          Send support reply
+                        </button>
+                        <Link
+                          href={`/app/contracts/${selectedJobView.id}/room`}
+                          className={styles.secondaryButton}
+                        >
+                          Open project room support thread
+                        </Link>
+                      </div>
+                    </>
+                  ) : null}
+                  <StatusNotice
+                    message={jobSupportState.message}
+                    messageClassName={styles.stateText}
+                  />
+                </div>
+              </article>
               <div className={styles.roleBar}>
                 {selectedJobRoles.length > 0 ? (
                   selectedJobRoles.map((role) => (

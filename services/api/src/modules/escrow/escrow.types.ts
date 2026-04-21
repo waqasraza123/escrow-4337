@@ -219,7 +219,10 @@ export type EscrowProjectActivityType =
   | 'revision_requested'
   | 'submission_approved'
   | 'submission_delivered'
-  | 'message_posted';
+  | 'message_posted'
+  | 'support_case_opened'
+  | 'support_case_message_posted'
+  | 'support_case_status_updated';
 
 export type EscrowProjectActivityRecord = {
   id: string;
@@ -234,10 +237,155 @@ export type EscrowProjectActivityRecord = {
   createdAt: number;
 };
 
+export type EscrowFeeDecision =
+  | 'default'
+  | 'waive_open_and_future'
+  | 'refund_realized_and_waive'
+  | 'manual_review';
+
+export type EscrowFeePolicyRecord = {
+  scheduleId: string;
+  feeMode: 'client_platform_fee';
+  realizationTrigger: 'milestone_release_or_resolution';
+  refundTreatment: 'no_fee_on_refund';
+  defaultPlatformFeeBps: number;
+  effectivePlatformFeeBps: number;
+  platformFeeLabel: string;
+  treasuryAccountRef: string;
+  feeDisclosure: string;
+  feeDecision: EscrowFeeDecision;
+  feeDecisionNote: string | null;
+  approvedByUserId: string | null;
+  approvedAt: number | null;
+  updatedAt: number;
+};
+
+export type EscrowTreasuryAccountRecord = {
+  accountRef: string;
+  label: string;
+  settlementAsset: string;
+  network: 'base';
+  destinationAddress: string;
+  reconciliationMode: 'offchain_ledger';
+  lastReviewedAt: number | null;
+};
+
+export type EscrowFeeLedgerEntryRecord = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number | null;
+  kind: 'platform_fee_accrued' | 'platform_fee_reversed';
+  source:
+    | 'milestone_release'
+    | 'dispute_resolution_release'
+    | 'support_fee_refund';
+  amount: string;
+  currencyAddress: string;
+  treasuryAccountRef: string;
+  note: string | null;
+  createdAt: number;
+};
+
+export type EscrowPayoutLedgerEntryRecord = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number;
+  kind: 'worker_payout' | 'client_refund';
+  source: 'milestone_release' | 'dispute_resolution_release' | 'dispute_refund';
+  amount: string;
+  currencyAddress: string;
+  note: string | null;
+  createdAt: number;
+};
+
+export type EscrowCommercialIssueRecord = {
+  code:
+    | 'fee_mismatch'
+    | 'payout_mismatch'
+    | 'stuck_funding'
+    | 'support_followup'
+    | 'unowned_support_case';
+  severity: 'warning' | 'critical';
+  summary: string;
+  detail: string | null;
+};
+
+export type EscrowCommercialReconciliationRecord = {
+  status: 'balanced' | 'attention';
+  expectedReleasedAmount: string;
+  expectedRefundedAmount: string;
+  expectedRealizedFees: string;
+  recordedReleasedAmount: string;
+  recordedRefundedAmount: string;
+  recordedRealizedFees: string;
+  openSupportCaseCount: number;
+  activeFeeException: boolean;
+  issueCount: number;
+  issues: EscrowCommercialIssueRecord[];
+  lastComputedAt: number;
+};
+
+export type EscrowCommercialRecord = {
+  feePolicy: EscrowFeePolicyRecord;
+  treasuryAccount: EscrowTreasuryAccountRecord;
+  feeLedger: EscrowFeeLedgerEntryRecord[];
+  payoutLedger: EscrowPayoutLedgerEntryRecord[];
+  reconciliation: EscrowCommercialReconciliationRecord | null;
+};
+
+export type EscrowSupportCaseStatus =
+  | 'open'
+  | 'investigating'
+  | 'waiting_on_client'
+  | 'waiting_on_worker'
+  | 'resolved';
+
+export type EscrowSupportCaseSeverity = 'routine' | 'elevated' | 'critical';
+
+export type EscrowSupportCaseReason =
+  | 'general_help'
+  | 'fee_question'
+  | 'fee_exception'
+  | 'stuck_funding'
+  | 'dispute_followup'
+  | 'release_delay';
+
+export type EscrowSupportCaseMessageRecord = {
+  id: string;
+  authorUserId: string;
+  authorRole: 'client' | 'worker' | 'operator';
+  visibility: 'external' | 'internal';
+  body: string;
+  createdAt: number;
+};
+
+export type EscrowSupportCaseRecord = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number | null;
+  reason: EscrowSupportCaseReason;
+  status: EscrowSupportCaseStatus;
+  severity: EscrowSupportCaseSeverity;
+  subject: string;
+  description: string;
+  createdByUserId: string;
+  createdByRole: 'client' | 'worker' | 'operator';
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  feeDecision: EscrowFeeDecision | null;
+  feeDecisionNote: string | null;
+  feeImpactAmount: string | null;
+  openedAt: number;
+  updatedAt: number;
+  resolvedAt: number | null;
+  messages: EscrowSupportCaseMessageRecord[];
+};
+
 export type EscrowProjectRoomRecord = {
   submissions: EscrowProjectSubmissionRecord[];
   messages: EscrowProjectMessageRecord[];
   activity: EscrowProjectActivityRecord[];
+  supportCases: EscrowSupportCaseRecord[];
 };
 
 export type EscrowOnchainState = {
@@ -486,6 +634,7 @@ export type EscrowJobRecord = {
     chainSync: EscrowChainSyncRecord | null;
     executionFailureWorkflow: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow: EscrowStaleWorkflowRecord | null;
+    commercial: EscrowCommercialRecord | null;
   };
   projectRoom: EscrowProjectRoomRecord;
   onchain: EscrowOnchainState;
@@ -572,6 +721,30 @@ export type EscrowProjectRoomView = {
   submissions: EscrowProjectSubmissionView[];
   messages: EscrowProjectMessageView[];
   activity: EscrowProjectRoomActivityView[];
+  supportCases: EscrowSupportCaseView[];
+};
+
+export type EscrowCommercialView = EscrowCommercialRecord;
+
+export type EscrowSupportCaseMessageView = Omit<
+  EscrowSupportCaseMessageRecord,
+  'authorUserId'
+> & {
+  author: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type EscrowSupportCaseView = Omit<
+  EscrowSupportCaseRecord,
+  'createdByUserId' | 'messages'
+> & {
+  createdBy: {
+    userId: string;
+    email: string;
+  };
+  messages: EscrowSupportCaseMessageView[];
 };
 
 export type EscrowContractorJoinReadinessStatus =
@@ -595,6 +768,48 @@ export type EscrowJobsListResponse = {
 
 export type EscrowProjectRoomResponse = {
   room: EscrowProjectRoomView;
+};
+
+export type EscrowJobSupportOperationsResponse = {
+  commercial: EscrowCommercialView;
+  supportCases: EscrowSupportCaseView[];
+};
+
+export type EscrowSupportCaseResponse = {
+  supportCase: EscrowSupportCaseView;
+};
+
+export type EscrowSupportOperationsJobView = {
+  jobId: string;
+  title: string;
+  status: JobStatus;
+  updatedAt: number;
+  fundedAmount: string | null;
+  supportSummary: {
+    openCaseCount: number;
+    criticalCaseCount: number;
+    latestCaseAt: number | null;
+    unresolvedFeeDecisions: number;
+  };
+  commercial: EscrowCommercialView;
+};
+
+export type EscrowSupportOperationsDashboardResponse = {
+  summary: {
+    openCaseCount: number;
+    criticalCaseCount: number;
+    reconciliationAttentionCount: number;
+    totalRealizedFees: string;
+    totalWorkerPayouts: string;
+    totalClientRefunds: string;
+  };
+  jobs: EscrowSupportOperationsJobView[];
+  cases: Array<
+    EscrowSupportCaseView & {
+      jobTitle: string;
+      jobStatus: JobStatus;
+    }
+  >;
 };
 
 export type EscrowProjectSubmissionResponse = {

@@ -132,6 +132,7 @@ type JobRow = QueryResultRow & {
     chainSync?: EscrowChainSyncRecord | null;
     executionFailureWorkflow?: EscrowExecutionFailureWorkflowRecord | null;
     staleWorkflow?: EscrowStaleWorkflowRecord | null;
+    commercial?: EscrowJobRecord['operations']['commercial'] | null;
   } | null;
   project_room_json: EscrowProjectRoomRecord | null;
 };
@@ -395,6 +396,7 @@ function mapOperations(row: JobRow): EscrowJobRecord['operations'] {
         }
       : null,
     staleWorkflow: row.operations_json?.staleWorkflow ?? null,
+    commercial: row.operations_json?.commercial ?? null,
   };
 }
 
@@ -463,6 +465,26 @@ function mapProjectRoom(row: JobRow): EscrowProjectRoomRecord {
       milestoneIndex: entry.milestoneIndex ?? null,
       relatedSubmissionId: entry.relatedSubmissionId ?? null,
       detail: entry.detail ?? null,
+    })),
+    supportCases: (row.project_room_json?.supportCases ?? []).map((supportCase) => ({
+      ...supportCase,
+      milestoneIndex: supportCase.milestoneIndex ?? null,
+      ownerUserId: supportCase.ownerUserId ?? null,
+      ownerEmail: supportCase.ownerEmail ?? null,
+      feeDecision: supportCase.feeDecision ?? null,
+      feeDecisionNote: supportCase.feeDecisionNote ?? null,
+      feeImpactAmount: supportCase.feeImpactAmount ?? null,
+      resolvedAt: supportCase.resolvedAt ?? null,
+      messages: (supportCase.messages ?? []).map((message) => ({
+        ...message,
+        authorRole:
+          message.authorRole === 'operator'
+            ? 'operator'
+            : message.authorRole === 'client'
+              ? 'client'
+              : 'worker',
+        visibility: message.visibility === 'internal' ? 'internal' : 'external',
+      })),
     })),
   };
 }

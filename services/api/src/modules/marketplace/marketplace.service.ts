@@ -2928,8 +2928,9 @@ export class MarketplaceService {
       disputeModel: 'operator-mediation',
       evidenceExpectation: 'delivery note plus linked evidence URLs',
       kickoffNote: application.milestonePlanSummary,
-      platformFeeBps: 0,
-      platformFeeLabel: 'Marketplace launch fee disabled',
+      platformFeeBps: 250,
+      platformFeeLabel:
+        '2.5% client platform fee realized only on released milestone value.',
       offerId: offer.id,
       offerRevisionNumber: offer.revisionNumber,
       opportunityId: opportunity.id,
