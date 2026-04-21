@@ -40,6 +40,55 @@ export function MarketplaceBrowser() {
   });
   const [error, setError] = useState<string | null>(null);
 
+  function summarizeDirectoryQuery(
+    kind: 'talent' | 'opportunity',
+    filters: Record<string, string>,
+  ) {
+    return (
+      Object.values(filters)
+        .map((value) => value.trim())
+        .find(Boolean)
+        ?.toLowerCase() ?? `${kind}:browse`
+    );
+  }
+
+  function trackDirectoryImpression(
+    kind: 'talent' | 'opportunity',
+    filters: Record<string, string>,
+    resultCount: number,
+    category?: string | null,
+  ) {
+    void webApi.recordMarketplaceInteraction({
+      surface: 'public_marketplace',
+      entityType: 'search',
+      eventType: 'search_impression',
+      searchKind: kind,
+      queryLabel: summarizeDirectoryQuery(kind, filters),
+      category: category ?? null,
+      skillTags: [filters.skill ?? '', filters.q ?? ''].filter(Boolean),
+      resultCount,
+    });
+  }
+
+  function trackResultClick(input: {
+    entityType: 'profile' | 'opportunity';
+    entityId: string;
+    searchKind: 'talent' | 'opportunity';
+    queryLabel: string;
+    category?: string | null;
+  }) {
+    void webApi.recordMarketplaceInteraction({
+      surface: 'public_marketplace',
+      entityType: input.entityType,
+      eventType: 'result_click',
+      entityId: input.entityId,
+      searchKind: input.searchKind,
+      queryLabel: input.queryLabel,
+      category: input.category ?? null,
+      resultCount: 1,
+    });
+  }
+
   async function loadDirectories() {
     setError(null);
     try {
@@ -88,6 +137,17 @@ export function MarketplaceBrowser() {
       ]);
       setTalentResults(talentResponse.results);
       setOpportunityResults(opportunityResponse.results);
+      trackDirectoryImpression(
+        'talent',
+        talentFilters,
+        talentResponse.results.length,
+      );
+      trackDirectoryImpression(
+        'opportunity',
+        opportunityFilters,
+        opportunityResponse.results.length,
+        opportunityFilters.category || null,
+      );
     } catch {
       setError(marketplaceMessages.loadFailure);
     }
@@ -492,7 +552,18 @@ export function MarketplaceBrowser() {
                       : ''}
                   </p>
                   {renderReasons(result.reasons)}
-                  <Link className={styles.cardLink} href={`/marketplace/profiles/${result.profile.slug}`}>
+                  <Link
+                    className={styles.cardLink}
+                    href={`/marketplace/profiles/${result.profile.slug}`}
+                    onClick={() =>
+                      trackResultClick({
+                        entityType: 'profile',
+                        entityId: result.profile.userId,
+                        searchKind: 'talent',
+                        queryLabel: summarizeDirectoryQuery('talent', talentFilters),
+                      })
+                    }
+                  >
                     {marketplaceMessages.actions.viewProfile}
                   </Link>
                 </SharedCard>
@@ -529,6 +600,18 @@ export function MarketplaceBrowser() {
                   <Link
                     className={styles.cardLink}
                     href={`/marketplace/opportunities/${result.opportunity.id}`}
+                    onClick={() =>
+                      trackResultClick({
+                        entityType: 'opportunity',
+                        entityId: result.opportunity.id,
+                        searchKind: 'opportunity',
+                        queryLabel: summarizeDirectoryQuery(
+                          'opportunity',
+                          opportunityFilters,
+                        ),
+                        category: result.opportunity.category,
+                      })
+                    }
                   >
                     {marketplaceMessages.actions.viewBrief}
                   </Link>

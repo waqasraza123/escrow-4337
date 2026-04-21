@@ -42,6 +42,7 @@ import type {
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
   MarketplaceModerationReportsQueryDto,
+  RecordMarketplaceInteractionDto,
   MarketplaceOpportunitiesQueryDto,
   MarketplaceProfilesQueryDto,
   MarketplaceSavedSearchesQueryDto,
@@ -97,6 +98,9 @@ import type {
   MarketplaceIdentityRiskReviewRecord,
   MarketplaceIdentityRiskReviewResponse,
   MarketplaceIdentityRiskReviewView,
+  MarketplaceIntelligenceReport,
+  MarketplaceIntelligenceReportResponse,
+  MarketplaceInteractionEventRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewMessageView,
   MarketplaceInterviewThreadRecord,
@@ -107,7 +111,12 @@ import type {
   MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
   MarketplaceModerationReviewsListResponse,
+  MarketplaceAnalyticsOverview,
+  MarketplaceAnalyticsOverviewResponse,
+  MarketplaceAnalyticsFunnelStage,
+  MarketplaceLiquiditySlice,
   MarketplaceNoHireReason,
+  MarketplaceNoHireReasonStat,
   MarketplaceOfferMilestoneDraft,
   MarketplaceOfferRecord,
   MarketplaceOfferResponse,
@@ -139,12 +148,16 @@ import type {
   MarketplaceSavedSearchRecord,
   MarketplaceSavedSearchView,
   MarketplaceSearchReason,
+  MarketplaceSearchKind,
   MarketplaceTalentSearchDocument,
   MarketplaceTalentSearchResponse,
   MarketplaceTalentSearchResult,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
   MarketplaceTalentProofArtifact,
+  MarketplaceTopSearchStat,
+  MarketplaceRankingAuditEntry,
+  MarketplaceStalledItem,
   MarketplaceTalentSummary,
   MarketplaceVerificationLevel,
   ModerationStatus,
@@ -293,6 +306,56 @@ function pickFundedVolumeBand(totalContracts: number, averageBand: MarketplaceEs
     return 'medium' as const;
   }
   return 'small' as const;
+}
+
+function normalizeMaybeText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeSkillTags(values: string[]) {
+  return Array.from(
+    new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean)),
+  );
+}
+
+function summarizeSearchQuery(
+  kind: MarketplaceSearchKind,
+  input: Record<string, unknown>,
+) {
+  const query =
+    asOptionalString(input.q as string | undefined) ??
+    asOptionalString(input.skill as string | undefined) ??
+    asOptionalString(input.skills as string | undefined) ??
+    asOptionalString(input.category as string | undefined) ??
+    null;
+  return query ? `${kind}:${query.toLowerCase()}` : `${kind}:browse`;
+}
+
+function countDecisionActions(
+  decisions: MarketplaceApplicationDecisionRecord[],
+  action: MarketplaceApplicationDecisionRecord['action'],
+) {
+  return decisions.filter((decision) => decision.action === action).length;
+}
+
+function eventStageLabel(
+  key: MarketplaceAnalyticsFunnelStage['key'],
+): MarketplaceAnalyticsFunnelStage['label'] {
+  const labels: Record<MarketplaceAnalyticsFunnelStage['key'], string> = {
+    search_impressions: 'Search impressions',
+    result_clicks: 'Result clicks',
+    saved_searches: 'Saved searches',
+    applications: 'Applications',
+    shortlists: 'Shortlists',
+    interviews: 'Interviews',
+    offers: 'Offers',
+    hires: 'Hires',
+    funded_jobs: 'Funded jobs',
+    released_milestones: 'Released milestones',
+    disputed_milestones: 'Disputed milestones',
+  };
+  return labels[key];
 }
 
 function compareModerationStatus(
@@ -930,6 +993,54 @@ export class MarketplaceService {
     };
   }
 
+  async recordInteraction(
+    actorUserId: string | null,
+    dto: RecordMarketplaceInteractionDto,
+  ) {
+    await this.trackMarketplaceEvent({
+      actorUserId,
+      actorWorkspaceId: actorUserId
+        ? (await this.organizationsService.buildWorkspaceContext(actorUserId))
+            .activeWorkspace?.workspaceId ?? null
+        : null,
+      surface: dto.surface,
+      entityType: dto.entityType,
+      eventType: dto.eventType,
+      entityId: dto.entityId ?? null,
+      searchKind: dto.searchKind ?? null,
+      queryLabel: dto.queryLabel ?? null,
+      category: dto.category ?? null,
+      timezone: dto.timezone ?? null,
+      skillTags: dto.skillTags,
+      resultCount: dto.resultCount,
+      relatedOpportunityId: dto.relatedOpportunityId ?? null,
+      relatedProfileUserId: dto.relatedProfileUserId ?? null,
+      relatedApplicationId: dto.relatedApplicationId ?? null,
+      relatedJobId: dto.relatedJobId ?? null,
+    });
+    return { ok: true as const };
+  }
+
+  async getAnalyticsOverview(
+    userId: string,
+  ): Promise<MarketplaceAnalyticsOverviewResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    await this.refreshSearchReadModels();
+    return {
+      overview: await this.buildAnalyticsOverview(userId, context.activeWorkspace),
+    };
+  }
+
+  async getModerationIntelligence(
+    userId: string,
+  ): Promise<MarketplaceIntelligenceReportResponse> {
+    await this.requireModerationAccess(userId);
+    await this.refreshSearchReadModels();
+    return {
+      report: await this.buildMarketplaceIntelligenceReport(),
+    };
+  }
+
   async getTalentRecommendations(
     userId: string,
     query: MarketplaceOpportunitiesQueryDto,
@@ -1058,6 +1169,31 @@ export class MarketplaceService {
       updatedAt: now,
     };
     await this.marketplaceRepository.saveSavedSearch(record);
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: context.activeWorkspace?.workspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'saved_search',
+      eventType: 'saved_search_created',
+      entityId: record.id,
+      searchKind: dto.kind,
+      queryLabel: summarizeSearchQuery(dto.kind, normalizedQuery),
+      category: asOptionalString(normalizedQuery.category),
+      timezone: asOptionalString(normalizedQuery.timezone),
+      skillTags: normalizeSkillTags(
+        [
+          asOptionalString(normalizedQuery.skill) ?? '',
+          asOptionalString(normalizedQuery.skills) ?? '',
+        ]
+          .join(',')
+          .split(','),
+      ),
+      resultCount,
+      relatedOpportunityId: null,
+      relatedProfileUserId: null,
+      relatedApplicationId: null,
+      relatedJobId: null,
+    });
     return {
       search: this.toSavedSearchView(
         record,
@@ -1127,6 +1263,24 @@ export class MarketplaceService {
       updatedAt: now,
     };
     await this.marketplaceRepository.saveOpportunityInvite(invite);
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'opportunity',
+      eventType: 'invite_sent',
+      entityId: opportunity.id,
+      searchKind: 'talent',
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: profile.userId,
+      relatedApplicationId: null,
+      relatedJobId: null,
+    });
     return {
       invite: await this.toOpportunityInviteView(invite),
     };
@@ -1229,6 +1383,24 @@ export class MarketplaceService {
       updatedAt: now,
     };
     await this.marketplaceRepository.saveReview(review);
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: null,
+      surface: 'workspace',
+      entityType: 'job',
+      eventType: 'review_submitted',
+      entityId: jobId,
+      searchKind: null,
+      queryLabel: null,
+      category: job.category,
+      timezone: null,
+      skillTags: [],
+      resultCount: 1,
+      relatedOpportunityId: null,
+      relatedProfileUserId: revieweeUserId,
+      relatedApplicationId: null,
+      relatedJobId: jobId,
+    });
     return {
       review: await this.toReviewView(review),
     };
@@ -1438,6 +1610,24 @@ export class MarketplaceService {
         updatedAt: now,
       });
     }
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: freelancerWorkspace.workspaceId,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'application_submitted',
+      entityId: application.id,
+      searchKind: 'opportunity',
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: profile.timezone,
+      skillTags: normalizeSkillTags(profile.skills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: userId,
+      relatedApplicationId: application.id,
+      relatedJobId: null,
+    });
 
     return {
       opportunity: await this.toOpportunityDetailView(
@@ -1610,6 +1800,24 @@ export class MarketplaceService {
       reason: dto.revisionReason ?? null,
       createdAt: now,
     });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: application.applicantWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'application_revised',
+      entityId: application.id,
+      searchKind: 'opportunity',
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: profile.timezone,
+      skillTags: normalizeSkillTags(profile.skills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: userId,
+      relatedApplicationId: application.id,
+      relatedJobId: null,
+    });
 
     return {
       revision: revision,
@@ -1685,6 +1893,27 @@ export class MarketplaceService {
         createdAt: now,
       });
     }
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: senderWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType:
+        application.status === 'interviewing'
+          ? 'interview_started'
+          : 'interview_message_posted',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: null,
+    });
 
     return {
       thread: await this.toInterviewThreadView(thread),
@@ -1738,6 +1967,24 @@ export class MarketplaceService {
       reason: dto.message ?? null,
       createdAt: now,
     });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'offer_created',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: null,
+    });
 
     return {
       offer,
@@ -1768,6 +2015,24 @@ export class MarketplaceService {
         reason: dto.message ?? null,
         createdAt: now,
       });
+      await this.trackMarketplaceEvent({
+        actorUserId: userId,
+        actorWorkspaceId: application.applicantWorkspaceId ?? null,
+        surface: 'workspace',
+        entityType: 'application',
+        eventType: 'offer_accepted',
+        entityId: application.id,
+        searchKind: null,
+        queryLabel: null,
+        category: null,
+        timezone: null,
+        skillTags: [],
+        resultCount: 1,
+        relatedOpportunityId: application.opportunityId,
+        relatedProfileUserId: application.applicantUserId,
+        relatedApplicationId: application.id,
+        relatedJobId: null,
+      });
       await this.ensureContractDraftFromAcceptedOffer(application, offer);
       return { offer };
     }
@@ -1786,6 +2051,24 @@ export class MarketplaceService {
         action: 'offer_declined',
         reason: offer.declineReason,
         createdAt: now,
+      });
+      await this.trackMarketplaceEvent({
+        actorUserId: userId,
+        actorWorkspaceId: application.applicantWorkspaceId ?? null,
+        surface: 'workspace',
+        entityType: 'application',
+        eventType: 'offer_declined',
+        entityId: application.id,
+        searchKind: null,
+        queryLabel: null,
+        category: null,
+        timezone: null,
+        skillTags: [],
+        resultCount: 1,
+        relatedOpportunityId: application.opportunityId,
+        relatedProfileUserId: application.applicantUserId,
+        relatedApplicationId: application.id,
+        relatedJobId: null,
       });
       return { offer };
     }
@@ -1818,6 +2101,24 @@ export class MarketplaceService {
       action: 'offer_countered',
       reason: dto.message ?? null,
       createdAt: now,
+    });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: application.applicantWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'offer_created',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: null,
+      timezone: null,
+      skillTags: [],
+      resultCount: 1,
+      relatedOpportunityId: application.opportunityId,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: null,
     });
     return { offer: counter };
   }
@@ -2024,6 +2325,24 @@ export class MarketplaceService {
       noHireReason: dto.noHireReason ?? 'candidate_withdrew',
       createdAt: now,
     });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: application.applicantWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'application_withdrawn',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: null,
+      timezone: null,
+      skillTags: [],
+      resultCount: 1,
+      relatedOpportunityId: application.opportunityId,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: application.hiredJobId,
+    });
     return this.listMyApplications(userId);
   }
 
@@ -2048,6 +2367,24 @@ export class MarketplaceService {
       action: 'shortlisted',
       reason: dto.reason ?? null,
       createdAt: now,
+    });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'application_shortlisted',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: application.hiredJobId,
     });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
@@ -2074,6 +2411,24 @@ export class MarketplaceService {
       reason: dto.reason ?? null,
       noHireReason: dto.noHireReason ?? null,
       createdAt: now,
+    });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'application_rejected',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: application.hiredJobId,
     });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
@@ -3166,17 +3521,970 @@ export class MarketplaceService {
     await this.marketplaceRepository.saveApplication(application);
     await this.marketplaceRepository.saveOpportunity(opportunity);
     await this.marketplaceRepository.saveContractDraft(draft);
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'contract_converted',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: createResponse.jobId,
+    });
     await this.recordApplicationDecision(application, {
       actorUserId: userId,
       action: 'hired',
       reason: 'Escrow contract created from finalized marketplace draft',
       createdAt: now,
     });
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: opportunity.ownerWorkspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'application',
+      eventType: 'hire_recorded',
+      entityId: application.id,
+      searchKind: null,
+      queryLabel: null,
+      category: opportunity.category,
+      timezone: null,
+      skillTags: normalizeSkillTags(opportunity.requiredSkills),
+      resultCount: 1,
+      relatedOpportunityId: opportunity.id,
+      relatedProfileUserId: application.applicantUserId,
+      relatedApplicationId: application.id,
+      relatedJobId: createResponse.jobId,
+    });
 
     return {
       applicationId: application.id,
       opportunityId: opportunity.id,
       jobId: createResponse.jobId,
+    };
+  }
+
+  private async trackMarketplaceEvent(
+    input: Omit<MarketplaceInteractionEventRecord, 'id' | 'createdAt'> & {
+      createdAt?: number;
+    },
+  ) {
+    const event: MarketplaceInteractionEventRecord = {
+      id: randomUUID(),
+      actorUserId: input.actorUserId,
+      actorWorkspaceId: input.actorWorkspaceId,
+      surface: input.surface,
+      entityType: input.entityType,
+      eventType: input.eventType,
+      entityId: normalizeMaybeText(input.entityId),
+      searchKind: input.searchKind ?? null,
+      queryLabel: normalizeMaybeText(input.queryLabel),
+      category: normalizeMaybeText(input.category)?.toLowerCase() ?? null,
+      timezone: normalizeMaybeText(input.timezone),
+      skillTags: normalizeSkillTags(input.skillTags),
+      resultCount: Math.max(1, Math.trunc(input.resultCount || 1)),
+      relatedOpportunityId: normalizeMaybeText(input.relatedOpportunityId),
+      relatedProfileUserId: normalizeMaybeText(input.relatedProfileUserId),
+      relatedApplicationId: normalizeMaybeText(input.relatedApplicationId),
+      relatedJobId: normalizeMaybeText(input.relatedJobId),
+      createdAt: input.createdAt ?? Date.now(),
+    };
+    await this.marketplaceRepository.saveInteractionEvent(event);
+  }
+
+  private async refreshSearchReadModels() {
+    const [profiles, opportunities] = await Promise.all([
+      this.marketplaceRepository.listProfiles(),
+      this.marketplaceRepository.listOpportunities(),
+    ]);
+
+    await Promise.all(
+      profiles.map(async (profile) => {
+        await this.marketplaceRepository.saveTalentSearchDocument(
+          await this.buildTalentSearchDocument(profile),
+        );
+      }),
+    );
+
+    await Promise.all(
+      opportunities.map(async (opportunity) => {
+        await this.marketplaceRepository.saveOpportunitySearchDocument(
+          await this.buildOpportunitySearchDocument(opportunity),
+        );
+      }),
+    );
+  }
+
+  private async buildTalentSearchDocument(
+    profile: MarketplaceProfileRecord,
+  ): Promise<MarketplaceTalentSearchDocument> {
+    const hydratedProfile = await this.ensureProfileWorkspace(profile);
+    const user = await this.usersService.getRequiredById(hydratedProfile.userId);
+    const escrowStats = await this.getEscrowStats(user, 'worker');
+    const reputation = await this.buildReputationSnapshot(user, 'worker');
+    const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
+    const verificationLevel = verifiedWalletAddress
+      ? this.computeVerificationLevel(verifiedWalletAddress, escrowStats)
+      : 'unverified';
+    const completeness = this.isProfileComplete(hydratedProfile) ? 100 : 55;
+    const fitDensity = Math.min(
+      100,
+      (hydratedProfile.skills.length + hydratedProfile.specialties.length) * 10,
+    );
+    const recencyDays = daysSince(hydratedProfile.updatedAt, Date.now());
+    const reviewBoost =
+      reputation.averageRating === null ? 0 : reputation.averageRating * 6;
+    const hireBoost = Math.min(
+      22,
+      Math.round((reputation.publicReviewCount + escrowStats.completionCount) / 2),
+    );
+    const score = Math.max(
+      5,
+      Math.round(
+        completeness * 0.22 +
+          fitDensity * 0.14 +
+          escrowStats.completionRate * 0.2 +
+          Math.max(0, 100 - escrowStats.disputeRate) * 0.12 +
+          (reputation.inviteAcceptanceRate ?? 55) * 0.08 +
+          (reputation.responseRate ?? 60) * 0.08 +
+          Math.max(0, 100 - recencyDays * 4) * 0.08 +
+          reviewBoost +
+          hireBoost,
+      ),
+    );
+
+    const reasons: MarketplaceSearchReason[] = [
+      {
+        code: 'strong_skill_match',
+        label: 'Skill density is high and profile coverage is broad.',
+      },
+    ];
+    if (verifiedWalletAddress) {
+      reasons.push({
+        code: 'verified_wallet',
+        label: 'Wallet verification is present.',
+      });
+    }
+    if (hydratedProfile.cryptoReadiness !== 'wallet_only') {
+      reasons.push({
+        code: 'smart_account_ready',
+        label: 'Execution setup is beyond wallet-only posture.',
+      });
+    }
+    if (escrowStats.completionCount > 0) {
+      reasons.push({
+        code: 'escrow_backed_delivery_history',
+        label: 'Escrow completion history improves confidence.',
+      });
+    }
+    if ((reputation.responseRate ?? 0) >= 60) {
+      reasons.push({
+        code: 'response_ready_profile',
+        label: 'Response posture is healthy.',
+      });
+    }
+
+    return {
+      profileUserId: hydratedProfile.userId,
+      profileSlug: hydratedProfile.slug,
+      workspaceId: hydratedProfile.workspaceId,
+      organizationId: hydratedProfile.organizationId,
+      displayName: hydratedProfile.displayName,
+      headline: hydratedProfile.headline,
+      searchableText: [
+        hydratedProfile.displayName,
+        hydratedProfile.headline,
+        hydratedProfile.bio,
+        ...hydratedProfile.skills,
+        ...hydratedProfile.specialties,
+      ]
+        .join(' ')
+        .trim(),
+      skills: hydratedProfile.skills,
+      specialties: hydratedProfile.specialties,
+      timezone: hydratedProfile.timezone,
+      availability: hydratedProfile.availability,
+      preferredEngagements: hydratedProfile.preferredEngagements,
+      cryptoReadiness: hydratedProfile.cryptoReadiness,
+      verificationLevel,
+      ranking: {
+        score,
+        profileCompleteness: completeness,
+        skillMatchPercent: fitDensity,
+        completionRate: escrowStats.completionRate,
+        disputeRate: escrowStats.disputeRate,
+        inviteAcceptanceRate: reputation.inviteAcceptanceRate ?? 0,
+        responseRate: reputation.responseRate ?? 0,
+        recencyDays,
+        timezoneOverlapHours: null,
+        budgetClarity: 0,
+        fitDensity,
+        fundedVolumeBand: pickFundedVolumeBand(
+          escrowStats.totalContracts,
+          escrowStats.averageContractValueBand,
+        ),
+        verificationLevel,
+      },
+      reasons: reasons.slice(0, 4),
+      updatedAt: hydratedProfile.updatedAt,
+    };
+  }
+
+  private async buildOpportunitySearchDocument(
+    opportunity: MarketplaceOpportunityRecord,
+  ): Promise<MarketplaceOpportunitySearchDocument> {
+    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const owner = await this.usersService.getRequiredById(
+      hydratedOpportunity.ownerUserId,
+    );
+    const ownerReputation = await this.buildReputationSnapshot(owner, 'client');
+    const completeness = [
+      hydratedOpportunity.title,
+      hydratedOpportunity.summary,
+      hydratedOpportunity.description,
+      hydratedOpportunity.timeline,
+    ].every((value) => value.trim().length > 0)
+      ? 100
+      : 60;
+    const budgetClarity =
+      hydratedOpportunity.budgetMin && hydratedOpportunity.budgetMax
+        ? 100
+        : hydratedOpportunity.budgetMin || hydratedOpportunity.budgetMax
+          ? 70
+          : 25;
+    const fitDensity = Math.min(
+      100,
+      hydratedOpportunity.requiredSkills.length * 12 +
+        hydratedOpportunity.mustHaveSkills.length * 10 +
+        hydratedOpportunity.screeningQuestions.length * 4 +
+        hydratedOpportunity.outcomes.length * 3,
+    );
+    const recencyDays = daysSince(
+      hydratedOpportunity.publishedAt ?? hydratedOpportunity.updatedAt,
+      Date.now(),
+    );
+    const score = Math.max(
+      5,
+      Math.round(
+        completeness * 0.22 +
+          budgetClarity * 0.16 +
+          fitDensity * 0.18 +
+          (ownerReputation.responseRate ?? 55) * 0.1 +
+          (ownerReputation.inviteAcceptanceRate ?? 55) * 0.08 +
+          Math.max(0, 100 - recencyDays * 4) * 0.1 +
+          (ownerReputation.averageRating ?? 3.8) * 8,
+      ),
+    );
+
+    const reasons: MarketplaceSearchReason[] = [];
+    if (completeness >= 90) {
+      reasons.push({
+        code: 'complete_brief',
+        label: 'The brief is structurally complete.',
+      });
+    }
+    if (budgetClarity >= 70) {
+      reasons.push({
+        code: 'budget_clear',
+        label: 'Budget guidance is clear enough to qualify demand.',
+      });
+    }
+    if (recencyDays <= 7) {
+      reasons.push({
+        code: 'recent_brief',
+        label: 'The brief is recent and likely still active.',
+      });
+    }
+    if (hydratedOpportunity.mustHaveSkills.length > 0) {
+      reasons.push({
+        code: 'must_have_coverage',
+        label: 'The brief names must-have requirements clearly.',
+      });
+    }
+    reasons.push({
+      code: 'category_match',
+      label: 'The category is explicit enough for directory discovery.',
+    });
+
+    return {
+      opportunityId: hydratedOpportunity.id,
+      ownerUserId: hydratedOpportunity.ownerUserId,
+      ownerWorkspaceId: hydratedOpportunity.ownerWorkspaceId,
+      ownerOrganizationId: hydratedOpportunity.ownerOrganizationId,
+      title: hydratedOpportunity.title,
+      summary: hydratedOpportunity.summary,
+      category: hydratedOpportunity.category,
+      searchableText: [
+        hydratedOpportunity.title,
+        hydratedOpportunity.summary,
+        hydratedOpportunity.description,
+        hydratedOpportunity.category,
+        ...hydratedOpportunity.requiredSkills,
+        ...hydratedOpportunity.mustHaveSkills,
+        ...hydratedOpportunity.outcomes,
+      ]
+        .join(' ')
+        .trim(),
+      requiredSkills: hydratedOpportunity.requiredSkills,
+      mustHaveSkills: hydratedOpportunity.mustHaveSkills,
+      engagementType: hydratedOpportunity.engagementType,
+      cryptoReadinessRequired: hydratedOpportunity.cryptoReadinessRequired,
+      timezoneOverlapHours: hydratedOpportunity.timezoneOverlapHours,
+      budgetMin: hydratedOpportunity.budgetMin,
+      budgetMax: hydratedOpportunity.budgetMax,
+      visibility: hydratedOpportunity.visibility,
+      status: hydratedOpportunity.status,
+      ranking: {
+        score,
+        profileCompleteness: completeness,
+        skillMatchPercent: fitDensity,
+        completionRate: ownerReputation.completionRate,
+        disputeRate: ownerReputation.disputeRate,
+        inviteAcceptanceRate: ownerReputation.inviteAcceptanceRate ?? 0,
+        responseRate: ownerReputation.responseRate ?? 0,
+        recencyDays,
+        timezoneOverlapHours: hydratedOpportunity.timezoneOverlapHours,
+        budgetClarity,
+        fitDensity,
+        fundedVolumeBand: pickFundedVolumeBand(
+          ownerReputation.totalContracts,
+          ownerReputation.averageContractValueBand,
+        ),
+        verificationLevel:
+          ownerReputation.identityConfidence === 'wallet_verified'
+            ? 'wallet_verified'
+            : ownerReputation.identityConfidence === 'smart_account_ready'
+              ? 'wallet_and_escrow_history'
+              : 'wallet_escrow_and_delivery',
+      },
+      reasons: reasons.slice(0, 4),
+      publishedAt: hydratedOpportunity.publishedAt,
+      updatedAt: hydratedOpportunity.updatedAt,
+    };
+  }
+
+  private buildFunnelStages(input: {
+    searchImpressions: number;
+    resultClicks: number;
+    savedSearches: number;
+    applications: number;
+    shortlists: number;
+    interviews: number;
+    offers: number;
+    hires: number;
+    fundedJobs: number;
+    releasedMilestones: number;
+    disputedMilestones: number;
+  }): MarketplaceAnalyticsFunnelStage[] {
+    const entries: Array<[MarketplaceAnalyticsFunnelStage['key'], number]> = [
+      ['search_impressions', input.searchImpressions],
+      ['result_clicks', input.resultClicks],
+      ['saved_searches', input.savedSearches],
+      ['applications', input.applications],
+      ['shortlists', input.shortlists],
+      ['interviews', input.interviews],
+      ['offers', input.offers],
+      ['hires', input.hires],
+      ['funded_jobs', input.fundedJobs],
+      ['released_milestones', input.releasedMilestones],
+      ['disputed_milestones', input.disputedMilestones],
+    ];
+    return entries.map(([key, count]) => ({
+      key,
+      label: eventStageLabel(key),
+      count,
+    }));
+  }
+
+  private buildNoHireReasonStats(
+    decisions: MarketplaceApplicationDecisionRecord[],
+  ): MarketplaceNoHireReasonStat[] {
+    const counts = new Map<MarketplaceNoHireReason, number>();
+    for (const decision of decisions) {
+      if (decision.noHireReason) {
+        counts.set(
+          decision.noHireReason,
+          (counts.get(decision.noHireReason) ?? 0) + 1,
+        );
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((left, right) => right.count - left.count);
+  }
+
+  private buildTopSearchStats(
+    events: MarketplaceInteractionEventRecord[],
+  ): MarketplaceTopSearchStat[] {
+    const grouped = new Map<string, MarketplaceTopSearchStat>();
+    for (const event of events) {
+      if (!event.searchKind || !event.queryLabel) {
+        continue;
+      }
+      const key = `${event.searchKind}:${event.queryLabel}`;
+      const current =
+        grouped.get(key) ??
+        {
+          searchKind: event.searchKind,
+          queryLabel: event.queryLabel,
+          impressions: 0,
+          resultClicks: 0,
+          saveCount: 0,
+        };
+      if (event.eventType === 'search_impression') {
+        current.impressions += event.resultCount;
+      }
+      if (event.eventType === 'result_click') {
+        current.resultClicks += event.resultCount;
+      }
+      if (event.eventType === 'saved_search_created') {
+        current.saveCount += event.resultCount;
+      }
+      grouped.set(key, current);
+    }
+    return Array.from(grouped.values())
+      .sort(
+        (left, right) =>
+          right.impressions - left.impressions ||
+          right.resultClicks - left.resultClicks,
+      )
+      .slice(0, 8);
+  }
+
+  private async buildLiquidityByCategory(
+    profiles: MarketplaceProfileRecord[],
+    opportunities: MarketplaceOpportunityRecord[],
+  ): Promise<MarketplaceLiquiditySlice[]> {
+    const demand = new Map<string, number>();
+    const supply = new Map<string, number>();
+    for (const opportunity of opportunities) {
+      if (
+        opportunity.status === 'published' &&
+        opportunity.visibility === 'public' &&
+        opportunity.moderationStatus === 'visible'
+      ) {
+        demand.set(
+          opportunity.category,
+          (demand.get(opportunity.category) ?? 0) + 1,
+        );
+      }
+    }
+    for (const profile of profiles) {
+      if (
+        profile.moderationStatus !== 'visible' ||
+        !this.isProfileComplete(profile)
+      ) {
+        continue;
+      }
+      const labels = new Set(
+        [...profile.skills, ...profile.specialties]
+          .map((value) => value.trim().toLowerCase())
+          .filter(Boolean),
+      );
+      for (const category of labels) {
+        supply.set(category, (supply.get(category) ?? 0) + 1);
+      }
+    }
+
+    return Array.from(new Set([...demand.keys(), ...supply.keys()]))
+      .map((label) => {
+        const demandCount = demand.get(label) ?? 0;
+        const supplyCount = supply.get(label) ?? 0;
+        const gap = demandCount - supplyCount;
+        return {
+          label,
+          demandCount,
+          supplyCount,
+          gap,
+          posture:
+            Math.abs(gap) <= 1
+              ? 'balanced'
+              : gap > 0
+                ? 'demand_heavy'
+                : 'supply_heavy',
+        } satisfies MarketplaceLiquiditySlice;
+      })
+      .sort((left, right) => Math.abs(right.gap) - Math.abs(left.gap))
+      .slice(0, 8);
+  }
+
+  private async buildLiquidityByTimezone(
+    profiles: MarketplaceProfileRecord[],
+    opportunities: MarketplaceOpportunityRecord[],
+  ): Promise<MarketplaceLiquiditySlice[]> {
+    const supply = new Map<string, number>();
+    const demand = new Map<string, number>();
+    const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
+    for (const profile of profiles) {
+      if (
+        profile.moderationStatus === 'visible' &&
+        this.isProfileComplete(profile) &&
+        profile.timezone.trim().length > 0
+      ) {
+        supply.set(profile.timezone, (supply.get(profile.timezone) ?? 0) + 1);
+      }
+    }
+    for (const opportunity of opportunities) {
+      if (
+        opportunity.status !== 'published' ||
+        opportunity.visibility !== 'public' ||
+        opportunity.moderationStatus !== 'visible'
+      ) {
+        continue;
+      }
+      const ownerTimezone =
+        profileByUserId.get(opportunity.ownerUserId)?.timezone ?? 'unattributed';
+      demand.set(ownerTimezone, (demand.get(ownerTimezone) ?? 0) + 1);
+    }
+    return Array.from(new Set([...demand.keys(), ...supply.keys()]))
+      .map((label) => {
+        const demandCount = demand.get(label) ?? 0;
+        const supplyCount = supply.get(label) ?? 0;
+        const gap = demandCount - supplyCount;
+        return {
+          label,
+          demandCount,
+          supplyCount,
+          gap,
+          posture:
+            Math.abs(gap) <= 1
+              ? 'balanced'
+              : gap > 0
+                ? 'demand_heavy'
+                : 'supply_heavy',
+        } satisfies MarketplaceLiquiditySlice;
+      })
+      .sort((left, right) => Math.abs(right.gap) - Math.abs(left.gap))
+      .slice(0, 8);
+  }
+
+  private buildStalledOpportunityViews(
+    opportunities: MarketplaceOpportunityRecord[],
+    applications: MarketplaceApplicationRecord[],
+    decisions: MarketplaceApplicationDecisionRecord[],
+  ): MarketplaceStalledItem[] {
+    const now = Date.now();
+    return opportunities
+      .filter(
+        (opportunity) =>
+          opportunity.status === 'published' &&
+          opportunity.visibility === 'public' &&
+          opportunity.moderationStatus === 'visible' &&
+          opportunity.hiredJobId === null &&
+          now - (opportunity.publishedAt ?? opportunity.updatedAt) >=
+            7 * 24 * hourMs,
+      )
+      .map((opportunity) => {
+        const opportunityApplications = applications.filter(
+          (application) => application.opportunityId === opportunity.id,
+        );
+        const opportunityDecisions = decisions.filter(
+          (decision) => decision.opportunityId === opportunity.id,
+        );
+        const lastDecisionAt =
+          opportunityDecisions.sort(
+            (left, right) => right.createdAt - left.createdAt,
+          )[0]?.createdAt ?? null;
+        return {
+          opportunityId: opportunity.id,
+          title: opportunity.title,
+          category: opportunity.category,
+          publishedAt: opportunity.publishedAt,
+          daysOpen: Math.floor(
+            (now - (opportunity.publishedAt ?? opportunity.updatedAt)) /
+              (24 * hourMs),
+          ),
+          applicationCount: opportunityApplications.length,
+          shortlistCount: countDecisionActions(opportunityDecisions, 'shortlisted'),
+          offerCount:
+            countDecisionActions(opportunityDecisions, 'offer_sent') +
+            countDecisionActions(opportunityDecisions, 'offer_countered'),
+          lastDecisionAt,
+        } satisfies MarketplaceStalledItem;
+      })
+      .sort(
+        (left, right) =>
+          right.daysOpen - left.daysOpen ||
+          left.applicationCount - right.applicationCount,
+      )
+      .slice(0, 8);
+  }
+
+  private async buildAnalyticsOverview(
+    userId: string,
+    workspace: Awaited<
+      ReturnType<OrganizationsService['buildWorkspaceContext']>
+    >['activeWorkspace'],
+  ): Promise<MarketplaceAnalyticsOverview> {
+    const user = await this.usersService.getRequiredById(userId);
+    const [
+      profiles,
+      opportunities,
+      applications,
+      decisions,
+      offers,
+      savedSearches,
+      events,
+    ] = await Promise.all([
+      this.marketplaceRepository.listProfiles(),
+      this.marketplaceRepository.listOpportunities(),
+      this.marketplaceRepository.listApplications(),
+      this.marketplaceRepository.listApplicationDecisions(),
+      this.marketplaceRepository.listOffers(),
+      this.marketplaceRepository.listSavedSearches(),
+      this.marketplaceRepository.listInteractionEvents(),
+    ]);
+
+    const scopedOpportunities =
+      workspace?.kind === 'client'
+        ? opportunities.filter(
+            (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
+          )
+        : opportunities.filter((opportunity) =>
+            applications.some(
+              (application) =>
+                application.applicantWorkspaceId === workspace?.workspaceId &&
+                application.opportunityId === opportunity.id,
+            ),
+          );
+    const scopedApplications =
+      workspace?.kind === 'client'
+        ? applications.filter((application) =>
+            scopedOpportunities.some(
+              (opportunity) => opportunity.id === application.opportunityId,
+            ),
+          )
+        : applications.filter(
+            (application) => application.applicantWorkspaceId === workspace?.workspaceId,
+          );
+    const scopedApplicationIds = new Set(scopedApplications.map((item) => item.id));
+    const scopedOpportunityIds = new Set(scopedOpportunities.map((item) => item.id));
+    const scopedDecisions = decisions.filter(
+      (decision) =>
+        scopedApplicationIds.has(decision.applicationId) ||
+        scopedOpportunityIds.has(decision.opportunityId),
+    );
+    const scopedOffers = offers.filter((offer) =>
+      scopedApplicationIds.has(offer.applicationId),
+    );
+    const scopedSearches = savedSearches.filter(
+      (search) =>
+        search.userId === userId &&
+        (workspace ? search.workspaceId === workspace.workspaceId : true),
+    );
+    const scopedEvents = events.filter(
+      (event) =>
+        event.actorUserId === userId ||
+        (workspace && event.actorWorkspaceId === workspace.workspaceId) ||
+        (event.relatedOpportunityId
+          ? scopedOpportunityIds.has(event.relatedOpportunityId)
+          : false) ||
+        (event.relatedApplicationId
+          ? scopedApplicationIds.has(event.relatedApplicationId)
+          : false),
+    );
+    const roleJobs = await this.getRoleJobs(
+      user,
+      workspace?.kind === 'client' ? 'client' : 'worker',
+    );
+    const searchImpressions = scopedEvents
+      .filter((event) => event.eventType === 'search_impression')
+      .reduce((sum, event) => sum + event.resultCount, 0);
+    const resultClicks = scopedEvents
+      .filter((event) => event.eventType === 'result_click')
+      .reduce((sum, event) => sum + event.resultCount, 0);
+    const interviews = new Set(
+      scopedEvents
+        .filter(
+          (event) =>
+            event.eventType === 'interview_started' ||
+            event.eventType === 'interview_message_posted',
+        )
+        .map((event) => event.relatedApplicationId ?? event.entityId)
+        .filter(Boolean),
+    ).size;
+    const summary = {
+      searchImpressions,
+      resultClicks,
+      savedSearches: scopedSearches.length,
+      applications: countDecisionActions(scopedDecisions, 'applied'),
+      shortlists: countDecisionActions(scopedDecisions, 'shortlisted'),
+      interviews,
+      offers: scopedOffers.length,
+      hires: countDecisionActions(scopedDecisions, 'hired'),
+      activeContracts: roleJobs.filter(
+        (job) => job.status !== 'completed' && job.status !== 'resolved',
+      ).length,
+    };
+
+    return {
+      generatedAt: new Date().toISOString(),
+      workspace: workspace
+        ? {
+            workspaceId: workspace.workspaceId,
+            kind: workspace.kind,
+            organizationId: workspace.organizationId,
+            organizationKind: workspace.organizationKind,
+          }
+        : null,
+      summary,
+      funnel: this.buildFunnelStages({
+        ...summary,
+        fundedJobs: roleJobs.filter((job) => job.fundedAmount !== null).length,
+        releasedMilestones: roleJobs.reduce(
+          (sum, job) =>
+            sum +
+            job.milestones.filter((milestone) => milestone.status === 'released')
+              .length,
+          0,
+        ),
+        disputedMilestones: roleJobs.reduce(
+          (sum, job) =>
+            sum +
+            job.milestones.filter(
+              (milestone) =>
+                milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+            ).length,
+          0,
+        ),
+      }),
+      liquidity: await this.buildLiquidityByCategory(profiles, opportunities),
+      noHireReasons: this.buildNoHireReasonStats(scopedDecisions),
+      topSearches: this.buildTopSearchStats(scopedEvents),
+      stalledItems:
+        workspace?.kind === 'client'
+          ? this.buildStalledOpportunityViews(
+              scopedOpportunities,
+              applications,
+              decisions,
+            )
+          : this.buildStalledOpportunityViews(opportunities, scopedApplications, scopedDecisions),
+    };
+  }
+
+  private async buildMarketplaceIntelligenceReport(): Promise<MarketplaceIntelligenceReport> {
+    const [
+      profiles,
+      opportunities,
+      applications,
+      decisions,
+      offers,
+      reviews,
+      events,
+      talentDocuments,
+      opportunityDocuments,
+    ] = await Promise.all([
+      this.marketplaceRepository.listProfiles(),
+      this.marketplaceRepository.listOpportunities(),
+      this.marketplaceRepository.listApplications(),
+      this.marketplaceRepository.listApplicationDecisions(),
+      this.marketplaceRepository.listOffers(),
+      this.marketplaceRepository.listReviews(),
+      this.marketplaceRepository.listInteractionEvents(),
+      this.marketplaceRepository.listTalentSearchDocuments(),
+      this.marketplaceRepository.listOpportunitySearchDocuments(),
+    ]);
+
+    const jobs = await this.escrowRepository.listAll();
+    const funnel = this.buildFunnelStages({
+      searchImpressions: events
+        .filter((event) => event.eventType === 'search_impression')
+        .reduce((sum, event) => sum + event.resultCount, 0),
+      resultClicks: events
+        .filter((event) => event.eventType === 'result_click')
+        .reduce((sum, event) => sum + event.resultCount, 0),
+      savedSearches: events.filter(
+        (event) => event.eventType === 'saved_search_created',
+      ).length,
+      applications: countDecisionActions(decisions, 'applied'),
+      shortlists: countDecisionActions(decisions, 'shortlisted'),
+      interviews: new Set(
+        events
+          .filter(
+            (event) =>
+              event.eventType === 'interview_started' ||
+              event.eventType === 'interview_message_posted',
+          )
+          .map((event) => event.relatedApplicationId ?? event.entityId)
+          .filter(Boolean),
+      ).size,
+      offers: offers.length,
+      hires: countDecisionActions(decisions, 'hired'),
+      fundedJobs: jobs.filter((job) => job.fundedAmount !== null).length,
+      releasedMilestones: jobs.reduce(
+        (sum, job) =>
+          sum +
+          job.milestones.filter((milestone) => milestone.status === 'released')
+            .length,
+        0,
+      ),
+      disputedMilestones: jobs.reduce(
+        (sum, job) =>
+          sum +
+          job.milestones.filter(
+            (milestone) =>
+              milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+          ).length,
+        0,
+      ),
+    });
+    const reviewBuckets = new Map<string, number[]>();
+    for (const review of reviews) {
+      const bucket = reviewBuckets.get(review.revieweeUserId) ?? [];
+      bucket.push(review.rating);
+      reviewBuckets.set(review.revieweeUserId, bucket);
+    }
+    const reviewAverageByUser = new Map<string, number>(
+      Array.from(reviewBuckets.entries()).map(([userId, ratings]) => [
+        userId,
+        Number(
+          (
+            ratings.reduce((sum, rating) => sum + rating, 0) /
+            Math.max(1, ratings.length)
+          ).toFixed(2),
+        ),
+      ]),
+    );
+    const clickCounts = new Map<string, number>();
+    for (const event of events) {
+      if (event.eventType !== 'result_click' || !event.entityId) {
+        continue;
+      }
+      clickCounts.set(event.entityId, (clickCounts.get(event.entityId) ?? 0) + 1);
+    }
+    const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
+    const opportunityMap = new Map(
+      opportunities.map((opportunity) => [opportunity.id, opportunity]),
+    );
+    const rankingAudit: MarketplaceRankingAuditEntry[] = [
+      ...talentDocuments
+        .map((document) => {
+          const profile = profileMap.get(document.profileUserId);
+          if (!profile) {
+            return null;
+          }
+          const hireCount = decisions.filter(
+            (decision) =>
+              decision.action === 'hired' &&
+              applications.find(
+                (application) =>
+                  application.id === decision.applicationId &&
+                  application.applicantUserId === document.profileUserId,
+              ),
+          ).length;
+          const noHireCount = decisions.filter(
+            (decision) =>
+              decision.action === 'no_hire' &&
+              applications.find(
+                (application) =>
+                  application.id === decision.applicationId &&
+                  application.applicantUserId === document.profileUserId,
+              ),
+          ).length;
+          const outcomeScore =
+            hireCount * 18 +
+            (reviewAverageByUser.get(document.profileUserId) ?? 0) * 8 -
+            noHireCount * 4;
+          return {
+            entityType: 'profile',
+            entityId: document.profileUserId,
+            label: document.displayName,
+            score: document.ranking.score,
+            outcomeScore,
+            momentumScore:
+              Math.max(0, 100 - document.ranking.recencyDays * 4) +
+              (clickCounts.get(document.profileUserId) ?? 0) * 3,
+            moderationStatus: profile.moderationStatus,
+            reasons: document.reasons,
+            signals: {
+              completionRate: document.ranking.completionRate,
+              disputeRate: document.ranking.disputeRate,
+              inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
+              responseRate: document.ranking.responseRate,
+              reviewAverage: reviewAverageByUser.get(document.profileUserId) ?? null,
+              hireCount,
+              noHireCount,
+              recencyDays: document.ranking.recencyDays,
+            },
+          } satisfies MarketplaceRankingAuditEntry;
+        })
+        .filter((entry): entry is MarketplaceRankingAuditEntry => entry !== null),
+      ...opportunityDocuments
+        .map((document) => {
+          const opportunity = opportunityMap.get(document.opportunityId);
+          if (!opportunity) {
+            return null;
+          }
+          const hireCount = decisions.filter(
+            (decision) =>
+              decision.opportunityId === document.opportunityId &&
+              decision.action === 'hired',
+          ).length;
+          const noHireCount = decisions.filter(
+            (decision) =>
+              decision.opportunityId === document.opportunityId &&
+              decision.action === 'no_hire',
+          ).length;
+          return {
+            entityType: 'opportunity',
+            entityId: document.opportunityId,
+            label: document.title,
+            score: document.ranking.score,
+            outcomeScore: hireCount * 18 - noHireCount * 5,
+            momentumScore:
+              Math.max(0, 100 - document.ranking.recencyDays * 4) +
+              (clickCounts.get(document.opportunityId) ?? 0) * 3,
+            moderationStatus: opportunity.moderationStatus,
+            reasons: document.reasons,
+            signals: {
+              completionRate: document.ranking.completionRate,
+              disputeRate: document.ranking.disputeRate,
+              inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
+              responseRate: document.ranking.responseRate,
+              reviewAverage: null,
+              hireCount,
+              noHireCount,
+              recencyDays: document.ranking.recencyDays,
+            },
+          } satisfies MarketplaceRankingAuditEntry;
+        })
+        .filter((entry): entry is MarketplaceRankingAuditEntry => entry !== null),
+    ]
+      .sort(
+        (left, right) =>
+          right.score +
+            right.outcomeScore +
+            right.momentumScore -
+            (left.score + left.outcomeScore + left.momentumScore),
+      )
+      .slice(0, 12);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      funnel,
+      liquidityByCategory: await this.buildLiquidityByCategory(
+        profiles,
+        opportunities,
+      ),
+      liquidityByTimezone: await this.buildLiquidityByTimezone(
+        profiles,
+        opportunities,
+      ),
+      noHireReasons: this.buildNoHireReasonStats(decisions),
+      topSearches: this.buildTopSearchStats(events),
+      stalledOpportunities: this.buildStalledOpportunityViews(
+        opportunities,
+        applications,
+        decisions,
+      ),
+      rankingAudit,
     };
   }
 

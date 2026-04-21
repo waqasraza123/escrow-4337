@@ -26,6 +26,7 @@ import {
   type MarketplaceAdminProfile,
   type MarketplaceIdentityConfidenceLabel,
   type MarketplaceIdentityRiskLevel,
+  type MarketplaceIntelligenceReport,
   type MarketplaceModerationDashboard,
   type MarketplaceModerationStatus,
   type MarketplaceReview,
@@ -106,6 +107,8 @@ export function MarketplaceModerationConsole() {
   const [dashboard, setDashboard] = useState<MarketplaceModerationDashboard | null>(
     null,
   );
+  const [intelligence, setIntelligence] =
+    useState<MarketplaceIntelligenceReport | null>(null);
   const [profiles, setProfiles] = useState<MarketplaceAdminProfile[]>([]);
   const [opportunities, setOpportunities] = useState<MarketplaceAdminOpportunity[]>(
     [],
@@ -157,6 +160,7 @@ export function MarketplaceModerationConsole() {
       setOperator(null);
       setCapabilityBlockMessage(null);
       setDashboard(null);
+      setIntelligence(null);
       setProfiles([]);
       setOpportunities([]);
       setReports([]);
@@ -174,6 +178,7 @@ export function MarketplaceModerationConsole() {
             'Marketplace moderation capability is required for this surface.',
         );
         setDashboard(null);
+        setIntelligence(null);
         setProfiles([]);
         setOpportunities([]);
         setReports([]);
@@ -183,12 +188,14 @@ export function MarketplaceModerationConsole() {
 
       const [
         dashboardResponse,
+        intelligenceResponse,
         profilesResponse,
         opportunitiesResponse,
         reportsResponse,
         reviewsResponse,
       ] = await Promise.all([
         adminApi.getMarketplaceModerationDashboard(nextTokens.accessToken),
+        adminApi.getMarketplaceModerationIntelligence(nextTokens.accessToken),
         adminApi.listMarketplaceModerationProfiles(nextTokens.accessToken),
         adminApi.listMarketplaceModerationOpportunities(nextTokens.accessToken),
         adminApi.listMarketplaceModerationReports(
@@ -199,6 +206,7 @@ export function MarketplaceModerationConsole() {
       ]);
 
       setDashboard(dashboardResponse);
+      setIntelligence(intelligenceResponse.report);
       setProfiles(profilesResponse.profiles);
       setOpportunities(opportunitiesResponse.opportunities);
       setReports(reportsResponse.reports);
@@ -584,6 +592,112 @@ export function MarketplaceModerationConsole() {
               />
             </FactGrid>
           </SectionCard>
+
+          {intelligence ? (
+            <section className={styles.grid}>
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.panelEyebrow}>Intelligence</span>
+                    <h2>Funnel and liquidity</h2>
+                  </div>
+                </div>
+                <div className={styles.stack}>
+                  <FactGrid className={styles.summaryGrid}>
+                    {intelligence.funnel.map((stage) => (
+                      <FactItem
+                        key={stage.key}
+                        label={stage.label}
+                        value={stage.count}
+                      />
+                    ))}
+                  </FactGrid>
+                  <div className={styles.stack}>
+                    <strong>Category imbalance</strong>
+                    {intelligence.liquidityByCategory.map((slice) => (
+                      <article key={slice.label} className={styles.timelineCard}>
+                        <strong>{slice.label}</strong>
+                        <p className={styles.stateText}>
+                          Demand {slice.demandCount} • Supply {slice.supplyCount} •{' '}
+                          {slice.posture}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className={styles.stack}>
+                    <strong>Timezone imbalance</strong>
+                    {intelligence.liquidityByTimezone.map((slice) => (
+                      <article key={slice.label} className={styles.timelineCard}>
+                        <strong>{slice.label}</strong>
+                        <p className={styles.stateText}>
+                          Demand {slice.demandCount} • Supply {slice.supplyCount} •{' '}
+                          {slice.posture}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </article>
+
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.panelEyebrow}>Diagnostics</span>
+                    <h2>No-hire and ranking QA</h2>
+                  </div>
+                </div>
+                <div className={styles.stack}>
+                  <div className={styles.stack}>
+                    <strong>No-hire reasons</strong>
+                    {intelligence.noHireReasons.length === 0 ? (
+                      <p className={styles.stateText}>No no-hire reasons captured yet.</p>
+                    ) : (
+                      intelligence.noHireReasons.map((entry) => (
+                        <article key={entry.reason} className={styles.timelineCard}>
+                          <strong>{entry.reason}</strong>
+                          <p className={styles.stateText}>{entry.count} decisions</p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                  <div className={styles.stack}>
+                    <strong>Top search queries</strong>
+                    {intelligence.topSearches.map((entry) => (
+                      <article
+                        key={`${entry.searchKind}-${entry.queryLabel}`}
+                        className={styles.timelineCard}
+                      >
+                        <strong>{entry.queryLabel}</strong>
+                        <p className={styles.stateText}>
+                          {entry.searchKind} • {entry.impressions} impressions •{' '}
+                          {entry.resultClicks} clicks • {entry.saveCount} saves
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className={styles.stack}>
+                    <strong>Ranking audit</strong>
+                    {intelligence.rankingAudit.map((entry) => (
+                      <article
+                        key={`${entry.entityType}-${entry.entityId}`}
+                        className={styles.timelineCard}
+                      >
+                        <strong>{entry.label}</strong>
+                        <p className={styles.stateText}>
+                          {entry.entityType} • score {entry.score} • outcome{' '}
+                          {entry.outcomeScore} • momentum {entry.momentumScore}
+                        </p>
+                        <p className={styles.stateText}>
+                          Hires {entry.signals.hireCount} • No-hire {entry.signals.noHireCount}
+                          {' • '}Reviews {entry.signals.reviewAverage ?? '—'}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            </section>
+          ) : null}
 
           <section className={styles.grid}>
             <article className={styles.panel}>

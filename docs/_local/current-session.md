@@ -4,21 +4,22 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the repo-side Phase 7 fee/treasury/support operations pass in one code step:
-  - contract-linked fee-policy snapshots and off-chain fee/payout ledgers
-  - reconciliation posture on escrow jobs
-  - participant support-case workflows in contract and project-room surfaces
-  - operator fee/support queue management in admin
+- Land the repo-side Phase 8 marketplace intelligence pass in one code step:
+  - interaction telemetry for public search and core marketplace conversions
+  - refreshed search read models with stronger ranking signals
+  - workspace analytics for search/conversion/liquidity/no-hire posture
+  - operator moderation intelligence for funnel, liquidity, and ranking QA
 
 ## Last Completed Step
-- Committed the Phase 6 handoff locally as `a7970c5` (`Implement Phase 6 marketplace reputation and review trust layer`).
+- Committed the Phase 7 handoff locally as `c3b8c93` (`Implement Phase 7 fee treasury and support operations`).
 
 ## Current Step
-- Phase 7 fee/treasury/support code is now implemented and intentionally unverified:
-  - `EscrowService` now seeds contract commercial policy snapshots, records off-chain fee/payout ledger entries on release/refund outcomes, derives reconciliation posture, and persists project-room-linked support cases
-  - new protected escrow routes now expose per-job support operations, participant support-case create/reply flows, operator support-case triage, and a global `/jobs/support-operations` queue
-  - `apps/web` now surfaces fee disclosure and support entry points on the contract console and project room
-  - `apps/admin` now surfaces the fee/support queue with assignment, fee-decision, and resolution controls
+- Phase 8 marketplace intelligence code is now implemented and intentionally unverified:
+  - `marketplace` now persists interaction telemetry plus a new Postgres migration `025_marketplace_intelligence_phase.sql`
+  - marketplace search read models are now refreshed from richer profile/opportunity ranking helpers instead of only the earlier shallow document state
+  - new API reads now expose authenticated workspace analytics and operator moderation intelligence
+  - `apps/web` now records public marketplace search/click/detail telemetry, exposes a workspace conversion-intelligence panel, and adds SEO metadata to public marketplace routes
+  - `apps/admin` now exposes funnel/liquidity/no-hire/ranking QA reads inside the marketplace moderation console
 - This pass is intentionally code-only:
   - no real tests were run
   - no builds were run
@@ -76,6 +77,13 @@
   `services/api/src/persistence/{file/file.repositories.ts,postgres/postgres.repositories.ts}`
   `apps/web/src/{app/project-room.tsx,app/web-console.tsx,lib/api.ts}`
   `apps/admin/src/{app/operator-console.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Phase 8 work in progress:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/025_marketplace_intelligence_phase.sql`
+  `apps/web/src/{app/marketplace/marketplace-browser.tsx,app/marketplace/workspace.tsx,app/marketplace/page.tsx,app/marketplace/profiles/[slug]/{page.tsx,profile-detail.tsx},app/marketplace/opportunities/[id]/{page.tsx,opportunity-detail.tsx},lib/api.ts}`
+  `apps/admin/src/{app/marketplace/moderation-console.tsx,lib/api.ts}`
   `docs/{project-state.md,_local/current-session.md}`
 
 ## Key Constraints

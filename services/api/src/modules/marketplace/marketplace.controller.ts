@@ -86,6 +86,22 @@ export class MarketplaceController {
     return this.marketplaceService.searchOpportunities(query);
   }
 
+  @Post('analytics/interactions')
+  recordInteraction(
+    @Body(
+      new ZodValidationPipe(marketplaceDto.recordMarketplaceInteractionSchema),
+    )
+    body: marketplaceDto.RecordMarketplaceInteractionDto,
+  ) {
+    return this.marketplaceService.recordInteraction(null, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('analytics/overview')
+  getAnalyticsOverview(@User() user: ReqUser) {
+    return this.marketplaceService.getAnalyticsOverview(user.id);
+  }
+
   @UseGuards(AuthGuard)
   @Get('recommendations/talent')
   getTalentRecommendations(
@@ -531,6 +547,12 @@ export class MarketplaceController {
   @Get('moderation/reviews')
   listModerationReviews(@User() user: ReqUser) {
     return this.marketplaceService.listModerationReviews(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('moderation/intelligence')
+  getModerationIntelligence(@User() user: ReqUser) {
+    return this.marketplaceService.getModerationIntelligence(user.id);
   }
 
   @UseGuards(AuthGuard)

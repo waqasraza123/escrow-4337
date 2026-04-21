@@ -31,6 +31,7 @@ import {
   type MarketplaceContractDraftStatus,
   type MarketplaceApplicationDossier,
   type MarketplaceApplicationTimeline,
+  type MarketplaceAnalyticsOverview,
   type MarketplaceCryptoReadiness,
   type MarketplaceEngagementType,
   type MarketplaceOfferMilestoneDraft,
@@ -475,6 +476,8 @@ export function MarketplaceWorkspace() {
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
+  const [analyticsOverview, setAnalyticsOverview] =
+    useState<MarketplaceAnalyticsOverview | null>(null);
   const [talentSearchResults, setTalentSearchResults] = useState<
     MarketplaceTalentSearchResult[]
   >([]);
@@ -682,6 +685,7 @@ export function MarketplaceWorkspace() {
         setOrganizationInvitations([]);
         setSavedSearches([]);
         setMarketplaceInvites([]);
+        setAnalyticsOverview(null);
         setTalentSearchResults([]);
         setOpportunitySearchResults([]);
         setMyOpportunities([]);
@@ -707,6 +711,7 @@ export function MarketplaceWorkspace() {
         orgMembershipResponse,
         savedSearchResponse,
         myMarketplaceInvitesResponse,
+        analyticsResponse,
         talentRecommendationResponse,
         opportunityRecommendationResponse,
       ] =
@@ -744,6 +749,9 @@ export function MarketplaceWorkspace() {
                 invites: [],
               }))
             : Promise.resolve({ invites: [] }),
+          webApi
+            .getMarketplaceAnalyticsOverview(nextTokens.accessToken)
+            .catch(() => ({ overview: null })),
           nextWorkspace?.kind === 'client'
             ? webApi
                 .getTalentRecommendations({ limit: 6 }, nextTokens.accessToken)
@@ -767,6 +775,7 @@ export function MarketplaceWorkspace() {
       setOrganizationInvitations(orgInvitationResponse.invitations);
       setSavedSearches(savedSearchResponse.searches);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
+      setAnalyticsOverview(analyticsResponse.overview);
       setTalentSearchResults(talentRecommendationResponse.results);
       setOpportunitySearchResults(opportunityRecommendationResponse.results);
       setMyOpportunities(myOpportunityResult.opportunities);
@@ -2267,6 +2276,97 @@ export function MarketplaceWorkspace() {
           </FactGrid>
         </SectionCard>
       </RevealSection>
+
+      {!loading && tokens && analyticsOverview ? (
+        <RevealSection className={styles.grid} delay={0.085}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow="Intelligence"
+            headerClassName={styles.panelHeader}
+            title="Marketplace conversion posture"
+          >
+            <div className={styles.stack}>
+              <FactGrid className={styles.summaryGrid}>
+                <FactItem label="Search impressions" value={analyticsOverview.summary.searchImpressions} />
+                <FactItem label="Result clicks" value={analyticsOverview.summary.resultClicks} />
+                <FactItem label="Saved searches" value={analyticsOverview.summary.savedSearches} />
+                <FactItem label="Applications" value={analyticsOverview.summary.applications} />
+                <FactItem label="Shortlists" value={analyticsOverview.summary.shortlists} />
+                <FactItem label="Interviews" value={analyticsOverview.summary.interviews} />
+                <FactItem label="Offers" value={analyticsOverview.summary.offers} />
+                <FactItem label="Hires" value={analyticsOverview.summary.hires} />
+                <FactItem label="Active contracts" value={analyticsOverview.summary.activeContracts} />
+              </FactGrid>
+              <div className={styles.summaryGrid}>
+                <SharedCard className={styles.actionPanel} interactive>
+                  <div className={styles.stack}>
+                    <strong>Liquidity imbalance</strong>
+                    {analyticsOverview.liquidity.length === 0 ? (
+                      <p className={styles.stateText}>No category imbalance yet.</p>
+                    ) : (
+                      analyticsOverview.liquidity.map((slice) => (
+                        <p key={slice.label} className={styles.stateText}>
+                          {slice.label}: demand {slice.demandCount} • supply {slice.supplyCount} • {slice.posture}
+                        </p>
+                      ))
+                    )}
+                  </div>
+                </SharedCard>
+                <SharedCard className={styles.actionPanel} interactive>
+                  <div className={styles.stack}>
+                    <strong>Top searches</strong>
+                    {analyticsOverview.topSearches.length === 0 ? (
+                      <p className={styles.stateText}>No search telemetry yet.</p>
+                    ) : (
+                      analyticsOverview.topSearches.map((entry) => (
+                        <p
+                          key={`${entry.searchKind}-${entry.queryLabel}`}
+                          className={styles.stateText}
+                        >
+                          {entry.queryLabel}: {entry.impressions} impressions • {entry.resultClicks} clicks
+                        </p>
+                      ))
+                    )}
+                  </div>
+                </SharedCard>
+                <SharedCard className={styles.actionPanel} interactive>
+                  <div className={styles.stack}>
+                    <strong>No-hire reasons</strong>
+                    {analyticsOverview.noHireReasons.length === 0 ? (
+                      <p className={styles.stateText}>No no-hire reasons recorded yet.</p>
+                    ) : (
+                      analyticsOverview.noHireReasons.map((entry) => (
+                        <p key={entry.reason} className={styles.stateText}>
+                          {entry.reason}: {entry.count}
+                        </p>
+                      ))
+                    )}
+                  </div>
+                </SharedCard>
+              </div>
+              {analyticsOverview.stalledItems.length > 0 ? (
+                <div className={styles.stack}>
+                  <span className={styles.metaLabel}>Stalled briefs</span>
+                  {analyticsOverview.stalledItems.map((item) => (
+                    <SharedCard
+                      key={item.opportunityId}
+                      className={styles.actionPanel}
+                      interactive
+                    >
+                      <div className={styles.stack}>
+                        <strong>{item.title}</strong>
+                        <p className={styles.stateText}>
+                          {item.category} • {item.daysOpen} days open • {item.applicationCount} applications
+                        </p>
+                      </div>
+                    </SharedCard>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
 
       {!loading && tokens && activeWorkspace ? (
         <RevealSection className={styles.grid} delay={0.1}>

@@ -398,6 +398,87 @@ export type MarketplaceModerationDashboard = {
   }>;
   recentAbuseReports: MarketplaceAbuseReport[];
 };
+export type MarketplaceAnalyticsFunnelStage = {
+  key:
+    | 'search_impressions'
+    | 'result_clicks'
+    | 'saved_searches'
+    | 'applications'
+    | 'shortlists'
+    | 'interviews'
+    | 'offers'
+    | 'hires'
+    | 'funded_jobs'
+    | 'released_milestones'
+    | 'disputed_milestones';
+  label: string;
+  count: number;
+};
+export type MarketplaceLiquiditySlice = {
+  label: string;
+  demandCount: number;
+  supplyCount: number;
+  gap: number;
+  posture: 'balanced' | 'demand_heavy' | 'supply_heavy';
+};
+export type MarketplaceNoHireReasonStat = {
+  reason:
+    | 'budget_changed'
+    | 'scope_changed'
+    | 'fit_not_strong_enough'
+    | 'candidate_withdrew'
+    | 'timeline_mismatch'
+    | 'other';
+  count: number;
+};
+export type MarketplaceTopSearchStat = {
+  searchKind: 'talent' | 'opportunity';
+  queryLabel: string;
+  impressions: number;
+  resultClicks: number;
+  saveCount: number;
+};
+export type MarketplaceStalledItem = {
+  opportunityId: string;
+  title: string;
+  category: string;
+  publishedAt: number | null;
+  daysOpen: number;
+  applicationCount: number;
+  shortlistCount: number;
+  offerCount: number;
+  lastDecisionAt: number | null;
+};
+export type MarketplaceRankingAuditEntry = {
+  entityType: 'profile' | 'opportunity';
+  entityId: string;
+  label: string;
+  score: number;
+  outcomeScore: number;
+  momentumScore: number;
+  moderationStatus: MarketplaceModerationStatus;
+  reasons: Array<{ code: string; label: string }>;
+  signals: {
+    completionRate: number;
+    disputeRate: number;
+    inviteAcceptanceRate: number;
+    responseRate: number;
+    reviewAverage: number | null;
+    hireCount: number;
+    noHireCount: number;
+    recencyDays: number;
+  };
+};
+export type MarketplaceIntelligenceReport = {
+  generatedAt: string;
+  funnel: MarketplaceAnalyticsFunnelStage[];
+  liquidityByCategory: MarketplaceLiquiditySlice[];
+  liquidityByTimezone: MarketplaceLiquiditySlice[];
+  noHireReasons: MarketplaceNoHireReasonStat[];
+  topSearches: MarketplaceTopSearchStat[];
+  stalledOpportunities: MarketplaceStalledItem[];
+  rankingAudit: MarketplaceRankingAuditEntry[];
+};
 
 export type MarketplaceAbuseReportReason =
   | 'spam'
@@ -1656,6 +1737,14 @@ export const adminApi = {
     return requestJson<{ reviews: MarketplaceReview[] }>(
       apiBaseUrl,
       '/marketplace/moderation/reviews',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getMarketplaceModerationIntelligence(accessToken: string) {
+    return requestJson<{ report: MarketplaceIntelligenceReport }>(
+      apiBaseUrl,
+      '/marketplace/moderation/intelligence',
       { method: 'GET' },
       accessToken,
     );

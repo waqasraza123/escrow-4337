@@ -15,6 +15,10 @@ import type {
   MarketplaceIdentityConfidenceLabel,
   MarketplaceIdentityRiskLevel,
   MarketplaceIdentityRiskReviewRecord,
+  MarketplaceInteractionEntityType,
+  MarketplaceInteractionEventRecord,
+  MarketplaceInteractionEventType,
+  MarketplaceInteractionSurface,
   MarketplaceInterviewMessageKind,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
@@ -338,6 +342,27 @@ type MarketplaceIdentityRiskReviewRow = QueryResultRow & {
   reviewed_at_ms: string;
   created_at_ms: string;
   updated_at_ms: string;
+};
+
+type MarketplaceInteractionEventRow = QueryResultRow & {
+  id: string;
+  actor_user_id: string | null;
+  actor_workspace_id: string | null;
+  surface: MarketplaceInteractionSurface;
+  entity_type: MarketplaceInteractionEntityType;
+  event_type: MarketplaceInteractionEventType;
+  entity_id: string | null;
+  search_kind: MarketplaceInteractionEventRecord['searchKind'];
+  query_label: string | null;
+  category: string | null;
+  timezone: string | null;
+  skill_tags_json: string[];
+  result_count: number;
+  related_opportunity_id: string | null;
+  related_profile_user_id: string | null;
+  related_application_id: string | null;
+  related_job_id: string | null;
+  created_at_ms: string;
 };
 
 function mapProfile(row: MarketplaceProfileRow): MarketplaceProfileRecord {
@@ -707,6 +732,31 @@ function mapIdentityRiskReview(
     reviewedAt: Number(row.reviewed_at_ms),
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapInteractionEvent(
+  row: MarketplaceInteractionEventRow,
+): MarketplaceInteractionEventRecord {
+  return {
+    id: row.id,
+    actorUserId: row.actor_user_id,
+    actorWorkspaceId: row.actor_workspace_id,
+    surface: row.surface,
+    entityType: row.entity_type,
+    eventType: row.event_type,
+    entityId: row.entity_id,
+    searchKind: row.search_kind,
+    queryLabel: row.query_label,
+    category: row.category,
+    timezone: row.timezone,
+    skillTags: row.skill_tags_json ?? [],
+    resultCount: row.result_count,
+    relatedOpportunityId: row.related_opportunity_id,
+    relatedProfileUserId: row.related_profile_user_id,
+    relatedApplicationId: row.related_application_id,
+    relatedJobId: row.related_job_id,
+    createdAt: Number(row.created_at_ms),
   };
 }
 
@@ -2019,6 +2069,88 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         String(review.reviewedAt),
         String(review.createdAt),
         String(review.updatedAt),
+      ],
+    );
+  }
+
+  async listInteractionEvents() {
+    const result = await this.db.query<MarketplaceInteractionEventRow>(
+      `
+        SELECT *
+        FROM marketplace_interaction_events
+        ORDER BY created_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapInteractionEvent);
+  }
+
+  async saveInteractionEvent(event: MarketplaceInteractionEventRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_interaction_events (
+          id,
+          actor_user_id,
+          actor_workspace_id,
+          surface,
+          entity_type,
+          event_type,
+          entity_id,
+          search_kind,
+          query_label,
+          category,
+          timezone,
+          skill_tags_json,
+          result_count,
+          related_opportunity_id,
+          related_profile_user_id,
+          related_application_id,
+          related_job_id,
+          created_at_ms
+        )
+        VALUES (
+          $1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13,
+          $14, $15::uuid, $16, $17, $18
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          actor_user_id = EXCLUDED.actor_user_id,
+          actor_workspace_id = EXCLUDED.actor_workspace_id,
+          surface = EXCLUDED.surface,
+          entity_type = EXCLUDED.entity_type,
+          event_type = EXCLUDED.event_type,
+          entity_id = EXCLUDED.entity_id,
+          search_kind = EXCLUDED.search_kind,
+          query_label = EXCLUDED.query_label,
+          category = EXCLUDED.category,
+          timezone = EXCLUDED.timezone,
+          skill_tags_json = EXCLUDED.skill_tags_json,
+          result_count = EXCLUDED.result_count,
+          related_opportunity_id = EXCLUDED.related_opportunity_id,
+          related_profile_user_id = EXCLUDED.related_profile_user_id,
+          related_application_id = EXCLUDED.related_application_id,
+          related_job_id = EXCLUDED.related_job_id,
+          created_at_ms = EXCLUDED.created_at_ms
+      `,
+      [
+        event.id,
+        event.actorUserId,
+        event.actorWorkspaceId,
+        event.surface,
+        event.entityType,
+        event.eventType,
+        event.entityId,
+        event.searchKind,
+        event.queryLabel,
+        event.category,
+        event.timezone,
+        JSON.stringify(event.skillTags),
+        event.resultCount,
+        event.relatedOpportunityId,
+        event.relatedProfileUserId,
+        event.relatedApplicationId,
+        event.relatedJobId,
+        String(event.createdAt),
       ],
     );
   }

@@ -43,6 +43,16 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
       .then((response: { profile: MarketplaceProfile }) => {
         if (active) {
           setProfile(response.profile);
+          void webApi.recordMarketplaceInteraction({
+            surface: 'public_marketplace',
+            entityType: 'profile',
+            eventType: 'detail_view',
+            entityId: response.profile.userId,
+            searchKind: 'talent',
+            queryLabel: slug,
+            timezone: response.profile.timezone,
+            skillTags: response.profile.skills.slice(0, 6),
+          });
         }
       })
       .catch((loadError: unknown) => {

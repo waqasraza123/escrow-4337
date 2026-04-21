@@ -49,6 +49,16 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
       .then((response: { opportunity: MarketplaceOpportunityDetail }) => {
         if (active) {
           setOpportunity(response.opportunity);
+          void webApi.recordMarketplaceInteraction({
+            surface: 'public_marketplace',
+            entityType: 'opportunity',
+            eventType: 'detail_view',
+            entityId: response.opportunity.id,
+            searchKind: 'opportunity',
+            queryLabel: response.opportunity.title,
+            category: response.opportunity.category,
+            skillTags: response.opportunity.requiredSkills.slice(0, 6),
+          });
         }
       })
       .catch((loadError: unknown) => {

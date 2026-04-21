@@ -392,6 +392,73 @@ export const marketplaceModerationReportsQuerySchema = z
   })
   .strict();
 
+export const recordMarketplaceInteractionSchema = z
+  .object({
+    surface: z.enum(['public_marketplace', 'workspace', 'admin', 'system']),
+    entityType: z.enum([
+      'search',
+      'profile',
+      'opportunity',
+      'application',
+      'saved_search',
+      'job',
+    ]),
+    eventType: z.enum([
+      'search_impression',
+      'result_click',
+      'detail_view',
+      'saved_search_created',
+      'invite_sent',
+      'application_submitted',
+      'application_revised',
+      'application_withdrawn',
+      'application_shortlisted',
+      'application_rejected',
+      'interview_started',
+      'interview_message_posted',
+      'offer_created',
+      'offer_accepted',
+      'offer_declined',
+      'contract_converted',
+      'hire_recorded',
+      'no_hire_recorded',
+      'job_funded',
+      'milestone_released',
+      'milestone_disputed',
+      'review_submitted',
+    ]),
+    entityId: z.string().trim().min(1).max(120).nullable().optional(),
+    searchKind: z.enum(['talent', 'opportunity']).nullable().optional(),
+    queryLabel: z.string().trim().min(1).max(200).nullable().optional(),
+    category: z.string().trim().min(1).max(120).nullable().optional(),
+    timezone: z.string().trim().min(1).max(120).nullable().optional(),
+    skillTags: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
+    resultCount: z.coerce.number().int().min(1).max(250).default(1),
+    relatedOpportunityId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .optional(),
+    relatedProfileUserId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .optional(),
+    relatedApplicationId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .optional(),
+    relatedJobId: z.string().trim().min(1).max(120).nullable().optional(),
+  })
+  .strict();
+
 export const updateMarketplaceAbuseReportSchema = z
   .object({
     status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
@@ -490,6 +557,9 @@ export type CreateMarketplaceAbuseReportDto = z.infer<
 >;
 export type MarketplaceModerationReportsQueryDto = z.infer<
   typeof marketplaceModerationReportsQuerySchema
+>;
+export type RecordMarketplaceInteractionDto = z.infer<
+  typeof recordMarketplaceInteractionSchema
 >;
 export type UpdateMarketplaceAbuseReportDto = z.infer<
   typeof updateMarketplaceAbuseReportSchema

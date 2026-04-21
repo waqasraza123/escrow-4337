@@ -131,6 +131,42 @@ export type MarketplaceNoHireReason =
   | 'candidate_withdrew'
   | 'timeline_mismatch'
   | 'other';
+export type MarketplaceSearchKind = 'talent' | 'opportunity';
+export type MarketplaceInteractionEntityType =
+  | 'search'
+  | 'profile'
+  | 'opportunity'
+  | 'application'
+  | 'saved_search'
+  | 'job';
+export type MarketplaceInteractionEventType =
+  | 'search_impression'
+  | 'result_click'
+  | 'detail_view'
+  | 'saved_search_created'
+  | 'invite_sent'
+  | 'application_submitted'
+  | 'application_revised'
+  | 'application_withdrawn'
+  | 'application_shortlisted'
+  | 'application_rejected'
+  | 'interview_started'
+  | 'interview_message_posted'
+  | 'offer_created'
+  | 'offer_accepted'
+  | 'offer_declined'
+  | 'contract_converted'
+  | 'hire_recorded'
+  | 'no_hire_recorded'
+  | 'job_funded'
+  | 'milestone_released'
+  | 'milestone_disputed'
+  | 'review_submitted';
+export type MarketplaceInteractionSurface =
+  | 'public_marketplace'
+  | 'workspace'
+  | 'admin'
+  | 'system';
 export type MarketplaceSearchReasonCode =
   | 'strong_skill_match'
   | 'timezone_overlap'
@@ -572,6 +608,27 @@ export type MarketplaceAbuseReportRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceInteractionEventRecord = {
+  id: string;
+  actorUserId: string | null;
+  actorWorkspaceId: string | null;
+  surface: MarketplaceInteractionSurface;
+  entityType: MarketplaceInteractionEntityType;
+  eventType: MarketplaceInteractionEventType;
+  entityId: string | null;
+  searchKind: MarketplaceSearchKind | null;
+  queryLabel: string | null;
+  category: string | null;
+  timezone: string | null;
+  skillTags: string[];
+  resultCount: number;
+  relatedOpportunityId: string | null;
+  relatedProfileUserId: string | null;
+  relatedApplicationId: string | null;
+  relatedJobId: string | null;
+  createdAt: number;
+};
+
 export type MarketplaceProfileView = Omit<
   MarketplaceProfileRecord,
   'moderationStatus'
@@ -892,6 +949,116 @@ export type MarketplaceModerationDashboard = {
   recentAbuseReports: MarketplaceAbuseReportView[];
 };
 
+export type MarketplaceAnalyticsFunnelStage = {
+  key:
+    | 'search_impressions'
+    | 'result_clicks'
+    | 'saved_searches'
+    | 'applications'
+    | 'shortlists'
+    | 'interviews'
+    | 'offers'
+    | 'hires'
+    | 'funded_jobs'
+    | 'released_milestones'
+    | 'disputed_milestones';
+  label: string;
+  count: number;
+};
+
+export type MarketplaceLiquiditySlice = {
+  label: string;
+  demandCount: number;
+  supplyCount: number;
+  gap: number;
+  posture: 'balanced' | 'demand_heavy' | 'supply_heavy';
+};
+
+export type MarketplaceNoHireReasonStat = {
+  reason: MarketplaceNoHireReason;
+  count: number;
+};
+
+export type MarketplaceTopSearchStat = {
+  searchKind: MarketplaceSearchKind;
+  queryLabel: string;
+  impressions: number;
+  resultClicks: number;
+  saveCount: number;
+};
+
+export type MarketplaceStalledItem = {
+  opportunityId: string;
+  title: string;
+  category: string;
+  publishedAt: number | null;
+  daysOpen: number;
+  applicationCount: number;
+  shortlistCount: number;
+  offerCount: number;
+  lastDecisionAt: number | null;
+};
+
+export type MarketplaceAnalyticsOverview = {
+  generatedAt: string;
+  workspace:
+    | {
+        workspaceId: string;
+        kind: 'client' | 'freelancer';
+        organizationId: string;
+        organizationKind: 'personal' | 'client' | 'agency';
+      }
+    | null;
+  summary: {
+    searchImpressions: number;
+    resultClicks: number;
+    savedSearches: number;
+    applications: number;
+    shortlists: number;
+    interviews: number;
+    offers: number;
+    hires: number;
+    activeContracts: number;
+  };
+  funnel: MarketplaceAnalyticsFunnelStage[];
+  liquidity: MarketplaceLiquiditySlice[];
+  noHireReasons: MarketplaceNoHireReasonStat[];
+  topSearches: MarketplaceTopSearchStat[];
+  stalledItems: MarketplaceStalledItem[];
+};
+
+export type MarketplaceRankingAuditEntry = {
+  entityType: 'profile' | 'opportunity';
+  entityId: string;
+  label: string;
+  score: number;
+  outcomeScore: number;
+  momentumScore: number;
+  moderationStatus: ModerationStatus;
+  reasons: MarketplaceSearchReason[];
+  signals: {
+    completionRate: number;
+    disputeRate: number;
+    inviteAcceptanceRate: number;
+    responseRate: number;
+    reviewAverage: number | null;
+    hireCount: number;
+    noHireCount: number;
+    recencyDays: number;
+  };
+};
+
+export type MarketplaceIntelligenceReport = {
+  generatedAt: string;
+  funnel: MarketplaceAnalyticsFunnelStage[];
+  liquidityByCategory: MarketplaceLiquiditySlice[];
+  liquidityByTimezone: MarketplaceLiquiditySlice[];
+  noHireReasons: MarketplaceNoHireReasonStat[];
+  topSearches: MarketplaceTopSearchStat[];
+  stalledOpportunities: MarketplaceStalledItem[];
+  rankingAudit: MarketplaceRankingAuditEntry[];
+};
+
 export type MarketplaceProfilesListResponse = {
   profiles: MarketplaceProfileView[];
 };
@@ -998,6 +1165,14 @@ export type MarketplaceModerationReviewsListResponse = {
 
 export type MarketplaceIdentityRiskReviewResponse = {
   review: MarketplaceIdentityRiskReviewView;
+};
+
+export type MarketplaceAnalyticsOverviewResponse = {
+  overview: MarketplaceAnalyticsOverview;
+};
+
+export type MarketplaceIntelligenceReportResponse = {
+  report: MarketplaceIntelligenceReport;
 };
 
 export type HireApplicationResponse = {

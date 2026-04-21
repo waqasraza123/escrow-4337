@@ -7,6 +7,7 @@ import type {
   MarketplaceContractDraftRevisionRecord,
   MarketplaceContractMetadataSnapshot,
   MarketplaceIdentityRiskReviewRecord,
+  MarketplaceInteractionEventRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferMilestoneDraft,
@@ -299,6 +300,24 @@ function normalizeIdentityRiskReview(
     ...review,
     flags: Array.from(new Set(review.flags)),
     operatorSummary: review.operatorSummary?.trim() || null,
+  };
+}
+
+function normalizeInteractionEvent(
+  event: MarketplaceInteractionEventRecord,
+): MarketplaceInteractionEventRecord {
+  return {
+    ...event,
+    entityId: event.entityId?.trim() || null,
+    queryLabel: event.queryLabel?.trim() || null,
+    category: event.category?.trim().toLowerCase() || null,
+    timezone: event.timezone?.trim() || null,
+    skillTags: normalizeTextList(event.skillTags),
+    relatedOpportunityId: event.relatedOpportunityId?.trim() || null,
+    relatedProfileUserId: event.relatedProfileUserId?.trim() || null,
+    relatedApplicationId: event.relatedApplicationId?.trim() || null,
+    relatedJobId: event.relatedJobId?.trim() || null,
+    resultCount: Math.max(1, Math.trunc(event.resultCount || 1)),
   };
 }
 
@@ -681,6 +700,22 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceIdentityRiskReviews[review.id] = cloneValue(
         normalizeIdentityRiskReview(review),
+      );
+    });
+  }
+
+  async listInteractionEvents() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceInteractionEvents)
+        .map((event) => cloneValue(normalizeInteractionEvent(event)))
+        .sort((left, right) => right.createdAt - left.createdAt),
+    );
+  }
+
+  async saveInteractionEvent(event: MarketplaceInteractionEventRecord) {
+    await this.store.write((data) => {
+      data.marketplaceInteractionEvents[event.id] = cloneValue(
+        normalizeInteractionEvent(event),
       );
     });
   }

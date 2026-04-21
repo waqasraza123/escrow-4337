@@ -23,6 +23,7 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceContractDraftRecord,
   MarketplaceIdentityRiskReviewRecord,
+  MarketplaceInteractionEventRecord,
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewThreadRecord,
   MarketplaceOfferRecord,
@@ -227,6 +228,8 @@ export interface MarketplaceRepository {
   saveIdentityRiskReview(
     review: MarketplaceIdentityRiskReviewRecord,
   ): Promise<void>;
+  listInteractionEvents(): Promise<MarketplaceInteractionEventRecord[]>;
+  saveInteractionEvent(event: MarketplaceInteractionEventRecord): Promise<void>;
 }
 
 export interface WalletLinkChallengesRepository {
@@ -239,7 +242,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 25;
+  version: 26;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -280,5 +283,6 @@ export type PersistenceFileData = {
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   marketplaceReviews: Record<string, MarketplaceReviewRecord>;
   marketplaceIdentityRiskReviews: Record<string, MarketplaceIdentityRiskReviewRecord>;
+  marketplaceInteractionEvents: Record<string, MarketplaceInteractionEventRecord>;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };
