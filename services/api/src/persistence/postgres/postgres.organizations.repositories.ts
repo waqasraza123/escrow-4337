@@ -1,5 +1,6 @@
 import type { QueryResultRow } from 'pg';
 import type {
+  OrganizationInvitationRecord,
   OrganizationMembershipRecord,
   OrganizationRecord,
   WorkspaceRecord,
@@ -23,6 +24,19 @@ type OrganizationMembershipRow = QueryResultRow & {
   user_id: string;
   role: OrganizationMembershipRecord['role'];
   status: OrganizationMembershipRecord['status'];
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type OrganizationInvitationRow = QueryResultRow & {
+  id: string;
+  organization_id: string;
+  invited_email: string;
+  role: OrganizationInvitationRecord['role'];
+  status: OrganizationInvitationRecord['status'];
+  invited_by_user_id: string;
+  accepted_by_user_id: string | null;
+  accepted_at_ms: string | null;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -59,6 +73,23 @@ function mapMembership(
     userId: row.user_id,
     role: row.role,
     status: row.status,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapInvitation(
+  row: OrganizationInvitationRow,
+): OrganizationInvitationRecord {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    invitedEmail: row.invited_email,
+    role: row.role,
+    status: row.status,
+    invitedByUserId: row.invited_by_user_id,
+    acceptedByUserId: row.accepted_by_user_id,
+    acceptedAt: row.accepted_at_ms ? Number(row.accepted_at_ms) : null,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -106,6 +137,19 @@ export class PostgresOrganizationsRepository implements OrganizationsRepository 
     return result.rows[0] ? mapOrganization(result.rows[0]) : null;
   }
 
+  async getInvitationById(id: string) {
+    const result = await this.db.query<OrganizationInvitationRow>(
+      `
+        SELECT *
+        FROM organization_invitations
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+    return result.rows[0] ? mapInvitation(result.rows[0]) : null;
+  }
+
   async listOrganizationsByUserId(userId: string) {
     const result = await this.db.query<OrganizationRow>(
       `
@@ -144,6 +188,32 @@ export class PostgresOrganizationsRepository implements OrganizationsRepository 
       [organizationId],
     );
     return result.rows.map(mapMembership);
+  }
+
+  async listInvitationsByUserEmail(email: string) {
+    const result = await this.db.query<OrganizationInvitationRow>(
+      `
+        SELECT *
+        FROM organization_invitations
+        WHERE invited_email = $1
+        ORDER BY updated_at_ms DESC
+      `,
+      [email.trim().toLowerCase()],
+    );
+    return result.rows.map(mapInvitation);
+  }
+
+  async listInvitationsByOrganizationId(organizationId: string) {
+    const result = await this.db.query<OrganizationInvitationRow>(
+      `
+        SELECT *
+        FROM organization_invitations
+        WHERE organization_id = $1
+        ORDER BY updated_at_ms DESC
+      `,
+      [organizationId],
+    );
+    return result.rows.map(mapInvitation);
   }
 
   async listWorkspacesByUserId(userId: string) {
@@ -246,6 +316,47 @@ export class PostgresOrganizationsRepository implements OrganizationsRepository 
         membership.status,
         String(membership.createdAt),
         String(membership.updatedAt),
+      ],
+    );
+  }
+
+  async saveInvitation(invitation: OrganizationInvitationRecord) {
+    await this.db.query(
+      `
+        INSERT INTO organization_invitations (
+          id,
+          organization_id,
+          invited_email,
+          role,
+          status,
+          invited_by_user_id,
+          accepted_by_user_id,
+          accepted_at_ms,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO UPDATE SET
+          organization_id = EXCLUDED.organization_id,
+          invited_email = EXCLUDED.invited_email,
+          role = EXCLUDED.role,
+          status = EXCLUDED.status,
+          invited_by_user_id = EXCLUDED.invited_by_user_id,
+          accepted_by_user_id = EXCLUDED.accepted_by_user_id,
+          accepted_at_ms = EXCLUDED.accepted_at_ms,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        invitation.id,
+        invitation.organizationId,
+        invitation.invitedEmail.trim().toLowerCase(),
+        invitation.role,
+        invitation.status,
+        invitation.invitedByUserId,
+        invitation.acceptedByUserId,
+        invitation.acceptedAt === null ? null : String(invitation.acceptedAt),
+        String(invitation.createdAt),
+        String(invitation.updatedAt),
       ],
     );
   }

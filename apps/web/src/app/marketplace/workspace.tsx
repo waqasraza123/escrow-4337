@@ -37,6 +37,7 @@ import {
   type OrganizationSummary,
   type SessionTokens,
   type UserProfile,
+  type WorkspaceSummary,
 } from '../../lib/api';
 
 const sessionStorageKey = 'escrow4337.web.session';
@@ -92,12 +93,15 @@ type ApplicationDraft = {
 type OrganizationDraft = {
   name: string;
   slug: string;
+  kind: 'client' | 'agency';
 };
 
 type InvitationDraft = {
   email: string;
-  role: 'client_owner' | 'client_recruiter';
+  role: OrganizationInvitation['role'];
 };
+
+type LaneKind = 'client' | 'freelancer' | 'agency';
 
 function readSession(): SessionTokens | null {
   if (typeof window === 'undefined') {
@@ -226,6 +230,7 @@ function createEmptyOrganizationDraft(): OrganizationDraft {
   return {
     name: '',
     slug: '',
+    kind: 'client',
   };
 }
 
@@ -234,6 +239,21 @@ function createEmptyInvitationDraft(): InvitationDraft {
     email: '',
     role: 'client_recruiter',
   };
+}
+
+function getWorkspaceLane(workspace: WorkspaceSummary): LaneKind {
+  if (workspace.kind === 'client') {
+    return 'client';
+  }
+  return workspace.organizationKind === 'agency' ? 'agency' : 'freelancer';
+}
+
+function getLaneFromInvitation(
+  invitation: Pick<OrganizationInvitation, 'role'>,
+): LaneKind {
+  return invitation.role === 'client_owner' || invitation.role === 'client_recruiter'
+    ? 'client'
+    : 'agency';
 }
 
 function slugifyWorkspaceName(value: string) {
@@ -338,9 +358,12 @@ export function MarketplaceWorkspace() {
     .flat()
     .filter((match) => match.recommendation === 'strong_match').length;
   const activeWorkspace = user?.activeWorkspace ?? null;
-  const isClientWorkspace = activeWorkspace?.kind === 'client';
-  const isFreelancerWorkspace = activeWorkspace?.kind === 'freelancer';
   const availableWorkspaces = user?.workspaces ?? [];
+  const activeLane = activeWorkspace ? getWorkspaceLane(activeWorkspace) : null;
+  const isClientWorkspace = activeLane === 'client';
+  const isFreelancerWorkspace = activeLane === 'freelancer';
+  const isAgencyWorkspace = activeLane === 'agency';
+  const isTalentWorkspace = activeWorkspace?.kind === 'freelancer';
   const activeOrganization =
     organizations.find(
       (organization) => organization.id === activeWorkspace?.organizationId,
@@ -357,12 +380,22 @@ export function MarketplaceWorkspace() {
   const canApplyToOpportunity = workspaceCapabilities.applyToOpportunity;
   const canCreateOpportunity = workspaceCapabilities.createOpportunity;
   const canReviewApplications = workspaceCapabilities.reviewApplications;
+  const workspaceMatchesLane = (
+    workspace: WorkspaceSummary,
+    lane: LaneKind,
+  ) =>
+    lane === 'client'
+      ? workspace.kind === 'client'
+      : lane === 'agency'
+        ? workspace.kind === 'freelancer' && workspace.organizationKind === 'agency'
+        : workspace.kind === 'freelancer' && workspace.organizationKind !== 'agency';
   const findWorkspaceWithCapability = (
-    kind: 'client' | 'freelancer',
+    lane: LaneKind,
     capability: keyof typeof workspaceCapabilities,
   ) =>
     availableWorkspaces.find(
-      (workspace) => workspace.kind === kind && workspace.capabilities[capability],
+      (workspace) =>
+        workspaceMatchesLane(workspace, lane) && workspace.capabilities[capability],
     ) ?? null;
   const clientAuthoringWorkspace = findWorkspaceWithCapability(
     'client',
@@ -380,6 +413,26 @@ export function MarketplaceWorkspace() {
     'freelancer',
     'applyToOpportunity',
   );
+  const agencyProfileWorkspace = findWorkspaceWithCapability(
+    'agency',
+    'manageProfile',
+  );
+  const agencyApplicationWorkspace = findWorkspaceWithCapability(
+    'agency',
+    'applyToOpportunity',
+  );
+  const activeOrganizationInvitable = activeOrganization?.kind === 'client' || activeOrganization?.kind === 'agency';
+  const invitationRoleOptions = activeOrganization?.kind === 'agency'
+    ? ([
+        'agency_member',
+        'agency_owner',
+      ] satisfies OrganizationInvitation['role'][])
+    : activeOrganization?.kind === 'client'
+      ? ([
+          'client_recruiter',
+          'client_owner',
+        ] satisfies OrganizationInvitation['role'][])
+      : [];
 
   const formatOpportunityStatus = (status: MarketplaceOpportunity['status']) =>
     marketplaceMessages.labels.opportunityStatus[status];
@@ -388,14 +441,13 @@ export function MarketplaceWorkspace() {
   const formatRecommendation = (
     recommendation: MarketplaceApplicationDossier['recommendation'],
   ) => marketplaceMessages.labels.recommendation[recommendation];
+  const formatWorkspaceMode = (workspace: WorkspaceSummary) =>
+    workspaceMessages.activeWorkspace.modeLabel[getWorkspaceLane(workspace)];
+  const formatOrganizationRole = (role: OrganizationSummary['roles'][number]) =>
+    workspaceMessages.invitationRoles[role as keyof typeof workspaceMessages.invitationRoles] ??
+    role;
   const renderWorkspaceAction = (
-    workspace:
-      | {
-          workspaceId: string;
-          label: string;
-          kind: 'client' | 'freelancer';
-        }
-      | null,
+    workspace: WorkspaceSummary | null,
   ) => {
     if (!workspace) {
       return null;
@@ -416,7 +468,7 @@ export function MarketplaceWorkspace() {
       >
         {workspaceMessages.activeWorkspace.switchWorkspace(
           workspace.label,
-          workspaceMessages.activeWorkspace.modeLabel[workspace.kind],
+          formatWorkspaceMode(workspace),
         )}
       </button>
     );
@@ -471,13 +523,15 @@ export function MarketplaceWorkspace() {
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceApplications(nextTokens.accessToken)
             : Promise.resolve({ applications: [] }),
-          nextWorkspace?.kind === 'client'
+          nextWorkspace &&
+          nextWorkspace.organizationKind !== 'personal'
             ? webApi.listOrganizationInvitations(
                 nextWorkspace.organizationId,
                 nextTokens.accessToken,
               )
             : Promise.resolve({ invitations: [] }),
-          nextWorkspace?.kind === 'client'
+          nextWorkspace &&
+          nextWorkspace.organizationKind !== 'personal'
             ? webApi.listOrganizationMemberships(
                 nextWorkspace.organizationId,
                 nextTokens.accessToken,
@@ -552,6 +606,18 @@ export function MarketplaceWorkspace() {
     void loadWorkspace(stored);
   }, []);
 
+  useEffect(() => {
+    setInvitationDraft((current) => {
+      const nextRole =
+        activeOrganization?.kind === 'agency'
+          ? 'agency_member'
+          : activeOrganization?.kind === 'client'
+            ? 'client_recruiter'
+            : current.role;
+      return current.role === nextRole ? current : { ...current, role: nextRole };
+    });
+  }, [activeOrganization?.kind]);
+
   async function handleSignOut() {
     if (tokens) {
       await webApi.logout(tokens.refreshToken);
@@ -573,11 +639,13 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
-  async function handleEnterLane(kind: 'client' | 'freelancer') {
+  async function handleEnterLane(kind: LaneKind) {
     const targetWorkspace =
       (kind === 'client'
         ? clientAuthoringWorkspace ?? clientReviewWorkspace
-        : freelancerProfileWorkspace ?? freelancerApplicationWorkspace) ?? null;
+        : kind === 'agency'
+          ? agencyProfileWorkspace ?? agencyApplicationWorkspace
+          : freelancerProfileWorkspace ?? freelancerApplicationWorkspace) ?? null;
     if (!targetWorkspace) {
       setError(workspaceMessages.messages.laneUnavailable(kind));
       return;
@@ -603,13 +671,16 @@ export function MarketplaceWorkspace() {
     await webApi.createOrganization(
       {
         name,
+        kind: organizationDraft.kind,
         slug,
         setActive: true,
       },
       tokens.accessToken,
     );
     setOrganizationDraft(createEmptyOrganizationDraft());
-    setMessage(workspaceMessages.messages.organizationCreated(name));
+    setMessage(
+      workspaceMessages.messages.organizationCreated(organizationDraft.kind, name),
+    );
     await loadWorkspace(tokens);
   }
 
@@ -639,18 +710,22 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
-  async function handleAcceptInvitation(invitationId: string) {
+  async function handleAcceptInvitation(invitation: OrganizationInvitation) {
     if (!tokens) {
       return;
     }
 
     setError(null);
     await webApi.acceptOrganizationInvitation(
-      invitationId,
+      invitation.invitationId,
       { setActive: true },
       tokens.accessToken,
     );
-    setMessage(workspaceMessages.messages.invitationAccepted);
+    setMessage(
+      workspaceMessages.messages.invitationAccepted(
+        workspaceMessages.activeWorkspace.modeLabel[getLaneFromInvitation(invitation)],
+      ),
+    );
     await loadWorkspace(tokens);
   }
 
@@ -974,7 +1049,7 @@ export function MarketplaceWorkspace() {
               </span>
               <strong>
                 {activeWorkspace.label} •{' '}
-                {workspaceMessages.activeWorkspace.modeLabel[activeWorkspace.kind]}
+                {workspaceMessages.activeWorkspace.modeLabel[activeLane ?? 'client']}
               </strong>
               <p className={styles.stateText}>
                 {workspaceMessages.activeWorkspace.organizationLabel}:{' '}
@@ -982,7 +1057,7 @@ export function MarketplaceWorkspace() {
               </p>
               <p className={styles.stateText}>
                 {workspaceMessages.activeWorkspace.roleLabel}:{' '}
-                {activeWorkspace.roles.join(', ')}
+                {activeWorkspace.roles.map(formatOrganizationRole).join(', ')}
               </p>
               {availableWorkspaces.length > 1 ? (
                 <div className={styles.inlineActions}>
@@ -995,7 +1070,7 @@ export function MarketplaceWorkspace() {
                     >
                       {workspaceMessages.activeWorkspace.switchWorkspace(
                         workspace.label,
-                        workspaceMessages.activeWorkspace.modeLabel[workspace.kind],
+                        formatWorkspaceMode(workspace),
                       )}
                     </button>
                   ))}
@@ -1077,6 +1152,37 @@ export function MarketplaceWorkspace() {
                   </div>
                 </div>
               </SharedCard>
+              <SharedCard
+                className={styles.actionPanel}
+                data-testid="marketplace-mode-card-agency"
+                interactive
+              >
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.modeGuide.agency.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.modeGuide.agency.body}
+                  </p>
+                  <p className={styles.stateText}>
+                    {isAgencyWorkspace
+                      ? workspaceMessages.modeGuide.currentMode
+                      : agencyApplicationWorkspace
+                        ? workspaceMessages.modeGuide.availableMode(
+                            agencyApplicationWorkspace.label,
+                          )
+                        : agencyProfileWorkspace
+                          ? workspaceMessages.modeGuide.availableMode(
+                              agencyProfileWorkspace.label,
+                            )
+                          : workspaceMessages.modeGuide.unavailableMode}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    {renderWorkspaceAction(agencyApplicationWorkspace)}
+                    {!agencyApplicationWorkspace
+                      ? renderWorkspaceAction(agencyProfileWorkspace)
+                      : null}
+                  </div>
+                </div>
+              </SharedCard>
             </div>
           </SectionCard>
         </RevealSection>
@@ -1123,6 +1229,22 @@ export function MarketplaceWorkspace() {
                   </div>
                 </div>
               </SharedCard>
+              <SharedCard className={styles.actionPanel} interactive>
+                <div className={styles.stack}>
+                  <strong>{workspaceMessages.onboarding.agency.title}</strong>
+                  <p className={styles.stateText}>
+                    {workspaceMessages.onboarding.agency.body}
+                  </p>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      onClick={() => void handleEnterLane('agency')}
+                    >
+                      {workspaceMessages.onboarding.agency.action}
+                    </button>
+                  </div>
+                </div>
+              </SharedCard>
             </div>
           </SectionCard>
         </RevealSection>
@@ -1156,9 +1278,7 @@ export function MarketplaceWorkspace() {
                     <div className={styles.inlineActions}>
                       <button
                         type="button"
-                        onClick={() =>
-                          void handleAcceptInvitation(invitation.invitationId)
-                        }
+                        onClick={() => void handleAcceptInvitation(invitation)}
                       >
                         {workspaceMessages.invitations.accept}
                       </button>
@@ -1208,7 +1328,7 @@ export function MarketplaceWorkspace() {
       </RevealSection>
 
       <RevealSection className={styles.grid} delay={0.12}>
-        {isClientWorkspace ? (
+        {activeWorkspace ? (
           <article className={styles.panel}>
             <div className={styles.panelHeader}>
               <div>
@@ -1242,37 +1362,53 @@ export function MarketplaceWorkspace() {
                       </p>
                       <p className={styles.stateText}>
                         {workspaceMessages.organizationRoleLabel}:{' '}
-                        {organization.roles.join(', ')}
+                        {organization.roles.map(formatOrganizationRole).join(', ')}
                       </p>
                       <div className={styles.inlineActions}>
-                        {organization.workspaces
-                          .filter((workspace) => workspace.kind === 'client')
-                          .map((workspace) => (
-                            <button
-                              key={workspace.workspaceId}
-                              type="button"
-                              disabled={
-                                workspace.workspaceId === activeWorkspace.workspaceId
-                              }
-                              onClick={() =>
-                                void handleSelectWorkspace(workspace.workspaceId)
-                              }
-                            >
-                              {workspace.workspaceId === activeWorkspace.workspaceId
-                                ? workspaceMessages.organizationCurrentWorkspace
-                                : workspaceMessages.activeWorkspace.switchWorkspace(
-                                    workspace.label,
-                                    workspaceMessages.activeWorkspace.modeLabel[
-                                      workspace.kind
-                                    ],
-                                  )}
-                            </button>
-                          ))}
+                        {organization.workspaces.map((workspace) => (
+                          <button
+                            key={workspace.workspaceId}
+                            type="button"
+                            disabled={
+                              workspace.workspaceId === activeWorkspace.workspaceId
+                            }
+                            onClick={() =>
+                              void handleSelectWorkspace(workspace.workspaceId)
+                            }
+                          >
+                            {workspace.workspaceId === activeWorkspace.workspaceId
+                              ? workspaceMessages.organizationCurrentWorkspace
+                              : workspaceMessages.activeWorkspace.switchWorkspace(
+                                  workspace.label,
+                                  formatWorkspaceMode(workspace),
+                                )}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </SharedCard>
                 ))
               )}
+              <label className={styles.field}>
+                <span>{workspaceMessages.organizationKindLabel}</span>
+                <select
+                  disabled={!canManageWorkspace}
+                  value={organizationDraft.kind}
+                  onChange={(event) =>
+                    setOrganizationDraft((current) => ({
+                      ...current,
+                      kind: event.target.value as OrganizationDraft['kind'],
+                    }))
+                  }
+                >
+                  <option value="client">
+                    {workspaceMessages.organizationKind.client}
+                  </option>
+                  <option value="agency">
+                    {workspaceMessages.organizationKind.agency}
+                  </option>
+                </select>
+              </label>
               <label className={styles.field}>
                 <span>{workspaceMessages.organizationForm.name}</span>
                 <input
@@ -1317,7 +1453,7 @@ export function MarketplaceWorkspace() {
                   {workspaceMessages.organizationForm.create}
                 </button>
               </div>
-              {activeOrganization ? (
+              {activeOrganization && activeOrganizationInvitable ? (
                 <>
                   <p className={styles.stateText}>
                     {workspaceMessages.organizationMemberships.body(
@@ -1337,9 +1473,7 @@ export function MarketplaceWorkspace() {
                             <strong>{membership.userEmail}</strong>
                             <p className={styles.stateText}>
                               {workspaceMessages.organizationMemberships.roleLabel}:{' '}
-                              {workspaceMessages.organizationMemberships.roleValue(
-                                membership.role,
-                              )}
+                              {formatOrganizationRole(membership.role)}
                             </p>
                             <p className={styles.stateText}>
                               {workspaceMessages.organizationMemberships.statusLabel}:{' '}
@@ -1383,12 +1517,11 @@ export function MarketplaceWorkspace() {
                         }))
                       }
                     >
-                      <option value="client_recruiter">
-                        {workspaceMessages.invitationRoles.client_recruiter}
-                      </option>
-                      <option value="client_owner">
-                        {workspaceMessages.invitationRoles.client_owner}
-                      </option>
+                      {invitationRoleOptions.map((role) => (
+                        <option key={role} value={role}>
+                          {workspaceMessages.invitationRoles[role]}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <div className={styles.inlineActions}>
@@ -1444,7 +1577,7 @@ export function MarketplaceWorkspace() {
           </article>
         ) : null}
 
-        {isFreelancerWorkspace ? (
+        {isTalentWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -1641,7 +1774,11 @@ export function MarketplaceWorkspace() {
                 {workspaceMessages.profileForm.saveProfile}
               </button>
               {!canManageProfile
-                ? renderWorkspaceAction(freelancerProfileWorkspace)
+                ? renderWorkspaceAction(
+                    activeLane === 'agency'
+                      ? agencyProfileWorkspace
+                      : freelancerProfileWorkspace,
+                  )
                 : null}
               {profile ? (
                 <Link
@@ -2144,7 +2281,7 @@ export function MarketplaceWorkspace() {
         </article>
         ) : null}
 
-        {isFreelancerWorkspace ? (
+        {isTalentWorkspace ? (
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
@@ -2166,7 +2303,11 @@ export function MarketplaceWorkspace() {
                     : workspaceMessages.emptyStates.freelancerApplicationsBlocked}
                 </p>
                 {!canApplyToOpportunity
-                  ? renderWorkspaceAction(freelancerApplicationWorkspace)
+                  ? renderWorkspaceAction(
+                      activeLane === 'agency'
+                        ? agencyApplicationWorkspace
+                        : freelancerApplicationWorkspace,
+                    )
                   : null}
               </div>
             ) : (
@@ -2214,7 +2355,7 @@ export function MarketplaceWorkspace() {
         ) : null}
       </RevealSection>
 
-      {isFreelancerWorkspace ? (
+        {isTalentWorkspace ? (
       <RevealSection className={styles.grid} delay={0.2}>
         <article className={styles.panel}>
           <div className={styles.panelHeader}>

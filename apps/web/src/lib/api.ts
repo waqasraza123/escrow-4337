@@ -47,10 +47,12 @@ export type UserCapabilities = {
 };
 
 export type WorkspaceKind = 'client' | 'freelancer';
-export type OrganizationKind = 'personal' | 'client';
+export type OrganizationKind = 'personal' | 'client' | 'agency';
 export type OrganizationRole =
   | 'client_owner'
   | 'client_recruiter'
+  | 'agency_owner'
+  | 'agency_member'
   | 'freelancer'
   | 'operator'
   | 'moderator';
@@ -101,7 +103,7 @@ export type OrganizationInvitation = {
   organizationSlug: string;
   organizationKind: OrganizationKind;
   invitedEmail: string;
-  role: 'client_owner' | 'client_recruiter';
+  role: 'client_owner' | 'client_recruiter' | 'agency_owner' | 'agency_member';
   status: 'pending' | 'accepted' | 'revoked';
   invitedByUserId: string;
   acceptedByUserId: string | null;
@@ -736,6 +738,7 @@ export const webApi = {
   createOrganization(
     input: {
       name: string;
+      kind: 'client' | 'agency';
       slug?: string;
       setActive?: boolean;
     },
@@ -755,7 +758,7 @@ export const webApi = {
     organizationId: string,
     input: {
       email: string;
-      role: 'client_owner' | 'client_recruiter';
+      role: 'client_owner' | 'client_recruiter' | 'agency_owner' | 'agency_member';
     },
     accessToken: string,
   ) {

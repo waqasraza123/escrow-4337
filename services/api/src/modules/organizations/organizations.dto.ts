@@ -11,6 +11,7 @@ const slugSchema = z
 export const createOrganizationSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
+    kind: z.enum(['client', 'agency']).default('client'),
     slug: slugSchema.optional(),
     setActive: z.boolean().optional().default(true),
   })
@@ -19,7 +20,12 @@ export const createOrganizationSchema = z
 export const createOrganizationInvitationSchema = z
   .object({
     email: z.string().trim().email(),
-    role: z.enum(['client_owner', 'client_recruiter']),
+    role: z.enum([
+      'client_owner',
+      'client_recruiter',
+      'agency_owner',
+      'agency_member',
+    ]),
   })
   .strict();
 

@@ -1,4 +1,5 @@
 import type {
+  OrganizationInvitationRecord,
   OrganizationMembershipRecord,
   OrganizationRecord,
   WorkspaceRecord,
@@ -26,6 +27,15 @@ function normalizeMembership(
   return {
     ...membership,
     status: 'active',
+  };
+}
+
+function normalizeInvitation(
+  invitation: OrganizationInvitationRecord,
+): OrganizationInvitationRecord {
+  return {
+    ...invitation,
+    invitedEmail: invitation.invitedEmail.trim().toLowerCase(),
   };
 }
 
@@ -58,6 +68,13 @@ export class FileOrganizationsRepository implements OrganizationsRepository {
     });
   }
 
+  async getInvitationById(id: string) {
+    return this.store.read((data) => {
+      const invitation = data.organizationInvitations[id];
+      return invitation ? cloneValue(normalizeInvitation(invitation)) : null;
+    });
+  }
+
   async listOrganizationsByUserId(userId: string) {
     return this.store.read((data) => {
       const organizationIds = new Set(
@@ -85,6 +102,23 @@ export class FileOrganizationsRepository implements OrganizationsRepository {
       Object.values(data.organizationMemberships)
         .filter((membership) => membership.organizationId === organizationId)
         .map((membership) => cloneValue(normalizeMembership(membership))),
+    );
+  }
+
+  async listInvitationsByUserEmail(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    return this.store.read((data) =>
+      Object.values(data.organizationInvitations)
+        .filter((invitation) => invitation.invitedEmail === normalizedEmail)
+        .map((invitation) => cloneValue(normalizeInvitation(invitation))),
+    );
+  }
+
+  async listInvitationsByOrganizationId(organizationId: string) {
+    return this.store.read((data) =>
+      Object.values(data.organizationInvitations)
+        .filter((invitation) => invitation.organizationId === organizationId)
+        .map((invitation) => cloneValue(normalizeInvitation(invitation))),
     );
   }
 
@@ -128,6 +162,14 @@ export class FileOrganizationsRepository implements OrganizationsRepository {
     await this.store.write((data) => {
       data.organizationMemberships[membership.id] = cloneValue(
         normalizeMembership(membership),
+      );
+    });
+  }
+
+  async saveInvitation(invitation: OrganizationInvitationRecord) {
+    await this.store.write((data) => {
+      data.organizationInvitations[invitation.id] = cloneValue(
+        normalizeInvitation(invitation),
       );
     });
   }

@@ -6,6 +6,7 @@
 - Phase: `1`
 - Title: Marketplace Identity, Workspaces, and Roles
 - Depends on: Phase 0
+- Repo status: repo-side Phase 1 coding is now in place for client, freelancer, and agency identity/workspace flows
 
 ## Objective
 
@@ -72,6 +73,7 @@
 ## Data and Migrations
 
 - Add normalized tables for organizations and memberships.
+- Add normalized invitation persistence so shared workspaces can be granted and accepted without overloading session state.
 - Add organization/workspace foreign keys to opportunities and future client-owned artifacts.
 - Add profile ownership abstraction so a talent or agency profile can survive role/member changes cleanly.
 - Preserve migration compatibility with the current single-user records by backfilling default personal workspaces where needed.
@@ -86,6 +88,20 @@
 - Add a workspace switcher with the active role/workspace always visible.
 - Add role-aware navigation rather than relying on one marketplace surface with conditionally hidden panels.
 - Keep wallet setup and smart-account readiness in the checklist, but place it after the user has chosen the right marketplace identity.
+
+## Current Repo Implementation
+
+- API:
+  - organizations, memberships, invitations, and workspaces persist through both file-backed and Postgres adapters
+  - personal client/freelancer workspaces are backfilled for existing users
+  - client and agency organizations both support owner/member invitation flows
+  - invitation acceptance activates the correct client or talent workspace
+- Web:
+  - the authenticated marketplace workspace now exposes explicit `client`, `freelancer`, and `agency` lanes
+  - the active workspace header and switcher always show the current mode
+  - organization creation is kind-aware (`client` or `agency`)
+  - agency workspaces reuse the talent/freelancer workspace kind while remaining distinct via `organizationKind === 'agency'`
+  - personal workspaces can create organizations but do not behave like shared invite-managed organizations
 
 ## Admin/Operator
 
@@ -108,6 +124,7 @@
 - Organizations and memberships are persisted and queryable through a normalized API surface.
 - Opportunities and future client-side marketplace actions can be owned by organizations instead of one auth user.
 - Privileged admin/moderation actions use a clearer capability baseline.
+- Repo-side status: these criteria are now satisfied in code and repo docs; broader release proof still follows the separate Phase 0 staging/release path.
 
 ## Verification
 

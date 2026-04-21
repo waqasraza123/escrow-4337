@@ -39,6 +39,9 @@ import {
   type WorkspaceSummary,
 } from './organizations.types';
 
+type ManagedOrganizationKind = Extract<OrganizationRecord['kind'], 'client' | 'agency'>;
+type ManagedOrganizationInvitationRole = OrganizationInvitationRecord['role'];
+
 function slugify(input: string) {
   const base = input
     .trim()
@@ -50,6 +53,47 @@ function slugify(input: string) {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function getOwnerRoleForOrganization(
+  kind: ManagedOrganizationKind,
+): ManagedOrganizationInvitationRole {
+  return kind === 'agency' ? 'agency_owner' : 'client_owner';
+}
+
+function getWorkspaceKindForOrganization(kind: ManagedOrganizationKind): WorkspaceKind {
+  return kind === 'agency' ? 'freelancer' : 'client';
+}
+
+function getDefaultWorkspaceLabel(kind: ManagedOrganizationKind, name: string) {
+  return kind === 'agency' ? `${name} talent workspace` : name;
+}
+
+function getAllowedInvitationRoles(
+  kind: OrganizationRecord['kind'],
+): ManagedOrganizationInvitationRole[] {
+  if (kind === 'agency') {
+    return ['agency_owner', 'agency_member'];
+  }
+  if (kind === 'client') {
+    return ['client_owner', 'client_recruiter'];
+  }
+  return [];
+}
+
+function getWorkspaceKindForRole(role: OrganizationRole): WorkspaceKind {
+  switch (role) {
+    case 'client_owner':
+    case 'client_recruiter':
+      return 'client';
+    case 'agency_owner':
+    case 'agency_member':
+    case 'freelancer':
+    case 'operator':
+    case 'moderator':
+    default:
+      return 'freelancer';
+  }
 }
 
 @Injectable()
@@ -199,6 +243,9 @@ export class OrganizationsService {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(user.id);
     const now = Date.now();
+    const organizationKind = dto.kind;
+    const ownerRole = getOwnerRoleForOrganization(organizationKind);
+    const workspaceKind = getWorkspaceKindForOrganization(organizationKind);
     const slug = dto.slug ?? slugify(dto.name);
     const existing = await this.organizationsRepository.getOrganizationBySlug(slug);
     if (existing) {
@@ -209,7 +256,7 @@ export class OrganizationsService {
       id: randomUUID(),
       slug,
       name: dto.name.trim(),
-      kind: 'client',
+      kind: organizationKind,
       createdByUserId: user.id,
       createdAt: now,
       updatedAt: now,
@@ -218,7 +265,7 @@ export class OrganizationsService {
       id: randomUUID(),
       organizationId: organization.id,
       userId: user.id,
-      role: 'client_owner',
+      role: ownerRole,
       status: 'active',
       createdAt: now,
       updatedAt: now,
@@ -226,8 +273,8 @@ export class OrganizationsService {
     const workspace: WorkspaceRecord = {
       id: randomUUID(),
       organizationId: organization.id,
-      kind: 'client',
-      label: organization.name,
+      kind: workspaceKind,
+      label: getDefaultWorkspaceLabel(organizationKind, organization.name),
       slug,
       defaultForUserId: null,
       createdAt: now,
@@ -248,9 +295,9 @@ export class OrganizationsService {
         slug: organization.slug,
         name: organization.name,
         kind: organization.kind,
-        roles: ['client_owner'],
+        roles: [ownerRole],
         workspaces: [
-          this.toWorkspaceSummary(organization, workspace, ['client_owner']),
+          this.toWorkspaceSummary(organization, workspace, [ownerRole]),
         ],
       },
     };
@@ -264,6 +311,11 @@ export class OrganizationsService {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(user.id);
     const organization = await this.requireOrganizationManagement(user.id, organizationId);
+    if (!getAllowedInvitationRoles(organization.kind).includes(dto.role)) {
+      throw new BadRequestException(
+        `Role ${dto.role} is not valid for ${organization.kind} organizations`,
+      );
+    }
 
     const invitedEmail = normalizeEmail(dto.email);
     const existingPending = (
@@ -380,7 +432,11 @@ export class OrganizationsService {
       invitation.organizationId,
     );
     const preferredWorkspace =
-      workspaces.find((workspace) => workspace.kind === 'client') ?? workspaces[0] ?? null;
+      workspaces.find(
+        (workspace) => workspace.kind === getWorkspaceKindForRole(invitation.role),
+      ) ??
+      workspaces[0] ??
+      null;
     if (dto.setActive !== false && preferredWorkspace) {
       await this.usersService.setActiveWorkspace(user.id, preferredWorkspace.id);
     }
@@ -426,8 +482,12 @@ export class OrganizationsService {
           ]),
         },
         freelancer: {
-          roles: ['freelancer'],
-          capabilities: this.buildWorkspaceCapabilities('freelancer', ['freelancer']),
+          roles: ['freelancer', 'agency_owner', 'agency_member'],
+          capabilities: this.buildWorkspaceCapabilities('freelancer', [
+            'freelancer',
+            'agency_owner',
+            'agency_member',
+          ]),
         },
       },
     };
@@ -654,9 +714,13 @@ export class OrganizationsService {
       return next;
     }
 
-    const canFreelancer = roles.includes('freelancer');
+    const canFreelancer =
+      roles.includes('freelancer') ||
+      roles.includes('agency_owner') ||
+      roles.includes('agency_member');
     next.manageProfile = canFreelancer;
     next.applyToOpportunity = canFreelancer;
+    next.manageWorkspace = roles.includes('agency_owner');
     return next;
   }
 
@@ -685,12 +749,18 @@ export class OrganizationsService {
     organizationId: string,
   ): Promise<OrganizationRecord> {
     const organization = await this.requireOrganizationAccess(userId, organizationId);
+    if (organization.kind === 'personal') {
+      throw new BadRequestException(
+        'Personal workspaces do not support organization invitation management',
+      );
+    }
     const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
       organizationId,
     );
     const canManage = memberships.some(
       (membership) =>
-        membership.userId === userId && membership.role === 'client_owner',
+        membership.userId === userId &&
+        membership.role === getOwnerRoleForOrganization(organization.kind),
     );
     if (!canManage) {
       throw new BadRequestException(

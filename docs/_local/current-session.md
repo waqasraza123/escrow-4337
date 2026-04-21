@@ -4,27 +4,25 @@
 - 2026-04-21
 
 ## Current Objective
-- Land the remaining repo-side Phase 1 identity/workspace slice on top of the Phase 0 repo-closeout work:
-  - collaborative client-workspace invitations
-  - explicit hire/freelance onboarding actions in the marketplace workspace
-  - browser-proof the onboarding path through the exact marketplace journey without adding more release-path plumbing
+- Finish the remaining repo-side Phase 1 identity/workspace coding and docs:
+  - explicit agency identity on top of the existing client/freelancer workspace model
+  - agency-aware organization creation and invitation persistence
+  - workspace/onboarding copy that matches the three-lane product model
 
 ## Last Completed Step
-- Added invitation-backed shared client workspaces plus explicit marketplace onboarding actions:
-  - API now persists `organization_invitations` and exposes invite create/list/accept endpoints
-  - web marketplace workspace now shows hire/freelance onboarding actions, pending invite acceptance, and owner-side collaborator invite controls
-  - the local exact marketplace browser flow now enters lanes through the onboarding actions rather than the older inline lane switch buttons
-- Extended shared client workspace management:
-  - API now exposes org-scoped member listing plus owner-side invitation revocation
-  - web marketplace ownership panel now shows accepted collaborators and lets client owners revoke pending invitations in place
+- Closed the remaining Phase 1 repo-side coding gap:
+  - API now supports client and agency organizations through the same persisted invitation-backed org model
+  - Postgres/file-backed persistence now both implement `organization_invitations`
+  - the authenticated web workspace now exposes explicit `client`, `freelancer`, and `agency` lanes
+  - organization creation in the web app is kind-aware and personal workspaces no longer behave like invite-managed shared orgs
 
 ## Current Step
-- Pause verification churn and stay code-focused.
-- Repo work now includes:
-  - Phase 0 repo-closeout commands and docs
-  - Phase 1 client/freelancer workspace ownership, onboarding, and invitations
-  - Phase 1 owner-visible collaborator management for shared client workspaces
-- Remaining external work is still the real staged proof path:
+- Repo-side Phase 1 coding is complete.
+- This pass was intentionally code-and-docs only:
+  - no real tests were run
+  - no builds were run
+  - no release-path work was attempted
+- Remaining external work is still the separate staged proof path:
   - deploy the candidate with real staging secrets
   - run `Deployed Smoke`
   - run `Launch Candidate`
@@ -49,6 +47,7 @@
 - Repo memory:
   `docs/project-state.md`
   `docs/_local/current-session.md`
+  `docs/MARKETPLACE_PHASE_1_V1.md`
 
 ## Key Constraints
 - Treat the current repo as an escrow-first marketplace foundation, not a blank-slate rewrite target.
@@ -79,21 +78,42 @@
   - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`
   - `git diff --check`
 - Blocked or not run:
+  - targeted verification for the agency-lane completion pass was intentionally not run because the user explicitly asked for code and documentation only
   - full `pnpm build` was intentionally not pursued further after the user redirected away from build/debug work; the last repo build failure was environment-only Google Fonts fetch resolution in the sandboxed web build, not a code type/test failure
   - real staged deployment validation against live staging secrets and URLs
   - real Phase 0 staging proof against launch-candidate evidence artifacts
-  - agency/delegated workspace flows, which remain outside this client+freelancer-only slice
+  - broader browser proof for agency/delegated workspace flows
 
 ## Next Likely Step
-- Keep moving on code, not release ceremony:
-  - add offer/interview pipeline groundwork from Phase 3
-  - or extend the org/workspace model with recruiter removal or membership-role management now that invitations and accepted-collaborator visibility exist
-- When switching back to release work, execute the real staging proof:
+- If staying in product code:
+  - start Phase 3 offer/interview pipeline groundwork
+  - or add explicit membership-role editing/removal for shared organizations
+- If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
   - run `Launch Candidate`
   - run `Promotion Review`
   - preserve `release-dossier` and `release-pointer-staging`
+
+## Update (2026-04-21, Phase 1 Agency Identity Completion)
+- Completed the remaining repo-side Phase 1 identity/workspace slice without running verification.
+- Backend changes:
+  - widened organization kinds/roles to include agency ownership and membership
+  - added missing file/Postgres organization-invitation repository methods
+  - added `019_organization_invitations.sql`
+  - made invitation management reject personal workspaces while still allowing new org creation from management-capable workspaces
+- Web changes:
+  - marketplace workspace now derives an explicit `agency` lane on top of freelancer-kind workspaces with `organizationKind === 'agency'`
+  - onboarding and mode guide now expose hire/freelance/agency entry points
+  - organization creation now supports `client` or `agency`
+  - organization ownership, membership, and invitation surfaces are generic across shared org kinds
+  - pending invitation acceptance now activates the correct lane copy for client vs agency invites
+- Docs updated:
+  - `docs/project-state.md`
+  - `docs/MARKETPLACE_PHASE_1_V1.md`
+  - `docs/_local/current-session.md`
+- Verification:
+  - not run by request
 
 ## Update (2026-04-21, Marketplace Search and Invite Backend Slice)
 - Added a new marketplace search/read-model backend slice on top of the current Phase 1 workspace baseline:

@@ -1,8 +1,10 @@
-export type OrganizationKind = 'personal' | 'client';
+export type OrganizationKind = 'personal' | 'client' | 'agency';
 export type WorkspaceKind = 'client' | 'freelancer';
 export type OrganizationRole =
   | 'client_owner'
   | 'client_recruiter'
+  | 'agency_owner'
+  | 'agency_member'
   | 'freelancer'
   | 'operator'
   | 'moderator';
@@ -39,7 +41,10 @@ export type OrganizationInvitationRecord = {
   id: string;
   organizationId: string;
   invitedEmail: string;
-  role: Extract<OrganizationRole, 'client_owner' | 'client_recruiter'>;
+  role: Extract<
+    OrganizationRole,
+    'client_owner' | 'client_recruiter' | 'agency_owner' | 'agency_member'
+  >;
   status: OrganizationInvitationStatus;
   invitedByUserId: string;
   acceptedByUserId: string | null;
