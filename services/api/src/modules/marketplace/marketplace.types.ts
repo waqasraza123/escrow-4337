@@ -101,6 +101,8 @@ export type MarketplaceNotificationKind =
   | 'automation_digest'
   | 'review_received';
 export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
+export type MarketplaceDigestCadence = 'manual' | 'daily' | 'weekly';
+export type MarketplaceDigestStatus = 'fresh' | 'acknowledged' | 'archived';
 export type MarketplaceOpportunityInviteStatus =
   | 'pending'
   | 'applied'
@@ -431,6 +433,52 @@ export type MarketplaceNotificationRecord = {
   relatedOfferId: string | null;
   relatedJobId: string | null;
   relatedAutomationRunId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceNotificationPreferencesRecord = {
+  userId: string;
+  digestCadence: MarketplaceDigestCadence;
+  talentInvitesEnabled: boolean;
+  applicationActivityEnabled: boolean;
+  interviewMessagesEnabled: boolean;
+  offerActivityEnabled: boolean;
+  reviewActivityEnabled: boolean;
+  automationActivityEnabled: boolean;
+  lifecycleDigestEnabled: boolean;
+  analyticsDigestEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceDigestHighlight = {
+  kind: 'notification' | 'task' | 'rehire' | 'analytics';
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+};
+
+export type MarketplaceDigestStats = {
+  unreadNotifications: number;
+  visibleNotifications: number;
+  taskCount: number;
+  rehireCandidateCount: number;
+  searchImpressions: number | null;
+  applications: number | null;
+  hires: number | null;
+};
+
+export type MarketplaceDigestRecord = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  cadence: MarketplaceDigestCadence;
+  status: MarketplaceDigestStatus;
+  title: string;
+  summary: string;
+  highlights: MarketplaceDigestHighlight[];
+  stats: MarketplaceDigestStats;
   createdAt: number;
   updatedAt: number;
 };
@@ -971,6 +1019,9 @@ export type MarketplaceAutomationRunView = MarketplaceAutomationRunRecord & {
 };
 
 export type MarketplaceNotificationView = MarketplaceNotificationRecord;
+export type MarketplaceNotificationPreferencesView =
+  MarketplaceNotificationPreferencesRecord;
+export type MarketplaceDigestView = MarketplaceDigestRecord;
 
 export type MarketplaceRehireCandidateView = {
   jobId: string;
@@ -1397,6 +1448,18 @@ export type MarketplaceNotificationsResponse = {
 
 export type MarketplaceNotificationResponse = {
   notification: MarketplaceNotificationView;
+};
+
+export type MarketplaceNotificationPreferencesResponse = {
+  preferences: MarketplaceNotificationPreferencesView;
+};
+
+export type MarketplaceDigestsResponse = {
+  digests: MarketplaceDigestView[];
+};
+
+export type MarketplaceDigestResponse = {
+  digest: MarketplaceDigestView;
 };
 
 export type MarketplaceAutomationRunsResponse = {

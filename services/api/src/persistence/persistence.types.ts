@@ -22,8 +22,10 @@ import type {
   MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
   MarketplaceAutomationRunRecord,
+  MarketplaceDigestRecord,
   MarketplaceContractDraftRecord,
   MarketplaceNotificationRecord,
+  MarketplaceNotificationPreferencesRecord,
   MarketplaceAutomationRuleRecord,
   MarketplaceIdentityRiskReviewRecord,
   MarketplaceInteractionEventRecord,
@@ -236,6 +238,15 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceNotificationRecord | null>;
   listNotifications(): Promise<MarketplaceNotificationRecord[]>;
   saveNotification(notification: MarketplaceNotificationRecord): Promise<void>;
+  getNotificationPreferencesByUserId(
+    userId: string,
+  ): Promise<MarketplaceNotificationPreferencesRecord | null>;
+  saveNotificationPreferences(
+    preferences: MarketplaceNotificationPreferencesRecord,
+  ): Promise<void>;
+  getDigestById(digestId: string): Promise<MarketplaceDigestRecord | null>;
+  listDigests(): Promise<MarketplaceDigestRecord[]>;
+  saveDigest(digest: MarketplaceDigestRecord): Promise<void>;
   getOpportunityInviteById(
     inviteId: string,
   ): Promise<MarketplaceOpportunityInviteRecord | null>;
@@ -270,7 +281,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 29;
+  version: 30;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -312,6 +323,11 @@ export type PersistenceFileData = {
   marketplaceAutomationRules: Record<string, MarketplaceAutomationRuleRecord>;
   marketplaceAutomationRuns: Record<string, MarketplaceAutomationRunRecord>;
   marketplaceNotifications: Record<string, MarketplaceNotificationRecord>;
+  marketplaceNotificationPreferences: Record<
+    string,
+    MarketplaceNotificationPreferencesRecord
+  >;
+  marketplaceDigests: Record<string, MarketplaceDigestRecord>;
   marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   marketplaceReviews: Record<string, MarketplaceReviewRecord>;

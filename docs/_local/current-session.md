@@ -1141,3 +1141,31 @@
     - blocked by unrelated existing web type errors in `src/app/milestone-lifecycle.spec.ts`, `src/app/project-room.tsx`, and `src/test/fixtures.ts`
 - Next likely step:
   - add operator-visible notification analytics or digest policies if this inbox becomes part of the formal post-Phase-8 plan
+
+## Update (2026-04-22, Marketplace Digest Controls)
+- Implemented the next full repo-side marketplace slice on top of the inbox layer:
+  - persisted per-user marketplace notification preferences
+  - preference-aware notification emission
+  - persisted marketplace digest snapshots with acknowledgement/archive state
+  - authenticated digest reads plus manual digest generation for the active workspace context
+- Backend changes:
+  - added marketplace digest/preference DTOs, controller routes, service flows, and new response types
+  - added file/Postgres persistence support and Postgres migration `029_marketplace_digest_preferences.sql`
+  - digest generation now summarizes filtered notifications plus optional lifecycle/analytics posture for the active workspace
+- Frontend changes:
+  - `apps/web/src/lib/api.ts` now exposes marketplace digest and notification-preference reads/mutations
+  - `apps/web/src/app/marketplace/workspace.tsx` now renders digest settings, manual digest generation, digest cards, and digest status actions
+  - `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` now mocks the new digest/preference contract
+- Changed files:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/029_marketplace_digest_preferences.sql`
+  `apps/web/src/{app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/migrations.spec.ts`
+  - passed: `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit 2>&1 | rg "marketplace|persistence.types|file-persistence.store|file.marketplace.repositories|postgres.marketplace.repositories" || true`
+  - passed: `git diff --check`
+- Next likely step:
+  - if product-code work continues, add digest dispatch/background materialization or operator-facing digest analytics on top of this persisted control layer

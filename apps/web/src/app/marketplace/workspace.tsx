@@ -37,9 +37,12 @@ import {
   type MarketplaceAutomationRuleKind,
   type MarketplaceAutomationRuleSchedule,
   type MarketplaceCryptoReadiness,
+  type MarketplaceDigest,
+  type MarketplaceDigestCadence,
   type MarketplaceEngagementType,
   type MarketplaceLifecycleDigest,
   type MarketplaceNotification,
+  type MarketplaceNotificationPreferences,
   type MarketplaceOfferMilestoneDraft,
   type MarketplaceOpportunityInvite,
   type MarketplaceOpportunitySearchResult,
@@ -351,6 +354,26 @@ function createEmptyAutomationRuleDraft(): AutomationRuleDraft {
   };
 }
 
+function createDefaultNotificationPreferences(
+  userId = 'workspace-user',
+): MarketplaceNotificationPreferences {
+  const now = Date.now();
+  return {
+    userId,
+    digestCadence: 'manual',
+    talentInvitesEnabled: true,
+    applicationActivityEnabled: true,
+    interviewMessagesEnabled: true,
+    offerActivityEnabled: true,
+    reviewActivityEnabled: true,
+    automationActivityEnabled: true,
+    lifecycleDigestEnabled: true,
+    analyticsDigestEnabled: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function getWorkspaceLane(workspace: WorkspaceSummary): LaneKind {
   if (workspace.kind === 'client') {
     return 'client';
@@ -521,6 +544,13 @@ export function MarketplaceWorkspace() {
     [],
   );
   const [notifications, setNotifications] = useState<MarketplaceNotification[]>([]);
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<MarketplaceNotificationPreferences>(
+      createDefaultNotificationPreferences(),
+    );
+  const [marketplaceDigests, setMarketplaceDigests] = useState<MarketplaceDigest[]>(
+    [],
+  );
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
@@ -597,6 +627,7 @@ export function MarketplaceWorkspace() {
   const unreadNotifications = notifications.filter(
     (notification) => notification.status === 'unread',
   );
+  const latestMarketplaceDigest = marketplaceDigests[0] ?? null;
   const strongMatches = Object.values(matchesByOpportunity)
     .flat()
     .filter((match) => match.recommendation === 'strong_match').length;
@@ -767,6 +798,8 @@ export function MarketplaceWorkspace() {
         setAutomationRules([]);
         setAutomationRuns([]);
         setNotifications([]);
+        setNotificationPreferences(createDefaultNotificationPreferences());
+        setMarketplaceDigests([]);
         setMarketplaceInvites([]);
         setAnalyticsOverview(null);
         setLifecycleDigest(null);
@@ -798,6 +831,8 @@ export function MarketplaceWorkspace() {
         automationRulesResponse,
         automationRunsResponse,
         notificationsResponse,
+        notificationPreferencesResponse,
+        digestsResponse,
         myMarketplaceInvitesResponse,
         analyticsResponse,
         lifecycleDigestResponse,
@@ -851,6 +886,14 @@ export function MarketplaceWorkspace() {
           webApi.listMarketplaceNotifications(nextTokens.accessToken).catch(() => ({
             notifications: [],
           })),
+          webApi
+            .getMarketplaceNotificationPreferences(nextTokens.accessToken)
+            .catch(() => ({
+              preferences: createDefaultNotificationPreferences(me.id),
+            })),
+          webApi.listMarketplaceDigests(nextTokens.accessToken).catch(() => ({
+            digests: [],
+          })),
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
                 invites: [],
@@ -890,6 +933,8 @@ export function MarketplaceWorkspace() {
       setAutomationRules(automationRulesResponse.rules);
       setAutomationRuns(automationRunsResponse.runs);
       setNotifications(notificationsResponse.notifications);
+      setNotificationPreferences(notificationPreferencesResponse.preferences);
+      setMarketplaceDigests(digestsResponse.digests);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
       setAnalyticsOverview(analyticsResponse.overview);
       setLifecycleDigest(lifecycleDigestResponse.digest);
@@ -1391,6 +1436,73 @@ export function MarketplaceWorkspace() {
     await webApi.markAllMarketplaceNotificationsRead(tokens.accessToken);
     setMessage('Notifications marked as read.');
     await loadWorkspace(tokens);
+  }
+
+  async function handleSaveNotificationPreferences() {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.updateMarketplaceNotificationPreferences(
+      {
+        digestCadence: notificationPreferences.digestCadence,
+        talentInvitesEnabled: notificationPreferences.talentInvitesEnabled,
+        applicationActivityEnabled:
+          notificationPreferences.applicationActivityEnabled,
+        interviewMessagesEnabled:
+          notificationPreferences.interviewMessagesEnabled,
+        offerActivityEnabled: notificationPreferences.offerActivityEnabled,
+        reviewActivityEnabled: notificationPreferences.reviewActivityEnabled,
+        automationActivityEnabled:
+          notificationPreferences.automationActivityEnabled,
+        lifecycleDigestEnabled:
+          notificationPreferences.lifecycleDigestEnabled,
+        analyticsDigestEnabled: notificationPreferences.analyticsDigestEnabled,
+      },
+      tokens.accessToken,
+    );
+    setNotificationPreferences(response.preferences);
+    setMessage('Marketplace notification preferences saved.');
+  }
+
+  async function handleGenerateDigest(cadence?: MarketplaceDigestCadence) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.generateMarketplaceDigest(
+      {
+        cadence,
+      },
+      tokens.accessToken,
+    );
+    setMarketplaceDigests((current) => [
+      response.digest,
+      ...current.filter((digest) => digest.id !== response.digest.id),
+    ]);
+    setMessage('Marketplace digest generated.');
+  }
+
+  async function handleUpdateDigestStatus(
+    digestId: string,
+    status: 'acknowledged' | 'archived',
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.updateMarketplaceDigest(
+      digestId,
+      { status },
+      tokens.accessToken,
+    );
+    setMarketplaceDigests((current) =>
+      current.map((digest) =>
+        digest.id === digestId ? response.digest : digest,
+      ),
+    );
+    setMessage(
+      status === 'acknowledged'
+        ? 'Marketplace digest acknowledged.'
+        : 'Marketplace digest archived.',
+    );
   }
 
   async function handleInviteTalent(profileSlug: string) {
@@ -2643,6 +2755,247 @@ export function MarketplaceWorkspace() {
                             }
                           >
                             Dismiss
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </SharedCard>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
+
+      {!loading && tokens ? (
+        <RevealSection className={styles.grid} delay={0.084}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow="Digest"
+            headerClassName={styles.panelHeader}
+            title="Marketplace digest controls"
+          >
+            <div className={styles.stack}>
+              <FactGrid className={styles.summaryGrid}>
+                <FactItem
+                  label="Saved digests"
+                  value={marketplaceDigests.length}
+                />
+                <FactItem
+                  label="Latest status"
+                  value={latestMarketplaceDigest?.status ?? 'none'}
+                />
+                <FactItem
+                  label="Cadence"
+                  value={notificationPreferences.digestCadence}
+                />
+              </FactGrid>
+              <label className={styles.field}>
+                <span>Digest cadence</span>
+                <select
+                  value={notificationPreferences.digestCadence}
+                  onChange={(event) =>
+                    setNotificationPreferences((current) => ({
+                      ...current,
+                      digestCadence: event.target.value as MarketplaceDigestCadence,
+                    }))
+                  }
+                >
+                  <option value="manual">Manual</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </label>
+              <div className={styles.summaryGrid}>
+                <label className={styles.field}>
+                  <span>Talent invites</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.talentInvitesEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        talentInvitesEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Application activity</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.applicationActivityEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        applicationActivityEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Interview messages</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.interviewMessagesEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        interviewMessagesEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Offer activity</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.offerActivityEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        offerActivityEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Review activity</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.reviewActivityEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        reviewActivityEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Automation activity</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.automationActivityEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        automationActivityEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Lifecycle digest</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.lifecycleDigestEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        lifecycleDigestEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Analytics summary</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferences.analyticsDigestEnabled}
+                    onChange={(event) =>
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        analyticsDigestEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveNotificationPreferences()}
+                >
+                  Save digest settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateDigest('manual')}
+                >
+                  Generate digest now
+                </button>
+              </div>
+              {marketplaceDigests.length === 0 ? (
+                <p className={styles.stateText}>
+                  No digest snapshots yet. Generate one after updating preferences to capture the current marketplace inbox and workflow posture.
+                </p>
+              ) : (
+                marketplaceDigests.slice(0, 5).map((digest) => (
+                  <SharedCard
+                    key={digest.id}
+                    className={styles.actionPanel}
+                    interactive
+                  >
+                    <div className={styles.stack}>
+                      <strong>{digest.title}</strong>
+                      <p className={styles.stateText}>
+                        {digest.status} • {digest.cadence} •{' '}
+                        {new Date(digest.updatedAt).toLocaleString()}
+                      </p>
+                      <p className={styles.stateText}>{digest.summary}</p>
+                      <FactGrid className={styles.summaryGrid}>
+                        <FactItem
+                          label="Unread"
+                          value={digest.stats.unreadNotifications}
+                        />
+                        <FactItem
+                          label="Tasks"
+                          value={digest.stats.taskCount}
+                        />
+                        <FactItem
+                          label="Rehire"
+                          value={digest.stats.rehireCandidateCount}
+                        />
+                        <FactItem
+                          label="Hires"
+                          value={digest.stats.hires ?? 0}
+                        />
+                      </FactGrid>
+                      {digest.highlights.length > 0 ? (
+                        <div className={styles.stack}>
+                          {digest.highlights.slice(0, 4).map((highlight, index) => (
+                            <p
+                              key={`${digest.id}-${highlight.kind}-${index + 1}`}
+                              className={styles.stateText}
+                            >
+                              {highlight.kind}: {highlight.title} • {highlight.detail}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className={styles.inlineActions}>
+                        {digest.status === 'fresh' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateDigestStatus(
+                                digest.id,
+                                'acknowledged',
+                              )
+                            }
+                          >
+                            Acknowledge
+                          </button>
+                        ) : null}
+                        {digest.status !== 'archived' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateDigestStatus(digest.id, 'archived')
+                            }
+                          >
+                            Archive
                           </button>
                         ) : null}
                       </div>

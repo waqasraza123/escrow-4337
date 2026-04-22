@@ -279,6 +279,57 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('notification-preferences')
+  getNotificationPreferences(@User() user: ReqUser) {
+    return this.marketplaceService.getNotificationPreferences(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('notification-preferences')
+  updateNotificationPreferences(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceNotificationPreferencesSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceNotificationPreferencesDto,
+  ) {
+    return this.marketplaceService.updateNotificationPreferences(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('digests')
+  listDigests(@User() user: ReqUser) {
+    return this.marketplaceService.listDigests(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('digests/generate')
+  generateDigest(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.generateMarketplaceDigestSchema),
+    )
+    body: marketplaceDto.GenerateMarketplaceDigestDto,
+  ) {
+    return this.marketplaceService.generateDigest(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('digests/:id')
+  updateDigest(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.updateMarketplaceDigestSchema),
+    )
+    body: marketplaceDto.UpdateMarketplaceDigestDto,
+  ) {
+    return this.marketplaceService.updateDigest(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('automation-runs/dispatch')
   dispatchAutomationRuns(
     @User() user: ReqUser,

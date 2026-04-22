@@ -26,6 +26,11 @@ const { mockedWebApi } = vi.hoisted(() => ({
     listMarketplaceAutomationRules: vi.fn(),
     listMarketplaceAutomationRuns: vi.fn(),
     listMarketplaceNotifications: vi.fn(),
+    getMarketplaceNotificationPreferences: vi.fn(),
+    updateMarketplaceNotificationPreferences: vi.fn(),
+    listMarketplaceDigests: vi.fn(),
+    generateMarketplaceDigest: vi.fn(),
+    updateMarketplaceDigest: vi.fn(),
     listMyMarketplaceInvites: vi.fn(),
     getMarketplaceAnalyticsOverview: vi.fn(),
     getMarketplaceLifecycleDigest: vi.fn(),
@@ -226,6 +231,87 @@ describe('marketplace workspace', () => {
     });
     mockedWebApi.listMarketplaceNotifications.mockResolvedValue({
       notifications: [],
+    });
+    mockedWebApi.getMarketplaceNotificationPreferences.mockResolvedValue({
+      preferences: {
+        userId: 'client-1',
+        digestCadence: 'manual',
+        talentInvitesEnabled: true,
+        applicationActivityEnabled: true,
+        interviewMessagesEnabled: true,
+        offerActivityEnabled: true,
+        reviewActivityEnabled: true,
+        automationActivityEnabled: true,
+        lifecycleDigestEnabled: true,
+        analyticsDigestEnabled: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+    mockedWebApi.updateMarketplaceNotificationPreferences.mockResolvedValue({
+      preferences: {
+        userId: 'client-1',
+        digestCadence: 'manual',
+        talentInvitesEnabled: true,
+        applicationActivityEnabled: true,
+        interviewMessagesEnabled: true,
+        offerActivityEnabled: true,
+        reviewActivityEnabled: true,
+        automationActivityEnabled: true,
+        lifecycleDigestEnabled: true,
+        analyticsDigestEnabled: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+    mockedWebApi.listMarketplaceDigests.mockResolvedValue({
+      digests: [],
+    });
+    mockedWebApi.generateMarketplaceDigest.mockResolvedValue({
+      digest: {
+        id: 'digest-1',
+        userId: 'client-1',
+        workspaceId: 'workspace-client-1',
+        cadence: 'manual',
+        status: 'fresh',
+        title: 'Workspace digest',
+        summary: 'No unread updates',
+        highlights: [],
+        stats: {
+          unreadNotifications: 0,
+          visibleNotifications: 0,
+          taskCount: 0,
+          rehireCandidateCount: 0,
+          searchImpressions: null,
+          applications: null,
+          hires: null,
+        },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+    mockedWebApi.updateMarketplaceDigest.mockResolvedValue({
+      digest: {
+        id: 'digest-1',
+        userId: 'client-1',
+        workspaceId: 'workspace-client-1',
+        cadence: 'manual',
+        status: 'acknowledged',
+        title: 'Workspace digest',
+        summary: 'No unread updates',
+        highlights: [],
+        stats: {
+          unreadNotifications: 0,
+          visibleNotifications: 0,
+          taskCount: 0,
+          rehireCandidateCount: 0,
+          searchImpressions: null,
+          applications: null,
+          hires: null,
+        },
+        createdAt: 1,
+        updatedAt: 2,
+      },
     });
     mockedWebApi.listMyMarketplaceInvites.mockResolvedValue({
       invites: [],

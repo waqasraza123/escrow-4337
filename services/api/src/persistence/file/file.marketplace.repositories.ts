@@ -3,6 +3,8 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceDigestRecord,
+  MarketplaceNotificationPreferencesRecord,
   MarketplaceNotificationRecord,
   MarketplaceAutomationRunRecord,
   MarketplaceAutomationRuleRecord,
@@ -345,6 +347,29 @@ function normalizeNotification(
     relatedOfferId: notification.relatedOfferId?.trim() || null,
     relatedJobId: notification.relatedJobId?.trim() || null,
     relatedAutomationRunId: notification.relatedAutomationRunId?.trim() || null,
+  };
+}
+
+function normalizeNotificationPreferences(
+  preferences: MarketplaceNotificationPreferencesRecord,
+): MarketplaceNotificationPreferencesRecord {
+  return {
+    ...preferences,
+  };
+}
+
+function normalizeDigest(digest: MarketplaceDigestRecord): MarketplaceDigestRecord {
+  return {
+    ...digest,
+    workspaceId: digest.workspaceId?.trim() || null,
+    title: digest.title.trim(),
+    summary: digest.summary.trim(),
+    highlights: digest.highlights.map((highlight) => ({
+      ...highlight,
+      title: highlight.title.trim(),
+      detail: highlight.detail.trim(),
+      relatedEntityId: highlight.relatedEntityId?.trim() || null,
+    })),
   };
 }
 
@@ -796,6 +821,46 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
       data.marketplaceNotifications[notification.id] = cloneValue(
         normalizeNotification(notification),
       );
+    });
+  }
+
+  async getNotificationPreferencesByUserId(userId: string) {
+    return this.store.read((data) => {
+      const preferences = data.marketplaceNotificationPreferences[userId];
+      return preferences
+        ? cloneValue(normalizeNotificationPreferences(preferences))
+        : null;
+    });
+  }
+
+  async saveNotificationPreferences(
+    preferences: MarketplaceNotificationPreferencesRecord,
+  ) {
+    await this.store.write((data) => {
+      data.marketplaceNotificationPreferences[preferences.userId] = cloneValue(
+        normalizeNotificationPreferences(preferences),
+      );
+    });
+  }
+
+  async getDigestById(digestId: string) {
+    return this.store.read((data) => {
+      const digest = data.marketplaceDigests[digestId];
+      return digest ? cloneValue(normalizeDigest(digest)) : null;
+    });
+  }
+
+  async listDigests() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceDigests)
+        .map((digest) => cloneValue(normalizeDigest(digest)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveDigest(digest: MarketplaceDigestRecord) {
+    await this.store.write((data) => {
+      data.marketplaceDigests[digest.id] = cloneValue(normalizeDigest(digest));
     });
   }
 

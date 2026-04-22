@@ -820,6 +820,8 @@ export type MarketplaceNotificationKind =
   | 'automation_digest'
   | 'review_received';
 export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
+export type MarketplaceDigestCadence = 'manual' | 'daily' | 'weekly';
+export type MarketplaceDigestStatus = 'fresh' | 'acknowledged' | 'archived';
 export type MarketplaceTalentPoolMember = {
   id: string;
   poolId: string;
@@ -915,6 +917,48 @@ export type MarketplaceNotification = {
   relatedOfferId: string | null;
   relatedJobId: string | null;
   relatedAutomationRunId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+export type MarketplaceNotificationPreferences = {
+  userId: string;
+  digestCadence: MarketplaceDigestCadence;
+  talentInvitesEnabled: boolean;
+  applicationActivityEnabled: boolean;
+  interviewMessagesEnabled: boolean;
+  offerActivityEnabled: boolean;
+  reviewActivityEnabled: boolean;
+  automationActivityEnabled: boolean;
+  lifecycleDigestEnabled: boolean;
+  analyticsDigestEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+export type MarketplaceDigestHighlight = {
+  kind: 'notification' | 'task' | 'rehire' | 'analytics';
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+};
+export type MarketplaceDigestStats = {
+  unreadNotifications: number;
+  visibleNotifications: number;
+  taskCount: number;
+  rehireCandidateCount: number;
+  searchImpressions: number | null;
+  applications: number | null;
+  hires: number | null;
+};
+export type MarketplaceDigest = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  cadence: MarketplaceDigestCadence;
+  status: MarketplaceDigestStatus;
+  title: string;
+  summary: string;
+  highlights: MarketplaceDigestHighlight[];
+  stats: MarketplaceDigestStats;
   createdAt: number;
   updatedAt: number;
 };
@@ -2870,6 +2914,82 @@ export const webApi = {
     return requestJson<{ notification: MarketplaceNotification }>(
       apiBaseUrl,
       `/marketplace/notifications/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceNotificationPreferences(accessToken: string) {
+    return requestJson<{ preferences: MarketplaceNotificationPreferences }>(
+      apiBaseUrl,
+      '/marketplace/notification-preferences',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  updateMarketplaceNotificationPreferences(
+    input: Partial<
+      Pick<
+        MarketplaceNotificationPreferences,
+        | 'digestCadence'
+        | 'talentInvitesEnabled'
+        | 'applicationActivityEnabled'
+        | 'interviewMessagesEnabled'
+        | 'offerActivityEnabled'
+        | 'reviewActivityEnabled'
+        | 'automationActivityEnabled'
+        | 'lifecycleDigestEnabled'
+        | 'analyticsDigestEnabled'
+      >
+    >,
+    accessToken: string,
+  ) {
+    return requestJson<{ preferences: MarketplaceNotificationPreferences }>(
+      apiBaseUrl,
+      '/marketplace/notification-preferences',
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMarketplaceDigests(accessToken: string) {
+    return requestJson<{ digests: MarketplaceDigest[] }>(
+      apiBaseUrl,
+      '/marketplace/digests',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  generateMarketplaceDigest(
+    input: {
+      cadence?: MarketplaceDigestCadence;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ digest: MarketplaceDigest }>(
+      apiBaseUrl,
+      '/marketplace/digests/generate',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceDigest(
+    id: string,
+    input: {
+      status: Extract<MarketplaceDigestStatus, 'acknowledged' | 'archived'>;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ digest: MarketplaceDigest }>(
+      apiBaseUrl,
+      `/marketplace/digests/${encodeURIComponent(id)}`,
       {
         method: 'PATCH',
         body: JSON.stringify(input),

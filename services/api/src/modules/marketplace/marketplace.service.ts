@@ -46,6 +46,7 @@ import type {
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
   DispatchMarketplaceAutomationRunsDto,
+  GenerateMarketplaceDigestDto,
   MarketplaceModerationReportsQueryDto,
   RecordMarketplaceInteractionDto,
   MarketplaceOpportunitiesQueryDto,
@@ -57,7 +58,9 @@ import type {
   RunMarketplaceAutomationRuleDto,
   ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
+  UpdateMarketplaceDigestDto,
   UpdateMarketplaceNotificationDto,
+  UpdateMarketplaceNotificationPreferencesDto,
   UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceAutomationRuleDto,
   UpdateMarketplaceIdentityRiskReviewDto,
@@ -94,6 +97,14 @@ import type {
   MarketplaceApplicationTimelineView,
   MarketplaceApplicationView,
   MarketplaceAutomationRunRecord,
+  MarketplaceDigestCadence,
+  MarketplaceDigestHighlight,
+  MarketplaceDigestRecord,
+  MarketplaceDigestResponse,
+  MarketplaceDigestsResponse,
+  MarketplaceDigestStats,
+  MarketplaceDigestStatus,
+  MarketplaceDigestView,
   MarketplaceAutomationRunResponse,
   MarketplaceAutomationRunsResponse,
   MarketplaceAutomationRunView,
@@ -139,6 +150,9 @@ import type {
   MarketplaceLiquiditySlice,
   MarketplaceNoHireReason,
   MarketplaceNotificationRecord,
+  MarketplaceNotificationPreferencesRecord,
+  MarketplaceNotificationPreferencesResponse,
+  MarketplaceNotificationPreferencesView,
   MarketplaceNotificationResponse,
   MarketplaceNotificationsResponse,
   MarketplaceNotificationStatus,
@@ -1521,6 +1535,100 @@ export class MarketplaceService {
     await this.marketplaceRepository.saveNotification(next);
     return {
       notification: this.toNotificationView(next),
+    };
+  }
+
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<MarketplaceNotificationPreferencesResponse> {
+    return {
+      preferences: this.toNotificationPreferencesView(
+        await this.getNotificationPreferencesRecord(userId),
+      ),
+    };
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    dto: UpdateMarketplaceNotificationPreferencesDto,
+  ): Promise<MarketplaceNotificationPreferencesResponse> {
+    const existing = await this.getNotificationPreferencesRecord(userId);
+    const next: MarketplaceNotificationPreferencesRecord = {
+      ...existing,
+      digestCadence: dto.digestCadence ?? existing.digestCadence,
+      talentInvitesEnabled:
+        dto.talentInvitesEnabled ?? existing.talentInvitesEnabled,
+      applicationActivityEnabled:
+        dto.applicationActivityEnabled ?? existing.applicationActivityEnabled,
+      interviewMessagesEnabled:
+        dto.interviewMessagesEnabled ?? existing.interviewMessagesEnabled,
+      offerActivityEnabled:
+        dto.offerActivityEnabled ?? existing.offerActivityEnabled,
+      reviewActivityEnabled:
+        dto.reviewActivityEnabled ?? existing.reviewActivityEnabled,
+      automationActivityEnabled:
+        dto.automationActivityEnabled ?? existing.automationActivityEnabled,
+      lifecycleDigestEnabled:
+        dto.lifecycleDigestEnabled ?? existing.lifecycleDigestEnabled,
+      analyticsDigestEnabled:
+        dto.analyticsDigestEnabled ?? existing.analyticsDigestEnabled,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveNotificationPreferences(next);
+    return {
+      preferences: this.toNotificationPreferencesView(next),
+    };
+  }
+
+  async listDigests(userId: string): Promise<MarketplaceDigestsResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    return {
+      digests: this.filterDigestsForWorkspace(
+        await this.marketplaceRepository.listDigests(),
+        userId,
+        context.activeWorkspace?.workspaceId ?? null,
+      ).map((digest) => this.toDigestView(digest)),
+    };
+  }
+
+  async generateDigest(
+    userId: string,
+    dto: GenerateMarketplaceDigestDto,
+  ): Promise<MarketplaceDigestResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const digest = await this.buildDigestForWorkspace({
+      userId,
+      workspace: context.activeWorkspace,
+      cadence: dto.cadence,
+    });
+    await this.marketplaceRepository.saveDigest(digest);
+    return {
+      digest: this.toDigestView(digest),
+    };
+  }
+
+  async updateDigest(
+    userId: string,
+    digestId: string,
+    dto: UpdateMarketplaceDigestDto,
+  ): Promise<MarketplaceDigestResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const workspaceId = context.activeWorkspace?.workspaceId ?? null;
+    const digest = await this.marketplaceRepository.getDigestById(digestId);
+    if (
+      !digest ||
+      !this.filterDigestsForWorkspace([digest], userId, workspaceId).length
+    ) {
+      throw new NotFoundException('Marketplace digest not found');
+    }
+    const next: MarketplaceDigestRecord = {
+      ...digest,
+      status: dto.status,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveDigest(next);
+    return {
+      digest: this.toDigestView(next),
     };
   }
 
@@ -5868,6 +5976,43 @@ export class MarketplaceService {
     return notification;
   }
 
+  private toNotificationPreferencesView(
+    preferences: MarketplaceNotificationPreferencesRecord,
+  ): MarketplaceNotificationPreferencesView {
+    return preferences;
+  }
+
+  private toDigestView(digest: MarketplaceDigestRecord): MarketplaceDigestView {
+    return digest;
+  }
+
+  private async getNotificationPreferencesRecord(userId: string) {
+    return (
+      (await this.marketplaceRepository.getNotificationPreferencesByUserId(userId)) ??
+      this.createDefaultNotificationPreferences(userId)
+    );
+  }
+
+  private createDefaultNotificationPreferences(
+    userId: string,
+  ): MarketplaceNotificationPreferencesRecord {
+    const now = Date.now();
+    return {
+      userId,
+      digestCadence: 'manual',
+      talentInvitesEnabled: true,
+      applicationActivityEnabled: true,
+      interviewMessagesEnabled: true,
+      offerActivityEnabled: true,
+      reviewActivityEnabled: true,
+      automationActivityEnabled: true,
+      lifecycleDigestEnabled: true,
+      analyticsDigestEnabled: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   private filterNotificationsForWorkspace(
     notifications: MarketplaceNotificationRecord[],
     userId: string,
@@ -5884,6 +6029,159 @@ export class MarketplaceService {
         return workspaceId === notification.workspaceId;
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  private filterDigestsForWorkspace(
+    digests: MarketplaceDigestRecord[],
+    userId: string,
+    workspaceId: string | null,
+  ) {
+    return digests
+      .filter((digest) => {
+        if (digest.userId !== userId) {
+          return false;
+        }
+        if (digest.workspaceId === null) {
+          return true;
+        }
+        return workspaceId === digest.workspaceId;
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  private isNotificationKindEnabled(
+    preferences: MarketplaceNotificationPreferencesRecord,
+    kind: MarketplaceNotificationRecord['kind'],
+  ) {
+    switch (kind) {
+      case 'talent_invite_received':
+        return preferences.talentInvitesEnabled;
+      case 'application_received':
+      case 'application_status_changed':
+        return preferences.applicationActivityEnabled;
+      case 'interview_message_received':
+        return preferences.interviewMessagesEnabled;
+      case 'offer_received':
+      case 'offer_response':
+        return preferences.offerActivityEnabled;
+      case 'review_received':
+        return preferences.reviewActivityEnabled;
+      case 'automation_digest':
+        return preferences.automationActivityEnabled;
+      default:
+        return true;
+    }
+  }
+
+  private async buildDigestForWorkspace(input: {
+    userId: string;
+    workspace: WorkspaceSummary | null;
+    cadence?: MarketplaceDigestCadence;
+  }): Promise<MarketplaceDigestRecord> {
+    const preferences = await this.getNotificationPreferencesRecord(input.userId);
+    const workspaceId = input.workspace?.workspaceId ?? null;
+    const notifications = this.filterNotificationsForWorkspace(
+      await this.marketplaceRepository.listNotifications(),
+      input.userId,
+      workspaceId,
+    ).filter((notification) =>
+      this.isNotificationKindEnabled(preferences, notification.kind),
+    );
+    const visibleNotifications = notifications.filter(
+      (notification) => notification.status !== 'dismissed',
+    );
+    const unreadNotifications = visibleNotifications.filter(
+      (notification) => notification.status === 'unread',
+    );
+    const lifecycleDigest =
+      preferences.lifecycleDigestEnabled && input.workspace?.kind === 'client'
+        ? await this.buildLifecycleDigestForWorkspace(input.workspace)
+        : null;
+    if (preferences.analyticsDigestEnabled && input.workspace) {
+      await this.refreshSearchReadModels();
+    }
+    const analyticsOverview =
+      preferences.analyticsDigestEnabled && input.workspace
+        ? await this.buildAnalyticsOverview(input.userId, input.workspace)
+        : null;
+
+    const highlights: MarketplaceDigestHighlight[] = [
+      ...unreadNotifications.slice(0, 4).map((notification) => ({
+        kind: 'notification' as const,
+        title: notification.title,
+        detail: notification.detail,
+        relatedEntityId:
+          notification.relatedApplicationId ??
+          notification.relatedOpportunityId ??
+          notification.relatedOfferId ??
+          notification.relatedJobId ??
+          notification.relatedAutomationRunId,
+      })),
+      ...(lifecycleDigest?.tasks.slice(0, 3).map((task) => ({
+        kind: 'task' as const,
+        title: task.title,
+        detail: task.detail,
+        relatedEntityId: task.relatedEntityId,
+      })) ?? []),
+      ...(lifecycleDigest?.rehireCandidates.slice(0, 2).map((candidate) => ({
+        kind: 'rehire' as const,
+        title: `Rehire: ${candidate.profile.displayName}`,
+        detail: `${candidate.title} • ${candidate.relationshipStrength}`,
+        relatedEntityId: candidate.jobId,
+      })) ?? []),
+    ];
+
+    if (analyticsOverview) {
+      highlights.push({
+        kind: 'analytics',
+        title: 'Conversion posture',
+        detail: `${analyticsOverview.summary.applications} applications • ${analyticsOverview.summary.hires} hires • ${analyticsOverview.summary.activeContracts} active contracts`,
+        relatedEntityId: workspaceId,
+      });
+    }
+
+    const stats: MarketplaceDigestStats = {
+      unreadNotifications: unreadNotifications.length,
+      visibleNotifications: visibleNotifications.length,
+      taskCount: lifecycleDigest?.tasks.length ?? 0,
+      rehireCandidateCount: lifecycleDigest?.rehireCandidates.length ?? 0,
+      searchImpressions: analyticsOverview?.summary.searchImpressions ?? null,
+      applications: analyticsOverview?.summary.applications ?? null,
+      hires: analyticsOverview?.summary.hires ?? null,
+    };
+    const summaryParts = [
+      unreadNotifications.length > 0
+        ? `${unreadNotifications.length} unread update${unreadNotifications.length === 1 ? '' : 's'}`
+        : 'no unread updates',
+      lifecycleDigest && lifecycleDigest.tasks.length > 0
+        ? `${lifecycleDigest.tasks.length} pending lifecycle task${lifecycleDigest.tasks.length === 1 ? '' : 's'}`
+        : null,
+      lifecycleDigest && lifecycleDigest.rehireCandidates.length > 0
+        ? `${lifecycleDigest.rehireCandidates.length} rehire prompt${lifecycleDigest.rehireCandidates.length === 1 ? '' : 's'}`
+        : null,
+      analyticsOverview
+        ? `${analyticsOverview.summary.hires} hire${analyticsOverview.summary.hires === 1 ? '' : 's'} tracked`
+        : null,
+    ].filter((value): value is string => value !== null);
+    const now = Date.now();
+    return {
+      id: randomUUID(),
+      userId: input.userId,
+      workspaceId,
+      cadence: input.cadence ?? preferences.digestCadence,
+      status: 'fresh',
+      title: input.workspace
+        ? `${input.workspace.label} marketplace digest`
+        : 'Marketplace digest',
+      summary:
+        summaryParts.length === 0
+          ? 'No marketplace activity matched the current digest settings.'
+          : summaryParts.join(' • '),
+      highlights: highlights.slice(0, 8),
+      stats,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
   private isAutomationRuleDue(
@@ -6003,6 +6301,10 @@ export class MarketplaceService {
     relatedJobId?: string | null;
     relatedAutomationRunId?: string | null;
   }) {
+    const preferences = await this.getNotificationPreferencesRecord(input.userId);
+    if (!this.isNotificationKindEnabled(preferences, input.kind)) {
+      return null;
+    }
     const now = Date.now();
     const notification: MarketplaceNotificationRecord = {
       id: randomUUID(),

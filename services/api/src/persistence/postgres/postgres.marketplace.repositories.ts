@@ -6,7 +6,13 @@ import type {
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceDigestCadence,
+  MarketplaceDigestHighlight,
+  MarketplaceDigestRecord,
+  MarketplaceDigestStats,
+  MarketplaceDigestStatus,
   MarketplaceNotificationKind,
+  MarketplaceNotificationPreferencesRecord,
   MarketplaceNotificationRecord,
   MarketplaceNotificationStatus,
   MarketplaceAutomationRunItem,
@@ -379,6 +385,35 @@ type MarketplaceNotificationRow = QueryResultRow & {
   related_offer_id: string | null;
   related_job_id: string | null;
   related_automation_run_id: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceNotificationPreferencesRow = QueryResultRow & {
+  user_id: string;
+  digest_cadence: MarketplaceDigestCadence;
+  talent_invites_enabled: boolean;
+  application_activity_enabled: boolean;
+  interview_messages_enabled: boolean;
+  offer_activity_enabled: boolean;
+  review_activity_enabled: boolean;
+  automation_activity_enabled: boolean;
+  lifecycle_digest_enabled: boolean;
+  analytics_digest_enabled: boolean;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceDigestRow = QueryResultRow & {
+  id: string;
+  user_id: string;
+  workspace_id: string | null;
+  cadence: MarketplaceDigestCadence;
+  status: MarketplaceDigestStatus;
+  title: string;
+  summary: string;
+  highlights_json: MarketplaceDigestHighlight[];
+  stats_json: MarketplaceDigestStats;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -848,6 +883,41 @@ function mapNotification(
     relatedOfferId: row.related_offer_id,
     relatedJobId: row.related_job_id,
     relatedAutomationRunId: row.related_automation_run_id,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapNotificationPreferences(
+  row: MarketplaceNotificationPreferencesRow,
+): MarketplaceNotificationPreferencesRecord {
+  return {
+    userId: row.user_id,
+    digestCadence: row.digest_cadence,
+    talentInvitesEnabled: row.talent_invites_enabled,
+    applicationActivityEnabled: row.application_activity_enabled,
+    interviewMessagesEnabled: row.interview_messages_enabled,
+    offerActivityEnabled: row.offer_activity_enabled,
+    reviewActivityEnabled: row.review_activity_enabled,
+    automationActivityEnabled: row.automation_activity_enabled,
+    lifecycleDigestEnabled: row.lifecycle_digest_enabled,
+    analyticsDigestEnabled: row.analytics_digest_enabled,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapDigest(row: MarketplaceDigestRow): MarketplaceDigestRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    cadence: row.cadence,
+    status: row.status,
+    title: row.title,
+    summary: row.summary,
+    highlights: row.highlights_json ?? [],
+    stats: row.stats_json,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -2274,6 +2344,144 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         notification.relatedAutomationRunId,
         String(notification.createdAt),
         String(notification.updatedAt),
+      ],
+    );
+  }
+
+  async getNotificationPreferencesByUserId(userId: string) {
+    const result = await this.db.query<MarketplaceNotificationPreferencesRow>(
+      `
+        SELECT *
+        FROM marketplace_notification_preferences
+        WHERE user_id = $1::uuid
+        LIMIT 1
+      `,
+      [userId],
+    );
+
+    return result.rows[0] ? mapNotificationPreferences(result.rows[0]) : null;
+  }
+
+  async saveNotificationPreferences(
+    preferences: MarketplaceNotificationPreferencesRecord,
+  ) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_notification_preferences (
+          user_id,
+          digest_cadence,
+          talent_invites_enabled,
+          application_activity_enabled,
+          interview_messages_enabled,
+          offer_activity_enabled,
+          review_activity_enabled,
+          automation_activity_enabled,
+          lifecycle_digest_enabled,
+          analytics_digest_enabled,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+        )
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          digest_cadence = EXCLUDED.digest_cadence,
+          talent_invites_enabled = EXCLUDED.talent_invites_enabled,
+          application_activity_enabled = EXCLUDED.application_activity_enabled,
+          interview_messages_enabled = EXCLUDED.interview_messages_enabled,
+          offer_activity_enabled = EXCLUDED.offer_activity_enabled,
+          review_activity_enabled = EXCLUDED.review_activity_enabled,
+          automation_activity_enabled = EXCLUDED.automation_activity_enabled,
+          lifecycle_digest_enabled = EXCLUDED.lifecycle_digest_enabled,
+          analytics_digest_enabled = EXCLUDED.analytics_digest_enabled,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        preferences.userId,
+        preferences.digestCadence,
+        preferences.talentInvitesEnabled,
+        preferences.applicationActivityEnabled,
+        preferences.interviewMessagesEnabled,
+        preferences.offerActivityEnabled,
+        preferences.reviewActivityEnabled,
+        preferences.automationActivityEnabled,
+        preferences.lifecycleDigestEnabled,
+        preferences.analyticsDigestEnabled,
+        String(preferences.createdAt),
+        String(preferences.updatedAt),
+      ],
+    );
+  }
+
+  async getDigestById(digestId: string) {
+    const result = await this.db.query<MarketplaceDigestRow>(
+      `
+        SELECT *
+        FROM marketplace_digests
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [digestId],
+    );
+
+    return result.rows[0] ? mapDigest(result.rows[0]) : null;
+  }
+
+  async listDigests() {
+    const result = await this.db.query<MarketplaceDigestRow>(
+      `
+        SELECT *
+        FROM marketplace_digests
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapDigest);
+  }
+
+  async saveDigest(digest: MarketplaceDigestRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_digests (
+          id,
+          user_id,
+          workspace_id,
+          cadence,
+          status,
+          title,
+          summary,
+          highlights_json,
+          stats_json,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2::uuid, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          workspace_id = EXCLUDED.workspace_id,
+          cadence = EXCLUDED.cadence,
+          status = EXCLUDED.status,
+          title = EXCLUDED.title,
+          summary = EXCLUDED.summary,
+          highlights_json = EXCLUDED.highlights_json,
+          stats_json = EXCLUDED.stats_json,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        digest.id,
+        digest.userId,
+        digest.workspaceId,
+        digest.cadence,
+        digest.status,
+        digest.title,
+        digest.summary,
+        JSON.stringify(digest.highlights),
+        JSON.stringify(digest.stats),
+        String(digest.createdAt),
+        String(digest.updatedAt),
       ],
     );
   }

@@ -313,6 +313,32 @@ export const updateMarketplaceNotificationSchema = z
   })
   .strict();
 
+export const updateMarketplaceNotificationPreferencesSchema = z
+  .object({
+    digestCadence: z.enum(['manual', 'daily', 'weekly']).optional(),
+    talentInvitesEnabled: z.boolean().optional(),
+    applicationActivityEnabled: z.boolean().optional(),
+    interviewMessagesEnabled: z.boolean().optional(),
+    offerActivityEnabled: z.boolean().optional(),
+    reviewActivityEnabled: z.boolean().optional(),
+    automationActivityEnabled: z.boolean().optional(),
+    lifecycleDigestEnabled: z.boolean().optional(),
+    analyticsDigestEnabled: z.boolean().optional(),
+  })
+  .strict();
+
+export const generateMarketplaceDigestSchema = z
+  .object({
+    cadence: z.enum(['manual', 'daily', 'weekly']).optional(),
+  })
+  .strict();
+
+export const updateMarketplaceDigestSchema = z
+  .object({
+    status: z.enum(['acknowledged', 'archived']),
+  })
+  .strict();
+
 export const createMarketplaceOpportunityInviteSchema = z
   .object({
     profileSlug: slugSchema,
@@ -647,6 +673,15 @@ export type DispatchMarketplaceAutomationRunsDto = z.infer<
 >;
 export type UpdateMarketplaceNotificationDto = z.infer<
   typeof updateMarketplaceNotificationSchema
+>;
+export type UpdateMarketplaceNotificationPreferencesDto = z.infer<
+  typeof updateMarketplaceNotificationPreferencesSchema
+>;
+export type GenerateMarketplaceDigestDto = z.infer<
+  typeof generateMarketplaceDigestSchema
+>;
+export type UpdateMarketplaceDigestDto = z.infer<
+  typeof updateMarketplaceDigestSchema
 >;
 export type CreateMarketplaceOpportunityInviteDto = z.infer<
   typeof createMarketplaceOpportunityInviteSchema
