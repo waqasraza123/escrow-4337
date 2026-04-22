@@ -9,6 +9,7 @@
     "launch:candidate": "node ./scripts/launch-candidate.mjs",
     "verify:authority:deployed": "node ./scripts/deployed-authority-evidence.mjs",
     "verify:ci": "./scripts/verify-ci.sh",
+    "verify:migrations:fresh": "node ./scripts/verify-fresh-postgres-migrations.mjs",
     "verify:chain:local": "pnpm --filter escrow4334-api build && node ./services/api/scripts/run-built-cli.mjs dist/modules/operations/escrow-chain-sync-local-verification-runner.js",
     "verify:push": "./scripts/verify-push.sh",
     "test:scripts": "node --test scripts/*.test.mjs",
