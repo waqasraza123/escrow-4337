@@ -39,6 +39,7 @@ import {
   type MarketplaceCryptoReadiness,
   type MarketplaceEngagementType,
   type MarketplaceLifecycleDigest,
+  type MarketplaceNotification,
   type MarketplaceOfferMilestoneDraft,
   type MarketplaceOpportunityInvite,
   type MarketplaceOpportunitySearchResult,
@@ -519,6 +520,7 @@ export function MarketplaceWorkspace() {
   const [automationRuns, setAutomationRuns] = useState<MarketplaceAutomationRun[]>(
     [],
   );
+  const [notifications, setNotifications] = useState<MarketplaceNotification[]>([]);
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
@@ -591,6 +593,9 @@ export function MarketplaceWorkspace() {
   const activeApplications = myApplications.filter(
     (application) =>
       application.status !== 'withdrawn' && application.status !== 'rejected',
+  );
+  const unreadNotifications = notifications.filter(
+    (notification) => notification.status === 'unread',
   );
   const strongMatches = Object.values(matchesByOpportunity)
     .flat()
@@ -761,6 +766,7 @@ export function MarketplaceWorkspace() {
         setTalentPools([]);
         setAutomationRules([]);
         setAutomationRuns([]);
+        setNotifications([]);
         setMarketplaceInvites([]);
         setAnalyticsOverview(null);
         setLifecycleDigest(null);
@@ -791,6 +797,7 @@ export function MarketplaceWorkspace() {
         talentPoolsResponse,
         automationRulesResponse,
         automationRunsResponse,
+        notificationsResponse,
         myMarketplaceInvitesResponse,
         analyticsResponse,
         lifecycleDigestResponse,
@@ -841,6 +848,9 @@ export function MarketplaceWorkspace() {
                 () => ({ runs: [] }),
               )
             : Promise.resolve({ runs: [] }),
+          webApi.listMarketplaceNotifications(nextTokens.accessToken).catch(() => ({
+            notifications: [],
+          })),
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
                 invites: [],
@@ -879,6 +889,7 @@ export function MarketplaceWorkspace() {
       setTalentPools(talentPoolsResponse.pools);
       setAutomationRules(automationRulesResponse.rules);
       setAutomationRuns(automationRunsResponse.runs);
+      setNotifications(notificationsResponse.notifications);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
       setAnalyticsOverview(analyticsResponse.overview);
       setLifecycleDigest(lifecycleDigestResponse.digest);
@@ -1350,6 +1361,35 @@ export function MarketplaceWorkspace() {
         ? `Ran ${response.runs.length} due automation${response.runs.length === 1 ? '' : 's'}.`
         : `Ran ${response.runs.length} enabled automation${response.runs.length === 1 ? '' : 's'}.`,
     );
+    await loadWorkspace(tokens);
+  }
+
+  async function handleUpdateNotification(
+    notificationId: string,
+    status: 'read' | 'dismissed',
+  ) {
+    if (!tokens) {
+      return;
+    }
+    await webApi.updateMarketplaceNotification(
+      notificationId,
+      { status },
+      tokens.accessToken,
+    );
+    setMessage(
+      status === 'read'
+        ? 'Notification marked as read.'
+        : 'Notification dismissed.',
+    );
+    await loadWorkspace(tokens);
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    if (!tokens) {
+      return;
+    }
+    await webApi.markAllMarketplaceNotificationsRead(tokens.accessToken);
+    setMessage('Notifications marked as read.');
     await loadWorkspace(tokens);
   }
 
@@ -2540,6 +2580,80 @@ export function MarketplaceWorkspace() {
           </FactGrid>
         </SectionCard>
       </RevealSection>
+
+      {!loading && tokens ? (
+        <RevealSection className={styles.grid} delay={0.082}>
+          <SectionCard
+            className={styles.panel}
+            eyebrow="Inbox"
+            headerClassName={styles.panelHeader}
+            title="Marketplace notifications"
+          >
+            <div className={styles.stack}>
+              <FactGrid className={styles.summaryGrid}>
+                <FactItem label="Unread" value={unreadNotifications.length} />
+                <FactItem label="Visible" value={notifications.length} />
+              </FactGrid>
+              {unreadNotifications.length > 0 ? (
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    onClick={() => void handleMarkAllNotificationsRead()}
+                  >
+                    Mark all read
+                  </button>
+                </div>
+              ) : null}
+              {notifications.length === 0 ? (
+                <p className={styles.stateText}>
+                  Notifications will appear here as clients and talent move through marketplace and retention flows.
+                </p>
+              ) : (
+                notifications.slice(0, 8).map((notification) => (
+                  <SharedCard
+                    key={notification.id}
+                    className={styles.actionPanel}
+                    interactive
+                  >
+                    <div className={styles.stack}>
+                      <strong>{notification.title}</strong>
+                      <p className={styles.stateText}>
+                        {notification.status} • {new Date(notification.updatedAt).toLocaleString()}
+                      </p>
+                      <p className={styles.stateText}>{notification.detail}</p>
+                      <div className={styles.inlineActions}>
+                        {notification.status === 'unread' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateNotification(notification.id, 'read')
+                            }
+                          >
+                            Mark read
+                          </button>
+                        ) : null}
+                        {notification.status !== 'dismissed' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateNotification(
+                                notification.id,
+                                'dismissed',
+                              )
+                            }
+                          >
+                            Dismiss
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </SharedCard>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        </RevealSection>
+      ) : null}
 
       {!loading && tokens && analyticsOverview ? (
         <RevealSection className={styles.grid} delay={0.085}>

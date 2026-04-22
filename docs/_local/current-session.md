@@ -1113,3 +1113,31 @@
 - Next likely step:
   - either formalize this retention lane into a named post-Phase-8 plan/doc set
   - or switch back to staged deployment and launch evidence work
+
+## Update (2026-04-22, Marketplace Notifications Inbox)
+- Implemented the next full repo-side marketplace slice on top of retention and automation:
+  - persisted workspace-scoped marketplace notifications
+  - authenticated inbox reads plus mark-read / dismiss actions
+  - notification emission from invite, application, interview, offer, review, hire-status, and automation-run flows
+- Backend changes:
+  - added notification DTO/types/controller/service support under `services/api/src/modules/marketplace`
+  - added file/Postgres persistence support and Postgres migration `028_marketplace_notifications.sql`
+  - notification responses now surface user-filtered inbox state across client and talent workspaces
+- Frontend changes:
+  - `apps/web/src/lib/api.ts` now exposes marketplace notification reads and update actions
+  - `apps/web/src/app/marketplace/workspace.tsx` now renders a marketplace notifications panel with unread counts, mark-all-read, mark-read, and dismiss controls
+  - refreshed `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` to match the current organization/timeline contracts
+- Changed files:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/028_marketplace_notifications.sql`
+  `apps/web/src/{app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/migrations.spec.ts`
+  - passed: `git diff --check`
+  - blocked: `pnpm --filter web typecheck`
+    - blocked by unrelated existing web type errors in `src/app/milestone-lifecycle.spec.ts`, `src/app/project-room.tsx`, and `src/test/fixtures.ts`
+- Next likely step:
+  - add operator-visible notification analytics or digest policies if this inbox becomes part of the formal post-Phase-8 plan

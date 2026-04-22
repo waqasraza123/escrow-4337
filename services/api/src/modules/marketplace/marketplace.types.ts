@@ -91,6 +91,16 @@ export type MarketplaceAutomationRuleSchedule =
   | 'manual'
   | 'daily'
   | 'weekly';
+export type MarketplaceNotificationKind =
+  | 'talent_invite_received'
+  | 'application_received'
+  | 'application_status_changed'
+  | 'interview_message_received'
+  | 'offer_received'
+  | 'offer_response'
+  | 'automation_digest'
+  | 'review_received';
+export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
 export type MarketplaceOpportunityInviteStatus =
   | 'pending'
   | 'applied'
@@ -405,6 +415,24 @@ export type MarketplaceAutomationRunRecord = {
   items: MarketplaceAutomationRunItem[];
   summary: string;
   createdAt: number;
+};
+
+export type MarketplaceNotificationRecord = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  kind: MarketplaceNotificationKind;
+  status: MarketplaceNotificationStatus;
+  title: string;
+  detail: string;
+  actorUserId: string | null;
+  relatedOpportunityId: string | null;
+  relatedApplicationId: string | null;
+  relatedOfferId: string | null;
+  relatedJobId: string | null;
+  relatedAutomationRunId: string | null;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type MarketplaceOpportunityInviteRecord = {
@@ -942,6 +970,8 @@ export type MarketplaceAutomationRunView = MarketplaceAutomationRunRecord & {
   preview: string;
 };
 
+export type MarketplaceNotificationView = MarketplaceNotificationRecord;
+
 export type MarketplaceRehireCandidateView = {
   jobId: string;
   completedAt: number | null;
@@ -1359,6 +1389,14 @@ export type MarketplaceAnalyticsOverviewResponse = {
 
 export type MarketplaceLifecycleDigestResponse = {
   digest: MarketplaceLifecycleDigest;
+};
+
+export type MarketplaceNotificationsResponse = {
+  notifications: MarketplaceNotificationView[];
+};
+
+export type MarketplaceNotificationResponse = {
+  notification: MarketplaceNotificationView;
 };
 
 export type MarketplaceAutomationRunsResponse = {

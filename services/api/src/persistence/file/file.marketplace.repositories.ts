@@ -3,6 +3,7 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceNotificationRecord,
   MarketplaceAutomationRunRecord,
   MarketplaceAutomationRuleRecord,
   MarketplaceContractDraftRecord,
@@ -327,6 +328,23 @@ function normalizeAutomationRun(
       recommendation: item.recommendation.trim(),
     })),
     summary: run.summary.trim(),
+  };
+}
+
+function normalizeNotification(
+  notification: MarketplaceNotificationRecord,
+): MarketplaceNotificationRecord {
+  return {
+    ...notification,
+    workspaceId: notification.workspaceId?.trim() || null,
+    title: notification.title.trim(),
+    detail: notification.detail.trim(),
+    actorUserId: notification.actorUserId?.trim() || null,
+    relatedOpportunityId: notification.relatedOpportunityId?.trim() || null,
+    relatedApplicationId: notification.relatedApplicationId?.trim() || null,
+    relatedOfferId: notification.relatedOfferId?.trim() || null,
+    relatedJobId: notification.relatedJobId?.trim() || null,
+    relatedAutomationRunId: notification.relatedAutomationRunId?.trim() || null,
   };
 }
 
@@ -754,6 +772,29 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceAutomationRuns[run.id] = cloneValue(
         normalizeAutomationRun(run),
+      );
+    });
+  }
+
+  async getNotificationById(notificationId: string) {
+    return this.store.read((data) => {
+      const notification = data.marketplaceNotifications[notificationId];
+      return notification ? cloneValue(normalizeNotification(notification)) : null;
+    });
+  }
+
+  async listNotifications() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceNotifications)
+        .map((notification) => cloneValue(normalizeNotification(notification)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveNotification(notification: MarketplaceNotificationRecord) {
+    await this.store.write((data) => {
+      data.marketplaceNotifications[notification.id] = cloneValue(
+        normalizeNotification(notification),
       );
     });
   }

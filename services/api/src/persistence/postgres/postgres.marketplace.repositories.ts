@@ -6,6 +6,9 @@ import type {
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceNotificationKind,
+  MarketplaceNotificationRecord,
+  MarketplaceNotificationStatus,
   MarketplaceAutomationRunItem,
   MarketplaceAutomationRunRecord,
   MarketplaceAutomationRunTrigger,
@@ -360,6 +363,24 @@ type MarketplaceAutomationRunRow = QueryResultRow & {
   items_json: MarketplaceAutomationRunItem[];
   summary: string;
   created_at_ms: string;
+};
+
+type MarketplaceNotificationRow = QueryResultRow & {
+  id: string;
+  user_id: string;
+  workspace_id: string | null;
+  kind: MarketplaceNotificationKind;
+  status: MarketplaceNotificationStatus;
+  title: string;
+  detail: string;
+  actor_user_id: string | null;
+  related_opportunity_id: string | null;
+  related_application_id: string | null;
+  related_offer_id: string | null;
+  related_job_id: string | null;
+  related_automation_run_id: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
 };
 
 type MarketplaceOpportunityInviteRow = QueryResultRow & {
@@ -807,6 +828,28 @@ function mapAutomationRun(
     items: row.items_json ?? [],
     summary: row.summary,
     createdAt: Number(row.created_at_ms),
+  };
+}
+
+function mapNotification(
+  row: MarketplaceNotificationRow,
+): MarketplaceNotificationRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    status: row.status,
+    title: row.title,
+    detail: row.detail,
+    actorUserId: row.actor_user_id,
+    relatedOpportunityId: row.related_opportunity_id,
+    relatedApplicationId: row.related_application_id,
+    relatedOfferId: row.related_offer_id,
+    relatedJobId: row.related_job_id,
+    relatedAutomationRunId: row.related_automation_run_id,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
   };
 }
 
@@ -2147,6 +2190,90 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         JSON.stringify(run.items),
         run.summary,
         String(run.createdAt),
+      ],
+    );
+  }
+
+  async getNotificationById(notificationId: string) {
+    const result = await this.db.query<MarketplaceNotificationRow>(
+      `
+        SELECT *
+        FROM marketplace_notifications
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [notificationId],
+    );
+
+    return result.rows[0] ? mapNotification(result.rows[0]) : null;
+  }
+
+  async listNotifications() {
+    const result = await this.db.query<MarketplaceNotificationRow>(
+      `
+        SELECT *
+        FROM marketplace_notifications
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapNotification);
+  }
+
+  async saveNotification(notification: MarketplaceNotificationRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_notifications (
+          id,
+          user_id,
+          workspace_id,
+          kind,
+          status,
+          title,
+          detail,
+          actor_user_id,
+          related_opportunity_id,
+          related_application_id,
+          related_offer_id,
+          related_job_id,
+          related_automation_run_id,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2::uuid, $3, $4, $5, $6, $7, $8::uuid, $9, $10, $11, $12, $13, $14, $15
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          workspace_id = EXCLUDED.workspace_id,
+          kind = EXCLUDED.kind,
+          status = EXCLUDED.status,
+          title = EXCLUDED.title,
+          detail = EXCLUDED.detail,
+          actor_user_id = EXCLUDED.actor_user_id,
+          related_opportunity_id = EXCLUDED.related_opportunity_id,
+          related_application_id = EXCLUDED.related_application_id,
+          related_offer_id = EXCLUDED.related_offer_id,
+          related_job_id = EXCLUDED.related_job_id,
+          related_automation_run_id = EXCLUDED.related_automation_run_id,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        notification.id,
+        notification.userId,
+        notification.workspaceId,
+        notification.kind,
+        notification.status,
+        notification.title,
+        notification.detail,
+        notification.actorUserId,
+        notification.relatedOpportunityId,
+        notification.relatedApplicationId,
+        notification.relatedOfferId,
+        notification.relatedJobId,
+        notification.relatedAutomationRunId,
+        String(notification.createdAt),
+        String(notification.updatedAt),
       ],
     );
   }

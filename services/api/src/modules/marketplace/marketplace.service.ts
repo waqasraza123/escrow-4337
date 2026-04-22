@@ -57,6 +57,7 @@ import type {
   RunMarketplaceAutomationRuleDto,
   ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
+  UpdateMarketplaceNotificationDto,
   UpdateMarketplaceAbuseReportDto,
   UpdateMarketplaceAutomationRuleDto,
   UpdateMarketplaceIdentityRiskReviewDto,
@@ -137,6 +138,11 @@ import type {
   MarketplaceAnalyticsFunnelStage,
   MarketplaceLiquiditySlice,
   MarketplaceNoHireReason,
+  MarketplaceNotificationRecord,
+  MarketplaceNotificationResponse,
+  MarketplaceNotificationsResponse,
+  MarketplaceNotificationStatus,
+  MarketplaceNotificationView,
   MarketplaceNoHireReasonStat,
   MarketplaceOfferMilestoneDraft,
   MarketplaceOfferRecord,
@@ -1450,6 +1456,74 @@ export class MarketplaceService {
     };
   }
 
+  async listNotifications(
+    userId: string,
+  ): Promise<MarketplaceNotificationsResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    return {
+      notifications: this.filterNotificationsForWorkspace(
+        await this.marketplaceRepository.listNotifications(),
+        userId,
+        context.activeWorkspace?.workspaceId ?? null,
+      ).map((notification) => this.toNotificationView(notification)),
+    };
+  }
+
+  async markAllNotificationsRead(
+    userId: string,
+  ): Promise<MarketplaceNotificationsResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const workspaceId = context.activeWorkspace?.workspaceId ?? null;
+    const notifications = this.filterNotificationsForWorkspace(
+      await this.marketplaceRepository.listNotifications(),
+      userId,
+      workspaceId,
+    );
+    await Promise.all(
+      notifications.map(async (notification) => {
+        if (notification.status !== 'unread') {
+          return;
+        }
+        await this.marketplaceRepository.saveNotification({
+          ...notification,
+          status: 'read',
+          updatedAt: Date.now(),
+        });
+      }),
+    );
+    return this.listNotifications(userId);
+  }
+
+  async updateNotification(
+    userId: string,
+    notificationId: string,
+    dto: UpdateMarketplaceNotificationDto,
+  ): Promise<MarketplaceNotificationResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const workspaceId = context.activeWorkspace?.workspaceId ?? null;
+    const notification =
+      await this.marketplaceRepository.getNotificationById(notificationId);
+    if (
+      !notification ||
+      !this.filterNotificationsForWorkspace(
+        [notification],
+        userId,
+        workspaceId,
+      ).length
+    ) {
+      throw new NotFoundException('Marketplace notification not found');
+    }
+    const next: MarketplaceNotificationRecord = {
+      ...notification,
+      status: dto.status,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveNotification(next);
+    return {
+      notification: this.toNotificationView(next),
+    };
+  }
+
   async runAutomationRule(
     userId: string,
     ruleId: string,
@@ -1580,6 +1654,17 @@ export class MarketplaceService {
       relatedApplicationId: null,
       relatedJobId: null,
     });
+    await this.emitNotification({
+      userId: profile.userId,
+      workspaceId: profile.workspaceId,
+      kind: 'talent_invite_received',
+      title: `Invitation to apply: ${opportunity.title}`,
+      detail:
+        invite.message ??
+        'A client invited you to apply from the marketplace workspace.',
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+    });
     return {
       invite: await this.toOpportunityInviteView(invite),
     };
@@ -1698,6 +1783,15 @@ export class MarketplaceService {
       relatedOpportunityId: null,
       relatedProfileUserId: revieweeUserId,
       relatedApplicationId: null,
+      relatedJobId: jobId,
+    });
+    await this.emitNotification({
+      userId: revieweeUserId,
+      workspaceId: null,
+      kind: 'review_received',
+      title: `New review on ${job.title}`,
+      detail: dto.headline?.trim() || `You received a ${dto.rating}/5 marketplace review.`,
+      actorUserId: userId,
       relatedJobId: jobId,
     });
     return {
@@ -2052,6 +2146,16 @@ export class MarketplaceService {
       relatedApplicationId: application.id,
       relatedJobId: null,
     });
+    await this.emitNotification({
+      userId: opportunity.ownerUserId,
+      workspaceId: opportunity.ownerWorkspaceId,
+      kind: 'application_received',
+      title: `New application for ${opportunity.title}`,
+      detail: `${profile.displayName} submitted a proposal that is ready for dossier review.`,
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
+    });
 
     return {
       opportunity: await this.toOpportunityDetailView(
@@ -2338,6 +2442,18 @@ export class MarketplaceService {
       relatedApplicationId: application.id,
       relatedJobId: null,
     });
+    await this.emitNotification({
+      userId: access.asOwner ? application.applicantUserId : opportunity.ownerUserId,
+      workspaceId: access.asOwner
+        ? application.applicantWorkspaceId
+        : opportunity.ownerWorkspaceId,
+      kind: 'interview_message_received',
+      title: `Interview update for ${opportunity.title}`,
+      detail: dto.body.trim(),
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
+    });
 
     return {
       thread: await this.toInterviewThreadView(thread),
@@ -2409,6 +2525,19 @@ export class MarketplaceService {
       relatedApplicationId: application.id,
       relatedJobId: null,
     });
+    await this.emitNotification({
+      userId: application.applicantUserId,
+      workspaceId: application.applicantWorkspaceId,
+      kind: 'offer_received',
+      title: `Offer received for ${opportunity.title}`,
+      detail:
+        offer.message ??
+        'A client sent a milestone-backed offer for this opportunity.',
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
+      relatedOfferId: offer.id,
+    });
 
     return {
       offer,
@@ -2457,6 +2586,18 @@ export class MarketplaceService {
         relatedApplicationId: application.id,
         relatedJobId: null,
       });
+      await this.emitNotification({
+        userId: offer.clientUserId,
+        workspaceId: (await this.requireOpportunity(application.opportunityId))
+          .ownerWorkspaceId,
+        kind: 'offer_response',
+        title: 'Offer accepted',
+        detail: dto.message?.trim() || 'The applicant accepted the marketplace offer.',
+        actorUserId: userId,
+        relatedOpportunityId: application.opportunityId,
+        relatedApplicationId: application.id,
+        relatedOfferId: offer.id,
+      });
       await this.ensureContractDraftFromAcceptedOffer(application, offer);
       return { offer };
     }
@@ -2493,6 +2634,20 @@ export class MarketplaceService {
         relatedProfileUserId: application.applicantUserId,
         relatedApplicationId: application.id,
         relatedJobId: null,
+      });
+      await this.emitNotification({
+        userId: offer.clientUserId,
+        workspaceId: (await this.requireOpportunity(application.opportunityId))
+          .ownerWorkspaceId,
+        kind: 'offer_response',
+        title: 'Offer declined',
+        detail:
+          offer.declineReason ??
+          'The applicant declined the marketplace offer.',
+        actorUserId: userId,
+        relatedOpportunityId: application.opportunityId,
+        relatedApplicationId: application.id,
+        relatedOfferId: offer.id,
       });
       return { offer };
     }
@@ -2543,6 +2698,20 @@ export class MarketplaceService {
       relatedProfileUserId: application.applicantUserId,
       relatedApplicationId: application.id,
       relatedJobId: null,
+    });
+    await this.emitNotification({
+      userId: offer.clientUserId,
+      workspaceId: (await this.requireOpportunity(application.opportunityId))
+        .ownerWorkspaceId,
+      kind: 'offer_response',
+      title: 'Offer countered',
+      detail:
+        counter.counterMessage ??
+        'The applicant proposed a counter offer with updated terms.',
+      actorUserId: userId,
+      relatedOpportunityId: application.opportunityId,
+      relatedApplicationId: application.id,
+      relatedOfferId: counter.id,
     });
     return { offer: counter };
   }
@@ -2810,6 +2979,16 @@ export class MarketplaceService {
       relatedApplicationId: application.id,
       relatedJobId: application.hiredJobId,
     });
+    await this.emitNotification({
+      userId: application.applicantUserId,
+      workspaceId: application.applicantWorkspaceId,
+      kind: 'application_status_changed',
+      title: `Shortlisted for ${opportunity.title}`,
+      detail: 'The client moved your proposal into the shortlist and may continue with interviews or offers.',
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
+    });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
 
@@ -2853,6 +3032,18 @@ export class MarketplaceService {
       relatedProfileUserId: application.applicantUserId,
       relatedApplicationId: application.id,
       relatedJobId: application.hiredJobId,
+    });
+    await this.emitNotification({
+      userId: application.applicantUserId,
+      workspaceId: application.applicantWorkspaceId,
+      kind: 'application_status_changed',
+      title: `Application closed for ${opportunity.title}`,
+      detail:
+        dto.reason?.trim() ||
+        'The client closed this application and did not move it forward.',
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
     });
     return this.getOpportunityApplications(userId, opportunity.id);
   }
@@ -2982,6 +3173,18 @@ export class MarketplaceService {
           noHireReason: 'fit_not_strong_enough',
           createdAt: now,
         });
+        await this.emitNotification({
+          userId: sibling.applicantUserId,
+          workspaceId: sibling.applicantWorkspaceId,
+          kind: 'application_status_changed',
+          title: `Application closed for ${opportunity.title}`,
+          detail:
+            'Another candidate moved forward into escrow for this opportunity.',
+          actorUserId: userId,
+          relatedOpportunityId: opportunity.id,
+          relatedApplicationId: sibling.id,
+          relatedJobId: createResponse.jobId,
+        });
       }
     }
 
@@ -2992,6 +3195,17 @@ export class MarketplaceService {
       action: 'hired',
       reason: dto.reason ?? null,
       createdAt: now,
+    });
+    await this.emitNotification({
+      userId: application.applicantUserId,
+      workspaceId: application.applicantWorkspaceId,
+      kind: 'application_status_changed',
+      title: `Hired into escrow: ${opportunity.title}`,
+      detail: 'The client converted your accepted marketplace proposal into an escrow contract.',
+      actorUserId: userId,
+      relatedOpportunityId: opportunity.id,
+      relatedApplicationId: application.id,
+      relatedJobId: createResponse.jobId,
     });
 
     return {
@@ -5648,6 +5862,30 @@ export class MarketplaceService {
     };
   }
 
+  private toNotificationView(
+    notification: MarketplaceNotificationRecord,
+  ): MarketplaceNotificationView {
+    return notification;
+  }
+
+  private filterNotificationsForWorkspace(
+    notifications: MarketplaceNotificationRecord[],
+    userId: string,
+    workspaceId: string | null,
+  ) {
+    return notifications
+      .filter((notification) => {
+        if (notification.userId !== userId) {
+          return false;
+        }
+        if (notification.workspaceId === null) {
+          return true;
+        }
+        return workspaceId === notification.workspaceId;
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
   private isAutomationRuleDue(
     rule: MarketplaceAutomationRuleRecord,
     runs: MarketplaceAutomationRunRecord[],
@@ -5693,6 +5931,21 @@ export class MarketplaceService {
       createdAt: Date.now(),
     };
     await this.marketplaceRepository.saveAutomationRun(run);
+    await this.emitNotification({
+      userId: rule.ownerUserId,
+      workspaceId: workspace.workspaceId,
+      kind: 'automation_digest',
+      title: `${rule.label} automation run`,
+      detail:
+        run.items.length === 0
+          ? 'No lifecycle items matched this run.'
+          : run.items
+              .slice(0, 3)
+              .map((item) => item.title)
+              .join(' • '),
+      actorUserId: rule.ownerUserId,
+      relatedAutomationRunId: run.id,
+    });
     return run;
   }
 
@@ -5735,6 +5988,41 @@ export class MarketplaceService {
       return `${rule.label} ran with no pending lifecycle items.`;
     }
     return `${rule.label} generated ${taskCount} automation follow-up item${taskCount === 1 ? '' : 's'}.`;
+  }
+
+  private async emitNotification(input: {
+    userId: string;
+    workspaceId: string | null;
+    kind: MarketplaceNotificationRecord['kind'];
+    title: string;
+    detail: string;
+    actorUserId?: string | null;
+    relatedOpportunityId?: string | null;
+    relatedApplicationId?: string | null;
+    relatedOfferId?: string | null;
+    relatedJobId?: string | null;
+    relatedAutomationRunId?: string | null;
+  }) {
+    const now = Date.now();
+    const notification: MarketplaceNotificationRecord = {
+      id: randomUUID(),
+      userId: input.userId,
+      workspaceId: input.workspaceId ?? null,
+      kind: input.kind,
+      status: 'unread',
+      title: input.title.trim(),
+      detail: input.detail.trim(),
+      actorUserId: input.actorUserId ?? null,
+      relatedOpportunityId: input.relatedOpportunityId ?? null,
+      relatedApplicationId: input.relatedApplicationId ?? null,
+      relatedOfferId: input.relatedOfferId ?? null,
+      relatedJobId: input.relatedJobId ?? null,
+      relatedAutomationRunId: input.relatedAutomationRunId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveNotification(notification);
+    return notification;
   }
 
   private matchesAutomationRule(

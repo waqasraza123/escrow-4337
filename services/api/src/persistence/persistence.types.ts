@@ -23,6 +23,7 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceAutomationRunRecord,
   MarketplaceContractDraftRecord,
+  MarketplaceNotificationRecord,
   MarketplaceAutomationRuleRecord,
   MarketplaceIdentityRiskReviewRecord,
   MarketplaceInteractionEventRecord,
@@ -230,6 +231,11 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceAutomationRunRecord | null>;
   listAutomationRuns(): Promise<MarketplaceAutomationRunRecord[]>;
   saveAutomationRun(run: MarketplaceAutomationRunRecord): Promise<void>;
+  getNotificationById(
+    notificationId: string,
+  ): Promise<MarketplaceNotificationRecord | null>;
+  listNotifications(): Promise<MarketplaceNotificationRecord[]>;
+  saveNotification(notification: MarketplaceNotificationRecord): Promise<void>;
   getOpportunityInviteById(
     inviteId: string,
   ): Promise<MarketplaceOpportunityInviteRecord | null>;
@@ -264,7 +270,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 28;
+  version: 29;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -305,6 +311,7 @@ export type PersistenceFileData = {
   marketplaceTalentPoolMembers: Record<string, MarketplaceTalentPoolMemberRecord>;
   marketplaceAutomationRules: Record<string, MarketplaceAutomationRuleRecord>;
   marketplaceAutomationRuns: Record<string, MarketplaceAutomationRunRecord>;
+  marketplaceNotifications: Record<string, MarketplaceNotificationRecord>;
   marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   marketplaceReviews: Record<string, MarketplaceReviewRecord>;

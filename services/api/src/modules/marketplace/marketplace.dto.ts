@@ -307,6 +307,12 @@ export const dispatchMarketplaceAutomationRunsSchema = z
   })
   .strict();
 
+export const updateMarketplaceNotificationSchema = z
+  .object({
+    status: z.enum(['read', 'dismissed']),
+  })
+  .strict();
+
 export const createMarketplaceOpportunityInviteSchema = z
   .object({
     profileSlug: slugSchema,
@@ -638,6 +644,9 @@ export type RunMarketplaceAutomationRuleDto = z.infer<
 >;
 export type DispatchMarketplaceAutomationRunsDto = z.infer<
   typeof dispatchMarketplaceAutomationRunsSchema
+>;
+export type UpdateMarketplaceNotificationDto = z.infer<
+  typeof updateMarketplaceNotificationSchema
 >;
 export type CreateMarketplaceOpportunityInviteDto = z.infer<
   typeof createMarketplaceOpportunityInviteSchema

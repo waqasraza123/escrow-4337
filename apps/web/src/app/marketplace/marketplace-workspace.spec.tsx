@@ -21,6 +21,17 @@ const { mockedWebApi } = vi.hoisted(() => ({
     listMyMarketplaceApplications: vi.fn(),
     listOpportunityApplications: vi.fn(),
     listOpportunityMatches: vi.fn(),
+    listMarketplaceSavedSearches: vi.fn(),
+    listMarketplaceTalentPools: vi.fn(),
+    listMarketplaceAutomationRules: vi.fn(),
+    listMarketplaceAutomationRuns: vi.fn(),
+    listMarketplaceNotifications: vi.fn(),
+    listMyMarketplaceInvites: vi.fn(),
+    getMarketplaceAnalyticsOverview: vi.fn(),
+    getMarketplaceLifecycleDigest: vi.fn(),
+    getMarketplaceApplicationTimeline: vi.fn(),
+    getTalentRecommendations: vi.fn(),
+    getOpportunityRecommendations: vi.fn(),
     shortlistMarketplaceApplication: vi.fn(),
     rejectMarketplaceApplication: vi.fn(),
     hireMarketplaceApplication: vi.fn(),
@@ -200,6 +211,45 @@ describe('marketplace workspace', () => {
     });
     mockedWebApi.listOpportunityMatches.mockResolvedValue({
       matches: [],
+    });
+    mockedWebApi.listMarketplaceSavedSearches.mockResolvedValue({
+      searches: [],
+    });
+    mockedWebApi.listMarketplaceTalentPools.mockResolvedValue({
+      pools: [],
+    });
+    mockedWebApi.listMarketplaceAutomationRules.mockResolvedValue({
+      rules: [],
+    });
+    mockedWebApi.listMarketplaceAutomationRuns.mockResolvedValue({
+      runs: [],
+    });
+    mockedWebApi.listMarketplaceNotifications.mockResolvedValue({
+      notifications: [],
+    });
+    mockedWebApi.listMyMarketplaceInvites.mockResolvedValue({
+      invites: [],
+    });
+    mockedWebApi.getMarketplaceAnalyticsOverview.mockResolvedValue({
+      overview: null,
+    });
+    mockedWebApi.getMarketplaceLifecycleDigest.mockResolvedValue({
+      digest: null,
+    });
+    mockedWebApi.getMarketplaceApplicationTimeline.mockResolvedValue({
+      timeline: {
+        revisions: [],
+        decisions: [],
+        offers: [],
+        interviewThread: null,
+        contractDraft: null,
+      },
+    });
+    mockedWebApi.getTalentRecommendations.mockResolvedValue({
+      results: [],
+    });
+    mockedWebApi.getOpportunityRecommendations.mockResolvedValue({
+      results: [],
     });
     mockedWebApi.shortlistMarketplaceApplication.mockResolvedValue({});
     mockedWebApi.rejectMarketplaceApplication.mockResolvedValue({});
@@ -857,11 +907,12 @@ describe('marketplace workspace', () => {
     fireEvent.change(screen.getByLabelText('Workspace slug'), {
       target: { value: 'atlas-labs' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create client organization' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
 
     await waitFor(() => {
       expect(mockedWebApi.createOrganization).toHaveBeenCalledWith(
         {
+          kind: 'client',
           name: 'Atlas Labs',
           slug: 'atlas-labs',
           setActive: true,
@@ -1026,7 +1077,7 @@ describe('marketplace workspace', () => {
 
     expect(screen.getByText(/only a workspace with management access/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Create client organization' }),
+      screen.getByRole('button', { name: 'Create organization' }),
     ).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Create draft brief' }),
@@ -1258,7 +1309,7 @@ describe('marketplace workspace', () => {
       expect(screen.getByRole('heading', { name: 'Credibility profile' })).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/read-only for freelancer profile edits/i)).toBeInTheDocument();
+    expect(screen.getByText(/read-only for talent profile edits/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save profile' })).toBeDisabled();
     expect(
       within(screen.getByTestId('marketplace-my-application-app-readonly-1')).getByRole('button', {

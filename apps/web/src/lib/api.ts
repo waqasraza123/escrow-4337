@@ -810,6 +810,16 @@ export type MarketplaceAutomationRuleKind =
   | 'rehire_digest';
 export type MarketplaceAutomationRuleSchedule = 'manual' | 'daily' | 'weekly';
 export type MarketplaceAutomationRunTrigger = 'manual' | 'scheduled';
+export type MarketplaceNotificationKind =
+  | 'talent_invite_received'
+  | 'application_received'
+  | 'application_status_changed'
+  | 'interview_message_received'
+  | 'offer_received'
+  | 'offer_response'
+  | 'automation_digest'
+  | 'review_received';
+export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
 export type MarketplaceTalentPoolMember = {
   id: string;
   poolId: string;
@@ -890,6 +900,23 @@ export type MarketplaceAutomationRun = {
   createdAt: number;
   taskCount: number;
   preview: string;
+};
+export type MarketplaceNotification = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  kind: MarketplaceNotificationKind;
+  status: MarketplaceNotificationStatus;
+  title: string;
+  detail: string;
+  actorUserId: string | null;
+  relatedOpportunityId: string | null;
+  relatedApplicationId: string | null;
+  relatedOfferId: string | null;
+  relatedJobId: string | null;
+  relatedAutomationRunId: string | null;
+  createdAt: number;
+  updatedAt: number;
 };
 export type MarketplaceRehireCandidate = {
   jobId: string;
@@ -2814,6 +2841,39 @@ export const webApi = {
       apiBaseUrl,
       '/marketplace/automation-runs',
       { method: 'GET' },
+      accessToken,
+    );
+  },
+  listMarketplaceNotifications(accessToken: string) {
+    return requestJson<{ notifications: MarketplaceNotification[] }>(
+      apiBaseUrl,
+      '/marketplace/notifications',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  markAllMarketplaceNotificationsRead(accessToken: string) {
+    return requestJson<{ notifications: MarketplaceNotification[] }>(
+      apiBaseUrl,
+      '/marketplace/notifications/read-all',
+      { method: 'POST' },
+      accessToken,
+    );
+  },
+  updateMarketplaceNotification(
+    id: string,
+    input: {
+      status: Extract<MarketplaceNotificationStatus, 'read' | 'dismissed'>;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ notification: MarketplaceNotification }>(
+      apiBaseUrl,
+      `/marketplace/notifications/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
       accessToken,
     );
   },

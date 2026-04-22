@@ -252,6 +252,33 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('notifications')
+  listNotifications(@User() user: ReqUser) {
+    return this.marketplaceService.listNotifications(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('notifications/read-all')
+  markAllNotificationsRead(@User() user: ReqUser) {
+    return this.marketplaceService.markAllNotificationsRead(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('notifications/:id')
+  updateNotification(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceNotificationSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceNotificationDto,
+  ) {
+    return this.marketplaceService.updateNotification(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('automation-runs/dispatch')
   dispatchAutomationRuns(
     @User() user: ReqUser,
