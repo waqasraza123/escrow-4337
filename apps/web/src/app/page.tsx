@@ -4,13 +4,18 @@ import Link from 'next/link';
 import {
   Button,
   Eyebrow,
-  FeatureCard,
   PageContainer,
   SectionHeading,
 } from '@escrow4334/frontend-core';
-import { GlassPanel, RevealSection, SharedCard, SpotlightButton } from '@escrow4334/frontend-core/spatial';
+import { RevealSection } from '@escrow4334/frontend-core/spatial';
 import styles from './marketing.styles';
 import { LanguageSwitcher } from './language-switcher';
+import {
+  EscrowFlowScene,
+  MarketplaceHeroScene,
+  PublicSceneFrame,
+  TalentCategoryGlyph,
+} from './public-visuals';
 import { ThemeToggle } from './theme-toggle';
 import { useWebI18n } from '../lib/i18n';
 
@@ -35,93 +40,125 @@ export default function Home() {
         </nav>
 
         <RevealSection className={styles.hero}>
-          <div className="fx-fade-up">
+          <div className={`${styles.heroContent} fx-fade-up`}>
             <Eyebrow className={styles.eyebrow}>
               {messages.marketing.heroEyebrow}
             </Eyebrow>
             <h1>{messages.marketing.heroTitle}</h1>
             <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
-              <Button asChild className={`${styles.ctaLink} ${styles.ctaSecondary}`} variant="secondary">
+              <Button
+                asChild
+                className={`${styles.ctaLink} ${styles.ctaPrimary}`}
+                data-testid="marketing-primary-cta"
+              >
                 <Link href="/marketplace">
                   {messages.common.marketplace}
                 </Link>
               </Button>
-              <SpotlightButton asChild className={`${styles.ctaLink} ${styles.ctaPrimary}`}>
+              <Button
+                asChild
+                className={`${styles.ctaLink} ${styles.ctaSecondary}`}
+                data-testid="marketing-secondary-cta"
+                variant="secondary"
+              >
                 <Link href="/app/new-contract">
                   {messages.common.startEscrow}
                 </Link>
-              </SpotlightButton>
-              <Button asChild className={`${styles.ctaLink} ${styles.ctaTertiary}`} variant="secondary">
+              </Button>
+              <Button
+                asChild
+                className={`${styles.ctaLink} ${styles.ctaTertiary}`}
+                variant="secondary"
+              >
                 <Link href="/trust">
                   {messages.marketing.trustCta}
                 </Link>
               </Button>
             </div>
-            <div className={styles.heroSignalGrid}>
-              {messages.marketing.stats.map((card) => (
-                <GlassPanel key={card.title} className={styles.heroSignal} tone="quiet">
-                  <span className={styles.heroSignalLabel}>{card.title}</span>
-                  <span className={styles.heroSignalValue}>{card.body}</span>
-                </GlassPanel>
+            <div className={styles.heroBadgeRow}>
+              {messages.marketing.heroBadges.map((badge) => (
+                <span key={badge} className={styles.heroBadge}>
+                  {badge}
+                </span>
               ))}
             </div>
           </div>
-          <div className={`${styles.cardStack} fx-fade-up fx-fade-up-delay-1`}>
-            {messages.marketing.stats.map((card) => (
-              <SharedCard key={card.title} className={styles.statCard} interactive>
-                <FeatureCard
-                  body={card.body}
-                  className="rounded-none border-0 bg-transparent p-0 shadow-none before:hidden"
-                  title={card.title}
-                />
-              </SharedCard>
-            ))}
+          <div className={`${styles.heroIllustrationShell} fx-fade-up fx-fade-up-delay-1`}>
+            <PublicSceneFrame accent="market">
+              <MarketplaceHeroScene />
+            </PublicSceneFrame>
+            <div className={styles.heroIllustrationMeta}>
+              {messages.marketing.heroSignals.map((item) => (
+                <div key={item.label} className={styles.heroIllustrationCard}>
+                  <span className={styles.heroIllustrationLabel}>{item.label}</span>
+                  <div>{item.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </RevealSection>
 
         <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-1`} delay={0.08}>
-          <div className={styles.splitSection}>
-            <div className={styles.sectionBody}>
-              <SectionHeading title={messages.marketing.howItWorksTitle} />
-            </div>
-            <GlassPanel as="aside" className={styles.railCard} tone="quiet">
-              <div className={styles.railList}>
-                {messages.marketing.bounds.map((entry) => (
-                  <div key={entry.title} className={styles.railItem}>
-                    <span className="text-[var(--foreground)]">
-                      {`${entry.title} ${entry.body}`}
-                    </span>
+          <SectionHeading title={messages.marketing.lanesTitle} />
+          <div className={styles.laneGrid}>
+            {messages.marketing.lanes.map((lane) => (
+              <article key={lane.title} className={styles.laneCard}>
+                <div className={styles.laneHeader}>
+                  <TalentCategoryGlyph
+                    kind={lane.glyph as 'engineering' | 'design' | 'growth'}
+                  />
+                  <div className={styles.laneMeta}>
+                    <strong className={styles.laneTitle}>{lane.title}</strong>
+                    <p className={styles.laneBody}>{lane.body}</p>
                   </div>
-                ))}
-              </div>
-            </GlassPanel>
-          </div>
-          <div className={styles.steps}>
-            {messages.marketing.steps.map((step, index) => (
-              <SharedCard key={step.title} className={styles.stepCard} interactive>
-                <FeatureCard
-                  body={step.body}
-                  className="rounded-none border-0 bg-transparent p-0 shadow-none before:hidden"
-                  leading={<span>{`0${index + 1}`}</span>}
-                  title={step.title}
-                />
-              </SharedCard>
+                </div>
+                <Link className={styles.secondaryLink} href="/marketplace">
+                  {messages.marketing.laneCta}
+                </Link>
+              </article>
             ))}
           </div>
         </RevealSection>
 
         <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-2`} delay={0.12}>
-          <SectionHeading title={messages.marketing.productBoundsTitle} />
-          <div className={styles.objectionGrid}>
-            {messages.marketing.bounds.map((entry) => (
-              <SharedCard key={entry.title} className={styles.objectionCard} interactive>
-                <FeatureCard
-                  body={entry.body}
-                  className="rounded-none border-0 bg-transparent p-0 shadow-none before:hidden"
-                  title={entry.title}
-                />
-              </SharedCard>
+          <div className={styles.flowSection}>
+            <div className={styles.sectionBody}>
+              <SectionHeading title={messages.marketing.howItWorksTitle} />
+              <div className={styles.steps}>
+                {messages.marketing.steps.map((step, index) => (
+                  <article key={step.title} className={styles.stepCard}>
+                    <span>{`0${index + 1}`}</span>
+                    <strong>{step.title}</strong>
+                    <p>{step.body}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className={styles.flowVisualCard}>
+              <PublicSceneFrame accent="trust">
+                <EscrowFlowScene />
+              </PublicSceneFrame>
+              <div className={styles.flowProofStrip}>
+                {messages.marketing.proofItems.map((item) => (
+                  <div key={item.title} className={styles.proofPill}>
+                    <span className={styles.proofPillTitle}>{item.title}</span>
+                    <div className={styles.proofPillBody}>{item.body}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </RevealSection>
+
+        <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-3`} delay={0.16}>
+          <SectionHeading title={messages.marketing.proofTitle} />
+          <div className={styles.proofStrip}>
+            {messages.marketing.proofStrip.map((item) => (
+              <div key={item.title} className={styles.proofPill}>
+                <span className={styles.proofPillTitle}>{item.title}</span>
+                <div className={styles.proofPillBody}>{item.body}</div>
+              </div>
             ))}
           </div>
         </RevealSection>

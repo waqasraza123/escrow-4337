@@ -5,7 +5,7 @@ import { WebI18nProvider } from '../lib/i18n';
 import Home from './page';
 
 describe('marketing homepage', () => {
-  it('explains the focused milestone escrow launch candidate', () => {
+  it('prioritizes marketplace hiring and keeps direct escrow secondary', () => {
     renderApp(
       <WebI18nProvider initialLocale="en">
         <Home />
@@ -13,21 +13,28 @@ describe('marketing homepage', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Milestone escrow for crypto service work' }),
+      screen.getByRole('heading', {
+        name: 'Hire vetted crypto-native talent through milestone escrow',
+      }),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('link', { name: 'Marketplace' })[0],
-    ).toHaveAttribute('href', '/marketplace');
-    expect(
-      screen.getAllByRole('link', { name: 'Start a milestone escrow' })[0],
-    ).toHaveAttribute('href', '/app/new-contract');
+    expect(screen.getByTestId('marketing-primary-cta')).toHaveAttribute(
+      'href',
+      '/marketplace',
+    );
+    expect(screen.getByTestId('marketing-secondary-cta')).toHaveAttribute(
+      'href',
+      '/app/new-contract',
+    );
+    expect(screen.getByRole('link', { name: 'See the trust model' })).toHaveAttribute(
+      'href',
+      '/trust',
+    );
     expect(screen.getByText('Theme')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
-    expect(screen.getByText('Create and fund')).toBeInTheDocument();
-    expect(
-      screen.getByText('It is an escrow-first marketplace, not an embedded platform.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Popular hiring lanes')).toBeInTheDocument();
+    expect(screen.getByText('How it works')).toBeInTheDocument();
+    expect(screen.getByText('Why teams can trust the close')).toBeInTheDocument();
   });
 
   it('renders Arabic CTA labels from the shared marketing messages', () => {
@@ -38,20 +45,23 @@ describe('marketing homepage', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'ضمان مراحل احترافي لأعمال الخدمات الرقمية' }),
+      screen.getByRole('heading', {
+        name: 'وظّف مواهب رقمية موثقة ثم أغلق العمل عبر ضمان المراحل',
+      }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'ابدأ ضمان المراحل' })[0]).toHaveAttribute(
-      'href',
-      '/app/new-contract',
-    );
-    expect(screen.getAllByRole('link', { name: 'السوق' })[0]).toHaveAttribute(
+    expect(screen.getByTestId('marketing-primary-cta')).toHaveAttribute(
       'href',
       '/marketplace',
+    );
+    expect(screen.getByTestId('marketing-secondary-cta')).toHaveAttribute(
+      'href',
+      '/app/new-contract',
     );
     expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'اطّلع على نموذج الثقة' })).toHaveAttribute(
       'href',
       '/trust',
     );
+    expect(screen.getByText('مسارات التوظيف الشائعة')).toBeInTheDocument();
   });
 });

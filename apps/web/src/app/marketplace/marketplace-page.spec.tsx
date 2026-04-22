@@ -39,17 +39,23 @@ describe('marketplace page', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'وظّف عبر عروض موجزة منسقة ثم حوّل الاختيار الفائز إلى الضمان.',
+          name: 'اعثر على المواهب، كوّن قائمة قصيرة بسرعة، ثم أغلق عبر الضمان.',
         }),
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('link', { name: 'افتح مساحة العمل' })).toHaveAttribute(
+    expect(screen.getByTestId('marketplace-primary-cta')).toHaveAttribute(
       'href',
       '/app/marketplace',
     );
+    expect(screen.getByTestId('marketplace-secondary-cta')).toHaveAttribute(
+      'href',
+      '/app/new-contract',
+    );
     expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getAllByText('0 ملف موهبة ظاهر').length).toBeGreaterThan(0);
+    expect(screen.getByText('ابحث داخل السوق')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'العروض' })).toBeInTheDocument();
     expect(screen.getByText('لا توجد ملفات مواهب عامة بعد')).toBeInTheDocument();
     expect(screen.getAllByText('0 عرض موجز مفتوح').length).toBeGreaterThan(0);
   });
@@ -246,22 +252,28 @@ describe('marketplace page', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Hire through curated briefs and convert the winner into escrow.',
+          name: 'Find talent, shortlist fast, and close through escrow.',
         }),
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Builder One')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Open workspace' }),
-    ).toHaveAttribute('href', '/app/marketplace');
+    expect(screen.getByTestId('marketplace-primary-cta')).toHaveAttribute(
+      'href',
+      '/app/marketplace',
+    );
+    expect(screen.getByTestId('marketplace-secondary-cta')).toHaveAttribute(
+      'href',
+      '/app/new-contract',
+    );
     expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByText('Search the marketplace')).toBeInTheDocument();
+    expect(screen.getByText('Builder One')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View profile' })).toHaveAttribute(
       'href',
       '/marketplace/profiles/builder-one',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Opportunity directory' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Briefs' }));
 
     await waitFor(() => {
       expect(screen.getByText('Founding product engineer')).toBeInTheDocument();

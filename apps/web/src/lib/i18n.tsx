@@ -68,53 +68,87 @@ const webMessages = {
       dueAt: (value: string) => `Due ${value}`,
     },
     marketing: {
-      heroEyebrow: 'Agency and client service work on Base',
-      heroTitle: 'Milestone escrow for crypto service work',
+      heroEyebrow: 'Escrow-backed hiring on Base',
+      heroTitle: 'Hire vetted crypto-native talent through milestone escrow',
       heroLead:
-        'Lock client funds upfront, release by milestone, and resolve disputes with a clear audit trail on Base. This launch candidate is built for one flow: client funds, contractor delivers, client releases or disputes, operator resolves.',
+        'Source the right builder, close into one escrow contract, and release by milestone with a visible dispute path.',
       trustCta: 'See the trust model',
-      stats: [
+      heroBadges: [
+        'Marketplace-first sourcing',
+        'Milestone escrow close',
+        'Operator dispute path',
+      ],
+      heroSignals: [
         {
-          title: 'Email-first onboarding',
-          body: 'OTP sign-in plus wallet linking keeps setup lighter than raw wallet-only flows.',
+          label: 'Close',
+          value: 'Pick one hire and convert straight into escrow.',
         },
         {
-          title: 'Milestone release and dispute flow',
-          body: 'Funding, delivery, release, dispute, and operator resolution are already implemented in the repo.',
-        },
-        {
-          title: 'Operator-visible case history',
-          body: 'Each contract exposes an audit bundle, execution receipts, and exportable case artifacts.',
+          label: 'Review',
+          value: 'Track milestone approval before release.',
         },
       ],
+      lanesTitle: 'Popular hiring lanes',
+      lanes: [
+        {
+          title: 'Product engineering',
+          body: 'Dashboards, portals, and client-facing builds.',
+          glyph: 'engineering',
+        },
+        {
+          title: 'Design systems',
+          body: 'Interface polish, flows, and visual cleanup.',
+          glyph: 'design',
+        },
+        {
+          title: 'Growth surfaces',
+          body: 'Landing pages, funnels, and launch-ready sites.',
+          glyph: 'growth',
+        },
+      ],
+      laneCta: 'Browse the marketplace',
       howItWorksTitle: 'How it works',
       steps: [
         {
-          title: 'Create and fund',
-          body: 'The client creates a milestone contract, binds the contractor wallet, and funds the escrow.',
+          title: 'Post a brief',
+          body: 'Open the marketplace, publish the brief, and review the strongest fit.',
         },
         {
-          title: 'Deliver and review',
-          body: 'The contractor joins through the shared link, signs in, links the exact wallet, and submits delivery evidence.',
+          title: 'Hire into escrow',
+          body: 'The winning application converts into one milestone contract.',
         },
         {
-          title: 'Release or dispute',
-          body: 'The client releases the milestone or opens a dispute. The operator resolves from the visible case history.',
+          title: 'Approve or dispute',
+          body: 'Release the milestone when approved or escalate through the operator path.',
         },
       ],
-      productBoundsTitle: 'What this launch candidate is and is not',
-      bounds: [
+      proofTitle: 'Why teams can trust the close',
+      proofItems: [
         {
-          title: 'It is a focused agency or client escrow flow.',
-          body: 'One client, one contractor, one operator, one chain, one milestone-based service contract model.',
+          title: 'Milestone releases',
+          body: 'Funding, delivery, release, and dispute are already wired into the repo.',
         },
         {
-          title: 'It is an escrow-first marketplace, not an embedded platform.',
-          body: 'Curated talent discovery and brief hiring now exist, but the close still routes into one client-to-one contractor escrow flow on one chain.',
+          title: 'Visible case history',
+          body: 'Every contract keeps an operator-readable audit trail and receipts.',
         },
         {
-          title: 'Trust claims stay narrow.',
-          body: 'The product shows what is implemented now and what still needs live staged proof before it should be called production-proven.',
+          title: 'Narrow trust claims',
+          body: 'The product shows implemented proof instead of vague platform promises.',
+        },
+      ],
+      proofStrip: [
+        {
+          title: 'Verified profiles',
+          body: 'Public talent cards surface wallet and delivery posture before hire.',
+        },
+        {
+          title: 'One winner, one contract',
+          body: 'The marketplace stays focused instead of becoming an open bid wall.',
+        },
+        {
+          title: 'Escrow-backed execution',
+          body: 'Delivery still closes through the same contract and dispute path.',
         },
       ],
       trustPage: {
@@ -156,22 +190,41 @@ const webMessages = {
       openWorkspace: 'Open workspace',
       directContractPath: 'Direct contract path',
       heroEyebrow: 'Escrow-first marketplace',
-      heroTitle: 'Hire through curated briefs and convert the winner into escrow.',
+      heroTitle: 'Find talent, shortlist fast, and close through escrow.',
       heroLead:
-        'Browse verified talent, publish private or public briefs, and move the selected application straight into the existing milestone escrow flow.',
+        'Browse visible talent and public briefs, then move the winner into one milestone contract.',
+      heroBadges: [
+        'Verified talent signals',
+        'Public briefs + private hiring lanes',
+        'Escrow-backed close',
+      ],
       loadFailure: 'Unable to load the marketplace feed right now.',
       stats: {
         visibleTalentTitle: (count: number) =>
           `${count} visible talent profile${count === 1 ? '' : 's'}`,
         visibleTalentBody:
-          'Profiles only appear after they are complete and moderation-visible.',
+          'Profiles shown only after completion and visibility review.',
         openBriefsTitle: (count: number) =>
           `${count} open brief${count === 1 ? '' : 's'}`,
         openBriefsBody:
-          'Public briefs are browseable; private briefs are still direct-linkable.',
-        escrowCloseTitle: 'One hire closes into one escrow contract',
+          'Public briefs stay browseable while private lanes stay controlled.',
+        escrowCloseTitle: 'One winner closes into escrow',
         escrowCloseBody:
-          'The marketplace is a sourcing layer, not a separate settlement path.',
+          'The marketplace sources the hire, not a separate settlement path.',
+      },
+      results: {
+        kickerTalent: 'Talent profile',
+        kickerBrief: 'Client brief',
+        talentTitle: (count: number) => `Talent matches (${count})`,
+        talentBody: 'Shortlist by fit, proof, and delivery posture.',
+        opportunityTitle: (count: number) => `Open briefs (${count})`,
+        opportunityBody:
+          'Review public briefs before moving into the authenticated lane.',
+        score: (value: number) => `Score ${value}`,
+        escrowJobs: (count: number) =>
+          `${count} escrow job${count === 1 ? '' : 's'}`,
+        applications: (count: number) =>
+          `${count} application${count === 1 ? '' : 's'}`,
       },
       featuredTalentTitle: 'Featured talent',
       noProfilesTitle: 'No public talent profiles yet',
@@ -204,14 +257,18 @@ const webMessages = {
       },
       directory: {
         eyebrow: 'Discovery',
-        title: 'Search the marketplace directly',
-        body: 'Filter talent and briefs by fit, trust, and delivery posture instead of relying on direct links alone.',
-        talentTab: 'Talent directory',
-        opportunityTab: 'Opportunity directory',
+        title: 'Search the marketplace',
+        body: 'Filter talent and briefs by fit, trust, and readiness.',
+        talentTab: 'Talent',
+        opportunityTab: 'Briefs',
         query: 'Query',
         skill: 'Skill',
         category: 'Category',
         availability: 'Availability',
+        all: 'All',
+        availabilityOpen: 'Open',
+        availabilityLimited: 'Limited',
+        availabilityUnavailable: 'Unavailable',
         verificationLevel: 'Verification',
         engagementType: 'Engagement',
         cryptoReadiness: 'Crypto readiness',
@@ -1644,53 +1701,87 @@ const webMessages = {
       dueAt: (value: string) => `الاستحقاق ${value}`,
     },
     marketing: {
-      heroEyebrow: 'أعمال الوكالات والعملاء على Base',
-      heroTitle: 'ضمان مراحل احترافي لأعمال الخدمات الرقمية',
+      heroEyebrow: 'توظيف مدعوم بالضمان على Base',
+      heroTitle: 'وظّف مواهب رقمية موثقة ثم أغلق العمل عبر ضمان المراحل',
       heroLead:
-        'يتم حجز أموال العميل مسبقاً، ثم الإفراج عنها لكل مرحلة، مع معالجة النزاعات عبر سجل تدقيق واضح على Base. هذا الإصدار مبني لمسار محدد: العميل يمول، المقاول يسلّم، العميل يفرج أو يعترض، والمشغّل يحسم النزاع.',
+        'اعثر على المنفذ المناسب، وأغلق الاختيار داخل عقد ضمان واحد، ثم أطلق كل مرحلة بعد المراجعة الواضحة.',
       trustCta: 'اطّلع على نموذج الثقة',
-      stats: [
+      heroBadges: [
+        'اكتشاف يبدأ من السوق',
+        'إغلاق عبر ضمان المراحل',
+        'مسار نزاع تشغيلي',
+      ],
+      heroSignals: [
         {
-          title: 'تهيئة تبدأ بالبريد الإلكتروني',
-          body: 'تسجيل الدخول عبر OTP مع ربط المحفظة يجعل البدء أخف من المسارات المعتمدة على المحفظة فقط.',
+          label: 'الإغلاق',
+          value: 'اختر منفذاً واحداً وحوّله مباشرة إلى الضمان.',
         },
         {
-          title: 'تدفق الإفراج والنزاع لكل مرحلة',
-          body: 'التمويل والتسليم والإفراج والنزاع والحسم التشغيلي كلها مطبقة بالفعل داخل المستودع.',
-        },
-        {
-          title: 'تاريخ قضية ظاهر للمشغّل',
-          body: 'كل عقد يعرض حزمة تدقيق وإيصالات تنفيذ وملفات قضية قابلة للتصدير.',
+          label: 'المراجعة',
+          value: 'تابع الموافقة على المرحلة قبل الإطلاق.',
         },
       ],
+      lanesTitle: 'مسارات التوظيف الشائعة',
+      lanes: [
+        {
+          title: 'هندسة المنتج',
+          body: 'لوحات التحكم والبوابات وبناء الواجهات الأساسية.',
+          glyph: 'engineering',
+        },
+        {
+          title: 'أنظمة التصميم',
+          body: 'تنسيق الواجهات وتحسين التدفقات وجودة العرض.',
+          glyph: 'design',
+        },
+        {
+          title: 'واجهات النمو',
+          body: 'صفحات الهبوط والمسارات التسويقية والمواقع الجاهزة للإطلاق.',
+          glyph: 'growth',
+        },
+      ],
+      laneCta: 'تصفح السوق',
       howItWorksTitle: 'كيف يعمل المنتج',
       steps: [
         {
-          title: 'الإنشاء والتمويل',
-          body: 'ينشئ العميل عقد المراحل ويربط محفظة المقاول ثم يمول الضمان.',
+          title: 'انشر عرضاً موجزاً',
+          body: 'افتح السوق، وانشر العرض، ثم راجع أفضل مطابقة بسرعة.',
         },
         {
-          title: 'التسليم والمراجعة',
-          body: 'ينضم المقاول عبر الرابط المشترك ويسجل الدخول ويربط المحفظة الصحيحة ثم يرسل أدلة التسليم.',
+          title: 'حوّل التوظيف إلى الضمان',
+          body: 'يتحول الطلب الفائز إلى عقد مراحل واحد.',
         },
         {
-          title: 'الإفراج أو النزاع',
-          body: 'يفرج العميل عن المرحلة أو يفتح نزاعاً. ويقوم المشغّل بالحسم من سجل القضية الظاهر.',
+          title: 'أطلق أو صعّد النزاع',
+          body: 'أطلق المرحلة بعد الموافقة أو صعّدها عبر مسار المشغّل الواضح.',
         },
       ],
-      productBoundsTitle: 'ما الذي يقدمه هذا الإصدار وما الذي لا يقدمه',
-      bounds: [
+      proofTitle: 'لماذا يمكن الوثوق بالإغلاق',
+      proofItems: [
         {
-          title: 'هو مسار ضمان مركز لأعمال العميل والمقاول.',
-          body: 'عميل واحد، مقاول واحد، مشغّل واحد، سلسلة واحدة، ونموذج عقد خدمات قائم على المراحل.',
+          title: 'إطلاق مراحل حقيقي',
+          body: 'التمويل والتسليم والإطلاق والنزاع موجودة فعلاً داخل المستودع.',
         },
         {
-          title: 'هو سوق يبدأ بالضمان وليس منصة مدمجة.',
-          body: 'يوجد الآن اكتشاف مواهب وعروض موجزة منسقة، لكن الإغلاق ما زال ينتقل إلى مسار ضمان بعقد عميل واحد مع مقاول واحد وعلى سلسلة واحدة.',
+          title: 'سجل قضية ظاهر',
+          body: 'كل عقد يحتفظ بمسار تدقيق وإيصالات يراجعها المشغّل.',
         },
         {
-          title: 'ادعاءات الثقة تبقى محدودة ودقيقة.',
-          body: 'المنتج يعرض ما هو مطبق الآن وما يزال يحتاج إلى إثبات مباشر في بيئة مرحلية قبل وصفه بأنه مثبت إنتاجياً.',
+          title: 'ادعاءات ثقة ضيقة',
+          body: 'المنتج يعرض ما هو مثبت فعلاً بدلاً من وعود عامة.',
+        },
+      ],
+      proofStrip: [
+        {
+          title: 'ملفات موثقة',
+          body: 'بطاقات المواهب العامة تعرض حالة المحفظة والتنفيذ قبل التوظيف.',
+        },
+        {
+          title: 'فائز واحد وعقد واحد',
+          body: 'يبقى السوق مركزاً بدلاً من التحول إلى جدار مزايدات مفتوح.',
+        },
+        {
+          title: 'تنفيذ مدعوم بالضمان',
+          body: 'الإغلاق النهائي يمر عبر العقد نفسه ومسار النزاع ذاته.',
         },
       ],
       trustPage: {
@@ -1732,21 +1823,37 @@ const webMessages = {
       openWorkspace: 'افتح مساحة العمل',
       directContractPath: 'المسار المباشر للعقد',
       heroEyebrow: 'سوق يبدأ بالضمان',
-      heroTitle: 'وظّف عبر عروض موجزة منسقة ثم حوّل الاختيار الفائز إلى الضمان.',
+      heroTitle: 'اعثر على المواهب، كوّن قائمة قصيرة بسرعة، ثم أغلق عبر الضمان.',
       heroLead:
-        'تصفح المواهب الموثقة، وانشر عروضاً خاصة أو عامة، ثم انقل الطلب المختار مباشرة إلى تدفق ضمان المراحل الحالي.',
+        'تصفح المواهب الظاهرة والعروض العامة، ثم انقل الاختيار الفائز إلى عقد مراحل واحد.',
+      heroBadges: [
+        'إشارات موهبة موثقة',
+        'عروض عامة مع مسارات توظيف خاصة',
+        'إغلاق مدعوم بالضمان',
+      ],
       loadFailure: 'تعذر تحميل تغذية السوق حالياً.',
       stats: {
         visibleTalentTitle: (count: number) =>
           `${count} ملف موهبة ظاهر`,
         visibleTalentBody:
-          'لا تظهر الملفات إلا بعد اكتمالها واجتيازها حالة الظهور الإشرافي.',
+          'لا تظهر الملفات إلا بعد اكتمالها ومراجعة الظهور.',
         openBriefsTitle: (count: number) => `${count} عرض موجز مفتوح`,
         openBriefsBody:
-          'يمكن تصفح العروض العامة، بينما تبقى العروض الخاصة قابلة للوصول عبر الرابط المباشر.',
-        escrowCloseTitle: 'كل توظيف يغلق داخل عقد ضمان واحد',
+          'تظل العروض العامة قابلة للتصفح بينما تبقى المسارات الخاصة مضبوطة.',
+        escrowCloseTitle: 'كل فائز يغلق داخل الضمان',
         escrowCloseBody:
-          'السوق هنا طبقة لاكتشاف المرشحين، وليس مسار تسوية منفصل.',
+          'السوق هنا لاكتشاف المرشح وليس مسار تسوية منفصل.',
+      },
+      results: {
+        kickerTalent: 'ملف موهبة',
+        kickerBrief: 'عرض عميل',
+        talentTitle: (count: number) => `مطابقات المواهب (${count})`,
+        talentBody: 'كوّن قائمة قصيرة بحسب الملاءمة والإثبات وجاهزية التنفيذ.',
+        opportunityTitle: (count: number) => `العروض المفتوحة (${count})`,
+        opportunityBody: 'راجع العروض العامة قبل الانتقال إلى المسار الموثق.',
+        score: (value: number) => `الدرجة ${value}`,
+        escrowJobs: (count: number) => `${count} عقد ضمان`,
+        applications: (count: number) => `${count} طلب`,
       },
       featuredTalentTitle: 'مواهب مميزة',
       noProfilesTitle: 'لا توجد ملفات مواهب عامة بعد',
@@ -1779,14 +1886,18 @@ const webMessages = {
       },
       directory: {
         eyebrow: 'الاكتشاف',
-        title: 'ابحث داخل السوق مباشرة',
-        body: 'صفِّ المواهب والعروض بحسب الملاءمة والثقة وجاهزية التنفيذ بدلاً من الاعتماد على الروابط المباشرة فقط.',
-        talentTab: 'دليل المواهب',
-        opportunityTab: 'دليل الفرص',
+        title: 'ابحث داخل السوق',
+        body: 'صفِّ المواهب والعروض بحسب الملاءمة والثقة والجاهزية.',
+        talentTab: 'المواهب',
+        opportunityTab: 'العروض',
         query: 'البحث',
         skill: 'المهارة',
         category: 'الفئة',
         availability: 'التوفر',
+        all: 'الكل',
+        availabilityOpen: 'متاح',
+        availabilityLimited: 'محدود',
+        availabilityUnavailable: 'غير متاح',
         verificationLevel: 'التحقق',
         engagementType: 'نوع الارتباط',
         cryptoReadiness: 'الجاهزية الرقمية',

@@ -1318,3 +1318,19 @@
   - passed: `git diff --check`
 - Not run:
   - full browser execution of `tests/e2e/specs/journeys/local/marketplace-client-console-flow.spec.ts`
+
+## Update (2026-04-22, Public Marketplace UI Refresh)
+- Reworked the public `/` and `/marketplace` surfaces to feel marketplace-first instead of contract-demo-first:
+  - homepage now leads with marketplace hiring as the primary conversion, keeps direct escrow secondary, compresses copy, and replaces the old stats/bounds stack with scan-first hiring lanes, escrow-flow steps, and proof strips
+  - public marketplace now uses a stronger browse/search presentation with a compact hero, escrow/trust signal strip, filter rail, upgraded result cards, and lighter directory copy while keeping the existing search/tracking behavior unchanged
+  - added repo-native SVG public visuals in `apps/web/src/app/public-visuals.tsx` for the hero, directory, escrow flow, and category glyphs
+  - localized the refreshed public copy in `apps/web/src/lib/i18n.tsx`, including Arabic-safe filter defaults and marketplace labels
+- Changed files:
+  `apps/web/src/app/{page.tsx,marketing.styles.ts,public-visuals.tsx,public-visuals.spec.tsx,marketing-page.spec.tsx,marketplace/marketplace-browser.tsx,marketplace/marketplace-page.spec.tsx}`
+  `apps/web/src/lib/i18n.tsx`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketing-page.spec.tsx src/app/marketplace/marketplace-page.spec.tsx src/app/public-visuals.spec.tsx`
+  - passed: `pnpm --filter web typecheck`
+  - passed: `git diff --check`
+- Not run:
+  - browser/dev-server visual verification of the refreshed public homepage and marketplace surface
