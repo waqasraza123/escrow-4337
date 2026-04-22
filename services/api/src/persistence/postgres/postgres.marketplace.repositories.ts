@@ -7,6 +7,10 @@ import type {
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
   MarketplaceDigestCadence,
+  MarketplaceDigestDispatchMode,
+  MarketplaceDigestDispatchRecipient,
+  MarketplaceDigestDispatchRunRecord,
+  MarketplaceDigestDispatchTrigger,
   MarketplaceDigestHighlight,
   MarketplaceDigestRecord,
   MarketplaceDigestStats,
@@ -408,6 +412,7 @@ type MarketplaceDigestRow = QueryResultRow & {
   id: string;
   user_id: string;
   workspace_id: string | null;
+  dispatch_run_id: string | null;
   cadence: MarketplaceDigestCadence;
   status: MarketplaceDigestStatus;
   title: string;
@@ -416,6 +421,17 @@ type MarketplaceDigestRow = QueryResultRow & {
   stats_json: MarketplaceDigestStats;
   created_at_ms: string;
   updated_at_ms: string;
+};
+
+type MarketplaceDigestDispatchRunRow = QueryResultRow & {
+  id: string;
+  workspace_id: string;
+  triggered_by_user_id: string;
+  trigger: MarketplaceDigestDispatchTrigger;
+  mode: MarketplaceDigestDispatchMode;
+  summary: string;
+  recipients_json: MarketplaceDigestDispatchRecipient[];
+  created_at_ms: string;
 };
 
 type MarketplaceOpportunityInviteRow = QueryResultRow & {
@@ -912,6 +928,7 @@ function mapDigest(row: MarketplaceDigestRow): MarketplaceDigestRecord {
     id: row.id,
     userId: row.user_id,
     workspaceId: row.workspace_id,
+    dispatchRunId: row.dispatch_run_id,
     cadence: row.cadence,
     status: row.status,
     title: row.title,
@@ -920,6 +937,21 @@ function mapDigest(row: MarketplaceDigestRow): MarketplaceDigestRecord {
     stats: row.stats_json,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapDigestDispatchRun(
+  row: MarketplaceDigestDispatchRunRow,
+): MarketplaceDigestDispatchRunRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    triggeredByUserId: row.triggered_by_user_id,
+    trigger: row.trigger,
+    mode: row.mode,
+    summary: row.summary,
+    recipients: row.recipients_json ?? [],
+    createdAt: Number(row.created_at_ms),
   };
 }
 
@@ -2459,6 +2491,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           id,
           user_id,
           workspace_id,
+          dispatch_run_id,
           cadence,
           status,
           title,
@@ -2469,11 +2502,12 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           updated_at_ms
         )
         VALUES (
-          $1, $2::uuid, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11
+          $1, $2::uuid, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12
         )
         ON CONFLICT (id)
         DO UPDATE SET
           workspace_id = EXCLUDED.workspace_id,
+          dispatch_run_id = EXCLUDED.dispatch_run_id,
           cadence = EXCLUDED.cadence,
           status = EXCLUDED.status,
           title = EXCLUDED.title,
@@ -2486,6 +2520,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         digest.id,
         digest.userId,
         digest.workspaceId,
+        digest.dispatchRunId,
         digest.cadence,
         digest.status,
         digest.title,
@@ -2494,6 +2529,70 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         JSON.stringify(digest.stats),
         String(digest.createdAt),
         String(digest.updatedAt),
+      ],
+    );
+  }
+
+  async getDigestDispatchRunById(runId: string) {
+    const result = await this.db.query<MarketplaceDigestDispatchRunRow>(
+      `
+        SELECT *
+        FROM marketplace_digest_dispatch_runs
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [runId],
+    );
+
+    return result.rows[0] ? mapDigestDispatchRun(result.rows[0]) : null;
+  }
+
+  async listDigestDispatchRuns() {
+    const result = await this.db.query<MarketplaceDigestDispatchRunRow>(
+      `
+        SELECT *
+        FROM marketplace_digest_dispatch_runs
+        ORDER BY created_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapDigestDispatchRun);
+  }
+
+  async saveDigestDispatchRun(run: MarketplaceDigestDispatchRunRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_digest_dispatch_runs (
+          id,
+          workspace_id,
+          triggered_by_user_id,
+          trigger,
+          mode,
+          summary,
+          recipients_json,
+          created_at_ms
+        )
+        VALUES (
+          $1, $2, $3::uuid, $4, $5, $6, $7::jsonb, $8
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          workspace_id = EXCLUDED.workspace_id,
+          triggered_by_user_id = EXCLUDED.triggered_by_user_id,
+          trigger = EXCLUDED.trigger,
+          mode = EXCLUDED.mode,
+          summary = EXCLUDED.summary,
+          recipients_json = EXCLUDED.recipients_json
+      `,
+      [
+        run.id,
+        run.workspaceId,
+        run.triggeredByUserId,
+        run.trigger,
+        run.mode,
+        run.summary,
+        JSON.stringify(run.recipients),
+        String(run.createdAt),
       ],
     );
   }

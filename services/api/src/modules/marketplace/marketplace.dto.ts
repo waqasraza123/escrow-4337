@@ -333,6 +333,13 @@ export const generateMarketplaceDigestSchema = z
   })
   .strict();
 
+export const dispatchMarketplaceDigestsSchema = z
+  .object({
+    mode: z.enum(['due', 'all_enabled']).default('due'),
+    trigger: z.enum(['manual', 'scheduled']).default('manual'),
+  })
+  .strict();
+
 export const updateMarketplaceDigestSchema = z
   .object({
     status: z.enum(['acknowledged', 'archived']),
@@ -679,6 +686,9 @@ export type UpdateMarketplaceNotificationPreferencesDto = z.infer<
 >;
 export type GenerateMarketplaceDigestDto = z.infer<
   typeof generateMarketplaceDigestSchema
+>;
+export type DispatchMarketplaceDigestsDto = z.infer<
+  typeof dispatchMarketplaceDigestsSchema
 >;
 export type UpdateMarketplaceDigestDto = z.infer<
   typeof updateMarketplaceDigestSchema

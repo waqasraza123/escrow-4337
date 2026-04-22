@@ -29,7 +29,9 @@ const { mockedWebApi } = vi.hoisted(() => ({
     getMarketplaceNotificationPreferences: vi.fn(),
     updateMarketplaceNotificationPreferences: vi.fn(),
     listMarketplaceDigests: vi.fn(),
+    listMarketplaceDigestDispatchRuns: vi.fn(),
     generateMarketplaceDigest: vi.fn(),
+    dispatchMarketplaceDigests: vi.fn(),
     updateMarketplaceDigest: vi.fn(),
     listMyMarketplaceInvites: vi.fn(),
     getMarketplaceAnalyticsOverview: vi.fn(),
@@ -267,11 +269,15 @@ describe('marketplace workspace', () => {
     mockedWebApi.listMarketplaceDigests.mockResolvedValue({
       digests: [],
     });
+    mockedWebApi.listMarketplaceDigestDispatchRuns.mockResolvedValue({
+      runs: [],
+    });
     mockedWebApi.generateMarketplaceDigest.mockResolvedValue({
       digest: {
         id: 'digest-1',
         userId: 'client-1',
         workspaceId: 'workspace-client-1',
+        dispatchRunId: null,
         cadence: 'manual',
         status: 'fresh',
         title: 'Workspace digest',
@@ -295,6 +301,7 @@ describe('marketplace workspace', () => {
         id: 'digest-1',
         userId: 'client-1',
         workspaceId: 'workspace-client-1',
+        dispatchRunId: null,
         cadence: 'manual',
         status: 'acknowledged',
         title: 'Workspace digest',
@@ -311,6 +318,31 @@ describe('marketplace workspace', () => {
         },
         createdAt: 1,
         updatedAt: 2,
+      },
+    });
+    mockedWebApi.dispatchMarketplaceDigests.mockResolvedValue({
+      run: {
+        id: 'dispatch-1',
+        workspaceId: 'workspace-client-1',
+        triggeredByUserId: 'client-1',
+        triggeredByEmail: 'client@example.com',
+        trigger: 'manual',
+        mode: 'due',
+        summary: 'Dispatched due marketplace digests to 1 recipient.',
+        recipients: [
+          {
+            userId: 'client-1',
+            userEmail: 'client@example.com',
+            cadence: 'daily',
+            result: 'dispatched',
+            reason: 'due',
+            digestId: 'digest-1',
+          },
+        ],
+        createdAt: 2,
+        dispatchedCount: 1,
+        skippedCount: 0,
+        preview: 'client@example.com',
       },
     });
     mockedWebApi.listMyMarketplaceInvites.mockResolvedValue({
@@ -341,6 +373,128 @@ describe('marketplace workspace', () => {
     mockedWebApi.rejectMarketplaceApplication.mockResolvedValue({});
     mockedWebApi.hireMarketplaceApplication.mockResolvedValue({
       jobId: 'job-1',
+    });
+  });
+
+  it('dispatches due digests from workspace controls and renders dispatch history', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-1',
+        kind: 'client',
+        label: 'Personal client workspace',
+        slug: 'personal-client-client-1',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['client_owner'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: true,
+          reviewApplications: true,
+          manageWorkspace: true,
+        },
+        isDefault: true,
+      },
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMarketplaceDigestDispatchRuns.mockResolvedValue({
+      runs: [
+        {
+          id: 'dispatch-seeded',
+          workspaceId: 'workspace-client-1',
+          triggeredByUserId: 'client-1',
+          triggeredByEmail: 'client@example.com',
+          trigger: 'manual',
+          mode: 'due',
+          summary: 'Dispatched due marketplace digests to 1 recipient.',
+          recipients: [
+            {
+              userId: 'client-1',
+              userEmail: 'client@example.com',
+              cadence: 'daily',
+              result: 'dispatched',
+              reason: 'due',
+              digestId: 'digest-1',
+            },
+          ],
+          createdAt: 1,
+          dispatchedCount: 1,
+          skippedCount: 0,
+          preview: 'client@example.com',
+        },
+      ],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Marketplace digest controls',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Dispatched due marketplace digests to 1 recipient.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dispatch due digests' }));
+
+    await waitFor(() => {
+      expect(mockedWebApi.dispatchMarketplaceDigests).toHaveBeenCalledWith(
+        {
+          mode: 'due',
+          trigger: 'manual',
+        },
+        'access-token-123',
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Dispatched 1 marketplace digest.'),
+      ).toBeInTheDocument();
     });
   });
 

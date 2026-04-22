@@ -1194,3 +1194,38 @@
   - passed: `git diff --check`
 - Next likely step:
   - add actual due-digest dispatch/background materialization on top of the now-observable digest layer
+
+## Update (2026-04-22, Marketplace Digest Dispatch)
+- Implemented the next full repo-side marketplace slice on top of digest controls/intelligence:
+  - persisted workspace-scoped digest dispatch run history
+  - authenticated due/all-enabled digest dispatch for shared client workspaces
+  - digest snapshots now carry `dispatchRunId` when materialized through a dispatch run
+  - workspace UI now renders dispatch actions plus recent dispatch history
+- Backend changes:
+  - added digest-dispatch DTO/controller/service flows and new response types
+  - added file/Postgres persistence support plus `030_marketplace_digest_dispatch_runs.sql`
+  - dispatch execution now resolves workspace members, respects digest cadence, skips manual/not-due/no-activity recipients, and records per-recipient results
+  - fixed a small `organizations.service.ts` type/runtime issue surfaced by targeted verification (`listMemberships` user lookup + owner-role narrowing)
+- Frontend changes:
+  - `apps/web/src/lib/api.ts` now exposes digest-dispatch run reads/mutations
+  - `apps/web/src/app/marketplace/workspace.tsx` now renders due/all-enabled dispatch controls and recent run cards beside digest snapshots
+  - `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` now covers dispatch-history rendering and the due-dispatch action
+- Changed files:
+  `services/api/src/modules/{marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts},organizations/organizations.service.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/030_marketplace_digest_dispatch_runs.sql`
+  `services/api/test/marketplace.service.spec.ts`
+  `apps/web/src/{app/marketplace/workspace.tsx,app/marketplace/marketplace-workspace.spec.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts -t "dispatches due digests across a shared client workspace and respects cadence windows|skips manual cadence recipients when dispatching all enabled digests"`
+  - passed: `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit 2>&1 | rg "marketplace|organizations.service|persistence.types|file.marketplace.repositories|postgres.marketplace.repositories|marketplace.controller|marketplace.dto" || true`
+  - passed: `pnpm --filter web typecheck 2>&1 | rg "app/marketplace/workspace|app/marketplace/marketplace-workspace.spec|lib/api.ts" || true`
+  - passed: `git diff --check`
+  - blocked or unrelated:
+    - full `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts` still has pre-existing failures in unrelated escrow/commercial and moderation expectations
+    - full `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit` still has unrelated existing errors in escrow/project-room/operations modules
+    - full `pnpm --filter web typecheck` still has unrelated existing errors in `src/app/milestone-lifecycle.spec.ts`, `src/app/project-room.tsx`, and `src/test/fixtures.ts`
+- Next likely step:
+  - add operator-facing digest dispatch analytics or a scheduler/worker entry point that triggers the same due-dispatch path outside the workspace UI

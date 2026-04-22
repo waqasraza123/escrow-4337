@@ -103,6 +103,15 @@ export type MarketplaceNotificationKind =
 export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
 export type MarketplaceDigestCadence = 'manual' | 'daily' | 'weekly';
 export type MarketplaceDigestStatus = 'fresh' | 'acknowledged' | 'archived';
+export type MarketplaceDigestDispatchTrigger = 'manual' | 'scheduled';
+export type MarketplaceDigestDispatchMode = 'due' | 'all_enabled';
+export type MarketplaceDigestDispatchRecipientResult = 'dispatched' | 'skipped';
+export type MarketplaceDigestDispatchRecipientReason =
+  | 'due'
+  | 'all_enabled'
+  | 'manual_cadence'
+  | 'not_due'
+  | 'no_activity';
 export type MarketplaceOpportunityInviteStatus =
   | 'pending'
   | 'applied'
@@ -473,6 +482,7 @@ export type MarketplaceDigestRecord = {
   id: string;
   userId: string;
   workspaceId: string | null;
+  dispatchRunId: string | null;
   cadence: MarketplaceDigestCadence;
   status: MarketplaceDigestStatus;
   title: string;
@@ -481,6 +491,26 @@ export type MarketplaceDigestRecord = {
   stats: MarketplaceDigestStats;
   createdAt: number;
   updatedAt: number;
+};
+
+export type MarketplaceDigestDispatchRecipient = {
+  userId: string;
+  userEmail: string;
+  cadence: MarketplaceDigestCadence;
+  result: MarketplaceDigestDispatchRecipientResult;
+  reason: MarketplaceDigestDispatchRecipientReason;
+  digestId: string | null;
+};
+
+export type MarketplaceDigestDispatchRunRecord = {
+  id: string;
+  workspaceId: string;
+  triggeredByUserId: string;
+  trigger: MarketplaceDigestDispatchTrigger;
+  mode: MarketplaceDigestDispatchMode;
+  summary: string;
+  recipients: MarketplaceDigestDispatchRecipient[];
+  createdAt: number;
 };
 
 export type MarketplaceOpportunityInviteRecord = {
@@ -1022,6 +1052,13 @@ export type MarketplaceNotificationView = MarketplaceNotificationRecord;
 export type MarketplaceNotificationPreferencesView =
   MarketplaceNotificationPreferencesRecord;
 export type MarketplaceDigestView = MarketplaceDigestRecord;
+export type MarketplaceDigestDispatchRunView =
+  MarketplaceDigestDispatchRunRecord & {
+    triggeredByEmail: string;
+    dispatchedCount: number;
+    skippedCount: number;
+    preview: string;
+  };
 
 export type MarketplaceRehireCandidateView = {
   jobId: string;
@@ -1501,6 +1538,14 @@ export type MarketplaceDigestsResponse = {
 
 export type MarketplaceDigestResponse = {
   digest: MarketplaceDigestView;
+};
+
+export type MarketplaceDigestDispatchRunsResponse = {
+  runs: MarketplaceDigestDispatchRunView[];
+};
+
+export type MarketplaceDigestDispatchRunResponse = {
+  run: MarketplaceDigestDispatchRunView;
 };
 
 export type MarketplaceAutomationRunsResponse = {

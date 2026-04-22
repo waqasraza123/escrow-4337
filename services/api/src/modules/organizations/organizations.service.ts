@@ -137,6 +137,7 @@ export class OrganizationsService {
   }
 
   async listMemberships(userId: string): Promise<MembershipsListResponse> {
+    const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(userId);
     const organizations = await this.organizationsRepository.listOrganizationsByUserId(userId);
     const organizationsById = new Map(organizations.map((organization) => [organization.id, organization]));
@@ -754,13 +755,14 @@ export class OrganizationsService {
         'Personal workspaces do not support organization invitation management',
       );
     }
+    const ownerRole = getOwnerRoleForOrganization(organization.kind);
     const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
       organizationId,
     );
     const canManage = memberships.some(
       (membership) =>
         membership.userId === userId &&
-        membership.role === getOwnerRoleForOrganization(organization.kind),
+        membership.role === ownerRole,
     );
     if (!canManage) {
       throw new BadRequestException(

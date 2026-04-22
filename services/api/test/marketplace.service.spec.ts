@@ -27,6 +27,7 @@ describe('MarketplaceService', () => {
   let clientUserId: string;
   let applicantUserId: string;
   let weakerApplicantUserId: string;
+  let recruiterUserId: string;
   let arbitratorUserId: string;
 
   beforeEach(async () => {
@@ -57,6 +58,11 @@ describe('MarketplaceService', () => {
       usersService,
       'weaker@example.com',
       weakerApplicantAddress,
+    );
+    recruiterUserId = await createLinkedUserId(
+      usersService,
+      'recruiter@example.com',
+      '0x8888888888888888888888888888888888888888',
     );
     arbitratorUserId = await createLinkedUserId(
       usersService,
@@ -399,6 +405,172 @@ describe('MarketplaceService', () => {
     expect(
       matches.matches[1]?.matchSummary.missingRequirements.length,
     ).toBeGreaterThan(0);
+  });
+
+  it('dispatches due digests across a shared client workspace and respects cadence windows', async () => {
+    const workspace = await createSharedClientWorkspace(
+      organizationsService,
+      clientUserId,
+      recruiterUserId,
+      'recruiter@example.com',
+    );
+    const now = Date.now();
+
+    await marketplaceRepository.saveNotificationPreferences({
+      userId: clientUserId,
+      digestCadence: 'daily',
+      talentInvitesEnabled: true,
+      applicationActivityEnabled: true,
+      interviewMessagesEnabled: true,
+      offerActivityEnabled: true,
+      reviewActivityEnabled: true,
+      automationActivityEnabled: true,
+      lifecycleDigestEnabled: true,
+      analyticsDigestEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await marketplaceRepository.saveNotificationPreferences({
+      userId: recruiterUserId,
+      digestCadence: 'daily',
+      talentInvitesEnabled: true,
+      applicationActivityEnabled: true,
+      interviewMessagesEnabled: true,
+      offerActivityEnabled: true,
+      reviewActivityEnabled: true,
+      automationActivityEnabled: true,
+      lifecycleDigestEnabled: true,
+      analyticsDigestEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await marketplaceRepository.saveNotification({
+      id: 'notification-client-dispatch',
+      userId: clientUserId,
+      workspaceId: workspace.workspaceId,
+      kind: 'application_received',
+      status: 'unread',
+      title: 'New applicant',
+      detail: 'A contractor applied to Atlas Labs.',
+      actorUserId: recruiterUserId,
+      relatedOpportunityId: null,
+      relatedApplicationId: null,
+      relatedOfferId: null,
+      relatedJobId: null,
+      relatedAutomationRunId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await marketplaceRepository.saveNotification({
+      id: 'notification-recruiter-dispatch',
+      userId: recruiterUserId,
+      workspaceId: workspace.workspaceId,
+      kind: 'application_received',
+      status: 'unread',
+      title: 'Candidate follow-up',
+      detail: 'Review the shortlisted application.',
+      actorUserId: clientUserId,
+      relatedOpportunityId: null,
+      relatedApplicationId: null,
+      relatedOfferId: null,
+      relatedJobId: null,
+      relatedAutomationRunId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const firstDispatch = await marketplaceService.dispatchDigests(clientUserId, {
+      mode: 'due',
+      trigger: 'manual',
+    });
+    expect(firstDispatch.run.dispatchedCount).toBe(2);
+    expect(
+      firstDispatch.run.recipients.every(
+        (recipient) => recipient.result === 'dispatched',
+      ),
+    ).toBe(true);
+
+    const dispatchedDigests = (await marketplaceRepository.listDigests()).filter(
+      (digest) => digest.dispatchRunId === firstDispatch.run.id,
+    );
+    expect(dispatchedDigests).toHaveLength(2);
+
+    const secondDispatch = await marketplaceService.dispatchDigests(clientUserId, {
+      mode: 'due',
+      trigger: 'manual',
+    });
+    expect(secondDispatch.run.dispatchedCount).toBe(0);
+    expect(
+      secondDispatch.run.recipients.map((recipient) => recipient.reason),
+    ).toEqual(['not_due', 'not_due']);
+  });
+
+  it('skips manual cadence recipients when dispatching all enabled digests', async () => {
+    const workspace = await createSharedClientWorkspace(
+      organizationsService,
+      clientUserId,
+      recruiterUserId,
+      'recruiter@example.com',
+    );
+    const now = Date.now();
+
+    await marketplaceRepository.saveNotificationPreferences({
+      userId: clientUserId,
+      digestCadence: 'daily',
+      talentInvitesEnabled: true,
+      applicationActivityEnabled: true,
+      interviewMessagesEnabled: true,
+      offerActivityEnabled: true,
+      reviewActivityEnabled: true,
+      automationActivityEnabled: true,
+      lifecycleDigestEnabled: true,
+      analyticsDigestEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await marketplaceRepository.saveNotificationPreferences({
+      userId: recruiterUserId,
+      digestCadence: 'manual',
+      talentInvitesEnabled: true,
+      applicationActivityEnabled: true,
+      interviewMessagesEnabled: true,
+      offerActivityEnabled: true,
+      reviewActivityEnabled: true,
+      automationActivityEnabled: true,
+      lifecycleDigestEnabled: true,
+      analyticsDigestEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await marketplaceRepository.saveNotification({
+      id: 'notification-manual-skip',
+      userId: clientUserId,
+      workspaceId: workspace.workspaceId,
+      kind: 'application_received',
+      status: 'unread',
+      title: 'Qualified applicant',
+      detail: 'A qualified applicant is waiting for review.',
+      actorUserId: recruiterUserId,
+      relatedOpportunityId: null,
+      relatedApplicationId: null,
+      relatedOfferId: null,
+      relatedJobId: null,
+      relatedAutomationRunId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const dispatch = await marketplaceService.dispatchDigests(clientUserId, {
+      mode: 'all_enabled',
+      trigger: 'manual',
+    });
+    expect(dispatch.run.dispatchedCount).toBe(1);
+    expect(dispatch.run.skippedCount).toBe(1);
+    expect(
+      dispatch.run.recipients.find(
+        (recipient) => recipient.userId === recruiterUserId,
+      )?.reason,
+    ).toBe('manual_cadence');
   });
 
   it('requires arbitrator control for moderation actions', async () => {
@@ -982,4 +1154,40 @@ async function createLinkedUserId(
   }
 
   return user.id;
+}
+
+async function createSharedClientWorkspace(
+  organizationsService: OrganizationsService,
+  ownerUserId: string,
+  memberUserId: string,
+  memberEmail: string,
+) {
+  const created = await organizationsService.createOrganization(ownerUserId, {
+    name: 'Atlas Labs',
+    slug: 'atlas-labs',
+    kind: 'client',
+    setActive: true,
+  });
+  const workspace = created.organization.workspaces[0];
+  if (!workspace) {
+    throw new Error('Expected created client workspace');
+  }
+  const invitation = await organizationsService.createInvitation(
+    ownerUserId,
+    created.organization.id,
+    {
+      email: memberEmail,
+      role: 'client_recruiter',
+    },
+  );
+  await organizationsService.acceptInvitation(
+    memberUserId,
+    invitation.invitation.invitationId,
+    {
+      setActive: true,
+    },
+  );
+  await organizationsService.selectWorkspace(ownerUserId, workspace.workspaceId);
+  await organizationsService.selectWorkspace(memberUserId, workspace.workspaceId);
+  return workspace;
 }

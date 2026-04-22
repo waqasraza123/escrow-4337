@@ -305,6 +305,12 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('digest-dispatch-runs')
+  listDigestDispatchRuns(@User() user: ReqUser) {
+    return this.marketplaceService.listDigestDispatchRuns(user.id);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('digests/generate')
   generateDigest(
     @User() user: ReqUser,
@@ -314,6 +320,18 @@ export class MarketplaceController {
     body: marketplaceDto.GenerateMarketplaceDigestDto,
   ) {
     return this.marketplaceService.generateDigest(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('digest-dispatch-runs/dispatch')
+  dispatchDigests(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.dispatchMarketplaceDigestsSchema),
+    )
+    body: marketplaceDto.DispatchMarketplaceDigestsDto,
+  ) {
+    return this.marketplaceService.dispatchDigests(user.id, body);
   }
 
   @UseGuards(AuthGuard)

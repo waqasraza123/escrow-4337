@@ -45,6 +45,7 @@ import type {
   CreateMarketplaceTalentPoolDto,
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
+  DispatchMarketplaceDigestsDto,
   DispatchMarketplaceAutomationRunsDto,
   GenerateMarketplaceDigestDto,
   MarketplaceModerationReportsQueryDto,
@@ -98,6 +99,12 @@ import type {
   MarketplaceApplicationView,
   MarketplaceAutomationRunRecord,
   MarketplaceDigestCadence,
+  MarketplaceDigestDispatchMode,
+  MarketplaceDigestDispatchRecipient,
+  MarketplaceDigestDispatchRunRecord,
+  MarketplaceDigestDispatchRunResponse,
+  MarketplaceDigestDispatchRunsResponse,
+  MarketplaceDigestDispatchRunView,
   MarketplaceDigestHighlight,
   MarketplaceDigestRecord,
   MarketplaceDigestResponse,
@@ -1591,6 +1598,20 @@ export class MarketplaceService {
     };
   }
 
+  async listDigestDispatchRuns(
+    userId: string,
+  ): Promise<MarketplaceDigestDispatchRunsResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const runs = (await this.marketplaceRepository.listDigestDispatchRuns()).filter(
+      (run) => run.workspaceId === workspace.workspaceId,
+    );
+    return {
+      runs: await Promise.all(
+        runs.map((run) => this.toDigestDispatchRunView(run)),
+      ),
+    };
+  }
+
   async generateDigest(
     userId: string,
     dto: GenerateMarketplaceDigestDto,
@@ -1604,6 +1625,98 @@ export class MarketplaceService {
     await this.marketplaceRepository.saveDigest(digest);
     return {
       digest: this.toDigestView(digest),
+    };
+  }
+
+  async dispatchDigests(
+    userId: string,
+    dto: DispatchMarketplaceDigestsDto,
+  ): Promise<MarketplaceDigestDispatchRunResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const recipients = await this.listWorkspaceDigestRecipients(userId, workspace);
+    const existingRuns = (await this.marketplaceRepository.listDigestDispatchRuns()).filter(
+      (run) => run.workspaceId === workspace.workspaceId,
+    );
+    const runId = randomUUID();
+    const now = Date.now();
+    const results: MarketplaceDigestDispatchRecipient[] = [];
+
+    for (const recipient of recipients) {
+      const preferences = await this.getNotificationPreferencesRecord(recipient.userId);
+      if (preferences.digestCadence === 'manual') {
+        results.push({
+          userId: recipient.userId,
+          userEmail: recipient.userEmail,
+          cadence: preferences.digestCadence,
+          result: 'skipped',
+          reason: 'manual_cadence',
+          digestId: null,
+        });
+        continue;
+      }
+      if (
+        dto.mode === 'due' &&
+        !this.isDigestDispatchDue(
+          recipient.userId,
+          preferences.digestCadence,
+          existingRuns,
+          now,
+        )
+      ) {
+        results.push({
+          userId: recipient.userId,
+          userEmail: recipient.userEmail,
+          cadence: preferences.digestCadence,
+          result: 'skipped',
+          reason: 'not_due',
+          digestId: null,
+        });
+        continue;
+      }
+
+      const digest = await this.buildDigestForWorkspace({
+        userId: recipient.userId,
+        workspace,
+        cadence: preferences.digestCadence,
+        dispatchRunId: runId,
+      });
+      if (this.isDigestDispatchEmpty(digest)) {
+        results.push({
+          userId: recipient.userId,
+          userEmail: recipient.userEmail,
+          cadence: preferences.digestCadence,
+          result: 'skipped',
+          reason: 'no_activity',
+          digestId: null,
+        });
+        continue;
+      }
+
+      await this.marketplaceRepository.saveDigest(digest);
+      results.push({
+        userId: recipient.userId,
+        userEmail: recipient.userEmail,
+        cadence: preferences.digestCadence,
+        result: 'dispatched',
+        reason: dto.mode === 'due' ? 'due' : 'all_enabled',
+        digestId: digest.id,
+      });
+    }
+
+    const run: MarketplaceDigestDispatchRunRecord = {
+      id: runId,
+      workspaceId: workspace.workspaceId,
+      triggeredByUserId: userId,
+      trigger: dto.trigger,
+      mode: dto.mode,
+      summary: this.describeDigestDispatchRun(dto.mode, results),
+      recipients: results,
+      createdAt: now,
+    };
+    await this.marketplaceRepository.saveDigestDispatchRun(run);
+
+    return {
+      run: await this.toDigestDispatchRunView(run),
     };
   }
 
@@ -6095,6 +6208,29 @@ export class MarketplaceService {
     return digest;
   }
 
+  private async toDigestDispatchRunView(
+    run: MarketplaceDigestDispatchRunRecord,
+  ): Promise<MarketplaceDigestDispatchRunView> {
+    const triggeredBy = await this.usersService.getRequiredById(run.triggeredByUserId);
+    const dispatched = run.recipients.filter(
+      (recipient) => recipient.result === 'dispatched',
+    );
+    const skippedCount = run.recipients.length - dispatched.length;
+    return {
+      ...run,
+      triggeredByEmail: triggeredBy.email,
+      dispatchedCount: dispatched.length,
+      skippedCount,
+      preview:
+        dispatched.length === 0
+          ? 'No digests were dispatched.'
+          : dispatched
+              .slice(0, 3)
+              .map((recipient) => recipient.userEmail)
+              .join(' • '),
+    };
+  }
+
   private async getNotificationPreferencesRecord(userId: string) {
     return (
       (await this.marketplaceRepository.getNotificationPreferencesByUserId(userId)) ??
@@ -6158,6 +6294,77 @@ export class MarketplaceService {
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }
 
+  private async listWorkspaceDigestRecipients(
+    userId: string,
+    workspace: WorkspaceSummary,
+  ) {
+    const memberships = await this.organizationsService.listOrganizationMemberships(
+      userId,
+      workspace.organizationId,
+    );
+    return memberships.memberships
+      .filter((membership) => membership.workspaceIds.includes(workspace.workspaceId))
+      .map((membership) => ({
+        userId: membership.userId,
+        userEmail: membership.userEmail,
+      }))
+      .sort((left, right) => left.userEmail.localeCompare(right.userEmail));
+  }
+
+  private isDigestDispatchDue(
+    userId: string,
+    cadence: Exclude<MarketplaceDigestCadence, 'manual'>,
+    runs: MarketplaceDigestDispatchRunRecord[],
+    now = Date.now(),
+  ) {
+    const latestRun =
+      runs
+        .filter((run) =>
+          run.recipients.some(
+            (recipient) =>
+              recipient.userId === userId && recipient.result === 'dispatched',
+          ),
+        )
+        .sort((left, right) => right.createdAt - left.createdAt)[0] ?? null;
+    if (!latestRun) {
+      return true;
+    }
+    const cadenceMs = cadence === 'daily' ? 24 * hourMs : 7 * 24 * hourMs;
+    return now - latestRun.createdAt >= cadenceMs;
+  }
+
+  private isDigestDispatchEmpty(digest: MarketplaceDigestRecord) {
+    return (
+      digest.highlights.length === 0 &&
+      digest.stats.unreadNotifications === 0 &&
+      digest.stats.taskCount === 0 &&
+      digest.stats.rehireCandidateCount === 0 &&
+      (digest.stats.searchImpressions ?? 0) === 0 &&
+      (digest.stats.applications ?? 0) === 0 &&
+      (digest.stats.hires ?? 0) === 0
+    );
+  }
+
+  private describeDigestDispatchRun(
+    mode: MarketplaceDigestDispatchMode,
+    recipients: MarketplaceDigestDispatchRecipient[],
+  ) {
+    const dispatchedCount = recipients.filter(
+      (recipient) => recipient.result === 'dispatched',
+    ).length;
+    const skippedCount = recipients.length - dispatchedCount;
+    const label =
+      mode === 'due' ? 'due marketplace digests' : 'enabled marketplace digests';
+    if (dispatchedCount === 0) {
+      return skippedCount === 0
+        ? `No ${label} were dispatched.`
+        : `No ${label} were dispatched; ${skippedCount} recipient${skippedCount === 1 ? '' : 's'} skipped.`;
+    }
+    return skippedCount === 0
+      ? `Dispatched ${label} to ${dispatchedCount} recipient${dispatchedCount === 1 ? '' : 's'}.`
+      : `Dispatched ${label} to ${dispatchedCount} recipient${dispatchedCount === 1 ? '' : 's'}; ${skippedCount} skipped.`;
+  }
+
   private isNotificationKindEnabled(
     preferences: MarketplaceNotificationPreferencesRecord,
     kind: MarketplaceNotificationRecord['kind'],
@@ -6186,6 +6393,7 @@ export class MarketplaceService {
     userId: string;
     workspace: WorkspaceSummary | null;
     cadence?: MarketplaceDigestCadence;
+    dispatchRunId?: string | null;
   }): Promise<MarketplaceDigestRecord> {
     const preferences = await this.getNotificationPreferencesRecord(input.userId);
     const workspaceId = input.workspace?.workspaceId ?? null;
@@ -6277,6 +6485,7 @@ export class MarketplaceService {
       id: randomUUID(),
       userId: input.userId,
       workspaceId,
+      dispatchRunId: input.dispatchRunId ?? null,
       cadence: input.cadence ?? preferences.digestCadence,
       status: 'fresh',
       title: input.workspace

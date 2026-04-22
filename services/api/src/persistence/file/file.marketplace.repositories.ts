@@ -4,6 +4,7 @@ import type {
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
   MarketplaceDigestRecord,
+  MarketplaceDigestDispatchRunRecord,
   MarketplaceNotificationPreferencesRecord,
   MarketplaceNotificationRecord,
   MarketplaceAutomationRunRecord,
@@ -362,6 +363,7 @@ function normalizeDigest(digest: MarketplaceDigestRecord): MarketplaceDigestReco
   return {
     ...digest,
     workspaceId: digest.workspaceId?.trim() || null,
+    dispatchRunId: digest.dispatchRunId?.trim() || null,
     title: digest.title.trim(),
     summary: digest.summary.trim(),
     highlights: digest.highlights.map((highlight) => ({
@@ -369,6 +371,23 @@ function normalizeDigest(digest: MarketplaceDigestRecord): MarketplaceDigestReco
       title: highlight.title.trim(),
       detail: highlight.detail.trim(),
       relatedEntityId: highlight.relatedEntityId?.trim() || null,
+    })),
+  };
+}
+
+function normalizeDigestDispatchRun(
+  run: MarketplaceDigestDispatchRunRecord,
+): MarketplaceDigestDispatchRunRecord {
+  return {
+    ...run,
+    workspaceId: run.workspaceId.trim(),
+    triggeredByUserId: run.triggeredByUserId.trim(),
+    summary: run.summary.trim(),
+    recipients: run.recipients.map((recipient) => ({
+      ...recipient,
+      userId: recipient.userId.trim(),
+      userEmail: recipient.userEmail.trim().toLowerCase(),
+      digestId: recipient.digestId?.trim() || null,
     })),
   };
 }
@@ -871,6 +890,29 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async saveDigest(digest: MarketplaceDigestRecord) {
     await this.store.write((data) => {
       data.marketplaceDigests[digest.id] = cloneValue(normalizeDigest(digest));
+    });
+  }
+
+  async getDigestDispatchRunById(runId: string) {
+    return this.store.read((data) => {
+      const run = data.marketplaceDigestDispatchRuns[runId];
+      return run ? cloneValue(normalizeDigestDispatchRun(run)) : null;
+    });
+  }
+
+  async listDigestDispatchRuns() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceDigestDispatchRuns)
+        .map((run) => cloneValue(normalizeDigestDispatchRun(run)))
+        .sort((left, right) => right.createdAt - left.createdAt),
+    );
+  }
+
+  async saveDigestDispatchRun(run: MarketplaceDigestDispatchRunRecord) {
+    await this.store.write((data) => {
+      data.marketplaceDigestDispatchRuns[run.id] = cloneValue(
+        normalizeDigestDispatchRun(run),
+      );
     });
   }
 

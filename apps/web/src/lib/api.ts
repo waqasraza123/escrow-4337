@@ -822,6 +822,15 @@ export type MarketplaceNotificationKind =
 export type MarketplaceNotificationStatus = 'unread' | 'read' | 'dismissed';
 export type MarketplaceDigestCadence = 'manual' | 'daily' | 'weekly';
 export type MarketplaceDigestStatus = 'fresh' | 'acknowledged' | 'archived';
+export type MarketplaceDigestDispatchTrigger = 'manual' | 'scheduled';
+export type MarketplaceDigestDispatchMode = 'due' | 'all_enabled';
+export type MarketplaceDigestDispatchRecipientResult = 'dispatched' | 'skipped';
+export type MarketplaceDigestDispatchRecipientReason =
+  | 'due'
+  | 'all_enabled'
+  | 'manual_cadence'
+  | 'not_due'
+  | 'no_activity';
 export type MarketplaceTalentPoolMember = {
   id: string;
   poolId: string;
@@ -953,6 +962,7 @@ export type MarketplaceDigest = {
   id: string;
   userId: string;
   workspaceId: string | null;
+  dispatchRunId: string | null;
   cadence: MarketplaceDigestCadence;
   status: MarketplaceDigestStatus;
   title: string;
@@ -961,6 +971,28 @@ export type MarketplaceDigest = {
   stats: MarketplaceDigestStats;
   createdAt: number;
   updatedAt: number;
+};
+export type MarketplaceDigestDispatchRecipient = {
+  userId: string;
+  userEmail: string;
+  cadence: MarketplaceDigestCadence;
+  result: MarketplaceDigestDispatchRecipientResult;
+  reason: MarketplaceDigestDispatchRecipientReason;
+  digestId: string | null;
+};
+export type MarketplaceDigestDispatchRun = {
+  id: string;
+  workspaceId: string;
+  triggeredByUserId: string;
+  triggeredByEmail: string;
+  trigger: MarketplaceDigestDispatchTrigger;
+  mode: MarketplaceDigestDispatchMode;
+  summary: string;
+  recipients: MarketplaceDigestDispatchRecipient[];
+  createdAt: number;
+  dispatchedCount: number;
+  skippedCount: number;
+  preview: string;
 };
 export type MarketplaceRehireCandidate = {
   jobId: string;
@@ -2964,6 +2996,14 @@ export const webApi = {
       accessToken,
     );
   },
+  listMarketplaceDigestDispatchRuns(accessToken: string) {
+    return requestJson<{ runs: MarketplaceDigestDispatchRun[] }>(
+      apiBaseUrl,
+      '/marketplace/digest-dispatch-runs',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
   generateMarketplaceDigest(
     input: {
       cadence?: MarketplaceDigestCadence;
@@ -2992,6 +3032,23 @@ export const webApi = {
       `/marketplace/digests/${encodeURIComponent(id)}`,
       {
         method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  dispatchMarketplaceDigests(
+    input: {
+      mode?: MarketplaceDigestDispatchMode;
+      trigger?: MarketplaceDigestDispatchTrigger;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ run: MarketplaceDigestDispatchRun }>(
+      apiBaseUrl,
+      '/marketplace/digest-dispatch-runs/dispatch',
+      {
+        method: 'POST',
         body: JSON.stringify(input),
       },
       accessToken,

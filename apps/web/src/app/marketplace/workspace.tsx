@@ -39,6 +39,7 @@ import {
   type MarketplaceCryptoReadiness,
   type MarketplaceDigest,
   type MarketplaceDigestCadence,
+  type MarketplaceDigestDispatchRun,
   type MarketplaceEngagementType,
   type MarketplaceLifecycleDigest,
   type MarketplaceNotification,
@@ -551,6 +552,9 @@ export function MarketplaceWorkspace() {
   const [marketplaceDigests, setMarketplaceDigests] = useState<MarketplaceDigest[]>(
     [],
   );
+  const [digestDispatchRuns, setDigestDispatchRuns] = useState<
+    MarketplaceDigestDispatchRun[]
+  >([]);
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
@@ -628,6 +632,7 @@ export function MarketplaceWorkspace() {
     (notification) => notification.status === 'unread',
   );
   const latestMarketplaceDigest = marketplaceDigests[0] ?? null;
+  const latestDigestDispatchRun = digestDispatchRuns[0] ?? null;
   const strongMatches = Object.values(matchesByOpportunity)
     .flat()
     .filter((match) => match.recommendation === 'strong_match').length;
@@ -800,6 +805,7 @@ export function MarketplaceWorkspace() {
         setNotifications([]);
         setNotificationPreferences(createDefaultNotificationPreferences());
         setMarketplaceDigests([]);
+        setDigestDispatchRuns([]);
         setMarketplaceInvites([]);
         setAnalyticsOverview(null);
         setLifecycleDigest(null);
@@ -833,6 +839,7 @@ export function MarketplaceWorkspace() {
         notificationsResponse,
         notificationPreferencesResponse,
         digestsResponse,
+        digestDispatchRunsResponse,
         myMarketplaceInvitesResponse,
         analyticsResponse,
         lifecycleDigestResponse,
@@ -894,6 +901,11 @@ export function MarketplaceWorkspace() {
           webApi.listMarketplaceDigests(nextTokens.accessToken).catch(() => ({
             digests: [],
           })),
+          nextWorkspace?.kind === 'client'
+            ? webApi
+                .listMarketplaceDigestDispatchRuns(nextTokens.accessToken)
+                .catch(() => ({ runs: [] }))
+            : Promise.resolve({ runs: [] }),
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
                 invites: [],
@@ -935,6 +947,7 @@ export function MarketplaceWorkspace() {
       setNotifications(notificationsResponse.notifications);
       setNotificationPreferences(notificationPreferencesResponse.preferences);
       setMarketplaceDigests(digestsResponse.digests);
+      setDigestDispatchRuns(digestDispatchRunsResponse.runs);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
       setAnalyticsOverview(analyticsResponse.overview);
       setLifecycleDigest(lifecycleDigestResponse.digest);
@@ -1479,6 +1492,29 @@ export function MarketplaceWorkspace() {
       ...current.filter((digest) => digest.id !== response.digest.id),
     ]);
     setMessage('Marketplace digest generated.');
+  }
+
+  async function handleDispatchDigests(mode: 'due' | 'all_enabled') {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.dispatchMarketplaceDigests(
+      {
+        mode,
+        trigger: 'manual',
+      },
+      tokens.accessToken,
+    );
+    setDigestDispatchRuns((current) => [
+      response.run,
+      ...current.filter((run) => run.id !== response.run.id),
+    ]);
+    await loadWorkspace(tokens);
+    setMessage(
+      response.run.dispatchedCount === 0
+        ? 'No marketplace digests were dispatched.'
+        : `Dispatched ${response.run.dispatchedCount} marketplace digest${response.run.dispatchedCount === 1 ? '' : 's'}.`,
+    );
   }
 
   async function handleUpdateDigestStatus(
@@ -2782,12 +2818,24 @@ export function MarketplaceWorkspace() {
                   value={marketplaceDigests.length}
                 />
                 <FactItem
+                  label="Dispatch runs"
+                  value={digestDispatchRuns.length}
+                />
+                <FactItem
                   label="Latest status"
                   value={latestMarketplaceDigest?.status ?? 'none'}
                 />
                 <FactItem
                   label="Cadence"
                   value={notificationPreferences.digestCadence}
+                />
+                <FactItem
+                  label="Last dispatch"
+                  value={
+                    latestDigestDispatchRun
+                      ? `${latestDigestDispatchRun.dispatchedCount} sent`
+                      : 'none'
+                  }
                 />
               </FactGrid>
               <label className={styles.field}>
@@ -2921,11 +2969,51 @@ export function MarketplaceWorkspace() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => void handleDispatchDigests('due')}
+                >
+                  Dispatch due digests
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDispatchDigests('all_enabled')}
+                >
+                  Dispatch all enabled
+                </button>
+                <button
+                  type="button"
                   onClick={() => void handleGenerateDigest('manual')}
                 >
                   Generate digest now
                 </button>
               </div>
+              {digestDispatchRuns.length === 0 ? (
+                <p className={styles.stateText}>
+                  No digest dispatch runs yet. Dispatch due digests after saving cadence settings to materialize delivery history for this workspace.
+                </p>
+              ) : (
+                digestDispatchRuns.slice(0, 3).map((run) => (
+                  <SharedCard
+                    key={run.id}
+                    className={styles.actionPanel}
+                    interactive
+                  >
+                    <div className={styles.stack}>
+                      <strong>
+                        {run.mode === 'due'
+                          ? 'Due digest dispatch'
+                          : 'Enabled digest dispatch'}
+                      </strong>
+                      <p className={styles.stateText}>
+                        {run.dispatchedCount} delivered • {run.skippedCount} skipped •{' '}
+                        {run.triggeredByEmail} •{' '}
+                        {new Date(run.createdAt).toLocaleString()}
+                      </p>
+                      <p className={styles.stateText}>{run.summary}</p>
+                      <p className={styles.stateText}>{run.preview}</p>
+                    </div>
+                  </SharedCard>
+                ))
+              )}
               {marketplaceDigests.length === 0 ? (
                 <p className={styles.stateText}>
                   No digest snapshots yet. Generate one after updating preferences to capture the current marketplace inbox and workflow posture.
