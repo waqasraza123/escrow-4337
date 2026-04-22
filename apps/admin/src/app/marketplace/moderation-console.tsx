@@ -624,6 +624,14 @@ export function MarketplaceModerationConsole() {
                       value={intelligence.retention.automationRules}
                     />
                     <FactItem
+                      label="Automation runs"
+                      value={intelligence.retention.automationRuns}
+                    />
+                    <FactItem
+                      label="Delivered tasks"
+                      value={intelligence.retention.automatedTaskDeliveries}
+                    />
+                    <FactItem
                       label="Lifecycle tasks"
                       value={intelligence.retention.pendingLifecycleTasks}
                     />

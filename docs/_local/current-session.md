@@ -258,6 +258,28 @@
 - Regression coverage:
   - `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` now covers the review-board persistence after shortlisting an applicant
 - Verification:
+
+## Update (2026-04-22, Post-Phase-8 Automation Execution)
+- Implemented the next repo-side marketplace phase as retention automation execution:
+  - persisted immutable `marketplace_automation_runs`
+  - added authenticated automation run list, per-rule manual run, and bulk dispatch endpoints
+  - generated run items now snapshot lifecycle follow-up recommendations from saved-search, invite, talent-pool, and rehire tasks
+  - workspace retention UI now shows run history, due/all-enabled dispatch actions, and rule-level last-run posture
+  - analytics and moderation intelligence now include automation run counts plus delivered task totals
+- Changed files:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/027_marketplace_automation_runs.sql`
+  `apps/web/src/{app/marketplace/workspace.tsx,lib/api.ts}`
+  `apps/admin/src/{app/marketplace/moderation-console.tsx,lib/api.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: filtered API typecheck scan for touched marketplace/persistence files
+  - passed: filtered web typecheck scan for touched marketplace/admin files
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/migrations.spec.ts`
+  - known existing failures remain in `pnpm --filter escrow4334-api test -- --runTestsByPath test/marketplace.service.spec.ts`:
+    - zero-amount escrow reconciliation in hire flows
+    - hidden-profile visibility expectation mismatch
   - `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
   - `pnpm --filter web typecheck`
   - `PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:journeys:local tests/e2e/specs/journeys/local/marketplace-exact-publish-apply-hire-flow.spec.ts`

@@ -295,6 +295,18 @@ export const updateMarketplaceAutomationRuleSchema = z
   })
   .strict();
 
+export const runMarketplaceAutomationRuleSchema = z
+  .object({
+    trigger: z.enum(['manual', 'scheduled']).default('manual'),
+  })
+  .strict();
+
+export const dispatchMarketplaceAutomationRunsSchema = z
+  .object({
+    mode: z.enum(['due', 'all_enabled']).default('due'),
+  })
+  .strict();
+
 export const createMarketplaceOpportunityInviteSchema = z
   .object({
     profileSlug: slugSchema,
@@ -620,6 +632,12 @@ export type CreateMarketplaceAutomationRuleDto = z.infer<
 >;
 export type UpdateMarketplaceAutomationRuleDto = z.infer<
   typeof updateMarketplaceAutomationRuleSchema
+>;
+export type RunMarketplaceAutomationRuleDto = z.infer<
+  typeof runMarketplaceAutomationRuleSchema
+>;
+export type DispatchMarketplaceAutomationRunsDto = z.infer<
+  typeof dispatchMarketplaceAutomationRunsSchema
 >;
 export type CreateMarketplaceOpportunityInviteDto = z.infer<
   typeof createMarketplaceOpportunityInviteSchema

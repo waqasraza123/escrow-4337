@@ -380,6 +380,33 @@ export type MarketplaceAutomationRuleRecord = {
   updatedAt: number;
 };
 
+export type MarketplaceAutomationRunTrigger = 'manual' | 'scheduled';
+
+export type MarketplaceAutomationRunItem = {
+  id: string;
+  kind: MarketplaceLifecycleTask['kind'];
+  priority: MarketplaceLifecycleTask['priority'];
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+  recommendation: string;
+};
+
+export type MarketplaceAutomationRunRecord = {
+  id: string;
+  ruleId: string;
+  ownerUserId: string;
+  workspaceId: string;
+  kind: MarketplaceAutomationRuleKind;
+  schedule: MarketplaceAutomationRuleSchedule;
+  trigger: MarketplaceAutomationRunTrigger;
+  ruleLabel: string;
+  matchedTaskIds: string[];
+  items: MarketplaceAutomationRunItem[];
+  summary: string;
+  createdAt: number;
+};
+
 export type MarketplaceOpportunityInviteRecord = {
   id: string;
   opportunityId: string;
@@ -904,6 +931,15 @@ export type MarketplaceLifecycleTask = {
 export type MarketplaceAutomationRuleView = MarketplaceAutomationRuleRecord & {
   pendingTaskCount: number;
   summary: string;
+  lastRunAt: number | null;
+  lastRunTaskCount: number;
+  latestRunSummary: string | null;
+  dueNow: boolean;
+};
+
+export type MarketplaceAutomationRunView = MarketplaceAutomationRunRecord & {
+  taskCount: number;
+  preview: string;
 };
 
 export type MarketplaceRehireCandidateView = {
@@ -1144,6 +1180,8 @@ export type MarketplaceAnalyticsOverview = {
     talentPools: number;
     trackedTalent: number;
     automationRules: number;
+    automationRuns: number;
+    automatedTaskDeliveries: number;
     pendingLifecycleTasks: number;
     rehireCandidates: number;
   };
@@ -1183,6 +1221,8 @@ export type MarketplaceIntelligenceReport = {
     talentPools: number;
     trackedTalent: number;
     automationRules: number;
+    automationRuns: number;
+    automatedTaskDeliveries: number;
     pendingLifecycleTasks: number;
     rehireCandidates: number;
     clientWorkspacesWithRetentionSetup: number;
@@ -1319,6 +1359,14 @@ export type MarketplaceAnalyticsOverviewResponse = {
 
 export type MarketplaceLifecycleDigestResponse = {
   digest: MarketplaceLifecycleDigest;
+};
+
+export type MarketplaceAutomationRunsResponse = {
+  runs: MarketplaceAutomationRunView[];
+};
+
+export type MarketplaceAutomationRunResponse = {
+  run: MarketplaceAutomationRunView;
 };
 
 export type MarketplaceIntelligenceReportResponse = {

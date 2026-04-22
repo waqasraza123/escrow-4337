@@ -809,6 +809,7 @@ export type MarketplaceAutomationRuleKind =
   | 'invite_followup'
   | 'rehire_digest';
 export type MarketplaceAutomationRuleSchedule = 'manual' | 'daily' | 'weekly';
+export type MarketplaceAutomationRunTrigger = 'manual' | 'scheduled';
 export type MarketplaceTalentPoolMember = {
   id: string;
   poolId: string;
@@ -860,6 +861,35 @@ export type MarketplaceAutomationRule = {
   updatedAt: number;
   pendingTaskCount: number;
   summary: string;
+  lastRunAt: number | null;
+  lastRunTaskCount: number;
+  latestRunSummary: string | null;
+  dueNow: boolean;
+};
+export type MarketplaceAutomationRunItem = {
+  id: string;
+  kind: MarketplaceLifecycleTask['kind'];
+  priority: MarketplaceLifecycleTask['priority'];
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+  recommendation: string;
+};
+export type MarketplaceAutomationRun = {
+  id: string;
+  ruleId: string;
+  ownerUserId: string;
+  workspaceId: string;
+  kind: MarketplaceAutomationRuleKind;
+  schedule: MarketplaceAutomationRuleSchedule;
+  trigger: MarketplaceAutomationRunTrigger;
+  ruleLabel: string;
+  matchedTaskIds: string[];
+  items: MarketplaceAutomationRunItem[];
+  summary: string;
+  createdAt: number;
+  taskCount: number;
+  preview: string;
 };
 export type MarketplaceRehireCandidate = {
   jobId: string;
@@ -1072,6 +1102,8 @@ export type MarketplaceAnalyticsOverview = {
     talentPools: number;
     trackedTalent: number;
     automationRules: number;
+    automationRuns: number;
+    automatedTaskDeliveries: number;
     pendingLifecycleTasks: number;
     rehireCandidates: number;
   };
@@ -1109,6 +1141,8 @@ export type MarketplaceIntelligenceReport = {
     talentPools: number;
     trackedTalent: number;
     automationRules: number;
+    automationRuns: number;
+    automatedTaskDeliveries: number;
     pendingLifecycleTasks: number;
     rehireCandidates: number;
     clientWorkspacesWithRetentionSetup: number;
@@ -2770,6 +2804,47 @@ export const webApi = {
       `/marketplace/automation-rules/${encodeURIComponent(id)}`,
       {
         method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMarketplaceAutomationRuns(accessToken: string) {
+    return requestJson<{ runs: MarketplaceAutomationRun[] }>(
+      apiBaseUrl,
+      '/marketplace/automation-runs',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  dispatchMarketplaceAutomationRuns(
+    input: {
+      mode?: 'due' | 'all_enabled';
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ runs: MarketplaceAutomationRun[] }>(
+      apiBaseUrl,
+      '/marketplace/automation-runs/dispatch',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  runMarketplaceAutomationRule(
+    id: string,
+    input: {
+      trigger?: MarketplaceAutomationRunTrigger;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ run: MarketplaceAutomationRun }>(
+      apiBaseUrl,
+      `/marketplace/automation-rules/${encodeURIComponent(id)}/run`,
+      {
+        method: 'POST',
         body: JSON.stringify(input),
       },
       accessToken,

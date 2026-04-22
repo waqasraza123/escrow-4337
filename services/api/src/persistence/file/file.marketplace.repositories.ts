@@ -3,6 +3,7 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceAutomationRunRecord,
   MarketplaceAutomationRuleRecord,
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftRevisionRecord,
@@ -308,6 +309,24 @@ function normalizeAutomationRule(
     ...rule,
     label: rule.label.trim(),
     targetId: rule.targetId?.trim() || null,
+  };
+}
+
+function normalizeAutomationRun(
+  run: MarketplaceAutomationRunRecord,
+): MarketplaceAutomationRunRecord {
+  return {
+    ...run,
+    ruleLabel: run.ruleLabel.trim(),
+    matchedTaskIds: normalizeTextList(run.matchedTaskIds),
+    items: run.items.map((item) => ({
+      ...item,
+      title: item.title.trim(),
+      detail: item.detail.trim(),
+      relatedEntityId: item.relatedEntityId?.trim() || null,
+      recommendation: item.recommendation.trim(),
+    })),
+    summary: run.summary.trim(),
   };
 }
 
@@ -712,6 +731,29 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     await this.store.write((data) => {
       data.marketplaceAutomationRules[rule.id] = cloneValue(
         normalizeAutomationRule(rule),
+      );
+    });
+  }
+
+  async getAutomationRunById(runId: string) {
+    return this.store.read((data) => {
+      const run = data.marketplaceAutomationRuns[runId];
+      return run ? cloneValue(normalizeAutomationRun(run)) : null;
+    });
+  }
+
+  async listAutomationRuns() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceAutomationRuns)
+        .map((run) => cloneValue(normalizeAutomationRun(run)))
+        .sort((left, right) => right.createdAt - left.createdAt),
+    );
+  }
+
+  async saveAutomationRun(run: MarketplaceAutomationRunRecord) {
+    await this.store.write((data) => {
+      data.marketplaceAutomationRuns[run.id] = cloneValue(
+        normalizeAutomationRun(run),
       );
     });
   }

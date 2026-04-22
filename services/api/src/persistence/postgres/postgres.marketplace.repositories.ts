@@ -6,6 +6,9 @@ import type {
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceAutomationRunItem,
+  MarketplaceAutomationRunRecord,
+  MarketplaceAutomationRunTrigger,
   MarketplaceAutomationRuleKind,
   MarketplaceAutomationRuleRecord,
   MarketplaceAutomationRuleSchedule,
@@ -342,6 +345,21 @@ type MarketplaceAutomationRuleRow = QueryResultRow & {
   enabled: boolean;
   created_at_ms: string;
   updated_at_ms: string;
+};
+
+type MarketplaceAutomationRunRow = QueryResultRow & {
+  id: string;
+  rule_id: string;
+  owner_user_id: string;
+  workspace_id: string;
+  kind: MarketplaceAutomationRuleKind;
+  schedule: MarketplaceAutomationRuleSchedule;
+  trigger: MarketplaceAutomationRunTrigger;
+  rule_label: string;
+  matched_task_ids_json: string[];
+  items_json: MarketplaceAutomationRunItem[];
+  summary: string;
+  created_at_ms: string;
 };
 
 type MarketplaceOpportunityInviteRow = QueryResultRow & {
@@ -770,6 +788,25 @@ function mapAutomationRule(
     enabled: row.enabled,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapAutomationRun(
+  row: MarketplaceAutomationRunRow,
+): MarketplaceAutomationRunRecord {
+  return {
+    id: row.id,
+    ruleId: row.rule_id,
+    ownerUserId: row.owner_user_id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    schedule: row.schedule,
+    trigger: row.trigger,
+    ruleLabel: row.rule_label,
+    matchedTaskIds: row.matched_task_ids_json ?? [],
+    items: row.items_json ?? [],
+    summary: row.summary,
+    createdAt: Number(row.created_at_ms),
   };
 }
 
@@ -2033,6 +2070,83 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         rule.enabled,
         String(rule.createdAt),
         String(rule.updatedAt),
+      ],
+    );
+  }
+
+  async getAutomationRunById(runId: string) {
+    const result = await this.db.query<MarketplaceAutomationRunRow>(
+      `
+        SELECT *
+        FROM marketplace_automation_runs
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [runId],
+    );
+
+    return result.rows[0] ? mapAutomationRun(result.rows[0]) : null;
+  }
+
+  async listAutomationRuns() {
+    const result = await this.db.query<MarketplaceAutomationRunRow>(
+      `
+        SELECT *
+        FROM marketplace_automation_runs
+        ORDER BY created_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapAutomationRun);
+  }
+
+  async saveAutomationRun(run: MarketplaceAutomationRunRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_automation_runs (
+          id,
+          rule_id,
+          owner_user_id,
+          workspace_id,
+          kind,
+          schedule,
+          trigger,
+          rule_label,
+          matched_task_ids_json,
+          items_json,
+          summary,
+          created_at_ms
+        )
+        VALUES (
+          $1, $2, $3::uuid, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          rule_id = EXCLUDED.rule_id,
+          owner_user_id = EXCLUDED.owner_user_id,
+          workspace_id = EXCLUDED.workspace_id,
+          kind = EXCLUDED.kind,
+          schedule = EXCLUDED.schedule,
+          trigger = EXCLUDED.trigger,
+          rule_label = EXCLUDED.rule_label,
+          matched_task_ids_json = EXCLUDED.matched_task_ids_json,
+          items_json = EXCLUDED.items_json,
+          summary = EXCLUDED.summary,
+          created_at_ms = EXCLUDED.created_at_ms
+      `,
+      [
+        run.id,
+        run.ruleId,
+        run.ownerUserId,
+        run.workspaceId,
+        run.kind,
+        run.schedule,
+        run.trigger,
+        run.ruleLabel,
+        JSON.stringify(run.matchedTaskIds),
+        JSON.stringify(run.items),
+        run.summary,
+        String(run.createdAt),
       ],
     );
   }

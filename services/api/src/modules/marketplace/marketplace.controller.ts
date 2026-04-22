@@ -246,6 +246,41 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('automation-runs')
+  listAutomationRuns(@User() user: ReqUser) {
+    return this.marketplaceService.listAutomationRuns(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('automation-runs/dispatch')
+  dispatchAutomationRuns(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.dispatchMarketplaceAutomationRunsSchema,
+      ),
+    )
+    body: marketplaceDto.DispatchMarketplaceAutomationRunsDto,
+  ) {
+    return this.marketplaceService.dispatchAutomationRuns(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('automation-rules/:id/run')
+  runAutomationRule(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.runMarketplaceAutomationRuleSchema,
+      ),
+    )
+    body: marketplaceDto.RunMarketplaceAutomationRuleDto,
+  ) {
+    return this.marketplaceService.runAutomationRule(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('lifecycle/digest')
   getLifecycleDigest(@User() user: ReqUser) {
     return this.marketplaceService.getLifecycleDigest(user.id);

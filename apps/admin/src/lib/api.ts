@@ -482,6 +482,8 @@ export type MarketplaceIntelligenceReport = {
     talentPools: number;
     trackedTalent: number;
     automationRules: number;
+    automationRuns: number;
+    automatedTaskDeliveries: number;
     pendingLifecycleTasks: number;
     rehireCandidates: number;
     clientWorkspacesWithRetentionSetup: number;

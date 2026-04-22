@@ -32,6 +32,7 @@ import {
   type MarketplaceApplicationDossier,
   type MarketplaceApplicationTimeline,
   type MarketplaceAnalyticsOverview,
+  type MarketplaceAutomationRun,
   type MarketplaceAutomationRule,
   type MarketplaceAutomationRuleKind,
   type MarketplaceAutomationRuleSchedule,
@@ -515,6 +516,9 @@ export function MarketplaceWorkspace() {
   const [automationRules, setAutomationRules] = useState<MarketplaceAutomationRule[]>(
     [],
   );
+  const [automationRuns, setAutomationRuns] = useState<MarketplaceAutomationRun[]>(
+    [],
+  );
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
@@ -756,6 +760,7 @@ export function MarketplaceWorkspace() {
         setSavedSearches([]);
         setTalentPools([]);
         setAutomationRules([]);
+        setAutomationRuns([]);
         setMarketplaceInvites([]);
         setAnalyticsOverview(null);
         setLifecycleDigest(null);
@@ -785,6 +790,7 @@ export function MarketplaceWorkspace() {
         savedSearchResponse,
         talentPoolsResponse,
         automationRulesResponse,
+        automationRunsResponse,
         myMarketplaceInvitesResponse,
         analyticsResponse,
         lifecycleDigestResponse,
@@ -830,6 +836,11 @@ export function MarketplaceWorkspace() {
                 () => ({ rules: [] }),
               )
             : Promise.resolve({ rules: [] }),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listMarketplaceAutomationRuns(nextTokens.accessToken).catch(
+                () => ({ runs: [] }),
+              )
+            : Promise.resolve({ runs: [] }),
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
                 invites: [],
@@ -867,6 +878,7 @@ export function MarketplaceWorkspace() {
       setSavedSearches(savedSearchResponse.searches);
       setTalentPools(talentPoolsResponse.pools);
       setAutomationRules(automationRulesResponse.rules);
+      setAutomationRuns(automationRunsResponse.runs);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
       setAnalyticsOverview(analyticsResponse.overview);
       setLifecycleDigest(lifecycleDigestResponse.digest);
@@ -1307,6 +1319,37 @@ export function MarketplaceWorkspace() {
     }
     await webApi.updateMarketplaceAutomationRule(ruleId, input, tokens.accessToken);
     setMessage('Automation rule updated.');
+    await loadWorkspace(tokens);
+  }
+
+  async function handleRunAutomationRule(ruleId: string) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.runMarketplaceAutomationRule(
+      ruleId,
+      { trigger: 'manual' },
+      tokens.accessToken,
+    );
+    setMessage(
+      `Automation run completed with ${response.run.taskCount} item${response.run.taskCount === 1 ? '' : 's'}.`,
+    );
+    await loadWorkspace(tokens);
+  }
+
+  async function handleDispatchAutomationRuns(mode: 'due' | 'all_enabled') {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.dispatchMarketplaceAutomationRuns(
+      { mode },
+      tokens.accessToken,
+    );
+    setMessage(
+      mode === 'due'
+        ? `Ran ${response.runs.length} due automation${response.runs.length === 1 ? '' : 's'}.`
+        : `Ran ${response.runs.length} enabled automation${response.runs.length === 1 ? '' : 's'}.`,
+    );
     await loadWorkspace(tokens);
   }
 
@@ -2520,6 +2563,11 @@ export function MarketplaceWorkspace() {
                 <FactItem label="Talent pools" value={analyticsOverview.retention.talentPools} />
                 <FactItem label="Tracked talent" value={analyticsOverview.retention.trackedTalent} />
                 <FactItem label="Automation rules" value={analyticsOverview.retention.automationRules} />
+                <FactItem label="Automation runs" value={analyticsOverview.retention.automationRuns} />
+                <FactItem
+                  label="Delivered tasks"
+                  value={analyticsOverview.retention.automatedTaskDeliveries}
+                />
                 <FactItem
                   label="Lifecycle tasks"
                   value={analyticsOverview.retention.pendingLifecycleTasks}
@@ -2832,6 +2880,18 @@ export function MarketplaceWorkspace() {
                   <button type="button" onClick={() => void handleCreateAutomationRule()}>
                     Create automation
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDispatchAutomationRuns('due')}
+                  >
+                    Run due automations
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDispatchAutomationRuns('all_enabled')}
+                  >
+                    Run all enabled
+                  </button>
                 </div>
 
                 {automationRules.length > 0 ? (
@@ -2841,10 +2901,22 @@ export function MarketplaceWorkspace() {
                         key={rule.id}
                         className={styles.actionPanel}
                         interactive
-                      >
+                        >
                         <div className={styles.stack}>
                           <strong>{rule.label}</strong>
                           <p className={styles.stateText}>{rule.summary}</p>
+                          <p className={styles.stateText}>
+                            Last run{' '}
+                            {rule.lastRunAt
+                              ? new Date(rule.lastRunAt).toLocaleString()
+                              : 'never'}{' '}
+                            • {rule.lastRunTaskCount} delivered item
+                            {rule.lastRunTaskCount === 1 ? '' : 's'} • due now{' '}
+                            {rule.dueNow ? 'yes' : 'no'}
+                          </p>
+                          {rule.latestRunSummary ? (
+                            <p className={styles.stateText}>{rule.latestRunSummary}</p>
+                          ) : null}
                           <div className={styles.inlineActions}>
                             <button
                               type="button"
@@ -2871,7 +2943,47 @@ export function MarketplaceWorkspace() {
                             >
                               Cycle cadence
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRunAutomationRule(rule.id)}
+                            >
+                              Run now
+                            </button>
                           </div>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+
+                {automationRuns.length > 0 ? (
+                  <div className={styles.stack}>
+                    <span className={styles.metaLabel}>Recent automation runs</span>
+                    {automationRuns.slice(0, 6).map((run) => (
+                      <SharedCard
+                        key={run.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{run.ruleLabel}</strong>
+                          <p className={styles.stateText}>
+                            {run.trigger} trigger • {run.taskCount} item
+                            {run.taskCount === 1 ? '' : 's'} •{' '}
+                            {new Date(run.createdAt).toLocaleString()}
+                          </p>
+                          <p className={styles.stateText}>{run.summary}</p>
+                          {run.items.length > 0 ? (
+                            run.items.slice(0, 3).map((item) => (
+                              <p key={item.id} className={styles.stateText}>
+                                {item.priority} • {item.title} • {item.recommendation}
+                              </p>
+                            ))
+                          ) : (
+                            <p className={styles.stateText}>
+                              No lifecycle work matched this run.
+                            </p>
+                          )}
                         </div>
                       </SharedCard>
                     ))}

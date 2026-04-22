@@ -45,6 +45,7 @@ import type {
   CreateMarketplaceTalentPoolDto,
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
+  DispatchMarketplaceAutomationRunsDto,
   MarketplaceModerationReportsQueryDto,
   RecordMarketplaceInteractionDto,
   MarketplaceOpportunitiesQueryDto,
@@ -53,6 +54,7 @@ import type {
   ApproveMarketplaceContractDraftDto,
   ConvertMarketplaceContractDraftDto,
   RespondToMarketplaceOfferDto,
+  RunMarketplaceAutomationRuleDto,
   ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
   UpdateMarketplaceAbuseReportDto,
@@ -90,11 +92,17 @@ import type {
   MarketplaceApplicationTimelineResponse,
   MarketplaceApplicationTimelineView,
   MarketplaceApplicationView,
+  MarketplaceAutomationRunRecord,
+  MarketplaceAutomationRunResponse,
+  MarketplaceAutomationRunsResponse,
+  MarketplaceAutomationRunView,
   MarketplaceApplicationsListResponse,
   MarketplaceAutomationRuleRecord,
+  MarketplaceAutomationRunItem,
   MarketplaceAutomationRuleResponse,
   MarketplaceAutomationRulesResponse,
   MarketplaceAutomationRuleView,
+  MarketplaceAutomationRunTrigger,
   MarketplaceClientSummary,
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftResponse,
@@ -1359,10 +1367,13 @@ export class MarketplaceService {
       (rule) => rule.workspaceId === workspace.workspaceId,
     );
     const digest = await this.buildLifecycleDigestForWorkspace(workspace);
+    const runs = (await this.marketplaceRepository.listAutomationRuns()).filter(
+      (run) => run.workspaceId === workspace.workspaceId,
+    );
 
     return {
       rules: await Promise.all(
-        rules.map((rule) => this.toAutomationRuleView(rule, workspace, digest)),
+        rules.map((rule) => this.toAutomationRuleView(rule, workspace, digest, runs)),
       ),
     };
   }
@@ -1420,6 +1431,73 @@ export class MarketplaceService {
     const digest = await this.buildLifecycleDigestForWorkspace(workspace);
     return {
       rule: await this.toAutomationRuleView(next, workspace, digest),
+    };
+  }
+
+  async listAutomationRuns(
+    userId: string,
+  ): Promise<MarketplaceAutomationRunsResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
+      (rule) => rule.workspaceId === workspace.workspaceId,
+    );
+    const ruleById = new Map(rules.map((rule) => [rule.id, rule]));
+    const runs = (await this.marketplaceRepository.listAutomationRuns()).filter(
+      (run) => run.workspaceId === workspace.workspaceId,
+    );
+    return {
+      runs: runs.map((run) => this.toAutomationRunView(run, ruleById.get(run.ruleId))),
+    };
+  }
+
+  async runAutomationRule(
+    userId: string,
+    ruleId: string,
+    dto: RunMarketplaceAutomationRuleDto,
+  ): Promise<MarketplaceAutomationRunResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const rule = await this.marketplaceRepository.getAutomationRuleById(ruleId);
+    if (!rule || rule.workspaceId !== workspace.workspaceId) {
+      throw new NotFoundException('Marketplace automation rule not found');
+    }
+    const run = await this.executeAutomationRule(rule, workspace, dto.trigger);
+    return {
+      run: this.toAutomationRunView(run, rule),
+    };
+  }
+
+  async dispatchAutomationRuns(
+    userId: string,
+    dto: DispatchMarketplaceAutomationRunsDto,
+  ): Promise<MarketplaceAutomationRunsResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
+      (rule) => rule.workspaceId === workspace.workspaceId && rule.enabled,
+    );
+    const existingRuns = (await this.marketplaceRepository.listAutomationRuns()).filter(
+      (run) => run.workspaceId === workspace.workspaceId,
+    );
+    const runs: MarketplaceAutomationRunRecord[] = [];
+    for (const rule of rules) {
+      if (
+        dto.mode === 'due' &&
+        !this.isAutomationRuleDue(
+          rule,
+          existingRuns.filter((run) => run.ruleId === rule.id),
+        )
+      ) {
+        continue;
+      }
+      const run = await this.executeAutomationRule(
+        rule,
+        workspace,
+        dto.mode === 'due' ? 'scheduled' : 'manual',
+      );
+      runs.push(run);
+      existingRuns.unshift(run);
+    }
+    return {
+      runs: runs.map((run) => this.toAutomationRunView(run)),
     };
   }
 
@@ -4481,6 +4559,7 @@ export class MarketplaceService {
       talentPools,
       talentPoolMembers,
       automationRules,
+      automationRuns,
     ] = await Promise.all([
       this.marketplaceRepository.listProfiles(),
       this.marketplaceRepository.listOpportunities(),
@@ -4492,6 +4571,7 @@ export class MarketplaceService {
       this.marketplaceRepository.listTalentPools(),
       this.marketplaceRepository.listTalentPoolMembers(),
       this.marketplaceRepository.listAutomationRules(),
+      this.marketplaceRepository.listAutomationRuns(),
     ]);
 
     const scopedOpportunities =
@@ -4644,6 +4724,18 @@ export class MarketplaceService {
                 (rule) => rule.workspaceId === workspace.workspaceId,
               ).length
             : 0,
+        automationRuns:
+          workspace?.kind === 'client'
+            ? automationRuns.filter(
+                (run) => run.workspaceId === workspace.workspaceId,
+              ).length
+            : 0,
+        automatedTaskDeliveries:
+          workspace?.kind === 'client'
+            ? automationRuns
+                .filter((run) => run.workspaceId === workspace.workspaceId)
+                .reduce((sum, run) => sum + run.items.length, 0)
+            : 0,
         pendingLifecycleTasks: lifecycleDigest?.tasks.length ?? 0,
         rehireCandidates: lifecycleDigest?.rehireCandidates.length ?? 0,
       },
@@ -4665,6 +4757,7 @@ export class MarketplaceService {
       talentPools,
       talentPoolMembers,
       automationRules,
+      automationRuns,
     ] = await Promise.all([
       this.marketplaceRepository.listProfiles(),
       this.marketplaceRepository.listOpportunities(),
@@ -4679,6 +4772,7 @@ export class MarketplaceService {
       this.marketplaceRepository.listTalentPools(),
       this.marketplaceRepository.listTalentPoolMembers(),
       this.marketplaceRepository.listAutomationRules(),
+      this.marketplaceRepository.listAutomationRuns(),
     ]);
 
     const jobs = await this.escrowRepository.listAll();
@@ -4905,6 +4999,11 @@ export class MarketplaceService {
         talentPools: talentPools.length,
         trackedTalent: talentPoolMembers.length,
         automationRules: automationRules.length,
+        automationRuns: automationRuns.length,
+        automatedTaskDeliveries: automationRuns.reduce(
+          (sum, run) => sum + run.items.length,
+          0,
+        ),
         pendingLifecycleTasks,
         rehireCandidates: rehireCandidates.length,
         clientWorkspacesWithRetentionSetup: retentionWorkspaceIds.size,
@@ -5505,9 +5604,19 @@ export class MarketplaceService {
     rule: MarketplaceAutomationRuleRecord,
     workspace: WorkspaceSummary,
     digest?: MarketplaceLifecycleDigest,
+    runs?: MarketplaceAutomationRunRecord[],
   ): Promise<MarketplaceAutomationRuleView> {
     const lifecycleDigest =
       digest ?? (await this.buildLifecycleDigestForWorkspace(workspace));
+    const automationRuns =
+      runs ??
+      (await this.marketplaceRepository.listAutomationRuns()).filter(
+        (run) => run.workspaceId === workspace.workspaceId,
+      );
+    const latestRun =
+      automationRuns
+        .filter((run) => run.ruleId === rule.id)
+        .sort((left, right) => right.createdAt - left.createdAt)[0] ?? null;
     const pendingTaskCount = lifecycleDigest.tasks.filter((task) =>
       this.matchesAutomationRule(rule, task),
     ).length;
@@ -5515,7 +5624,117 @@ export class MarketplaceService {
       ...rule,
       pendingTaskCount,
       summary: this.describeAutomationRule(rule, pendingTaskCount),
+      lastRunAt: latestRun?.createdAt ?? null,
+      lastRunTaskCount: latestRun?.items.length ?? 0,
+      latestRunSummary: latestRun?.summary ?? null,
+      dueNow: this.isAutomationRuleDue(
+        rule,
+        automationRuns.filter((run) => run.ruleId === rule.id),
+      ),
     };
+  }
+
+  private toAutomationRunView(
+    run: MarketplaceAutomationRunRecord,
+    rule?: MarketplaceAutomationRuleRecord,
+  ): MarketplaceAutomationRunView {
+    const title = rule?.label ?? run.ruleLabel;
+    return {
+      ...run,
+      taskCount: run.items.length,
+      preview:
+        run.items[0]?.recommendation ??
+        `${title} produced ${run.items.length} automation item${run.items.length === 1 ? '' : 's'}.`,
+    };
+  }
+
+  private isAutomationRuleDue(
+    rule: MarketplaceAutomationRuleRecord,
+    runs: MarketplaceAutomationRunRecord[],
+    now = Date.now(),
+  ) {
+    if (!rule.enabled || rule.schedule === 'manual') {
+      return false;
+    }
+    const latestRun =
+      runs
+        .filter((run) => run.ruleId === rule.id)
+        .sort((left, right) => right.createdAt - left.createdAt)[0] ?? null;
+    if (!latestRun) {
+      return true;
+    }
+    const cadenceMs = rule.schedule === 'daily' ? 24 * hourMs : 7 * 24 * hourMs;
+    return now - latestRun.createdAt >= cadenceMs;
+  }
+
+  private async executeAutomationRule(
+    rule: MarketplaceAutomationRuleRecord,
+    workspace: WorkspaceSummary,
+    trigger: MarketplaceAutomationRunTrigger,
+  ): Promise<MarketplaceAutomationRunRecord> {
+    const digest = await this.buildLifecycleDigestForWorkspace(workspace);
+    const matchedTasks = digest.tasks.filter((task) =>
+      this.matchesAutomationRule(rule, task),
+    );
+    const run: MarketplaceAutomationRunRecord = {
+      id: randomUUID(),
+      ruleId: rule.id,
+      ownerUserId: rule.ownerUserId,
+      workspaceId: workspace.workspaceId,
+      kind: rule.kind,
+      schedule: rule.schedule,
+      trigger,
+      ruleLabel: rule.label,
+      matchedTaskIds: matchedTasks.map((task) => task.id),
+      items: matchedTasks.map((task, index) =>
+        this.createAutomationRunItem(rule, task, index),
+      ),
+      summary: this.describeAutomationRun(rule, matchedTasks.length),
+      createdAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveAutomationRun(run);
+    return run;
+  }
+
+  private createAutomationRunItem(
+    rule: MarketplaceAutomationRuleRecord,
+    task: MarketplaceLifecycleTask,
+    index: number,
+  ): MarketplaceAutomationRunItem {
+    return {
+      id: `${rule.id}-${task.id}-${index + 1}`,
+      kind: task.kind,
+      priority: task.priority,
+      title: task.title,
+      detail: task.detail,
+      relatedEntityId: task.relatedEntityId,
+      recommendation: this.describeAutomationRunRecommendation(task),
+    };
+  }
+
+  private describeAutomationRunRecommendation(task: MarketplaceLifecycleTask) {
+    switch (task.kind) {
+      case 'saved_search_refresh':
+        return 'Refresh the saved search and review net-new talent before the brief goes stale.';
+      case 'invite_followup':
+        return 'Follow up on the pending invite and either convert it into an application or close it out.';
+      case 'pool_followup':
+        return 'Move this talent-pool candidate into outreach, interview, or archive so the bench stays current.';
+      case 'rehire_prompt':
+        return 'Open a repeat brief or private invite while the completed delivery context is still fresh.';
+      default:
+        return 'Review this lifecycle task and clear the next client-side action.';
+    }
+  }
+
+  private describeAutomationRun(
+    rule: MarketplaceAutomationRuleRecord,
+    taskCount: number,
+  ) {
+    if (taskCount === 0) {
+      return `${rule.label} ran with no pending lifecycle items.`;
+    }
+    return `${rule.label} generated ${taskCount} automation follow-up item${taskCount === 1 ? '' : 's'}.`;
   }
 
   private matchesAutomationRule(
