@@ -5,6 +5,8 @@ import {
   EscrowFlowScene,
   MarketplaceDirectoryScene,
   MarketplaceHeroScene,
+  OpportunityDetailScene,
+  ProfileDetailScene,
   TalentCategoryGlyph,
 } from './public-visuals';
 
@@ -15,6 +17,8 @@ describe('public visuals', () => {
         <MarketplaceHeroScene />
         <MarketplaceDirectoryScene />
         <EscrowFlowScene />
+        <ProfileDetailScene />
+        <OpportunityDetailScene />
         <TalentCategoryGlyph kind="engineering" />
       </div>,
     );
@@ -28,6 +32,14 @@ describe('public visuals', () => {
       'true',
     );
     expect(screen.getByTestId('escrow-flow-scene')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByTestId('profile-detail-scene')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByTestId('opportunity-detail-scene')).toHaveAttribute(
       'aria-hidden',
       'true',
     );

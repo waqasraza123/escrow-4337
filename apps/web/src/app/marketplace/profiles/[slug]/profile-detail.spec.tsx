@@ -97,7 +97,7 @@ describe('marketplace profile detail', () => {
       expect(screen.getByRole('heading', { name: 'Builder One' })).toBeInTheDocument();
     });
 
-    expect(screen.getByText('ملف السوق')).toBeInTheDocument();
+    expect(screen.getByText('ملف الموهبة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'العودة إلى السوق' })).toHaveAttribute(
       'href',
       '/marketplace',
@@ -108,6 +108,10 @@ describe('marketplace profile detail', () => {
       '/app/marketplace',
     );
     expect(screen.getAllByText('محفظة موثقة').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('profile-detail-scene')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
     expect(
       screen.getByText('0x1111111111111111111111111111111111111111'),
     ).toHaveAttribute('data-ltr', 'true');

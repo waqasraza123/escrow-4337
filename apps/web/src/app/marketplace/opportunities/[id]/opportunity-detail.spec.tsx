@@ -98,7 +98,7 @@ describe('marketplace opportunity detail', () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText('فرصة في السوق')).toBeInTheDocument();
+    expect(screen.getByText('النطاق والنتائج')).toBeInTheDocument();
     expect(screen.getByText('السمة')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'افتح مساحة العمل' })).toHaveAttribute(
       'href',
@@ -107,6 +107,10 @@ describe('marketplace opportunity detail', () => {
     expect(screen.getByRole('link', { name: 'قدّم من مساحة العمل' })).toHaveAttribute(
       'href',
       '/app/marketplace',
+    );
+    expect(screen.getByTestId('opportunity-detail-scene')).toHaveAttribute(
+      'aria-hidden',
+      'true',
     );
     expect(
       screen.getByText(

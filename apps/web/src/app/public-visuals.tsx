@@ -178,6 +178,94 @@ export function EscrowFlowScene() {
   );
 }
 
+export function ProfileDetailScene() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="profile-detail-scene"
+      viewBox="0 0 520 320"
+      className="h-full w-full"
+      fill="none"
+    >
+      <rect width="520" height="320" rx="28" fill="url(#profile-bg)" />
+      <circle cx="100" cy="70" r="56" fill="#CBEBD5" opacity="0.8" />
+      <circle cx="434" cy="264" r="72" fill="#A7D9B8" opacity="0.4" />
+
+      <rect x="38" y="48" width="190" height="224" rx="26" fill="#0E2418" stroke="#1A5F36" />
+      <rect x="68" y="78" width="130" height="14" rx="7" fill="#D7F0DE" opacity="0.8" />
+      <circle cx="133" cy="142" r="42" fill="#F5FBF7" />
+      <circle cx="133" cy="132" r="16" fill="#2EA15B" />
+      <path d="M103 169C111 154.333 155 154.333 163 169" stroke="#2EA15B" strokeWidth="7" strokeLinecap="round" />
+      <rect x="64" y="200" width="138" height="12" rx="6" fill="#D7F0DE" opacity="0.55" />
+      <rect x="64" y="223" width="112" height="12" rx="6" fill="#D7F0DE" opacity="0.38" />
+
+      <rect x="252" y="58" width="228" height="94" rx="24" fill="#FFFFFF" stroke="#D7E7DA" />
+      <rect x="276" y="82" width="76" height="12" rx="6" fill="#0F3D26" />
+      <rect x="276" y="104" width="160" height="10" rx="5" fill="#6A8B74" opacity="0.55" />
+      <rect x="276" y="126" width="104" height="14" rx="7" fill="#E6F5EA" />
+      <rect x="276" y="126" width="58" height="14" rx="7" fill="#2EA15B" />
+
+      <rect x="252" y="174" width="228" height="98" rx="24" fill="#F7FBF8" stroke="#D7E7DA" />
+      <rect x="276" y="200" width="58" height="58" rx="18" fill="#E7F5EA" />
+      <path d="M293 228L304 239L321 217" stroke="#2EA15B" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="354" y="202" width="90" height="12" rx="6" fill="#0F3D26" />
+      <rect x="354" y="223" width="68" height="10" rx="5" fill="#6A8B74" opacity="0.55" />
+      <rect x="354" y="244" width="96" height="12" rx="6" fill="#E6F5EA" />
+
+      <defs>
+        <linearGradient id="profile-bg" x1="30" y1="18" x2="494" y2="296" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#F7FBF8" />
+          <stop offset="1" stopColor="#ECF7EE" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+export function OpportunityDetailScene() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="opportunity-detail-scene"
+      viewBox="0 0 520 320"
+      className="h-full w-full"
+      fill="none"
+    >
+      <rect width="520" height="320" rx="28" fill="url(#opportunity-bg)" />
+      <circle cx="420" cy="74" r="62" fill="#BFE5CB" opacity="0.65" />
+      <circle cx="88" cy="264" r="54" fill="#DCEEE1" opacity="0.7" />
+
+      <rect x="38" y="48" width="268" height="224" rx="26" fill="#FFFFFF" stroke="#D7E7DA" />
+      <rect x="66" y="76" width="92" height="14" rx="7" fill="#0F3D26" opacity="0.18" />
+      <rect x="66" y="104" width="184" height="18" rx="9" fill="#0F3D26" />
+      <rect x="66" y="134" width="150" height="11" rx="5.5" fill="#6A8B74" opacity="0.55" />
+      <rect x="66" y="162" width="206" height="44" rx="16" fill="#EEF8F1" />
+      <rect x="66" y="222" width="86" height="14" rx="7" fill="#E6F5EA" />
+      <rect x="66" y="222" width="48" height="14" rx="7" fill="#2EA15B" />
+      <rect x="166" y="222" width="74" height="14" rx="7" fill="#E6F5EA" />
+
+      <rect x="330" y="66" width="152" height="92" rx="22" fill="#0E2418" stroke="#1A5F36" />
+      <rect x="354" y="92" width="90" height="12" rx="6" fill="#D7F0DE" opacity="0.8" />
+      <rect x="354" y="114" width="62" height="10" rx="5" fill="#D7F0DE" opacity="0.45" />
+      <rect x="354" y="132" width="82" height="10" rx="5" fill="#2EA15B" />
+
+      <rect x="330" y="180" width="152" height="92" rx="22" fill="#F5FBF6" stroke="#D7E7DA" />
+      <circle cx="372" cy="224" r="22" fill="#E7F5EA" />
+      <path d="M361 226L369 234L383 215" stroke="#2EA15B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="404" y="208" width="54" height="10" rx="5" fill="#0F3D26" />
+      <rect x="404" y="226" width="40" height="9" rx="4.5" fill="#6A8B74" opacity="0.55" />
+      <rect x="404" y="244" width="46" height="10" rx="5" fill="#E6F5EA" />
+
+      <defs>
+        <linearGradient id="opportunity-bg" x1="26" y1="16" x2="496" y2="300" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#F7FBF8" />
+          <stop offset="1" stopColor="#EDF8F0" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 export function TalentCategoryGlyph(props: { kind: GlyphKind }) {
   const { kind } = props;
 

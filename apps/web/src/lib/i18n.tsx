@@ -295,6 +295,11 @@ const webMessages = {
           smart_account_ready: 'Smart account ready',
           operator_reviewed_proof: 'Operator reviewed proof',
         },
+        availability: {
+          open: 'Open',
+          limited: 'Limited',
+          unavailable: 'Unavailable',
+        },
         cryptoReadiness: {
           wallet_only: 'Wallet only',
           smart_account_ready: 'Smart account ready',
@@ -978,6 +983,8 @@ const webMessages = {
         specialties: 'Specialties',
         preferredEngagements: 'Preferred engagements',
         rateRange: 'Rate range',
+        availability: 'Availability',
+        timezone: 'Timezone',
         noneListed: 'None listed',
         notListed: 'Not listed',
         escrowSignalEyebrow: 'Escrow signal',
@@ -1924,6 +1931,11 @@ const webMessages = {
           smart_account_ready: 'جاهز بالحساب الذكي',
           operator_reviewed_proof: 'إثبات راجعه المشغّل',
         },
+        availability: {
+          open: 'متاح',
+          limited: 'محدود',
+          unavailable: 'غير متاح',
+        },
         cryptoReadiness: {
           wallet_only: 'محفظة فقط',
           smart_account_ready: 'جاهز بالحساب الذكي',
@@ -2600,6 +2612,8 @@ const webMessages = {
         specialties: 'التخصصات',
         preferredEngagements: 'أنماط الارتباط المفضلة',
         rateRange: 'نطاق السعر',
+        availability: 'التوفر',
+        timezone: 'المنطقة الزمنية',
         noneListed: 'لا يوجد',
         notListed: 'غير مدرج',
         escrowSignalEyebrow: 'إشارة الضمان',

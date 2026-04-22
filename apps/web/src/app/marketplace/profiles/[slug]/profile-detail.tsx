@@ -3,17 +3,22 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
+  Badge,
   Button,
   FactGrid,
   FactItem,
   PageContainer,
-  PageTopBar,
-  SectionCard,
   SectionHeading,
 } from '@escrow4334/frontend-core';
-import { RevealSection, SharedCard } from '@escrow4334/frontend-core/spatial';
+import { RevealSection } from '@escrow4334/frontend-core/spatial';
 import { AbuseReportPanel } from '../../abuse-report-panel';
-import { ThemeToggle } from '../../../theme-toggle';
+import styles from '../../../marketing.styles';
+import {
+  ProfileDetailScene,
+  PublicSceneFrame,
+  TalentCategoryGlyph,
+} from '../../../public-visuals';
+import { PublicMarketplaceNav } from '../../public-marketplace-nav';
 import { webApi, type MarketplaceProfile } from '../../../../lib/api';
 import { useWebI18n } from '../../../../lib/i18n';
 
@@ -27,6 +32,28 @@ function formatPercent(value: number) {
 
 function formatRating(value: number | null) {
   return value === null ? '—' : `${value.toFixed(1)} / 5`;
+}
+
+function resolveProfileGlyph(profile: MarketplaceProfile) {
+  const haystack = [
+    profile.headline,
+    ...profile.specialties,
+    ...profile.skills,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes('design')) {
+    return 'design';
+  }
+  if (
+    haystack.includes('growth') ||
+    haystack.includes('seo') ||
+    haystack.includes('marketing')
+  ) {
+    return 'growth';
+  }
+  return 'engineering';
 }
 
 export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
@@ -55,13 +82,9 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
           });
         }
       })
-      .catch((loadError: unknown) => {
+      .catch(() => {
         if (active) {
-          setError(
-            loadError instanceof Error && loadError.message.trim().length > 0
-              ? marketplaceMessages.profileDetail.unavailableBody
-              : marketplaceMessages.profileDetail.unavailableBody,
-          );
+          setError(marketplaceMessages.profileDetail.unavailableBody);
         }
       });
 
@@ -71,126 +94,210 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
   }, [slug, marketplaceMessages.profileDetail.unavailableBody]);
 
   return (
-    <main className="min-h-screen">
-      <PageContainer className="w-[min(1480px,calc(100vw-40px))]">
-        <PageTopBar
-          eyebrow={marketplaceMessages.profileDetail.topBarLabel}
-          description={marketplaceMessages.profileDetail.topBarMeta}
-          actions={
-            <>
-              <Button asChild variant="secondary">
-                <Link href="/marketplace">
-                  {marketplaceMessages.actions.backToMarketplace}
-                </Link>
-              </Button>
-              <ThemeToggle />
-              <Button asChild>
-                <Link href="/app/marketplace">{marketplaceMessages.openWorkspace}</Link>
-              </Button>
-            </>
-          }
-        />
+    <main className={styles.page}>
+      <PageContainer className={styles.shell}>
+        <PublicMarketplaceNav />
 
         {error ? (
-          <SectionCard title={marketplaceMessages.profileDetail.unavailableTitle}>
-            <p className="text-sm leading-6 text-[var(--foreground-soft)]">{error}</p>
-          </SectionCard>
+          <section className={styles.section}>
+            <SectionHeading
+              eyebrow={marketplaceMessages.profileDetail.topBarLabel}
+              title={marketplaceMessages.profileDetail.unavailableTitle}
+              description={error}
+            />
+          </section>
         ) : null}
 
         {!profile && !error ? (
-          <SectionCard title={marketplaceMessages.profileDetail.loadingTitle} />
+          <section className={styles.section}>
+            <SectionHeading
+              eyebrow={marketplaceMessages.profileDetail.topBarLabel}
+              title={marketplaceMessages.profileDetail.loadingTitle}
+            />
+          </section>
         ) : null}
 
         {profile ? (
           <>
-            <RevealSection className="fx-fade-up grid items-start gap-7 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[image:var(--hero-bg)] p-8 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
-              <SectionHeading
-                eyebrow={marketplaceMessages.profileDetail.heroEyebrow}
-                title={profile.displayName}
-                titleClassName="max-w-[9.8ch] text-[clamp(3rem,6vw,5.8rem)] leading-[0.9]"
-                description={profile.headline}
-                descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
-              />
-              <SharedCard
-                className="rounded-[1.9rem] bg-[image:var(--card-strong-bg)] p-6"
-                layoutId={`marketplace-profile-${profile.slug}`}
-              >
-                <FactGrid className="md:grid-cols-1">
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.verification}
-                    value={
+            <RevealSection className={styles.hero}>
+              <div className={`${styles.heroContent} fx-fade-up`}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.profileDetail.heroEyebrow}
+                  title={profile.displayName}
+                  titleClassName="max-w-[10ch] text-[clamp(2.9rem,6vw,5.6rem)] leading-[0.92]"
+                  description={profile.headline}
+                  descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
+                />
+                <p className={styles.lead}>{profile.bio}</p>
+                <div className={styles.ctaRow}>
+                  <Button
+                    asChild
+                    className={`${styles.ctaLink} ${styles.ctaPrimary}`}
+                  >
+                    <Link href="/app/marketplace">
+                      {marketplaceMessages.openWorkspace}
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className={`${styles.ctaLink} ${styles.ctaSecondary}`}
+                    variant="secondary"
+                  >
+                    <Link href="/marketplace">
+                      {marketplaceMessages.actions.backToMarketplace}
+                    </Link>
+                  </Button>
+                </div>
+                <div className={styles.heroBadgeRow}>
+                  <Badge tone="success">
+                    {
                       marketplaceMessages.labels.verificationLevel[
                         profile.verificationLevel
                       ]
                     }
-                  />
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.cryptoReadiness}
-                    value={
+                  </Badge>
+                  <Badge tone="neutral">
+                    {
                       marketplaceMessages.labels.cryptoReadiness[
                         profile.cryptoReadiness
                       ]
                     }
-                  />
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.completedEscrowJobs}
-                    value={profile.completedEscrowCount}
-                  />
-                </FactGrid>
-              </SharedCard>
+                  </Badge>
+                  <Badge tone="neutral">
+                    {marketplaceMessages.results.escrowJobs(
+                      profile.completedEscrowCount,
+                    )}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className={`${styles.heroIllustrationShell} fx-fade-up fx-fade-up-delay-1`}>
+                <PublicSceneFrame accent="market">
+                  <ProfileDetailScene />
+                </PublicSceneFrame>
+                <div className={styles.heroIllustrationMeta}>
+                  <div className={styles.heroIllustrationCard}>
+                    <span className={styles.heroIllustrationLabel}>
+                      {marketplaceMessages.profileDetail.verification}
+                    </span>
+                    <div>
+                      {
+                        marketplaceMessages.labels.verificationLevel[
+                          profile.verificationLevel
+                        ]
+                      }
+                    </div>
+                  </div>
+                  <div className={styles.heroIllustrationCard}>
+                    <span className={styles.heroIllustrationLabel}>
+                      {marketplaceMessages.profileDetail.rateRange}
+                    </span>
+                    <div dir="ltr">
+                      {profile.rateMin || profile.rateMax
+                        ? `${profile.rateMin ?? '—'} to ${profile.rateMax ?? '—'}`
+                        : marketplaceMessages.profileDetail.notListed}
+                    </div>
+                  </div>
+                  <div className={styles.heroIllustrationCard}>
+                    <span className={styles.heroIllustrationLabel}>
+                      {marketplaceMessages.profileDetail.timezone}
+                    </span>
+                    <div>{profile.timezone || marketplaceMessages.profileDetail.notListed}</div>
+                  </div>
+                  <div className={styles.heroIllustrationCard}>
+                    <span className={styles.heroIllustrationLabel}>
+                      {marketplaceMessages.profileDetail.completedEscrowJobs}
+                    </span>
+                    <div>{profile.completedEscrowCount}</div>
+                  </div>
+                </div>
+              </div>
             </RevealSection>
 
-            <RevealSection className="fx-fade-up fx-fade-up-delay-1 grid gap-5 xl:grid-cols-2" delay={0.08}>
-              <SectionCard
+            <RevealSection className={`${styles.section} fx-fade-up fx-fade-up-delay-1`} delay={0.08}>
+              <SectionHeading
                 eyebrow={marketplaceMessages.profileDetail.aboutEyebrow}
                 title={marketplaceMessages.profileDetail.credibilityTitle}
-                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
-                headerClassName="mb-5"
-              >
-                <p className="text-sm leading-6 text-[var(--foreground-soft)]">{profile.bio}</p>
-                <FactGrid>
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.skills}
-                    value={profile.skills.join(' • ')}
-                  />
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.specialties}
-                    value={
-                      profile.specialties.join(' • ') ||
-                      marketplaceMessages.profileDetail.noneListed
+                description={profile.bio}
+              />
+              <div className={styles.resultHeader}>
+                <div className={styles.resultGlyphWrap}>
+                  <TalentCategoryGlyph kind={resolveProfileGlyph(profile)} />
+                </div>
+                <div className={styles.resultHeaderCopy}>
+                  <span className={styles.resultKicker}>
+                    {marketplaceMessages.results.kickerTalent}
+                  </span>
+                  <strong className={styles.resultTitle}>{profile.headline}</strong>
+                  <p className={styles.resultSummary}>
+                    {
+                      marketplaceMessages.labels.availability[
+                        profile.availability
+                      ]
+                    }{' '}
+                    •{' '}
+                    {
+                      marketplaceMessages.labels.cryptoReadiness[
+                        profile.cryptoReadiness
+                      ]
                     }
-                  />
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.preferredEngagements}
-                    value={
-                      profile.preferredEngagements.length > 0
-                        ? profile.preferredEngagements
-                            .map(
-                              (engagement) =>
-                                marketplaceMessages.labels.engagementType[engagement],
-                            )
-                            .join(' • ')
-                        : marketplaceMessages.profileDetail.noneListed
-                    }
-                  />
-                  <FactItem
-                    label={marketplaceMessages.profileDetail.rateRange}
-                    value={
-                      profile.rateMin || profile.rateMax
-                        ? `${profile.rateMin ?? '—'} to ${profile.rateMax ?? '—'}`
-                        : marketplaceMessages.profileDetail.notListed
-                    }
-                    dir="ltr"
-                  />
-                </FactGrid>
-              </SectionCard>
+                  </p>
+                </div>
+              </div>
+              <div className={styles.chipRow}>
+                {profile.skills.map((skill) => (
+                  <span key={skill} className={styles.chip}>
+                    {skill}
+                  </span>
+                ))}
+                {profile.specialties.map((specialty) => (
+                  <span key={specialty} className={styles.resultMetaChip}>
+                    {specialty}
+                  </span>
+                ))}
+              </div>
+              <FactGrid>
+                <FactItem
+                  label={marketplaceMessages.profileDetail.preferredEngagements}
+                  value={
+                    profile.preferredEngagements.length > 0
+                      ? profile.preferredEngagements
+                          .map(
+                            (engagement) =>
+                              marketplaceMessages.labels.engagementType[engagement],
+                          )
+                          .join(' • ')
+                      : marketplaceMessages.profileDetail.noneListed
+                  }
+                />
+                <FactItem
+                  label={marketplaceMessages.profileDetail.rateRange}
+                  value={
+                    profile.rateMin || profile.rateMax
+                      ? `${profile.rateMin ?? '—'} to ${profile.rateMax ?? '—'}`
+                      : marketplaceMessages.profileDetail.notListed
+                  }
+                  dir="ltr"
+                />
+                <FactItem
+                  label={marketplaceMessages.profileDetail.availability}
+                  value={
+                    marketplaceMessages.labels.availability[profile.availability]
+                  }
+                />
+                <FactItem
+                  label={marketplaceMessages.profileDetail.timezone}
+                  value={profile.timezone || marketplaceMessages.profileDetail.notListed}
+                />
+              </FactGrid>
+            </RevealSection>
 
-              <SectionCard
-                eyebrow={marketplaceMessages.profileDetail.escrowSignalEyebrow}
-                title={marketplaceMessages.profileDetail.executionTitle}
-                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
-                headerClassName="mb-5"
-              >
+            <RevealSection className="fx-fade-up fx-fade-up-delay-2 grid gap-5 xl:grid-cols-2" delay={0.12}>
+              <section className={styles.section}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.profileDetail.escrowSignalEyebrow}
+                  title={marketplaceMessages.profileDetail.executionTitle}
+                />
                 <FactGrid>
                   <FactItem
                     label={marketplaceMessages.profileDetail.completionRate}
@@ -213,35 +320,26 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                     }
                   />
                 </FactGrid>
-                <div className="grid gap-3">
-                  <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
-                    {marketplaceMessages.profileDetail.completedByCategory}
-                  </span>
+                <div className={styles.chipRow}>
                   {profile.escrowStats.completedByCategory.length === 0 ? (
-                    <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+                    <span className={styles.resultMetaChip}>
                       {marketplaceMessages.profileDetail.noEscrowHistory}
-                    </p>
+                    </span>
                   ) : (
                     profile.escrowStats.completedByCategory.map((entry) => (
-                      <p
-                        key={entry.category}
-                        className="text-sm leading-6 text-[var(--foreground-soft)]"
-                      >
+                      <span key={entry.category} className={styles.resultMetaChip}>
                         {entry.category}: {entry.count}
-                      </p>
+                      </span>
                     ))
                   )}
                 </div>
-              </SectionCard>
-            </RevealSection>
+              </section>
 
-            <RevealSection className="fx-fade-up fx-fade-up-delay-2 grid gap-5 xl:grid-cols-2" delay={0.12}>
-              <SectionCard
-                eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
-                title={marketplaceMessages.profileDetail.trustTitle}
-                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
-                headerClassName="mb-5"
-              >
+              <section className={styles.section}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
+                  title={marketplaceMessages.profileDetail.trustTitle}
+                />
                 <FactGrid>
                   <FactItem
                     label={marketplaceMessages.profileDetail.averageRating}
@@ -284,71 +382,106 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
                     }
                   />
                 </FactGrid>
-              </SectionCard>
+              </section>
+            </RevealSection>
 
-              <SectionCard
-                eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
-                title={marketplaceMessages.profileDetail.recentReviews}
-                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
-                headerClassName="mb-5"
-              >
-                <div className="grid gap-4">
+            <RevealSection className="fx-fade-up fx-fade-up-delay-3 grid gap-5 xl:grid-cols-2" delay={0.16}>
+              <section className={styles.section}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.profileDetail.trustEyebrow}
+                  title={marketplaceMessages.profileDetail.recentReviews}
+                />
+                <div className={styles.cardStack}>
                   {profile.publicReviews.length === 0 ? (
-                    <p className="text-sm leading-6 text-[var(--foreground-soft)]">
-                      {marketplaceMessages.profileDetail.noReviews}
-                    </p>
+                    <article className={styles.resultCard}>
+                      <strong className={styles.resultTitle}>
+                        {marketplaceMessages.profileDetail.noReviews}
+                      </strong>
+                    </article>
                   ) : (
                     profile.publicReviews.map((review) => (
-                      <article
-                        key={review.id}
-                        className="rounded-[1.25rem] border border-[var(--surface-border)] bg-[var(--card-bg)] p-4"
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--foreground-muted)]">
-                          {review.reviewer.displayName} • {formatRating(review.rating)}
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
-                          {review.headline ?? marketplaceMessages.profileDetail.recentReviews}
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-[var(--foreground-soft)]">
-                          {review.body ?? ''}
-                        </p>
+                      <article key={review.id} className={styles.resultCard}>
+                        <div className={styles.resultHeaderCopy}>
+                          <span className={styles.resultKicker}>
+                            {review.reviewer.displayName} • {formatRating(review.rating)}
+                          </span>
+                          <strong className={styles.resultTitle}>
+                            {review.headline ??
+                              marketplaceMessages.profileDetail.recentReviews}
+                          </strong>
+                          <p className={styles.resultSummary}>{review.body ?? ''}</p>
+                        </div>
                       </article>
                     ))
                   )}
                 </div>
-              </SectionCard>
+              </section>
+
+              <section className={styles.section}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.profileDetail.proofEyebrow}
+                  title={marketplaceMessages.profileDetail.walletAndProofTitle}
+                />
+                <FactGrid className="md:grid-cols-1">
+                  <FactItem
+                    label={marketplaceMessages.profileDetail.verifiedWallet}
+                    value={
+                      profile.verifiedWalletAddress ??
+                      marketplaceMessages.profileDetail.noVerifiedWallet
+                    }
+                    dir="ltr"
+                  />
+                </FactGrid>
+                <div className={styles.cardStack}>
+                  {profile.proofArtifacts.length === 0 ? (
+                    <article className={styles.resultCard}>
+                      <strong className={styles.resultTitle}>
+                        {marketplaceMessages.profileDetail.noneListed}
+                      </strong>
+                    </article>
+                  ) : (
+                    profile.proofArtifacts.map((artifact) => (
+                      <article key={artifact.id} className={styles.resultCard}>
+                        <div className={styles.resultHeaderCopy}>
+                          <span className={styles.resultKicker}>
+                            {
+                              marketplaceMessages.labels.proofArtifactKind[
+                                artifact.kind
+                              ]
+                            }
+                          </span>
+                          <strong className={styles.resultTitle}>{artifact.label}</strong>
+                        </div>
+                        <a
+                          href={artifact.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={styles.cardLink}
+                        >
+                          {artifact.url}
+                        </a>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
             </RevealSection>
 
-            <RevealSection className="fx-fade-up fx-fade-up-delay-3 grid gap-5 xl:grid-cols-2" delay={0.16}>
-              <SectionCard
-                eyebrow={marketplaceMessages.profileDetail.proofEyebrow}
-                title={marketplaceMessages.profileDetail.walletAndProofTitle}
-                className="rounded-[1.9rem] bg-[var(--panel-bg)] p-7"
-                headerClassName="mb-5"
-              >
-                <FactItem
-                  label={marketplaceMessages.profileDetail.verifiedWallet}
-                  value={
-                    profile.verifiedWalletAddress ??
-                    marketplaceMessages.profileDetail.noVerifiedWallet
-                  }
-                  dir="ltr"
+            <RevealSection className="fx-fade-up fx-fade-up-delay-3 grid gap-5 xl:grid-cols-2" delay={0.2}>
+              <section className={styles.section}>
+                <SectionHeading
+                  eyebrow={marketplaceMessages.heroEyebrow}
+                  title={marketplaceMessages.heroTitle}
+                  description={marketplaceMessages.results.talentBody}
                 />
-                <div className="grid gap-2">
-                  {profile.proofArtifacts.map((artifact) => (
-                    <a
-                      key={artifact.id}
-                      href={artifact.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm leading-6 text-[var(--foreground)] underline decoration-[var(--status-info-border)] underline-offset-4"
-                    >
-                      {artifact.label} •{' '}
-                      {marketplaceMessages.labels.proofArtifactKind[artifact.kind]}
-                    </a>
+                <div className={styles.heroBadgeRow}>
+                  {marketplaceMessages.heroBadges.map((badge) => (
+                    <span key={badge} className={styles.heroBadge}>
+                      {badge}
+                    </span>
                   ))}
                 </div>
-              </SectionCard>
+              </section>
 
               <AbuseReportPanel
                 subjectLabel={profile.displayName}
