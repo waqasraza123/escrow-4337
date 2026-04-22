@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-21
 
+## Update (2026-04-22, Admin Theme Alignment)
+- Re-themed `apps/admin` to match the web app visual system:
+  - added admin light/dark theme state with cookie-backed persistence via `escrow4334-admin-theme`
+  - switched admin layout/fonts and global tokens to the same web-style theme model
+  - moved admin shell and shared-page usage onto the `web` theme variant
+  - added admin theme toggle controls to the operator and marketplace moderation top bars
+  - added admin theme-toggle coverage and updated toolbar assertions in admin UI tests
+- Changed files:
+  `apps/admin/src/app/{globals.css,language-switcher.tsx,layout.tsx,operator-console.tsx,page.styles.ts,spatial-shell.tsx,theme-toggle.tsx,theme-toggle.spec.tsx}`
+  `apps/admin/src/app/marketplace/{moderation-console.tsx,marketplace-moderation.spec.tsx}`
+  `apps/admin/src/app/operator-walkthrough.spec.tsx`
+  `apps/admin/src/lib/{i18n.tsx,theme.shared.ts,theme.tsx}`
+- Verification:
+  - passed: `pnpm --filter admin typecheck`
+  - passed: `pnpm --filter admin test -- src/app/operator-case.spec.ts`
+  - passed: `pnpm --filter admin test -- src/app/operator-walkthrough.spec.tsx src/app/theme-toggle.spec.tsx`
+  - passed: `pnpm --filter admin test -- src/app/marketplace/marketplace-moderation.spec.tsx`
+  - passed: `git diff --check`
+  - still noisy in this shell: `pnpm --filter admin test` and `pnpm --filter admin test -- src/app/page.spec.tsx` did not return a clean completion signal here even though targeted admin specs and typecheck passed
+
 ## Current Objective
 - Land the repo-side Phase 8 marketplace intelligence pass in one code step:
   - interaction telemetry for public search and core marketplace conversions
@@ -1334,3 +1354,35 @@
   - passed: `git diff --check`
 - Not run:
   - browser/dev-server visual verification of the refreshed public homepage and marketplace surface
+
+## Update (2026-04-22, Public Detail Page Refresh)
+- Extended the public marketplace visual system into the clickthrough detail pages so the browse funnel no longer drops back to the older console-style layout:
+  - refreshed public profile detail to use the same marketplace nav, shorter hero copy, code-native vector scene, trust badges, lighter fact groupings, and stronger browse-to-workspace CTA treatment
+  - refreshed public opportunity detail with the same public chrome, a brief-first hero, vector summary scene, clearer scope/fit/client-trust sections, and a cleaner apply-from-workspace conversion path
+  - added a shared `public-marketplace-nav` component for the public detail routes and new detail-specific SVG scenes in `apps/web/src/app/public-visuals.tsx`
+  - expanded public-marketplace copy with availability labels plus profile timezone/availability labels, and updated the detail/visual tests to match the new public surface
+- Changed files:
+  `apps/web/src/app/marketplace/{public-marketplace-nav.tsx,profiles/[slug]/profile-detail.tsx,profiles/[slug]/profile-detail.spec.tsx,opportunities/[id]/opportunity-detail.tsx,opportunities/[id]/opportunity-detail.spec.tsx}`
+  `apps/web/src/app/{public-visuals.tsx,public-visuals.spec.tsx}`
+  `apps/web/src/lib/i18n.tsx`
+- Verification:
+  - passed: `pnpm --filter web test 'src/app/marketplace/profiles/[slug]/profile-detail.spec.tsx' 'src/app/marketplace/opportunities/[id]/opportunity-detail.spec.tsx' src/app/public-visuals.spec.tsx`
+  - passed: `pnpm --filter web typecheck`
+  - passed: `git diff --check`
+- Not run:
+  - browser/dev-server visual verification of the refreshed public profile and opportunity detail routes
+
+## Update (2026-04-22, Authenticated Workspace Entry Refresh)
+- Refreshed the top of the authenticated marketplace workspace so the first viewport no longer drops back to the older console stack:
+  - kept the existing workspace workflows and backend contracts intact, but replaced the old active-workspace summary panel with a real hero entry shell
+  - folded the highest-value pipeline metrics into the hero summary rail and moved workspace switching into that same control area
+  - kept lane cards and onboarding actions intact, including the client-console deep link and capability-aware lane switching behavior
+  - updated the workspace spec for the now-valid duplicate public-marketplace link in the redesigned shell
+- Changed files:
+  `apps/web/src/app/marketplace/{workspace.tsx,marketplace-workspace.spec.tsx}`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `pnpm --filter web typecheck`
+  - passed: `git diff --check`
+- Not run:
+  - browser/dev-server visual verification of the refreshed authenticated workspace shell

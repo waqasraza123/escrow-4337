@@ -25,6 +25,9 @@ const adminMessages = {
     common: {
       brand: 'Milestone Escrow Operator',
       currentLanguage: 'Language',
+      theme: 'Theme',
+      lightTheme: 'Light',
+      darkTheme: 'Dark',
       loading: 'Loading',
       unavailable: 'Unavailable',
       unknown: 'Unknown',
@@ -132,6 +135,9 @@ const adminMessages = {
     common: {
       brand: 'مشغّل ضمان المراحل',
       currentLanguage: 'اللغة',
+      theme: 'السمة',
+      lightTheme: 'فاتح',
+      darkTheme: 'داكن',
       loading: 'جاري التحميل',
       unavailable: 'غير متاح',
       unknown: 'غير معروف',

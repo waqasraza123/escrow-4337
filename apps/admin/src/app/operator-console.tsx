@@ -60,6 +60,7 @@ import {
   getRecentLookupSuggestions,
 } from './operator-case';
 import { LanguageSwitcher } from './language-switcher';
+import { ThemeToggle } from './theme-toggle';
 import { useOperatorLaunchWalkthrough } from './operator-walkthrough';
 import { useAdminI18n } from '../lib/i18n';
 
@@ -1542,7 +1543,7 @@ export function OperatorConsole({
   }
 
   return (
-    <ConsolePage theme="admin">
+    <ConsolePage theme="web">
       <RevealSection>
         <PageTopBar
           eyebrow={messages.topBar.label}
@@ -1556,6 +1557,13 @@ export function OperatorConsole({
                 Read the manual
               </Link>
               <LanguageSwitcher
+                className={styles.languageSwitcher}
+                labelClassName={styles.languageSwitcherLabel}
+                optionClassName={styles.languageSwitcherOption}
+                optionActiveClassName={styles.languageSwitcherOptionActive}
+                theme="web"
+              />
+              <ThemeToggle
                 className={styles.languageSwitcher}
                 labelClassName={styles.languageSwitcherLabel}
                 optionClassName={styles.languageSwitcherOption}
@@ -1577,7 +1585,7 @@ export function OperatorConsole({
       ) : null}
       <RevealSection delay={0.08}>
         <HeroPanel
-          theme="admin"
+          theme="web"
           eyebrow={frame.eyebrow}
           title={frame.title}
           description={frame.copy}

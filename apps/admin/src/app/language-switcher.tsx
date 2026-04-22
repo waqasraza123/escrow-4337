@@ -22,7 +22,7 @@ export function LanguageSwitcher(props: LanguageSwitcherProps) {
     labelClassName,
     optionActiveClassName,
     optionClassName,
-    theme = 'admin',
+    theme = 'web',
   } = props;
   const { locale, messages, setLocale } = useAdminI18n();
 

@@ -5,6 +5,7 @@ import {
 } from '@escrow4334/frontend-core/testing';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AdminI18nProvider } from '../../lib/i18n';
 
 const sessionStorageKey = 'escrow4337.admin.session';
 
@@ -31,6 +32,14 @@ vi.mock('../../lib/api', () => ({
 }));
 
 import MarketplaceModerationPage from './page';
+
+function renderModerationPage() {
+  return renderApp(
+    <AdminI18nProvider initialLocale="en">
+      <MarketplaceModerationPage />
+    </AdminI18nProvider>,
+  );
+}
 
 describe('marketplace moderation page', () => {
   beforeEach(() => {
@@ -450,12 +459,15 @@ describe('marketplace moderation page', () => {
       reviews: [],
     });
 
-    renderApp(<MarketplaceModerationPage />);
+    renderModerationPage();
 
     await waitFor(() => {
       expect(screen.getByText('operator@example.com')).toBeInTheDocument();
     });
 
+    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
     expect(screen.getByText('Talent moderation')).toBeInTheDocument();
     expect(screen.getAllByText('Builder One').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Old brief').length).toBeGreaterThan(0);
@@ -643,7 +655,7 @@ describe('marketplace moderation page', () => {
       },
     });
 
-    renderApp(<MarketplaceModerationPage />);
+    renderModerationPage();
 
     await waitFor(() => {
       expect(

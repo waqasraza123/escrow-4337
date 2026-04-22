@@ -77,6 +77,10 @@ describe('operator walkthrough', () => {
       expect(screen.getByRole('button', { name: 'Stop walkthrough' })).toBeInTheDocument();
     });
 
+    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
+
     expect(
       screen.getByRole('dialog', {
         name:

@@ -35,6 +35,7 @@ import {
   type SessionTokens,
   type UserProfile,
 } from '../../lib/api';
+import { ThemeToggle } from '../theme-toggle';
 
 const sessionStorageKey = 'escrow4337.admin.session';
 const evidenceReviewLabels: Record<
@@ -492,20 +493,21 @@ export function MarketplaceModerationConsole() {
   }
 
   return (
-    <ConsolePage theme="admin">
+    <ConsolePage theme="web">
       <PageTopBar
         eyebrow="Marketplace moderation"
         description="Hide, unhide, or suspend marketplace actors and briefs from the operator surface."
         className={styles.topBar}
         contentClassName={styles.topBarContent}
         actions={
-          <>
-            <Button asChild variant="secondary">
-              <Link href="/">Operator home</Link>
-            </Button>
-            {tokens ? (
-              <Button type="button" onClick={() => void handleSignOut()}>
-                Sign out
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/">Operator home</Link>
+              </Button>
+              <ThemeToggle />
+              {tokens ? (
+                <Button type="button" onClick={() => void handleSignOut()}>
+                  Sign out
               </Button>
             ) : (
               <Button asChild>
