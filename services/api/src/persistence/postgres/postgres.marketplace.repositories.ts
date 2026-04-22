@@ -2362,6 +2362,18 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     return result.rows[0] ? mapNotificationPreferences(result.rows[0]) : null;
   }
 
+  async listNotificationPreferences() {
+    const result = await this.db.query<MarketplaceNotificationPreferencesRow>(
+      `
+        SELECT *
+        FROM marketplace_notification_preferences
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapNotificationPreferences);
+  }
+
   async saveNotificationPreferences(
     preferences: MarketplaceNotificationPreferencesRecord,
   ) {

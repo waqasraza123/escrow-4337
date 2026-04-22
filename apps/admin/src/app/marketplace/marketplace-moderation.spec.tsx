@@ -13,12 +13,16 @@ const { mockedAdminApi } = vi.hoisted(() => ({
     me: vi.fn(),
     logout: vi.fn(),
     getMarketplaceModerationDashboard: vi.fn(),
+    getMarketplaceModerationIntelligence: vi.fn(),
     listMarketplaceModerationProfiles: vi.fn(),
     listMarketplaceModerationOpportunities: vi.fn(),
     listMarketplaceModerationReports: vi.fn(),
+    listMarketplaceModerationReviews: vi.fn(),
     moderateMarketplaceProfile: vi.fn(),
     moderateMarketplaceOpportunity: vi.fn(),
     updateMarketplaceModerationReport: vi.fn(),
+    updateMarketplaceReviewModeration: vi.fn(),
+    updateMarketplaceIdentityRiskReview: vi.fn(),
   },
 }));
 
@@ -164,6 +168,136 @@ describe('marketplace moderation page', () => {
         },
       ],
     });
+    mockedAdminApi.getMarketplaceModerationIntelligence.mockResolvedValue({
+      report: {
+        generatedAt: new Date().toISOString(),
+        funnel: [
+          { key: 'applications', label: 'Applications', count: 3 },
+          { key: 'hires', label: 'Hires', count: 1 },
+        ],
+        liquidityByCategory: [
+          {
+            label: 'software-development',
+            demandCount: 3,
+            supplyCount: 2,
+            gap: 1,
+            posture: 'demand_heavy',
+          },
+        ],
+        liquidityByTimezone: [
+          {
+            label: 'UTC',
+            demandCount: 2,
+            supplyCount: 1,
+            gap: 1,
+            posture: 'demand_heavy',
+          },
+        ],
+        noHireReasons: [
+          {
+            reason: 'fit_not_strong_enough',
+            count: 1,
+          },
+        ],
+        topSearches: [
+          {
+            searchKind: 'talent',
+            queryLabel: 'typescript',
+            impressions: 10,
+            resultClicks: 4,
+            saveCount: 1,
+          },
+        ],
+        stalledOpportunities: [
+          {
+            opportunityId: 'opp-1',
+            title: 'Old brief',
+            category: 'software-development',
+            publishedAt: 1,
+            daysOpen: 9,
+            applicationCount: 0,
+            shortlistCount: 0,
+            offerCount: 0,
+            lastDecisionAt: null,
+          },
+        ],
+        rankingAudit: [
+          {
+            entityType: 'profile',
+            entityId: 'user-1',
+            label: 'Builder One',
+            score: 88,
+            outcomeScore: 20,
+            momentumScore: 12,
+            moderationStatus: 'visible',
+            reasons: [{ code: 'strong_skill_match', label: 'Strong skill match' }],
+            signals: {
+              completionRate: 100,
+              disputeRate: 0,
+              inviteAcceptanceRate: 50,
+              responseRate: 80,
+              reviewAverage: 4.9,
+              hireCount: 1,
+              noHireCount: 0,
+              recencyDays: 2,
+            },
+          },
+        ],
+        retention: {
+          talentPools: 2,
+          trackedTalent: 3,
+          automationRules: 1,
+          automationRuns: 2,
+          automatedTaskDeliveries: 4,
+          pendingLifecycleTasks: 3,
+          rehireCandidates: 1,
+          clientWorkspacesWithRetentionSetup: 1,
+        },
+        digestOps: {
+          totalPreferences: 2,
+          digestUsers: 1,
+          manualCadenceUsers: 1,
+          dailyCadenceUsers: 1,
+          weeklyCadenceUsers: 0,
+          usersWithSuppressedNotifications: 1,
+          lifecycleDigestEnabledUsers: 2,
+          analyticsDigestEnabledUsers: 1,
+          totalDigests: 2,
+          freshDigests: 1,
+          acknowledgedDigests: 1,
+          archivedDigests: 0,
+          digestsLast7Days: 2,
+          usersWithRecentDigests: 1,
+          suppression: {
+            talentInvitesDisabled: 0,
+            applicationActivityDisabled: 1,
+            interviewMessagesDisabled: 0,
+            offerActivityDisabled: 0,
+            reviewActivityDisabled: 0,
+            automationActivityDisabled: 0,
+            lifecycleDigestDisabled: 0,
+            analyticsDigestDisabled: 1,
+          },
+          recentDigests: [
+            {
+              digestId: 'digest-1',
+              userId: 'client-1',
+              userEmail: 'client@example.com',
+              workspaceId: 'workspace-client-1',
+              cadence: 'daily',
+              status: 'fresh',
+              title: 'Atlas Labs marketplace digest',
+              summary: '2 unread updates • 1 pending lifecycle task',
+              unreadNotifications: 2,
+              taskCount: 1,
+              rehireCandidateCount: 0,
+              hires: 1,
+              updatedAt: 10,
+            },
+          ],
+        },
+      },
+    });
     mockedAdminApi.listMarketplaceModerationProfiles.mockResolvedValue({
       profiles: [
         {
@@ -182,6 +316,8 @@ describe('marketplace moderation page', () => {
           completedEscrowCount: 2,
           isComplete: true,
           moderationStatus: 'visible',
+          identityReview: null,
+          riskSignals: [],
         },
       ],
     });
@@ -310,6 +446,9 @@ describe('marketplace moderation page', () => {
         status: 'resolved',
       },
     });
+    mockedAdminApi.listMarketplaceModerationReviews.mockResolvedValue({
+      reviews: [],
+    });
 
     renderApp(<MarketplaceModerationPage />);
 
@@ -322,6 +461,8 @@ describe('marketplace moderation page', () => {
     expect(screen.getAllByText('Old brief').length).toBeGreaterThan(0);
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('Abuse queue')).toBeInTheDocument();
+    expect(screen.getByText('Digest adoption and suppression')).toBeInTheDocument();
+    expect(screen.getByText('Atlas Labs marketplace digest')).toBeInTheDocument();
     expect(screen.getByText('Suspicious copied portfolio.')).toBeInTheDocument();
     expect(screen.getByText('Claimed by operator@example.com')).toBeInTheDocument();
     expect(screen.getByText(/Priority High/)).toBeInTheDocument();

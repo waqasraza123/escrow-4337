@@ -730,6 +730,127 @@ export function MarketplaceModerationConsole() {
                   </div>
                 </div>
               </article>
+
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.panelEyebrow}>Digest Ops</span>
+                    <h2>Digest adoption and suppression</h2>
+                  </div>
+                </div>
+                <div className={styles.stack}>
+                  <FactGrid className={styles.summaryGrid}>
+                    <FactItem
+                      label="Preference records"
+                      value={intelligence.digestOps.totalPreferences}
+                    />
+                    <FactItem
+                      label="Digest users"
+                      value={intelligence.digestOps.digestUsers}
+                    />
+                    <FactItem
+                      label="Manual cadence"
+                      value={intelligence.digestOps.manualCadenceUsers}
+                    />
+                    <FactItem
+                      label="Daily cadence"
+                      value={intelligence.digestOps.dailyCadenceUsers}
+                    />
+                    <FactItem
+                      label="Weekly cadence"
+                      value={intelligence.digestOps.weeklyCadenceUsers}
+                    />
+                    <FactItem
+                      label="Suppressed users"
+                      value={intelligence.digestOps.usersWithSuppressedNotifications}
+                    />
+                    <FactItem
+                      label="Lifecycle enabled"
+                      value={intelligence.digestOps.lifecycleDigestEnabledUsers}
+                    />
+                    <FactItem
+                      label="Analytics enabled"
+                      value={intelligence.digestOps.analyticsDigestEnabledUsers}
+                    />
+                    <FactItem
+                      label="Total digests"
+                      value={intelligence.digestOps.totalDigests}
+                    />
+                    <FactItem
+                      label="Fresh digests"
+                      value={intelligence.digestOps.freshDigests}
+                    />
+                    <FactItem
+                      label="Acknowledged"
+                      value={intelligence.digestOps.acknowledgedDigests}
+                    />
+                    <FactItem
+                      label="Archived"
+                      value={intelligence.digestOps.archivedDigests}
+                    />
+                    <FactItem
+                      label="Last 7 days"
+                      value={intelligence.digestOps.digestsLast7Days}
+                    />
+                    <FactItem
+                      label="Users with recent digests"
+                      value={intelligence.digestOps.usersWithRecentDigests}
+                    />
+                  </FactGrid>
+                  <div className={styles.stack}>
+                    <strong>Suppression toggles</strong>
+                    <article className={styles.timelineCard}>
+                      <p className={styles.stateText}>
+                        Talent invites {intelligence.digestOps.suppression.talentInvitesDisabled}
+                        {' • '}Applications{' '}
+                        {intelligence.digestOps.suppression.applicationActivityDisabled}
+                        {' • '}Interview messages{' '}
+                        {intelligence.digestOps.suppression.interviewMessagesDisabled}
+                      </p>
+                      <p className={styles.stateText}>
+                        Offers {intelligence.digestOps.suppression.offerActivityDisabled}
+                        {' • '}Reviews{' '}
+                        {intelligence.digestOps.suppression.reviewActivityDisabled}
+                        {' • '}Automation{' '}
+                        {intelligence.digestOps.suppression.automationActivityDisabled}
+                      </p>
+                      <p className={styles.stateText}>
+                        Lifecycle digests{' '}
+                        {intelligence.digestOps.suppression.lifecycleDigestDisabled}
+                        {' • '}Analytics digests{' '}
+                        {intelligence.digestOps.suppression.analyticsDigestDisabled}
+                      </p>
+                    </article>
+                  </div>
+                  <div className={styles.stack}>
+                    <strong>Recent digests</strong>
+                    {intelligence.digestOps.recentDigests.length === 0 ? (
+                      <p className={styles.stateText}>
+                        No digest snapshots captured yet.
+                      </p>
+                    ) : (
+                      intelligence.digestOps.recentDigests.map((digest) => (
+                        <article
+                          key={digest.digestId}
+                          className={styles.timelineCard}
+                        >
+                          <strong>{digest.title}</strong>
+                          <p className={styles.stateText}>
+                            {digest.userEmail} • {digest.status} • {digest.cadence}
+                          </p>
+                          <p className={styles.stateText}>{digest.summary}</p>
+                          <p className={styles.stateText}>
+                            Unread {digest.unreadNotifications}
+                            {' • '}Tasks {digest.taskCount}
+                            {' • '}Rehire {digest.rehireCandidateCount}
+                            {' • '}Hires {digest.hires ?? '—'}
+                          </p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </article>
             </section>
           ) : null}
 

@@ -5080,6 +5080,8 @@ export class MarketplaceService {
       talentPoolMembers,
       automationRules,
       automationRuns,
+      notificationPreferences,
+      digests,
     ] = await Promise.all([
       this.marketplaceRepository.listProfiles(),
       this.marketplaceRepository.listOpportunities(),
@@ -5095,6 +5097,8 @@ export class MarketplaceService {
       this.marketplaceRepository.listTalentPoolMembers(),
       this.marketplaceRepository.listAutomationRules(),
       this.marketplaceRepository.listAutomationRuns(),
+      this.marketplaceRepository.listNotificationPreferences(),
+      this.marketplaceRepository.listDigests(),
     ]);
 
     const jobs = await this.escrowRepository.listAll();
@@ -5297,6 +5301,57 @@ export class MarketplaceService {
             (left.score + left.outcomeScore + left.momentumScore),
       )
       .slice(0, 12);
+    const cadenceCounts = {
+      manual: notificationPreferences.filter(
+        (preferences) => preferences.digestCadence === 'manual',
+      ).length,
+      daily: notificationPreferences.filter(
+        (preferences) => preferences.digestCadence === 'daily',
+      ).length,
+      weekly: notificationPreferences.filter(
+        (preferences) => preferences.digestCadence === 'weekly',
+      ).length,
+    };
+    const suppression = {
+      talentInvitesDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.talentInvitesEnabled,
+      ).length,
+      applicationActivityDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.applicationActivityEnabled,
+      ).length,
+      interviewMessagesDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.interviewMessagesEnabled,
+      ).length,
+      offerActivityDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.offerActivityEnabled,
+      ).length,
+      reviewActivityDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.reviewActivityEnabled,
+      ).length,
+      automationActivityDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.automationActivityEnabled,
+      ).length,
+      lifecycleDigestDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.lifecycleDigestEnabled,
+      ).length,
+      analyticsDigestDisabled: notificationPreferences.filter(
+        (preferences) => !preferences.analyticsDigestEnabled,
+      ).length,
+    };
+    const digestUserIds = new Set(digests.map((digest) => digest.userId));
+    const recentDigests = [...digests]
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, 8);
+    const digestUsers = new Map(
+      await Promise.all(
+        Array.from(new Set(recentDigests.map((digest) => digest.userId))).map(
+          async (userId) => {
+            const user = await this.usersService.getRequiredById(userId);
+            return [userId, user.email] as const;
+          },
+        ),
+      ),
+    );
 
     return {
       generatedAt: new Date().toISOString(),
@@ -5329,6 +5384,60 @@ export class MarketplaceService {
         pendingLifecycleTasks,
         rehireCandidates: rehireCandidates.length,
         clientWorkspacesWithRetentionSetup: retentionWorkspaceIds.size,
+      },
+      digestOps: {
+        totalPreferences: notificationPreferences.length,
+        digestUsers: digestUserIds.size,
+        manualCadenceUsers: cadenceCounts.manual,
+        dailyCadenceUsers: cadenceCounts.daily,
+        weeklyCadenceUsers: cadenceCounts.weekly,
+        usersWithSuppressedNotifications: notificationPreferences.filter(
+          (preferences) =>
+            !preferences.talentInvitesEnabled ||
+            !preferences.applicationActivityEnabled ||
+            !preferences.interviewMessagesEnabled ||
+            !preferences.offerActivityEnabled ||
+            !preferences.reviewActivityEnabled ||
+            !preferences.automationActivityEnabled,
+        ).length,
+        lifecycleDigestEnabledUsers: notificationPreferences.filter(
+          (preferences) => preferences.lifecycleDigestEnabled,
+        ).length,
+        analyticsDigestEnabledUsers: notificationPreferences.filter(
+          (preferences) => preferences.analyticsDigestEnabled,
+        ).length,
+        totalDigests: digests.length,
+        freshDigests: digests.filter((digest) => digest.status === 'fresh').length,
+        acknowledgedDigests: digests.filter(
+          (digest) => digest.status === 'acknowledged',
+        ).length,
+        archivedDigests: digests.filter(
+          (digest) => digest.status === 'archived',
+        ).length,
+        digestsLast7Days: digests.filter(
+          (digest) => Date.now() - digest.updatedAt < 7 * 24 * hourMs,
+        ).length,
+        usersWithRecentDigests: new Set(
+          digests
+            .filter((digest) => Date.now() - digest.updatedAt < 7 * 24 * hourMs)
+            .map((digest) => digest.userId),
+        ).size,
+        suppression,
+        recentDigests: recentDigests.map((digest) => ({
+          digestId: digest.id,
+          userId: digest.userId,
+          userEmail: digestUsers.get(digest.userId) ?? digest.userId,
+          workspaceId: digest.workspaceId,
+          cadence: digest.cadence,
+          status: digest.status,
+          title: digest.title,
+          summary: digest.summary,
+          unreadNotifications: digest.stats.unreadNotifications,
+          taskCount: digest.stats.taskCount,
+          rehireCandidateCount: digest.stats.rehireCandidateCount,
+          hires: digest.stats.hires,
+          updatedAt: digest.updatedAt,
+        })),
       },
     };
   }

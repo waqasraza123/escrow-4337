@@ -488,6 +488,47 @@ export type MarketplaceIntelligenceReport = {
     rehireCandidates: number;
     clientWorkspacesWithRetentionSetup: number;
   };
+  digestOps: {
+    totalPreferences: number;
+    digestUsers: number;
+    manualCadenceUsers: number;
+    dailyCadenceUsers: number;
+    weeklyCadenceUsers: number;
+    usersWithSuppressedNotifications: number;
+    lifecycleDigestEnabledUsers: number;
+    analyticsDigestEnabledUsers: number;
+    totalDigests: number;
+    freshDigests: number;
+    acknowledgedDigests: number;
+    archivedDigests: number;
+    digestsLast7Days: number;
+    usersWithRecentDigests: number;
+    suppression: {
+      talentInvitesDisabled: number;
+      applicationActivityDisabled: number;
+      interviewMessagesDisabled: number;
+      offerActivityDisabled: number;
+      reviewActivityDisabled: number;
+      automationActivityDisabled: number;
+      lifecycleDigestDisabled: number;
+      analyticsDigestDisabled: number;
+    };
+    recentDigests: Array<{
+      digestId: string;
+      userId: string;
+      userEmail: string;
+      workspaceId: string | null;
+      cadence: 'manual' | 'daily' | 'weekly';
+      status: 'fresh' | 'acknowledged' | 'archived';
+      title: string;
+      summary: string;
+      unreadNotifications: number;
+      taskCount: number;
+      rehireCandidateCount: number;
+      hires: number | null;
+      updatedAt: number;
+    }>;
+  };
 };
 
 export type MarketplaceAbuseReportReason =

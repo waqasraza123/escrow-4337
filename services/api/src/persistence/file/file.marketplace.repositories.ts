@@ -833,6 +833,16 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     });
   }
 
+  async listNotificationPreferences() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceNotificationPreferences)
+        .map((preferences) =>
+          cloneValue(normalizeNotificationPreferences(preferences)),
+        )
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
   async saveNotificationPreferences(
     preferences: MarketplaceNotificationPreferencesRecord,
   ) {

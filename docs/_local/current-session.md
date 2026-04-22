@@ -1169,3 +1169,28 @@
   - passed: `git diff --check`
 - Next likely step:
   - if product-code work continues, add digest dispatch/background materialization or operator-facing digest analytics on top of this persisted control layer
+
+## Update (2026-04-22, Marketplace Digest Intelligence)
+- Implemented the next full repo-side marketplace slice on top of digest controls:
+  - operator-visible digest adoption metrics inside the marketplace intelligence report
+  - suppression-pattern analytics for notification preference toggles
+  - recent digest snapshot reporting with cadence/status/user context
+- Backend changes:
+  - extended marketplace intelligence reporting with `digestOps` metrics and recent digest entries
+  - added repository list support for marketplace notification preferences so operator analytics can aggregate adoption/suppression posture
+- Admin changes:
+  - `apps/admin/src/lib/api.ts` now includes the expanded intelligence report contract
+  - `apps/admin/src/app/marketplace/moderation-console.tsx` now renders a dedicated digest adoption/suppression panel with recent digest cards
+  - `apps/admin/src/app/marketplace/marketplace-moderation.spec.tsx` now covers the new digest intelligence surface and current moderation fixture contract
+- Changed files:
+  `services/api/src/modules/marketplace/{marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `apps/admin/src/{lib/api.ts,app/marketplace/{moderation-console.tsx,marketplace-moderation.spec.tsx}}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter admin test src/app/marketplace/marketplace-moderation.spec.tsx`
+  - passed: `pnpm --filter admin typecheck 2>&1 | rg "marketplace/moderation-console|apps/admin/src/lib/api.ts|MarketplaceIntelligenceReport" || true`
+  - passed: `pnpm --filter escrow4334-api exec tsc -p tsconfig.json --noEmit 2>&1 | rg "marketplace|persistence.types|file-persistence.store|file.marketplace.repositories|postgres.marketplace.repositories" || true`
+  - passed: `git diff --check`
+- Next likely step:
+  - add actual due-digest dispatch/background materialization on top of the now-observable digest layer

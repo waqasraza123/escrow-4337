@@ -241,6 +241,7 @@ export interface MarketplaceRepository {
   getNotificationPreferencesByUserId(
     userId: string,
   ): Promise<MarketplaceNotificationPreferencesRecord | null>;
+  listNotificationPreferences(): Promise<MarketplaceNotificationPreferencesRecord[]>;
   saveNotificationPreferences(
     preferences: MarketplaceNotificationPreferencesRecord,
   ): Promise<void>;
