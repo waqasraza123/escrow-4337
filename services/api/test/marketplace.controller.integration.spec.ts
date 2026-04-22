@@ -219,7 +219,10 @@ describe('MarketplaceController integration', () => {
 
     await controller.publishOpportunity(clientUser, created.opportunity.id);
 
-    const publicFeed = await controller.listOpportunities({ limit: 24 });
+    const publicFeed = await controller.listOpportunities({
+      sort: 'recent',
+      limit: 24,
+    });
     expect(publicFeed.opportunities).toHaveLength(0);
 
     const detail = await controller.getOpportunity(created.opportunity.id);

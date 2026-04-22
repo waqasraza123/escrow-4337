@@ -157,6 +157,101 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('talent-pools')
+  listTalentPools(@User() user: ReqUser) {
+    return this.marketplaceService.listTalentPools(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('talent-pools')
+  createTalentPool(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(marketplaceDto.createMarketplaceTalentPoolSchema),
+    )
+    body: marketplaceDto.CreateMarketplaceTalentPoolDto,
+  ) {
+    return this.marketplaceService.createTalentPool(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('talent-pools/:id/members')
+  addTalentPoolMember(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.addMarketplaceTalentPoolMemberSchema,
+      ),
+    )
+    body: marketplaceDto.AddMarketplaceTalentPoolMemberDto,
+  ) {
+    return this.marketplaceService.addTalentPoolMember(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('talent-pools/:poolId/members/:memberId')
+  updateTalentPoolMember(
+    @User() user: ReqUser,
+    @Param('poolId') poolId: string,
+    @Param('memberId') memberId: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceTalentPoolMemberSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceTalentPoolMemberDto,
+  ) {
+    return this.marketplaceService.updateTalentPoolMember(
+      user.id,
+      poolId,
+      memberId,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('automation-rules')
+  listAutomationRules(@User() user: ReqUser) {
+    return this.marketplaceService.listAutomationRules(user.id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('automation-rules')
+  createAutomationRule(
+    @User() user: ReqUser,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.createMarketplaceAutomationRuleSchema,
+      ),
+    )
+    body: marketplaceDto.CreateMarketplaceAutomationRuleDto,
+  ) {
+    return this.marketplaceService.createAutomationRule(user.id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('automation-rules/:id')
+  updateAutomationRule(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.updateMarketplaceAutomationRuleSchema,
+      ),
+    )
+    body: marketplaceDto.UpdateMarketplaceAutomationRuleDto,
+  ) {
+    return this.marketplaceService.updateAutomationRule(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('lifecycle/digest')
+  getLifecycleDigest(@User() user: ReqUser) {
+    return this.marketplaceService.getLifecycleDigest(user.id);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('opportunities/mine')
   listMyOpportunities(@User() user: ReqUser) {
     return this.marketplaceService.listMyOpportunities(user.id);
@@ -182,6 +277,21 @@ export class MarketplaceController {
     body: marketplaceDto.CreateMarketplaceReviewDto,
   ) {
     return this.marketplaceService.createJobReview(user.id, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('jobs/:id/rehire-opportunity')
+  createRehireOpportunity(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+    @Body(
+      new ZodValidationPipe(
+        marketplaceDto.createMarketplaceRehireOpportunitySchema,
+      ),
+    )
+    body: marketplaceDto.CreateMarketplaceRehireOpportunityDto,
+  ) {
+    return this.marketplaceService.createRehireOpportunity(user.id, id, body);
   }
 
   @UseGuards(AuthGuard)
@@ -341,7 +451,7 @@ export class MarketplaceController {
     @Body(
       new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
     )
-    body: marketplaceDto.ApplicationDecisionNoteDto,
+    body: marketplaceDto.ApplicationDecisionNoteDto = {},
   ) {
     return this.marketplaceService.shortlistApplication(user.id, id, body);
   }
@@ -424,7 +534,7 @@ export class MarketplaceController {
     @Body(
       new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
     )
-    body: marketplaceDto.ApplicationDecisionNoteDto,
+    body: marketplaceDto.ApplicationDecisionNoteDto = {},
   ) {
     return this.marketplaceService.hireApplication(user.id, id, body);
   }

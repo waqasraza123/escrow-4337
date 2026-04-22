@@ -3,6 +3,7 @@ import type {
   MarketplaceAbuseReportRecord,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceAutomationRuleRecord,
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftRevisionRecord,
   MarketplaceContractMetadataSnapshot,
@@ -18,6 +19,8 @@ import type {
   MarketplaceProfileRecord,
   MarketplaceReviewRecord,
   MarketplaceSavedSearchRecord,
+  MarketplaceTalentPoolMemberRecord,
+  MarketplaceTalentPoolRecord,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
   MarketplaceTalentSearchDocument,
@@ -271,6 +274,40 @@ function normalizeSavedSearch(
   return {
     ...search,
     label: search.label.trim(),
+  };
+}
+
+function normalizeTalentPool(
+  pool: MarketplaceTalentPoolRecord,
+): MarketplaceTalentPoolRecord {
+  return {
+    ...pool,
+    label: pool.label.trim(),
+    focusSkills: normalizeTextList(pool.focusSkills),
+    note: pool.note?.trim() || null,
+  };
+}
+
+function normalizeTalentPoolMember(
+  member: MarketplaceTalentPoolMemberRecord,
+): MarketplaceTalentPoolMemberRecord {
+  return {
+    ...member,
+    profileSlug: member.profileSlug.trim().toLowerCase(),
+    note: member.note?.trim() || null,
+    sourceOpportunityId: member.sourceOpportunityId?.trim() || null,
+    sourceApplicationId: member.sourceApplicationId?.trim() || null,
+    sourceJobId: member.sourceJobId?.trim() || null,
+  };
+}
+
+function normalizeAutomationRule(
+  rule: MarketplaceAutomationRuleRecord,
+): MarketplaceAutomationRuleRecord {
+  return {
+    ...rule,
+    label: rule.label.trim(),
+    targetId: rule.targetId?.trim() || null,
   };
 }
 
@@ -609,6 +646,73 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async deleteSavedSearch(searchId: string) {
     await this.store.write((data) => {
       delete data.marketplaceSavedSearches[searchId];
+    });
+  }
+
+  async getTalentPoolById(poolId: string) {
+    return this.store.read((data) => {
+      const pool = data.marketplaceTalentPools[poolId];
+      return pool ? cloneValue(normalizeTalentPool(pool)) : null;
+    });
+  }
+
+  async listTalentPools() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceTalentPools)
+        .map((pool) => cloneValue(normalizeTalentPool(pool)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveTalentPool(pool: MarketplaceTalentPoolRecord) {
+    await this.store.write((data) => {
+      data.marketplaceTalentPools[pool.id] = cloneValue(normalizeTalentPool(pool));
+    });
+  }
+
+  async getTalentPoolMemberById(memberId: string) {
+    return this.store.read((data) => {
+      const member = data.marketplaceTalentPoolMembers[memberId];
+      return member ? cloneValue(normalizeTalentPoolMember(member)) : null;
+    });
+  }
+
+  async listTalentPoolMembers() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceTalentPoolMembers)
+        .map((member) => cloneValue(normalizeTalentPoolMember(member)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveTalentPoolMember(member: MarketplaceTalentPoolMemberRecord) {
+    await this.store.write((data) => {
+      data.marketplaceTalentPoolMembers[member.id] = cloneValue(
+        normalizeTalentPoolMember(member),
+      );
+    });
+  }
+
+  async getAutomationRuleById(ruleId: string) {
+    return this.store.read((data) => {
+      const rule = data.marketplaceAutomationRules[ruleId];
+      return rule ? cloneValue(normalizeAutomationRule(rule)) : null;
+    });
+  }
+
+  async listAutomationRules() {
+    return this.store.read((data) =>
+      Object.values(data.marketplaceAutomationRules)
+        .map((rule) => cloneValue(normalizeAutomationRule(rule)))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }
+
+  async saveAutomationRule(rule: MarketplaceAutomationRuleRecord) {
+    await this.store.write((data) => {
+      data.marketplaceAutomationRules[rule.id] = cloneValue(
+        normalizeAutomationRule(rule),
+      );
     });
   }
 

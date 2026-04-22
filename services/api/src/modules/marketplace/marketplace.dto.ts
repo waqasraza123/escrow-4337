@@ -215,9 +215,101 @@ export const marketplaceSavedSearchesQuerySchema = z
   })
   .strict();
 
+export const createMarketplaceTalentPoolSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    focusSkills: stringArraySchema.default([]),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+  })
+  .strict();
+
+export const addMarketplaceTalentPoolMemberSchema = z
+  .object({
+    profileSlug: slugSchema,
+    stage: z
+      .enum([
+        'saved',
+        'contacted',
+        'interviewing',
+        'offered',
+        'rehire_ready',
+        'archived',
+      ])
+      .default('saved'),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+    sourceOpportunityId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .optional(),
+    sourceApplicationId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .optional(),
+    sourceJobId: z.string().trim().min(1).max(120).nullable().optional(),
+  })
+  .strict();
+
+export const updateMarketplaceTalentPoolMemberSchema = z
+  .object({
+    stage: z
+      .enum([
+        'saved',
+        'contacted',
+        'interviewing',
+        'offered',
+        'rehire_ready',
+        'archived',
+      ])
+      .optional(),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+  })
+  .strict();
+
+export const createMarketplaceAutomationRuleSchema = z
+  .object({
+    kind: z.enum([
+      'saved_search_digest',
+      'talent_pool_digest',
+      'invite_followup',
+      'rehire_digest',
+    ]),
+    label: z.string().trim().min(1).max(120),
+    targetId: z.string().trim().min(1).max(120).nullable().optional(),
+    schedule: z.enum(['manual', 'daily', 'weekly']).default('manual'),
+    enabled: z.boolean().default(true),
+  })
+  .strict();
+
+export const updateMarketplaceAutomationRuleSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120).optional(),
+    targetId: z.string().trim().min(1).max(120).nullable().optional(),
+    schedule: z.enum(['manual', 'daily', 'weekly']).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 export const createMarketplaceOpportunityInviteSchema = z
   .object({
     profileSlug: slugSchema,
+    message: z.string().trim().min(1).max(1000).nullable().optional(),
+  })
+  .strict();
+
+export const createMarketplaceRehireOpportunitySchema = z
+  .object({
+    title: z.string().trim().min(1).max(120).optional(),
+    summary: z.string().trim().min(1).max(280).optional(),
+    description: z.string().trim().min(1).max(5000).optional(),
+    budgetMin: z.string().regex(amountPattern).nullable().optional(),
+    budgetMax: z.string().regex(amountPattern).nullable().optional(),
+    timeline: z.string().trim().min(1).max(240).optional(),
     message: z.string().trim().min(1).max(1000).nullable().optional(),
   })
   .strict();
@@ -514,8 +606,26 @@ export type CreateMarketplaceSavedSearchDto = z.infer<
 export type MarketplaceSavedSearchesQueryDto = z.infer<
   typeof marketplaceSavedSearchesQuerySchema
 >;
+export type CreateMarketplaceTalentPoolDto = z.infer<
+  typeof createMarketplaceTalentPoolSchema
+>;
+export type AddMarketplaceTalentPoolMemberDto = z.infer<
+  typeof addMarketplaceTalentPoolMemberSchema
+>;
+export type UpdateMarketplaceTalentPoolMemberDto = z.infer<
+  typeof updateMarketplaceTalentPoolMemberSchema
+>;
+export type CreateMarketplaceAutomationRuleDto = z.infer<
+  typeof createMarketplaceAutomationRuleSchema
+>;
+export type UpdateMarketplaceAutomationRuleDto = z.infer<
+  typeof updateMarketplaceAutomationRuleSchema
+>;
 export type CreateMarketplaceOpportunityInviteDto = z.infer<
   typeof createMarketplaceOpportunityInviteSchema
+>;
+export type CreateMarketplaceRehireOpportunityDto = z.infer<
+  typeof createMarketplaceRehireOpportunitySchema
 >;
 export type ApplyToOpportunityDto = z.infer<typeof applyToOpportunitySchema>;
 export type ReviseMarketplaceApplicationDto = z.infer<

@@ -796,6 +796,100 @@ export type MarketplaceSavedSearch = {
   createdAt: number;
   updatedAt: number;
 };
+export type MarketplaceTalentPoolMemberStage =
+  | 'saved'
+  | 'contacted'
+  | 'interviewing'
+  | 'offered'
+  | 'rehire_ready'
+  | 'archived';
+export type MarketplaceAutomationRuleKind =
+  | 'saved_search_digest'
+  | 'talent_pool_digest'
+  | 'invite_followup'
+  | 'rehire_digest';
+export type MarketplaceAutomationRuleSchedule = 'manual' | 'daily' | 'weekly';
+export type MarketplaceTalentPoolMember = {
+  id: string;
+  poolId: string;
+  addedByUserId: string;
+  stage: MarketplaceTalentPoolMemberStage;
+  note: string | null;
+  sourceOpportunityId: string | null;
+  sourceApplicationId: string | null;
+  sourceJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  profile: MarketplaceApplication['applicant'];
+  reviewAverage: number | null;
+  activeInviteStatus: MarketplaceOpportunityInvite['status'] | null;
+};
+export type MarketplaceTalentPool = {
+  id: string;
+  ownerUserId: string;
+  workspaceId: string;
+  label: string;
+  focusSkills: string[];
+  note: string | null;
+  createdAt: number;
+  updatedAt: number;
+  members: MarketplaceTalentPoolMember[];
+};
+export type MarketplaceLifecycleTask = {
+  id: string;
+  kind:
+    | 'saved_search_refresh'
+    | 'invite_followup'
+    | 'pool_followup'
+    | 'rehire_prompt';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+};
+export type MarketplaceAutomationRule = {
+  id: string;
+  ownerUserId: string;
+  workspaceId: string;
+  kind: MarketplaceAutomationRuleKind;
+  label: string;
+  targetId: string | null;
+  schedule: MarketplaceAutomationRuleSchedule;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+  pendingTaskCount: number;
+  summary: string;
+};
+export type MarketplaceRehireCandidate = {
+  jobId: string;
+  completedAt: number | null;
+  title: string;
+  profile: MarketplaceApplication['applicant'];
+  reviewAverage: number | null;
+  relationshipStrength: 'repeat_ready' | 'trusted' | 'watch';
+};
+export type MarketplaceLifecycleDigest = {
+  generatedAt: string;
+  workspace:
+    | {
+        workspaceId: string;
+        kind: WorkspaceKind;
+        organizationId: string;
+        organizationKind: OrganizationKind;
+      }
+    | null;
+  poolSummary: {
+    poolCount: number;
+    trackedTalentCount: number;
+    contactedCount: number;
+    interviewingCount: number;
+    offeredCount: number;
+    rehireReadyCount: number;
+  };
+  rehireCandidates: MarketplaceRehireCandidate[];
+  tasks: MarketplaceLifecycleTask[];
+};
 export type MarketplaceOpportunityInvite = {
   id: string;
   status: 'pending' | 'applied' | 'dismissed';
@@ -974,6 +1068,13 @@ export type MarketplaceAnalyticsOverview = {
   noHireReasons: MarketplaceNoHireReasonStat[];
   topSearches: MarketplaceTopSearchStat[];
   stalledItems: MarketplaceStalledItem[];
+  retention: {
+    talentPools: number;
+    trackedTalent: number;
+    automationRules: number;
+    pendingLifecycleTasks: number;
+    rehireCandidates: number;
+  };
 };
 export type MarketplaceRankingAuditEntry = {
   entityType: 'profile' | 'opportunity';
@@ -982,7 +1083,7 @@ export type MarketplaceRankingAuditEntry = {
   score: number;
   outcomeScore: number;
   momentumScore: number;
-  moderationStatus: MarketplaceModerationStatus;
+  moderationStatus: ModerationStatus;
   reasons: MarketplaceSearchReason[];
   signals: {
     completionRate: number;
@@ -1004,6 +1105,14 @@ export type MarketplaceIntelligenceReport = {
   topSearches: MarketplaceTopSearchStat[];
   stalledOpportunities: MarketplaceStalledItem[];
   rankingAudit: MarketplaceRankingAuditEntry[];
+  retention: {
+    talentPools: number;
+    trackedTalent: number;
+    automationRules: number;
+    pendingLifecycleTasks: number;
+    rehireCandidates: number;
+    clientWorkspacesWithRetentionSetup: number;
+  };
 };
 export type MarketplaceReviewScores = {
   scopeClarity: number;
@@ -1976,6 +2085,29 @@ export const webApi = {
       accessToken,
     );
   },
+  createMarketplaceRehireOpportunity(
+    jobId: string,
+    input: {
+      title?: string;
+      summary?: string;
+      description?: string;
+      budgetMin?: string | null;
+      budgetMax?: string | null;
+      timeline?: string;
+      message?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ opportunity: MarketplaceOpportunity }>(
+      apiBaseUrl,
+      `/marketplace/jobs/${encodeURIComponent(jobId)}/rehire-opportunity`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
   requestProjectRevision(
     jobId: string,
     submissionId: string,
@@ -2522,6 +2654,132 @@ export const webApi = {
       apiBaseUrl,
       `/marketplace/saved-searches/${id}`,
       { method: 'DELETE' },
+      accessToken,
+    );
+  },
+  listMarketplaceTalentPools(accessToken: string) {
+    return requestJson<{ pools: MarketplaceTalentPool[] }>(
+      apiBaseUrl,
+      '/marketplace/talent-pools',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createMarketplaceTalentPool(
+    input: {
+      label: string;
+      focusSkills?: string[];
+      note?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ pool: MarketplaceTalentPool }>(
+      apiBaseUrl,
+      '/marketplace/talent-pools',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ...input,
+          focusSkills: input.focusSkills ?? [],
+        }),
+      },
+      accessToken,
+    );
+  },
+  addMarketplaceTalentPoolMember(
+    poolId: string,
+    input: {
+      profileSlug: string;
+      stage?: MarketplaceTalentPoolMemberStage;
+      note?: string | null;
+      sourceOpportunityId?: string | null;
+      sourceApplicationId?: string | null;
+      sourceJobId?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ pool: MarketplaceTalentPool }>(
+      apiBaseUrl,
+      `/marketplace/talent-pools/${encodeURIComponent(poolId)}/members`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceTalentPoolMember(
+    poolId: string,
+    memberId: string,
+    input: {
+      stage?: MarketplaceTalentPoolMemberStage;
+      note?: string | null;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ pool: MarketplaceTalentPool }>(
+      apiBaseUrl,
+      `/marketplace/talent-pools/${encodeURIComponent(poolId)}/members/${encodeURIComponent(memberId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  listMarketplaceAutomationRules(accessToken: string) {
+    return requestJson<{ rules: MarketplaceAutomationRule[] }>(
+      apiBaseUrl,
+      '/marketplace/automation-rules',
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  createMarketplaceAutomationRule(
+    input: {
+      kind: MarketplaceAutomationRuleKind;
+      label: string;
+      targetId?: string | null;
+      schedule?: MarketplaceAutomationRuleSchedule;
+      enabled?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ rule: MarketplaceAutomationRule }>(
+      apiBaseUrl,
+      '/marketplace/automation-rules',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  updateMarketplaceAutomationRule(
+    id: string,
+    input: {
+      label?: string;
+      targetId?: string | null;
+      schedule?: MarketplaceAutomationRuleSchedule;
+      enabled?: boolean;
+    },
+    accessToken: string,
+  ) {
+    return requestJson<{ rule: MarketplaceAutomationRule }>(
+      apiBaseUrl,
+      `/marketplace/automation-rules/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+      accessToken,
+    );
+  },
+  getMarketplaceLifecycleDigest(accessToken: string) {
+    return requestJson<{ digest: MarketplaceLifecycleDigest }>(
+      apiBaseUrl,
+      '/marketplace/lifecycle/digest',
+      { method: 'GET' },
       accessToken,
     );
   },

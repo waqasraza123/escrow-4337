@@ -75,6 +75,22 @@ export type MarketplaceSavedSearchAlertFrequency =
   | 'manual'
   | 'daily'
   | 'weekly';
+export type MarketplaceTalentPoolMemberStage =
+  | 'saved'
+  | 'contacted'
+  | 'interviewing'
+  | 'offered'
+  | 'rehire_ready'
+  | 'archived';
+export type MarketplaceAutomationRuleKind =
+  | 'saved_search_digest'
+  | 'talent_pool_digest'
+  | 'invite_followup'
+  | 'rehire_digest';
+export type MarketplaceAutomationRuleSchedule =
+  | 'manual'
+  | 'daily'
+  | 'weekly';
 export type MarketplaceOpportunityInviteStatus =
   | 'pending'
   | 'applied'
@@ -321,6 +337,45 @@ export type MarketplaceSavedSearchRecord = {
   query: Record<string, string | number | boolean | null>;
   alertFrequency: MarketplaceSavedSearchAlertFrequency;
   lastResultCount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceTalentPoolRecord = {
+  id: string;
+  ownerUserId: string;
+  workspaceId: string;
+  label: string;
+  focusSkills: string[];
+  note: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceTalentPoolMemberRecord = {
+  id: string;
+  poolId: string;
+  profileUserId: string;
+  profileSlug: string;
+  addedByUserId: string;
+  stage: MarketplaceTalentPoolMemberStage;
+  note: string | null;
+  sourceOpportunityId: string | null;
+  sourceApplicationId: string | null;
+  sourceJobId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceAutomationRuleRecord = {
+  id: string;
+  ownerUserId: string;
+  workspaceId: string;
+  kind: MarketplaceAutomationRuleKind;
+  label: string;
+  targetId: string | null;
+  schedule: MarketplaceAutomationRuleSchedule;
+  enabled: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -822,6 +877,66 @@ export type MarketplaceOpportunityInviteView = {
   talent: MarketplaceTalentSummary;
 };
 
+export type MarketplaceTalentPoolMemberView =
+  Omit<MarketplaceTalentPoolMemberRecord, 'profileUserId' | 'profileSlug'> & {
+    profile: MarketplaceTalentSummary;
+    reviewAverage: number | null;
+    activeInviteStatus: MarketplaceOpportunityInviteStatus | null;
+  };
+
+export type MarketplaceTalentPoolView = MarketplaceTalentPoolRecord & {
+  members: MarketplaceTalentPoolMemberView[];
+};
+
+export type MarketplaceLifecycleTask = {
+  id: string;
+  kind:
+    | 'saved_search_refresh'
+    | 'invite_followup'
+    | 'pool_followup'
+    | 'rehire_prompt';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+};
+
+export type MarketplaceAutomationRuleView = MarketplaceAutomationRuleRecord & {
+  pendingTaskCount: number;
+  summary: string;
+};
+
+export type MarketplaceRehireCandidateView = {
+  jobId: string;
+  completedAt: number | null;
+  title: string;
+  profile: MarketplaceTalentSummary;
+  reviewAverage: number | null;
+  relationshipStrength: 'repeat_ready' | 'trusted' | 'watch';
+};
+
+export type MarketplaceLifecycleDigest = {
+  generatedAt: string;
+  workspace:
+    | {
+        workspaceId: string;
+        kind: 'client' | 'freelancer';
+        organizationId: string;
+        organizationKind: 'personal' | 'client' | 'agency';
+      }
+    | null;
+  poolSummary: {
+    poolCount: number;
+    trackedTalentCount: number;
+    contactedCount: number;
+    interviewingCount: number;
+    offeredCount: number;
+    rehireReadyCount: number;
+  };
+  rehireCandidates: MarketplaceRehireCandidateView[];
+  tasks: MarketplaceLifecycleTask[];
+};
+
 export type MarketplaceTalentSearchResult = {
   profile: MarketplaceProfileView;
   reasons: MarketplaceSearchReason[];
@@ -1025,6 +1140,13 @@ export type MarketplaceAnalyticsOverview = {
   noHireReasons: MarketplaceNoHireReasonStat[];
   topSearches: MarketplaceTopSearchStat[];
   stalledItems: MarketplaceStalledItem[];
+  retention: {
+    talentPools: number;
+    trackedTalent: number;
+    automationRules: number;
+    pendingLifecycleTasks: number;
+    rehireCandidates: number;
+  };
 };
 
 export type MarketplaceRankingAuditEntry = {
@@ -1057,6 +1179,14 @@ export type MarketplaceIntelligenceReport = {
   topSearches: MarketplaceTopSearchStat[];
   stalledOpportunities: MarketplaceStalledItem[];
   rankingAudit: MarketplaceRankingAuditEntry[];
+  retention: {
+    talentPools: number;
+    trackedTalent: number;
+    automationRules: number;
+    pendingLifecycleTasks: number;
+    rehireCandidates: number;
+    clientWorkspacesWithRetentionSetup: number;
+  };
 };
 
 export type MarketplaceProfilesListResponse = {
@@ -1115,6 +1245,22 @@ export type MarketplaceSavedSearchResponse = {
   search: MarketplaceSavedSearchView;
 };
 
+export type MarketplaceTalentPoolsResponse = {
+  pools: MarketplaceTalentPoolView[];
+};
+
+export type MarketplaceTalentPoolResponse = {
+  pool: MarketplaceTalentPoolView;
+};
+
+export type MarketplaceAutomationRulesResponse = {
+  rules: MarketplaceAutomationRuleView[];
+};
+
+export type MarketplaceAutomationRuleResponse = {
+  rule: MarketplaceAutomationRuleView;
+};
+
 export type MarketplaceOpportunityInvitesResponse = {
   invites: MarketplaceOpportunityInviteView[];
 };
@@ -1169,6 +1315,10 @@ export type MarketplaceIdentityRiskReviewResponse = {
 
 export type MarketplaceAnalyticsOverviewResponse = {
   overview: MarketplaceAnalyticsOverview;
+};
+
+export type MarketplaceLifecycleDigestResponse = {
+  digest: MarketplaceLifecycleDigest;
 };
 
 export type MarketplaceIntelligenceReportResponse = {

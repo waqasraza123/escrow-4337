@@ -32,8 +32,12 @@ import {
   type MarketplaceApplicationDossier,
   type MarketplaceApplicationTimeline,
   type MarketplaceAnalyticsOverview,
+  type MarketplaceAutomationRule,
+  type MarketplaceAutomationRuleKind,
+  type MarketplaceAutomationRuleSchedule,
   type MarketplaceCryptoReadiness,
   type MarketplaceEngagementType,
+  type MarketplaceLifecycleDigest,
   type MarketplaceOfferMilestoneDraft,
   type MarketplaceOpportunityInvite,
   type MarketplaceOpportunitySearchResult,
@@ -41,6 +45,8 @@ import {
   type MarketplaceProfile,
   type MarketplaceProofArtifact,
   type MarketplaceSavedSearch,
+  type MarketplaceTalentPool,
+  type MarketplaceTalentPoolMemberStage,
   type MarketplaceTalentSearchResult,
   type OrganizationInvitation,
   type OrganizationMembership,
@@ -151,6 +157,20 @@ type OpportunityDiscoveryDraft = {
   skills: string;
   category: string;
   savedSearchLabel: string;
+};
+
+type TalentPoolDraft = {
+  label: string;
+  focusSkills: string;
+  note: string;
+};
+
+type AutomationRuleDraft = {
+  kind: MarketplaceAutomationRuleKind;
+  label: string;
+  targetId: string;
+  schedule: MarketplaceAutomationRuleSchedule;
+  enabled: boolean;
 };
 
 function readSession(): SessionTokens | null {
@@ -308,6 +328,24 @@ function createEmptyInvitationDraft(): InvitationDraft {
   return {
     email: '',
     role: 'client_recruiter',
+  };
+}
+
+function createEmptyTalentPoolDraft(): TalentPoolDraft {
+  return {
+    label: '',
+    focusSkills: '',
+    note: '',
+  };
+}
+
+function createEmptyAutomationRuleDraft(): AutomationRuleDraft {
+  return {
+    kind: 'saved_search_digest',
+    label: '',
+    targetId: '',
+    schedule: 'weekly',
+    enabled: true,
   };
 }
 
@@ -473,11 +511,17 @@ export function MarketplaceWorkspace() {
     OrganizationInvitation[]
   >([]);
   const [savedSearches, setSavedSearches] = useState<MarketplaceSavedSearch[]>([]);
+  const [talentPools, setTalentPools] = useState<MarketplaceTalentPool[]>([]);
+  const [automationRules, setAutomationRules] = useState<MarketplaceAutomationRule[]>(
+    [],
+  );
   const [marketplaceInvites, setMarketplaceInvites] = useState<
     MarketplaceOpportunityInvite[]
   >([]);
   const [analyticsOverview, setAnalyticsOverview] =
     useState<MarketplaceAnalyticsOverview | null>(null);
+  const [lifecycleDigest, setLifecycleDigest] =
+    useState<MarketplaceLifecycleDigest | null>(null);
   const [talentSearchResults, setTalentSearchResults] = useState<
     MarketplaceTalentSearchResult[]
   >([]);
@@ -520,6 +564,12 @@ export function MarketplaceWorkspace() {
     useState<TalentDiscoveryDraft>(createEmptyTalentDiscoveryDraft());
   const [opportunityDiscoveryDraft, setOpportunityDiscoveryDraft] =
     useState<OpportunityDiscoveryDraft>(createEmptyOpportunityDiscoveryDraft());
+  const [talentPoolDraft, setTalentPoolDraft] = useState<TalentPoolDraft>(
+    createEmptyTalentPoolDraft(),
+  );
+  const [selectedTalentPoolId, setSelectedTalentPoolId] = useState('');
+  const [automationRuleDraft, setAutomationRuleDraft] =
+    useState<AutomationRuleDraft>(createEmptyAutomationRuleDraft());
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -609,6 +659,26 @@ export function MarketplaceWorkspace() {
   const opportunitySavedSearches = savedSearches.filter(
     (search) => search.kind === 'opportunity',
   );
+  const automationRuleTargetOptions =
+    automationRuleDraft.kind === 'saved_search_digest'
+      ? talentSavedSearches.map((search) => ({
+          id: search.id,
+          label: search.label,
+        }))
+      : automationRuleDraft.kind === 'talent_pool_digest'
+        ? talentPools.map((pool) => ({
+            id: pool.id,
+            label: pool.label,
+          }))
+        : automationRuleDraft.kind === 'invite_followup'
+          ? myOpportunities.map((opportunity) => ({
+              id: opportunity.id,
+              label: opportunity.title,
+            }))
+          : (lifecycleDigest?.rehireCandidates ?? []).map((candidate) => ({
+              id: candidate.jobId,
+              label: candidate.profile.displayName,
+            }));
   const activeOrganizationInvitable = activeOrganization?.kind === 'client' || activeOrganization?.kind === 'agency';
   const invitationRoleOptions = activeOrganization?.kind === 'agency'
     ? ([
@@ -684,8 +754,11 @@ export function MarketplaceWorkspace() {
         setOrganizationMemberships([]);
         setOrganizationInvitations([]);
         setSavedSearches([]);
+        setTalentPools([]);
+        setAutomationRules([]);
         setMarketplaceInvites([]);
         setAnalyticsOverview(null);
+        setLifecycleDigest(null);
         setTalentSearchResults([]);
         setOpportunitySearchResults([]);
         setMyOpportunities([]);
@@ -710,8 +783,11 @@ export function MarketplaceWorkspace() {
         orgInvitationResponse,
         orgMembershipResponse,
         savedSearchResponse,
+        talentPoolsResponse,
+        automationRulesResponse,
         myMarketplaceInvitesResponse,
         analyticsResponse,
+        lifecycleDigestResponse,
         talentRecommendationResponse,
         opportunityRecommendationResponse,
       ] =
@@ -744,6 +820,16 @@ export function MarketplaceWorkspace() {
           webApi.listMarketplaceSavedSearches(undefined, nextTokens.accessToken).catch(
             () => ({ searches: [] }),
           ),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listMarketplaceTalentPools(nextTokens.accessToken).catch(() => ({
+                pools: [],
+              }))
+            : Promise.resolve({ pools: [] }),
+          nextWorkspace?.kind === 'client'
+            ? webApi.listMarketplaceAutomationRules(nextTokens.accessToken).catch(
+                () => ({ rules: [] }),
+              )
+            : Promise.resolve({ rules: [] }),
           nextWorkspace?.kind === 'freelancer'
             ? webApi.listMyMarketplaceInvites(nextTokens.accessToken).catch(() => ({
                 invites: [],
@@ -752,6 +838,11 @@ export function MarketplaceWorkspace() {
           webApi
             .getMarketplaceAnalyticsOverview(nextTokens.accessToken)
             .catch(() => ({ overview: null })),
+          nextWorkspace?.kind === 'client'
+            ? webApi.getMarketplaceLifecycleDigest(nextTokens.accessToken).catch(
+                () => ({ digest: null }),
+              )
+            : Promise.resolve({ digest: null }),
           nextWorkspace?.kind === 'client'
             ? webApi
                 .getTalentRecommendations({ limit: 6 }, nextTokens.accessToken)
@@ -774,8 +865,11 @@ export function MarketplaceWorkspace() {
       setOrganizationMemberships(orgMembershipResponse.memberships);
       setOrganizationInvitations(orgInvitationResponse.invitations);
       setSavedSearches(savedSearchResponse.searches);
+      setTalentPools(talentPoolsResponse.pools);
+      setAutomationRules(automationRulesResponse.rules);
       setMarketplaceInvites(myMarketplaceInvitesResponse.invites);
       setAnalyticsOverview(analyticsResponse.overview);
+      setLifecycleDigest(lifecycleDigestResponse.digest);
       setTalentSearchResults(talentRecommendationResponse.results);
       setOpportunitySearchResults(opportunityRecommendationResponse.results);
       setMyOpportunities(myOpportunityResult.opportunities);
@@ -865,6 +959,18 @@ export function MarketplaceWorkspace() {
           },
     );
   }, [myOpportunities]);
+
+  useEffect(() => {
+    if (talentPools.length === 0) {
+      if (selectedTalentPoolId) {
+        setSelectedTalentPoolId('');
+      }
+      return;
+    }
+    if (!talentPools.some((pool) => pool.id === selectedTalentPoolId)) {
+      setSelectedTalentPoolId(talentPools[0]?.id ?? '');
+    }
+  }, [selectedTalentPoolId, talentPools]);
 
   async function handleSignOut() {
     if (tokens) {
@@ -1059,12 +1165,13 @@ export function MarketplaceWorkspace() {
           opportunityDiscoveryDraft.q.trim() ||
           opportunityDiscoveryDraft.skill.trim() ||
           'Opportunity search';
-    const query =
+    const query: Record<string, string | number | boolean | null> =
       kind === 'talent'
         ? {
             q: talentDiscoveryDraft.q || null,
             skill: talentDiscoveryDraft.skill || null,
             skills: talentDiscoveryDraft.skills || null,
+            category: null,
           }
         : {
             q: opportunityDiscoveryDraft.q || null,
@@ -1098,6 +1205,111 @@ export function MarketplaceWorkspace() {
     await loadWorkspace(tokens);
   }
 
+  async function handleCreateTalentPool() {
+    if (!tokens) {
+      return;
+    }
+    const label = talentPoolDraft.label.trim();
+    if (!label) {
+      setError('Talent pool label is required.');
+      return;
+    }
+    setError(null);
+    const response = await webApi.createMarketplaceTalentPool(
+      {
+        label,
+        focusSkills: splitList(talentPoolDraft.focusSkills),
+        note: talentPoolDraft.note.trim() || null,
+      },
+      tokens.accessToken,
+    );
+    setTalentPoolDraft(createEmptyTalentPoolDraft());
+    setSelectedTalentPoolId(response.pool.id);
+    setMessage(`Talent pool created: ${response.pool.label}.`);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleAddTalentToPool(profileSlug: string) {
+    if (!tokens || !selectedTalentPoolId) {
+      setError('Select a talent pool before saving candidates.');
+      return;
+    }
+    setError(null);
+    await webApi.addMarketplaceTalentPoolMember(
+      selectedTalentPoolId,
+      {
+        profileSlug,
+        stage: 'saved',
+        sourceOpportunityId: talentDiscoveryDraft.selectedOpportunityId || null,
+      },
+      tokens.accessToken,
+    );
+    setMessage('Candidate saved to the selected talent pool.');
+    await loadWorkspace(tokens);
+  }
+
+  async function handleUpdateTalentPoolMember(
+    poolId: string,
+    memberId: string,
+    stage: MarketplaceTalentPoolMemberStage,
+    note: string | null,
+  ) {
+    if (!tokens) {
+      return;
+    }
+    await webApi.updateMarketplaceTalentPoolMember(
+      poolId,
+      memberId,
+      {
+        stage,
+        note,
+      },
+      tokens.accessToken,
+    );
+    setMessage('Talent pool member updated.');
+    await loadWorkspace(tokens);
+  }
+
+  async function handleCreateAutomationRule() {
+    if (!tokens) {
+      return;
+    }
+    const label = automationRuleDraft.label.trim();
+    if (!label) {
+      setError('Automation rule label is required.');
+      return;
+    }
+    setError(null);
+    await webApi.createMarketplaceAutomationRule(
+      {
+        kind: automationRuleDraft.kind,
+        label,
+        targetId: automationRuleDraft.targetId || null,
+        schedule: automationRuleDraft.schedule,
+        enabled: automationRuleDraft.enabled,
+      },
+      tokens.accessToken,
+    );
+    setAutomationRuleDraft(createEmptyAutomationRuleDraft());
+    setMessage(`Automation rule created: ${label}.`);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleUpdateAutomationRule(
+    ruleId: string,
+    input: {
+      schedule?: MarketplaceAutomationRuleSchedule;
+      enabled?: boolean;
+    },
+  ) {
+    if (!tokens) {
+      return;
+    }
+    await webApi.updateMarketplaceAutomationRule(ruleId, input, tokens.accessToken);
+    setMessage('Automation rule updated.');
+    await loadWorkspace(tokens);
+  }
+
   async function handleInviteTalent(profileSlug: string) {
     if (!tokens || !talentDiscoveryDraft.selectedOpportunityId) {
       return;
@@ -1111,6 +1323,15 @@ export function MarketplaceWorkspace() {
       tokens.accessToken,
     );
     setMessage(workspaceMessages.messages.talentInvited);
+    await loadWorkspace(tokens);
+  }
+
+  async function handleCreateRehireOpportunity(jobId: string) {
+    if (!tokens) {
+      return;
+    }
+    await webApi.createMarketplaceRehireOpportunity(jobId, {}, tokens.accessToken);
+    setMessage('Rehire opportunity created from the completed escrow contract.');
     await loadWorkspace(tokens);
   }
 
@@ -2296,6 +2517,17 @@ export function MarketplaceWorkspace() {
                 <FactItem label="Offers" value={analyticsOverview.summary.offers} />
                 <FactItem label="Hires" value={analyticsOverview.summary.hires} />
                 <FactItem label="Active contracts" value={analyticsOverview.summary.activeContracts} />
+                <FactItem label="Talent pools" value={analyticsOverview.retention.talentPools} />
+                <FactItem label="Tracked talent" value={analyticsOverview.retention.trackedTalent} />
+                <FactItem label="Automation rules" value={analyticsOverview.retention.automationRules} />
+                <FactItem
+                  label="Lifecycle tasks"
+                  value={analyticsOverview.retention.pendingLifecycleTasks}
+                />
+                <FactItem
+                  label="Rehire prompts"
+                  value={analyticsOverview.retention.rehireCandidates}
+                />
               </FactGrid>
               <div className={styles.summaryGrid}>
                 <SharedCard className={styles.actionPanel} interactive>
@@ -2370,6 +2602,336 @@ export function MarketplaceWorkspace() {
 
       {!loading && tokens && activeWorkspace ? (
         <RevealSection className={styles.grid} delay={0.1}>
+          {isClientWorkspace ? (
+            <article className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.panelEyebrow}>Retention</span>
+                  <h2>Talent pools and lifecycle prompts</h2>
+                </div>
+              </div>
+              <div className={styles.stack}>
+                <FactGrid className={styles.summaryGrid}>
+                  <FactItem
+                    label="Pools"
+                    value={lifecycleDigest?.poolSummary.poolCount ?? talentPools.length}
+                  />
+                  <FactItem
+                    label="Tracked talent"
+                    value={lifecycleDigest?.poolSummary.trackedTalentCount ?? 0}
+                  />
+                  <FactItem
+                    label="Contacted"
+                    value={lifecycleDigest?.poolSummary.contactedCount ?? 0}
+                  />
+                  <FactItem
+                    label="Interviewing"
+                    value={lifecycleDigest?.poolSummary.interviewingCount ?? 0}
+                  />
+                  <FactItem
+                    label="Offered"
+                    value={lifecycleDigest?.poolSummary.offeredCount ?? 0}
+                  />
+                  <FactItem
+                    label="Rehire ready"
+                    value={lifecycleDigest?.poolSummary.rehireReadyCount ?? 0}
+                  />
+                </FactGrid>
+
+                <label className={styles.field}>
+                  <span>Pool label</span>
+                  <input
+                    value={talentPoolDraft.label}
+                    onChange={(event) =>
+                      setTalentPoolDraft((current) => ({
+                        ...current,
+                        label: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Focus skills</span>
+                  <input
+                    value={talentPoolDraft.focusSkills}
+                    onChange={(event) =>
+                      setTalentPoolDraft((current) => ({
+                        ...current,
+                        focusSkills: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Pool note</span>
+                  <input
+                    value={talentPoolDraft.note}
+                    onChange={(event) =>
+                      setTalentPoolDraft((current) => ({
+                        ...current,
+                        note: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className={styles.inlineActions}>
+                  <button type="button" onClick={() => void handleCreateTalentPool()}>
+                    Create talent pool
+                  </button>
+                </div>
+
+                {talentPools.length > 0 ? (
+                  <>
+                    <label className={styles.field}>
+                      <span>Pool used for search saves</span>
+                      <select
+                        value={selectedTalentPoolId}
+                        onChange={(event) => setSelectedTalentPoolId(event.target.value)}
+                      >
+                        <option value="">No pool selected</option>
+                        {talentPools.map((pool) => (
+                          <option key={pool.id} value={pool.id}>
+                            {pool.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className={styles.stack}>
+                      {talentPools.map((pool) => (
+                        <SharedCard
+                          key={pool.id}
+                          className={styles.actionPanel}
+                          interactive
+                        >
+                          <div className={styles.stack}>
+                            <strong>{pool.label}</strong>
+                            <p className={styles.stateText}>
+                              {pool.focusSkills.join(', ') || 'No focus skills'} •{' '}
+                              {pool.members.length} tracked candidate
+                              {pool.members.length === 1 ? '' : 's'}
+                            </p>
+                            {pool.note ? (
+                              <p className={styles.stateText}>{pool.note}</p>
+                            ) : null}
+                            {pool.members.length === 0 ? (
+                              <p className={styles.stateText}>
+                                Save talent search results into this pool to start tracking.
+                              </p>
+                            ) : (
+                              pool.members.map((member) => (
+                                <div key={member.id} className={styles.stack}>
+                                  <strong>{member.profile.displayName}</strong>
+                                  <p className={styles.stateText}>
+                                    {member.stage} • reviews {member.reviewAverage ?? '—'} •
+                                    invite {member.activeInviteStatus ?? 'none'}
+                                  </p>
+                                  <div className={styles.inlineActions}>
+                                    {(
+                                      [
+                                        'saved',
+                                        'contacted',
+                                        'interviewing',
+                                        'offered',
+                                        'rehire_ready',
+                                        'archived',
+                                      ] satisfies MarketplaceTalentPoolMemberStage[]
+                                    ).map((stage) => (
+                                      <button
+                                        key={stage}
+                                        type="button"
+                                        disabled={member.stage === stage}
+                                        onClick={() =>
+                                          void handleUpdateTalentPoolMember(
+                                            pool.id,
+                                            member.id,
+                                            stage,
+                                            member.note,
+                                          )
+                                        }
+                                      >
+                                        {stage}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </SharedCard>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+
+                <label className={styles.field}>
+                  <span>Automation kind</span>
+                  <select
+                    value={automationRuleDraft.kind}
+                    onChange={(event) =>
+                      setAutomationRuleDraft((current) => ({
+                        ...current,
+                        kind: event.target.value as MarketplaceAutomationRuleKind,
+                        targetId: '',
+                      }))
+                    }
+                  >
+                    <option value="saved_search_digest">Saved search digest</option>
+                    <option value="talent_pool_digest">Talent pool digest</option>
+                    <option value="invite_followup">Invite follow-up</option>
+                    <option value="rehire_digest">Rehire digest</option>
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span>Automation label</span>
+                  <input
+                    value={automationRuleDraft.label}
+                    onChange={(event) =>
+                      setAutomationRuleDraft((current) => ({
+                        ...current,
+                        label: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Automation target</span>
+                  <select
+                    value={automationRuleDraft.targetId}
+                    onChange={(event) =>
+                      setAutomationRuleDraft((current) => ({
+                        ...current,
+                        targetId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">All matching items</option>
+                    {automationRuleTargetOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span>Automation cadence</span>
+                  <select
+                    value={automationRuleDraft.schedule}
+                    onChange={(event) =>
+                      setAutomationRuleDraft((current) => ({
+                        ...current,
+                        schedule: event.target.value as MarketplaceAutomationRuleSchedule,
+                      }))
+                    }
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </label>
+                <div className={styles.inlineActions}>
+                  <button type="button" onClick={() => void handleCreateAutomationRule()}>
+                    Create automation
+                  </button>
+                </div>
+
+                {automationRules.length > 0 ? (
+                  <div className={styles.stack}>
+                    {automationRules.map((rule) => (
+                      <SharedCard
+                        key={rule.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{rule.label}</strong>
+                          <p className={styles.stateText}>{rule.summary}</p>
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleUpdateAutomationRule(rule.id, {
+                                  enabled: !rule.enabled,
+                                })
+                              }
+                            >
+                              {rule.enabled ? 'Disable' : 'Enable'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleUpdateAutomationRule(rule.id, {
+                                  schedule:
+                                    rule.schedule === 'weekly'
+                                      ? 'daily'
+                                      : rule.schedule === 'daily'
+                                        ? 'manual'
+                                        : 'weekly',
+                                })
+                              }
+                            >
+                              Cycle cadence
+                            </button>
+                          </div>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+
+                {lifecycleDigest ? (
+                  <div className={styles.stack}>
+                    <span className={styles.metaLabel}>Lifecycle tasks</span>
+                    {lifecycleDigest.tasks.length === 0 ? (
+                      <p className={styles.stateText}>
+                        No lifecycle tasks are pending for this workspace.
+                      </p>
+                    ) : (
+                      lifecycleDigest.tasks.map((task) => (
+                        <SharedCard
+                          key={task.id}
+                          className={styles.actionPanel}
+                          interactive
+                        >
+                          <div className={styles.stack}>
+                            <strong>{task.title}</strong>
+                            <p className={styles.stateText}>
+                              {task.priority} priority • {task.detail}
+                            </p>
+                          </div>
+                        </SharedCard>
+                      ))
+                    )}
+                    {(lifecycleDigest.rehireCandidates ?? []).map((candidate) => (
+                      <SharedCard
+                        key={candidate.jobId}
+                        className={styles.actionPanel}
+                        interactive
+                      >
+                        <div className={styles.stack}>
+                          <strong>{candidate.profile.displayName}</strong>
+                          <p className={styles.stateText}>
+                            {candidate.relationshipStrength} • previous escrow{' '}
+                            {candidate.title}
+                          </p>
+                          <div className={styles.inlineActions}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleCreateRehireOpportunity(candidate.jobId)
+                              }
+                            >
+                              Create rehire brief
+                            </button>
+                          </div>
+                        </div>
+                      </SharedCard>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          ) : null}
+
           {isClientWorkspace ? (
             <article className={styles.panel}>
               <div className={styles.panelHeader}>
@@ -2537,6 +3099,15 @@ export function MarketplaceWorkspace() {
                           >
                             {marketplaceMessages.actions.viewProfile}
                           </Link>
+                          <button
+                            type="button"
+                            disabled={!selectedTalentPoolId}
+                            onClick={() =>
+                              void handleAddTalentToPool(result.profile.slug)
+                            }
+                          >
+                            Save to pool
+                          </button>
                           <button
                             type="button"
                             disabled={!talentDiscoveryDraft.selectedOpportunityId}
@@ -3715,7 +4286,7 @@ export function MarketplaceWorkspace() {
                             {applicationTimelines[application.id].contractDraft
                               ? renderContractDraftPanel(
                                   application,
-                                  applicationTimelines[application.id].contractDraft,
+                                  applicationTimelines[application.id].contractDraft!,
                                   'client',
                                 )
                               : null}
@@ -3993,7 +4564,7 @@ export function MarketplaceWorkspace() {
                       {applicationTimelines[application.id].contractDraft
                         ? renderContractDraftPanel(
                             application,
-                            applicationTimelines[application.id].contractDraft,
+                            applicationTimelines[application.id].contractDraft!,
                             'talent',
                           )
                         : null}

@@ -6,6 +6,9 @@ import type {
   MarketplaceAbuseReportSubjectType,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
+  MarketplaceAutomationRuleKind,
+  MarketplaceAutomationRuleRecord,
+  MarketplaceAutomationRuleSchedule,
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftRevisionRecord,
   MarketplaceContractDraftStatus,
@@ -43,6 +46,9 @@ import type {
   MarketplaceSearchReason,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
+  MarketplaceTalentPoolMemberRecord,
+  MarketplaceTalentPoolMemberStage,
+  MarketplaceTalentPoolRecord,
   MarketplaceTalentSearchDocument,
   MarketplaceTalentProofArtifact,
 } from '../../modules/marketplace/marketplace.types';
@@ -295,6 +301,45 @@ type MarketplaceSavedSearchRow = QueryResultRow & {
   query_json: Record<string, string | number | boolean | null>;
   alert_frequency: MarketplaceSavedSearchAlertFrequency;
   last_result_count: number;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceTalentPoolRow = QueryResultRow & {
+  id: string;
+  owner_user_id: string;
+  workspace_id: string;
+  label: string;
+  focus_skills_json: string[];
+  note: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceTalentPoolMemberRow = QueryResultRow & {
+  id: string;
+  pool_id: string;
+  profile_user_id: string;
+  profile_slug: string;
+  added_by_user_id: string;
+  stage: MarketplaceTalentPoolMemberStage;
+  note: string | null;
+  source_opportunity_id: string | null;
+  source_application_id: string | null;
+  source_job_id: string | null;
+  created_at_ms: string;
+  updated_at_ms: string;
+};
+
+type MarketplaceAutomationRuleRow = QueryResultRow & {
+  id: string;
+  owner_user_id: string;
+  workspace_id: string;
+  kind: MarketplaceAutomationRuleKind;
+  label: string;
+  target_id: string | null;
+  schedule: MarketplaceAutomationRuleSchedule;
+  enabled: boolean;
   created_at_ms: string;
   updated_at_ms: string;
 };
@@ -674,6 +719,55 @@ function mapSavedSearch(row: MarketplaceSavedSearchRow): MarketplaceSavedSearchR
     query: row.query_json ?? {},
     alertFrequency: row.alert_frequency,
     lastResultCount: row.last_result_count,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapTalentPool(row: MarketplaceTalentPoolRow): MarketplaceTalentPoolRecord {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    workspaceId: row.workspace_id,
+    label: row.label,
+    focusSkills: row.focus_skills_json ?? [],
+    note: row.note,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapTalentPoolMember(
+  row: MarketplaceTalentPoolMemberRow,
+): MarketplaceTalentPoolMemberRecord {
+  return {
+    id: row.id,
+    poolId: row.pool_id,
+    profileUserId: row.profile_user_id,
+    profileSlug: row.profile_slug,
+    addedByUserId: row.added_by_user_id,
+    stage: row.stage,
+    note: row.note,
+    sourceOpportunityId: row.source_opportunity_id,
+    sourceApplicationId: row.source_application_id,
+    sourceJobId: row.source_job_id,
+    createdAt: Number(row.created_at_ms),
+    updatedAt: Number(row.updated_at_ms),
+  };
+}
+
+function mapAutomationRule(
+  row: MarketplaceAutomationRuleRow,
+): MarketplaceAutomationRuleRecord {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    label: row.label,
+    targetId: row.target_id,
+    schedule: row.schedule,
+    enabled: row.enabled,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
   };
@@ -1738,6 +1832,208 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         WHERE id = $1
       `,
       [searchId],
+    );
+  }
+
+  async getTalentPoolById(poolId: string) {
+    const result = await this.db.query<MarketplaceTalentPoolRow>(
+      `
+        SELECT *
+        FROM marketplace_talent_pools
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [poolId],
+    );
+
+    return result.rows[0] ? mapTalentPool(result.rows[0]) : null;
+  }
+
+  async listTalentPools() {
+    const result = await this.db.query<MarketplaceTalentPoolRow>(
+      `
+        SELECT *
+        FROM marketplace_talent_pools
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapTalentPool);
+  }
+
+  async saveTalentPool(pool: MarketplaceTalentPoolRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_talent_pools (
+          id,
+          owner_user_id,
+          workspace_id,
+          label,
+          focus_skills_json,
+          note,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES ($1, $2::uuid, $3, $4, $5::jsonb, $6, $7, $8)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          owner_user_id = EXCLUDED.owner_user_id,
+          workspace_id = EXCLUDED.workspace_id,
+          label = EXCLUDED.label,
+          focus_skills_json = EXCLUDED.focus_skills_json,
+          note = EXCLUDED.note,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        pool.id,
+        pool.ownerUserId,
+        pool.workspaceId,
+        pool.label,
+        JSON.stringify(pool.focusSkills),
+        pool.note,
+        String(pool.createdAt),
+        String(pool.updatedAt),
+      ],
+    );
+  }
+
+  async getTalentPoolMemberById(memberId: string) {
+    const result = await this.db.query<MarketplaceTalentPoolMemberRow>(
+      `
+        SELECT *
+        FROM marketplace_talent_pool_members
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [memberId],
+    );
+
+    return result.rows[0] ? mapTalentPoolMember(result.rows[0]) : null;
+  }
+
+  async listTalentPoolMembers() {
+    const result = await this.db.query<MarketplaceTalentPoolMemberRow>(
+      `
+        SELECT *
+        FROM marketplace_talent_pool_members
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapTalentPoolMember);
+  }
+
+  async saveTalentPoolMember(member: MarketplaceTalentPoolMemberRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_talent_pool_members (
+          id,
+          pool_id,
+          profile_user_id,
+          profile_slug,
+          added_by_user_id,
+          stage,
+          note,
+          source_opportunity_id,
+          source_application_id,
+          source_job_id,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (
+          $1, $2, $3::uuid, $4, $5::uuid, $6, $7, $8, $9, $10, $11, $12
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+          stage = EXCLUDED.stage,
+          note = EXCLUDED.note,
+          source_opportunity_id = EXCLUDED.source_opportunity_id,
+          source_application_id = EXCLUDED.source_application_id,
+          source_job_id = EXCLUDED.source_job_id,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        member.id,
+        member.poolId,
+        member.profileUserId,
+        member.profileSlug,
+        member.addedByUserId,
+        member.stage,
+        member.note,
+        member.sourceOpportunityId,
+        member.sourceApplicationId,
+        member.sourceJobId,
+        String(member.createdAt),
+        String(member.updatedAt),
+      ],
+    );
+  }
+
+  async getAutomationRuleById(ruleId: string) {
+    const result = await this.db.query<MarketplaceAutomationRuleRow>(
+      `
+        SELECT *
+        FROM marketplace_automation_rules
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [ruleId],
+    );
+
+    return result.rows[0] ? mapAutomationRule(result.rows[0]) : null;
+  }
+
+  async listAutomationRules() {
+    const result = await this.db.query<MarketplaceAutomationRuleRow>(
+      `
+        SELECT *
+        FROM marketplace_automation_rules
+        ORDER BY updated_at_ms DESC
+      `,
+    );
+
+    return result.rows.map(mapAutomationRule);
+  }
+
+  async saveAutomationRule(rule: MarketplaceAutomationRuleRecord) {
+    await this.db.query(
+      `
+        INSERT INTO marketplace_automation_rules (
+          id,
+          owner_user_id,
+          workspace_id,
+          kind,
+          label,
+          target_id,
+          schedule,
+          enabled,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          owner_user_id = EXCLUDED.owner_user_id,
+          workspace_id = EXCLUDED.workspace_id,
+          kind = EXCLUDED.kind,
+          label = EXCLUDED.label,
+          target_id = EXCLUDED.target_id,
+          schedule = EXCLUDED.schedule,
+          enabled = EXCLUDED.enabled,
+          updated_at_ms = EXCLUDED.updated_at_ms
+      `,
+      [
+        rule.id,
+        rule.ownerUserId,
+        rule.workspaceId,
+        rule.kind,
+        rule.label,
+        rule.targetId,
+        rule.schedule,
+        rule.enabled,
+        String(rule.createdAt),
+        String(rule.updatedAt),
+      ],
     );
   }
 

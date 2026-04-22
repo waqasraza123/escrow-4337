@@ -611,6 +611,32 @@ export function MarketplaceModerationConsole() {
                         value={stage.count}
                       />
                     ))}
+                    <FactItem
+                      label="Talent pools"
+                      value={intelligence.retention.talentPools}
+                    />
+                    <FactItem
+                      label="Tracked talent"
+                      value={intelligence.retention.trackedTalent}
+                    />
+                    <FactItem
+                      label="Automation rules"
+                      value={intelligence.retention.automationRules}
+                    />
+                    <FactItem
+                      label="Lifecycle tasks"
+                      value={intelligence.retention.pendingLifecycleTasks}
+                    />
+                    <FactItem
+                      label="Rehire prompts"
+                      value={intelligence.retention.rehireCandidates}
+                    />
+                    <FactItem
+                      label="Retention-ready workspaces"
+                      value={
+                        intelligence.retention.clientWorkspacesWithRetentionSetup
+                      }
+                    />
                   </FactGrid>
                   <div className={styles.stack}>
                     <strong>Category imbalance</strong>

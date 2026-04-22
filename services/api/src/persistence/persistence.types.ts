@@ -22,6 +22,7 @@ import type {
   MarketplaceApplicationDecisionRecord,
   MarketplaceAbuseReportRecord,
   MarketplaceContractDraftRecord,
+  MarketplaceAutomationRuleRecord,
   MarketplaceIdentityRiskReviewRecord,
   MarketplaceInteractionEventRecord,
   MarketplaceInterviewMessageRecord,
@@ -32,6 +33,8 @@ import type {
   MarketplaceProfileRecord,
   MarketplaceReviewRecord,
   MarketplaceSavedSearchRecord,
+  MarketplaceTalentPoolMemberRecord,
+  MarketplaceTalentPoolRecord,
   MarketplaceOpportunitySearchDocument,
   MarketplaceTalentSearchDocument,
 } from '../modules/marketplace/marketplace.types';
@@ -208,6 +211,19 @@ export interface MarketplaceRepository {
   listSavedSearches(): Promise<MarketplaceSavedSearchRecord[]>;
   saveSavedSearch(search: MarketplaceSavedSearchRecord): Promise<void>;
   deleteSavedSearch(searchId: string): Promise<void>;
+  getTalentPoolById(poolId: string): Promise<MarketplaceTalentPoolRecord | null>;
+  listTalentPools(): Promise<MarketplaceTalentPoolRecord[]>;
+  saveTalentPool(pool: MarketplaceTalentPoolRecord): Promise<void>;
+  getTalentPoolMemberById(
+    memberId: string,
+  ): Promise<MarketplaceTalentPoolMemberRecord | null>;
+  listTalentPoolMembers(): Promise<MarketplaceTalentPoolMemberRecord[]>;
+  saveTalentPoolMember(member: MarketplaceTalentPoolMemberRecord): Promise<void>;
+  getAutomationRuleById(
+    ruleId: string,
+  ): Promise<MarketplaceAutomationRuleRecord | null>;
+  listAutomationRules(): Promise<MarketplaceAutomationRuleRecord[]>;
+  saveAutomationRule(rule: MarketplaceAutomationRuleRecord): Promise<void>;
   getOpportunityInviteById(
     inviteId: string,
   ): Promise<MarketplaceOpportunityInviteRecord | null>;
@@ -242,7 +258,7 @@ export interface WalletLinkChallengesRepository {
 export type PersistenceDriver = 'postgres' | 'file';
 
 export type PersistenceFileData = {
-  version: 26;
+  version: 27;
   users: Record<string, UserRecord>;
   organizations: Record<string, OrganizationRecord>;
   organizationMemberships: Record<string, OrganizationMembershipRecord>;
@@ -279,6 +295,9 @@ export type PersistenceFileData = {
     MarketplaceApplicationDecisionRecord
   >;
   marketplaceSavedSearches: Record<string, MarketplaceSavedSearchRecord>;
+  marketplaceTalentPools: Record<string, MarketplaceTalentPoolRecord>;
+  marketplaceTalentPoolMembers: Record<string, MarketplaceTalentPoolMemberRecord>;
+  marketplaceAutomationRules: Record<string, MarketplaceAutomationRuleRecord>;
   marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   marketplaceReviews: Record<string, MarketplaceReviewRecord>;

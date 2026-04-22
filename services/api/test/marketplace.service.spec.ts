@@ -435,6 +435,7 @@ describe('MarketplaceService', () => {
     expect(moderated.profile.slug).toBe('moderated-builder');
 
     const profiles = await marketplaceService.listProfiles({
+      sort: 'recent',
       limit: 24,
     });
     expect(profiles.profiles).toHaveLength(0);

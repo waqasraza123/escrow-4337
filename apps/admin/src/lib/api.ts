@@ -478,6 +478,14 @@ export type MarketplaceIntelligenceReport = {
   topSearches: MarketplaceTopSearchStat[];
   stalledOpportunities: MarketplaceStalledItem[];
   rankingAudit: MarketplaceRankingAuditEntry[];
+  retention: {
+    talentPools: number;
+    trackedTalent: number;
+    automationRules: number;
+    pendingLifecycleTasks: number;
+    rehireCandidates: number;
+    clientWorkspacesWithRetentionSetup: number;
+  };
 };
 
 export type MarketplaceAbuseReportReason =

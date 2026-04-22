@@ -32,13 +32,17 @@ import {
   type UserRecord,
 } from '../users/users.types';
 import type {
+  AddMarketplaceTalentPoolMemberDto,
   ApplicationDecisionNoteDto,
   ApplyToOpportunityDto,
+  CreateMarketplaceAutomationRuleDto,
   CreateMarketplaceInterviewMessageDto,
   CreateMarketplaceOfferDto,
   CreateMarketplaceOpportunityInviteDto,
+  CreateMarketplaceRehireOpportunityDto,
   CreateMarketplaceReviewDto,
   CreateMarketplaceSavedSearchDto,
+  CreateMarketplaceTalentPoolDto,
   CreateMarketplaceAbuseReportDto,
   CreateMarketplaceOpportunityDto,
   MarketplaceModerationReportsQueryDto,
@@ -52,11 +56,13 @@ import type {
   ReviseMarketplaceContractDraftDto,
   ReviseMarketplaceApplicationDto,
   UpdateMarketplaceAbuseReportDto,
+  UpdateMarketplaceAutomationRuleDto,
   UpdateMarketplaceIdentityRiskReviewDto,
   UpdateMarketplaceOpportunityDto,
   UpdateMarketplaceProofsDto,
   UpdateMarketplaceReviewModerationDto,
   UpdateMarketplaceScreeningDto,
+  UpdateMarketplaceTalentPoolMemberDto,
   UpdateModerationDto,
   UpsertMarketplaceProfileDto,
 } from './marketplace.dto';
@@ -85,6 +91,10 @@ import type {
   MarketplaceApplicationTimelineView,
   MarketplaceApplicationView,
   MarketplaceApplicationsListResponse,
+  MarketplaceAutomationRuleRecord,
+  MarketplaceAutomationRuleResponse,
+  MarketplaceAutomationRulesResponse,
+  MarketplaceAutomationRuleView,
   MarketplaceClientSummary,
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftResponse,
@@ -107,6 +117,9 @@ import type {
   MarketplaceJobReviewsResponse,
   MarketplaceInterviewThreadResponse,
   MarketplaceInterviewThreadView,
+  MarketplaceLifecycleDigest,
+  MarketplaceLifecycleDigestResponse,
+  MarketplaceLifecycleTask,
   MarketplaceMatchesResponse,
   MarketplaceMatchSummary,
   MarketplaceModerationDashboard,
@@ -143,12 +156,18 @@ import type {
   MarketplaceReviewView,
   MarketplaceRiskSignalCode,
   MarketplaceRiskSignalView,
+  MarketplaceRehireCandidateView,
   MarketplaceSavedSearchResponse,
   MarketplaceSavedSearchesResponse,
   MarketplaceSavedSearchRecord,
   MarketplaceSavedSearchView,
   MarketplaceSearchReason,
   MarketplaceSearchKind,
+  MarketplaceTalentPoolMemberRecord,
+  MarketplaceTalentPoolResponse,
+  MarketplaceTalentPoolsResponse,
+  MarketplaceTalentPoolRecord,
+  MarketplaceTalentPoolView,
   MarketplaceTalentSearchDocument,
   MarketplaceTalentSearchResponse,
   MarketplaceTalentSearchResult,
@@ -207,7 +226,11 @@ function normalizeScreeningAnswers(values: MarketplaceScreeningAnswer[]) {
 }
 
 function normalizeOfferMilestones(
-  values: MarketplaceOfferMilestoneDraft[],
+  values: Array<
+    MarketplaceOfferMilestoneDraft | (Omit<MarketplaceOfferMilestoneDraft, 'dueAt'> & {
+      dueAt?: number | null;
+    })
+  >,
 ): MarketplaceOfferMilestoneDraft[] {
   return values.map((milestone) => ({
     ...milestone,
@@ -1178,8 +1201,8 @@ export class MarketplaceService {
       entityId: record.id,
       searchKind: dto.kind,
       queryLabel: summarizeSearchQuery(dto.kind, normalizedQuery),
-      category: asOptionalString(normalizedQuery.category),
-      timezone: asOptionalString(normalizedQuery.timezone),
+      category: asOptionalString(normalizedQuery.category) ?? null,
+      timezone: asOptionalString(normalizedQuery.timezone) ?? null,
       skillTags: normalizeSkillTags(
         [
           asOptionalString(normalizedQuery.skill) ?? '',
@@ -1209,6 +1232,204 @@ export class MarketplaceService {
     }
     await this.marketplaceRepository.deleteSavedSearch(searchId);
     return { ok: true as const };
+  }
+
+  async listTalentPools(userId: string): Promise<MarketplaceTalentPoolsResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const pools = (await this.marketplaceRepository.listTalentPools()).filter(
+      (pool) => pool.workspaceId === workspace.workspaceId,
+    );
+
+    return {
+      pools: await Promise.all(
+        pools.map((pool) => this.toTalentPoolView(pool, workspace.workspaceId)),
+      ),
+    };
+  }
+
+  async createTalentPool(
+    userId: string,
+    dto: CreateMarketplaceTalentPoolDto,
+  ): Promise<MarketplaceTalentPoolResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const now = Date.now();
+    const pool: MarketplaceTalentPoolRecord = {
+      id: randomUUID(),
+      ownerUserId: userId,
+      workspaceId: workspace.workspaceId,
+      label: dto.label.trim(),
+      focusSkills: normalizeTextArray(dto.focusSkills),
+      note: normalizeMaybeText(dto.note),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.marketplaceRepository.saveTalentPool(pool);
+    return {
+      pool: await this.toTalentPoolView(pool, workspace.workspaceId),
+    };
+  }
+
+  async addTalentPoolMember(
+    userId: string,
+    poolId: string,
+    dto: AddMarketplaceTalentPoolMemberDto,
+  ): Promise<MarketplaceTalentPoolResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const pool = await this.requireTalentPoolInWorkspace(poolId, workspace.workspaceId);
+    const profile = await this.marketplaceRepository.getProfileBySlug(
+      dto.profileSlug.trim().toLowerCase(),
+    );
+    if (!profile || !this.isProfileComplete(profile)) {
+      throw new NotFoundException('Marketplace profile not found');
+    }
+    await this.validateTalentPoolMemberSources(workspace.workspaceId, dto);
+    const members = await this.marketplaceRepository.listTalentPoolMembers();
+    const existing = members.find(
+      (member) =>
+        member.poolId === pool.id && member.profileUserId === profile.userId,
+    );
+    const now = Date.now();
+    const member: MarketplaceTalentPoolMemberRecord = {
+      id: existing?.id ?? randomUUID(),
+      poolId: pool.id,
+      profileUserId: profile.userId,
+      profileSlug: profile.slug,
+      addedByUserId: userId,
+      stage: dto.stage,
+      note: normalizeMaybeText(dto.note),
+      sourceOpportunityId: normalizeMaybeText(dto.sourceOpportunityId),
+      sourceApplicationId: normalizeMaybeText(dto.sourceApplicationId),
+      sourceJobId: normalizeMaybeText(dto.sourceJobId),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    await this.marketplaceRepository.saveTalentPoolMember(member);
+    await this.marketplaceRepository.saveTalentPool({
+      ...pool,
+      updatedAt: now,
+    });
+    return {
+      pool: await this.toTalentPoolView(
+        { ...pool, updatedAt: now },
+        workspace.workspaceId,
+      ),
+    };
+  }
+
+  async updateTalentPoolMember(
+    userId: string,
+    poolId: string,
+    memberId: string,
+    dto: UpdateMarketplaceTalentPoolMemberDto,
+  ): Promise<MarketplaceTalentPoolResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const pool = await this.requireTalentPoolInWorkspace(poolId, workspace.workspaceId);
+    const member = await this.marketplaceRepository.getTalentPoolMemberById(memberId);
+    if (!member || member.poolId !== pool.id) {
+      throw new NotFoundException('Marketplace talent pool member not found');
+    }
+    const now = Date.now();
+    const next: MarketplaceTalentPoolMemberRecord = {
+      ...member,
+      stage: dto.stage ?? member.stage,
+      note:
+        dto.note !== undefined ? normalizeMaybeText(dto.note) : member.note,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveTalentPoolMember(next);
+    await this.marketplaceRepository.saveTalentPool({
+      ...pool,
+      updatedAt: now,
+    });
+    return {
+      pool: await this.toTalentPoolView(
+        { ...pool, updatedAt: now },
+        workspace.workspaceId,
+      ),
+    };
+  }
+
+  async listAutomationRules(
+    userId: string,
+  ): Promise<MarketplaceAutomationRulesResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
+      (rule) => rule.workspaceId === workspace.workspaceId,
+    );
+    const digest = await this.buildLifecycleDigestForWorkspace(workspace);
+
+    return {
+      rules: await Promise.all(
+        rules.map((rule) => this.toAutomationRuleView(rule, workspace, digest)),
+      ),
+    };
+  }
+
+  async createAutomationRule(
+    userId: string,
+    dto: CreateMarketplaceAutomationRuleDto,
+  ): Promise<MarketplaceAutomationRuleResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const targetId = normalizeMaybeText(dto.targetId);
+    await this.validateAutomationRuleTarget(workspace.workspaceId, dto.kind, targetId);
+    const now = Date.now();
+    const rule: MarketplaceAutomationRuleRecord = {
+      id: randomUUID(),
+      ownerUserId: userId,
+      workspaceId: workspace.workspaceId,
+      kind: dto.kind,
+      label: dto.label.trim(),
+      targetId,
+      schedule: dto.schedule,
+      enabled: dto.enabled,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.marketplaceRepository.saveAutomationRule(rule);
+    const digest = await this.buildLifecycleDigestForWorkspace(workspace);
+    return {
+      rule: await this.toAutomationRuleView(rule, workspace, digest),
+    };
+  }
+
+  async updateAutomationRule(
+    userId: string,
+    ruleId: string,
+    dto: UpdateMarketplaceAutomationRuleDto,
+  ): Promise<MarketplaceAutomationRuleResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    const rule = await this.marketplaceRepository.getAutomationRuleById(ruleId);
+    if (!rule || rule.workspaceId !== workspace.workspaceId) {
+      throw new NotFoundException('Marketplace automation rule not found');
+    }
+    const targetId =
+      dto.targetId !== undefined ? normalizeMaybeText(dto.targetId) : rule.targetId;
+    await this.validateAutomationRuleTarget(workspace.workspaceId, rule.kind, targetId);
+    const next: MarketplaceAutomationRuleRecord = {
+      ...rule,
+      label: dto.label?.trim() ?? rule.label,
+      targetId,
+      schedule: dto.schedule ?? rule.schedule,
+      enabled: dto.enabled ?? rule.enabled,
+      updatedAt: Date.now(),
+    };
+    await this.marketplaceRepository.saveAutomationRule(next);
+    const digest = await this.buildLifecycleDigestForWorkspace(workspace);
+    return {
+      rule: await this.toAutomationRuleView(next, workspace, digest),
+    };
+  }
+
+  async getLifecycleDigest(
+    userId: string,
+  ): Promise<MarketplaceLifecycleDigestResponse> {
+    const workspace = await this.requireClientRetentionWorkspace(userId);
+    return {
+      digest: await this.buildLifecycleDigestForWorkspace(workspace),
+    };
   }
 
   async listMyOpportunityInvites(
@@ -1403,6 +1624,131 @@ export class MarketplaceService {
     });
     return {
       review: await this.toReviewView(review),
+    };
+  }
+
+  async createRehireOpportunity(
+    userId: string,
+    jobId: string,
+    dto: CreateMarketplaceRehireOpportunityDto,
+  ): Promise<MarketplaceOpportunityResponse> {
+    const workspace = await this.organizationsService.requireWorkspace(
+      userId,
+      'client',
+      'createOpportunity',
+    );
+    const user = await this.usersService.getRequiredById(userId);
+    const job = await this.requireReviewableJob(jobId);
+    const roles = await this.resolveEscrowParticipantRoles(user, job);
+    if (!roles.includes('client')) {
+      throw new ForbiddenException(
+        'Only the client-side marketplace participant can create a rehire opportunity',
+      );
+    }
+    const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+    if (!workerUserId) {
+      throw new ConflictException(
+        'The previous worker could not be resolved into a marketplace account',
+      );
+    }
+    const workerUser = await this.usersService.getRequiredById(workerUserId);
+    const workerSummary = await this.toTalentSummary(workerUser);
+    if (!workerSummary.profileSlug) {
+      throw new ConflictException(
+        'The previous worker does not have a reusable marketplace profile',
+      );
+    }
+    const totalAmount = this.sumMilestoneAmounts(job.milestones);
+    const createResponse = await this.createOpportunity(userId, {
+      title: dto.title?.trim() || `Rehire ${workerSummary.displayName}`,
+      summary:
+        dto.summary?.trim() ||
+        `Repeat engagement with ${workerSummary.displayName} using the same escrow-backed workflow.`,
+      description:
+        dto.description?.trim() ||
+        [
+          `Previous escrow job: ${job.title}`,
+          `Rehire candidate: ${workerSummary.displayName}`,
+          dto.message?.trim() || 'Resume delivery under a new milestone-backed brief.',
+        ].join('\n\n'),
+      category: job.category,
+      currencyAddress: job.onchain.currencyAddress,
+      requiredSkills: workerSummary.specialties,
+      mustHaveSkills: workerSummary.specialties.slice(0, 3),
+      outcomes: job.milestones.map((milestone) => milestone.title),
+      acceptanceCriteria: job.milestones.map(
+        (milestone) => milestone.deliverable,
+      ),
+      screeningQuestions: [],
+      visibility: 'private',
+      budgetMin: dto.budgetMin ?? totalAmount,
+      budgetMax: dto.budgetMax ?? totalAmount,
+      timeline:
+        dto.timeline?.trim() ||
+        `Repeat execution path for ${job.milestones.length} milestone${job.milestones.length === 1 ? '' : 's'}.`,
+      desiredStartAt: null,
+      timezoneOverlapHours: null,
+      engagementType: 'fixed_scope',
+      cryptoReadinessRequired: workerSummary.cryptoReadiness,
+    });
+
+    let opportunity = createResponse.opportunity;
+    if ((await this.getEscrowReadiness(userId)) === 'ready') {
+      opportunity = (
+        await this.publishOpportunity(userId, createResponse.opportunity.id)
+      ).opportunity;
+      await this.inviteTalentToOpportunity(userId, opportunity.id, {
+        profileSlug: workerSummary.profileSlug,
+        message: dto.message?.trim() || null,
+      });
+    }
+
+    const pools = await this.marketplaceRepository.listTalentPools();
+    const defaultPool = pools.find(
+      (pool) =>
+        pool.workspaceId === workspace.workspaceId &&
+        pool.label.trim().toLowerCase() === 'rehire bench',
+    );
+    const now = Date.now();
+    const rehirePool =
+      defaultPool ??
+      ({
+        id: randomUUID(),
+        ownerUserId: userId,
+        workspaceId: workspace.workspaceId,
+        label: 'Rehire bench',
+        focusSkills: workerSummary.specialties,
+        note: 'Repeat-ready talent sourced from completed escrow delivery.',
+        createdAt: now,
+        updatedAt: now,
+      } satisfies MarketplaceTalentPoolRecord);
+    await this.marketplaceRepository.saveTalentPool({
+      ...rehirePool,
+      updatedAt: now,
+    });
+    const members = await this.marketplaceRepository.listTalentPoolMembers();
+    const existingMember = members.find(
+      (member) =>
+        member.poolId === rehirePool.id &&
+        member.profileUserId === workerSummary.userId,
+    );
+    await this.marketplaceRepository.saveTalentPoolMember({
+      id: existingMember?.id ?? randomUUID(),
+      poolId: rehirePool.id,
+      profileUserId: workerSummary.userId,
+      profileSlug: workerSummary.profileSlug,
+      addedByUserId: userId,
+      stage: 'rehire_ready',
+      note: dto.message?.trim() || 'Seeded automatically from a completed escrow contract.',
+      sourceOpportunityId: opportunity.id,
+      sourceApplicationId: null,
+      sourceJobId: job.id,
+      createdAt: existingMember?.createdAt ?? now,
+      updatedAt: now,
+    });
+
+    return {
+      opportunity,
     };
   }
 
@@ -2349,7 +2695,7 @@ export class MarketplaceService {
   async shortlistApplication(
     userId: string,
     applicationId: string,
-    dto: ApplicationDecisionNoteDto,
+    dto: ApplicationDecisionNoteDto = {},
   ): Promise<MarketplaceApplicationsListResponse> {
     const application = await this.requireApplication(applicationId);
     const opportunity = await this.requireOpportunity(
@@ -2436,7 +2782,7 @@ export class MarketplaceService {
   async hireApplication(
     userId: string,
     applicationId: string,
-    dto: ApplicationDecisionNoteDto,
+    dto: ApplicationDecisionNoteDto = {},
   ): Promise<HireApplicationResponse> {
     const application = await this.requireApplication(applicationId);
     const opportunity = await this.requireOpportunity(
@@ -4132,6 +4478,9 @@ export class MarketplaceService {
       offers,
       savedSearches,
       events,
+      talentPools,
+      talentPoolMembers,
+      automationRules,
     ] = await Promise.all([
       this.marketplaceRepository.listProfiles(),
       this.marketplaceRepository.listOpportunities(),
@@ -4140,6 +4489,9 @@ export class MarketplaceService {
       this.marketplaceRepository.listOffers(),
       this.marketplaceRepository.listSavedSearches(),
       this.marketplaceRepository.listInteractionEvents(),
+      this.marketplaceRepository.listTalentPools(),
+      this.marketplaceRepository.listTalentPoolMembers(),
+      this.marketplaceRepository.listAutomationRules(),
     ]);
 
     const scopedOpportunities =
@@ -4194,6 +4546,10 @@ export class MarketplaceService {
       user,
       workspace?.kind === 'client' ? 'client' : 'worker',
     );
+    const lifecycleDigest =
+      workspace?.kind === 'client'
+        ? await this.buildLifecycleDigestForWorkspace(workspace)
+        : null;
     const searchImpressions = scopedEvents
       .filter((event) => event.eventType === 'search_impression')
       .reduce((sum, event) => sum + event.resultCount, 0);
@@ -4266,6 +4622,31 @@ export class MarketplaceService {
               decisions,
             )
           : this.buildStalledOpportunityViews(opportunities, scopedApplications, scopedDecisions),
+      retention: {
+        talentPools:
+          workspace?.kind === 'client'
+            ? talentPools.filter((pool) => pool.workspaceId === workspace.workspaceId)
+                .length
+            : 0,
+        trackedTalent:
+          workspace?.kind === 'client'
+            ? talentPoolMembers.filter((member) =>
+                talentPools.some(
+                  (pool) =>
+                    pool.workspaceId === workspace.workspaceId &&
+                    pool.id === member.poolId,
+                ),
+              ).length
+            : 0,
+        automationRules:
+          workspace?.kind === 'client'
+            ? automationRules.filter(
+                (rule) => rule.workspaceId === workspace.workspaceId,
+              ).length
+            : 0,
+        pendingLifecycleTasks: lifecycleDigest?.tasks.length ?? 0,
+        rehireCandidates: lifecycleDigest?.rehireCandidates.length ?? 0,
+      },
     };
   }
 
@@ -4280,6 +4661,10 @@ export class MarketplaceService {
       events,
       talentDocuments,
       opportunityDocuments,
+      savedSearches,
+      talentPools,
+      talentPoolMembers,
+      automationRules,
     ] = await Promise.all([
       this.marketplaceRepository.listProfiles(),
       this.marketplaceRepository.listOpportunities(),
@@ -4290,9 +4675,38 @@ export class MarketplaceService {
       this.marketplaceRepository.listInteractionEvents(),
       this.marketplaceRepository.listTalentSearchDocuments(),
       this.marketplaceRepository.listOpportunitySearchDocuments(),
+      this.marketplaceRepository.listSavedSearches(),
+      this.marketplaceRepository.listTalentPools(),
+      this.marketplaceRepository.listTalentPoolMembers(),
+      this.marketplaceRepository.listAutomationRules(),
     ]);
 
     const jobs = await this.escrowRepository.listAll();
+    const hiredJobs = jobs.filter((job) =>
+      opportunities.some((opportunity) => opportunity.hiredJobId === job.id),
+    );
+    const rehireCandidates = await this.buildRehireCandidates(hiredJobs, reviews);
+    const pendingLifecycleTasks =
+      savedSearches.filter(
+        (search) =>
+          search.kind === 'talent' && Date.now() - search.updatedAt >= 7 * 24 * hourMs,
+      ).length +
+      (await this.marketplaceRepository.listOpportunityInvites()).filter(
+        (invite) =>
+          invite.status === 'pending' &&
+          Date.now() - invite.updatedAt >= 3 * 24 * hourMs,
+      ).length +
+      talentPoolMembers.filter(
+        (member) =>
+          ['saved', 'contacted'].includes(member.stage) &&
+          Date.now() - member.updatedAt >= 5 * 24 * hourMs,
+      ).length +
+      rehireCandidates.length;
+    const retentionWorkspaceIds = new Set(
+      talentPools.map((pool) => pool.workspaceId).concat(
+        automationRules.map((rule) => rule.workspaceId),
+      ),
+    );
     const funnel = this.buildFunnelStages({
       searchImpressions: events
         .filter((event) => event.eventType === 'search_impression')
@@ -4363,9 +4777,8 @@ export class MarketplaceService {
     const opportunityMap = new Map(
       opportunities.map((opportunity) => [opportunity.id, opportunity]),
     );
-    const rankingAudit: MarketplaceRankingAuditEntry[] = [
-      ...talentDocuments
-        .map((document) => {
+    const profileRankingAudit = talentDocuments
+      .map((document) => {
           const profile = profileMap.get(document.profileUserId);
           if (!profile) {
             return null;
@@ -4415,9 +4828,9 @@ export class MarketplaceService {
             },
           } satisfies MarketplaceRankingAuditEntry;
         })
-        .filter((entry): entry is MarketplaceRankingAuditEntry => entry !== null),
-      ...opportunityDocuments
-        .map((document) => {
+        .filter(Boolean) as MarketplaceRankingAuditEntry[];
+    const opportunityRankingAudit = opportunityDocuments
+      .map((document) => {
           const opportunity = opportunityMap.get(document.opportunityId);
           if (!opportunity) {
             return null;
@@ -4455,7 +4868,10 @@ export class MarketplaceService {
             },
           } satisfies MarketplaceRankingAuditEntry;
         })
-        .filter((entry): entry is MarketplaceRankingAuditEntry => entry !== null),
+        .filter(Boolean) as MarketplaceRankingAuditEntry[];
+    const rankingAudit: MarketplaceRankingAuditEntry[] = [
+      ...profileRankingAudit,
+      ...opportunityRankingAudit,
     ]
       .sort(
         (left, right) =>
@@ -4485,6 +4901,14 @@ export class MarketplaceService {
         decisions,
       ),
       rankingAudit,
+      retention: {
+        talentPools: talentPools.length,
+        trackedTalent: talentPoolMembers.length,
+        automationRules: automationRules.length,
+        pendingLifecycleTasks,
+        rehireCandidates: rehireCandidates.length,
+        clientWorkspacesWithRetentionSetup: retentionWorkspaceIds.size,
+      },
     };
   }
 
@@ -4706,6 +5130,440 @@ export class MarketplaceService {
     );
   }
 
+  private async requireClientRetentionWorkspace(userId: string) {
+    return this.organizationsService.requireWorkspace(
+      userId,
+      'client',
+      'reviewApplications',
+    );
+  }
+
+  private async requireTalentPoolInWorkspace(poolId: string, workspaceId: string) {
+    const pool = await this.marketplaceRepository.getTalentPoolById(poolId);
+    if (!pool || pool.workspaceId !== workspaceId) {
+      throw new NotFoundException('Marketplace talent pool not found');
+    }
+    return pool;
+  }
+
+  private async validateTalentPoolMemberSources(
+    workspaceId: string,
+    dto: Pick<
+      AddMarketplaceTalentPoolMemberDto,
+      'sourceApplicationId' | 'sourceJobId' | 'sourceOpportunityId'
+    >,
+  ) {
+    if (dto.sourceOpportunityId) {
+      const opportunity = await this.requireOpportunity(dto.sourceOpportunityId);
+      const hydrated = await this.ensureOpportunityWorkspace(opportunity);
+      if (hydrated.ownerWorkspaceId !== workspaceId) {
+        throw new ForbiddenException(
+          'Talent pool sources must belong to the active client workspace',
+        );
+      }
+    }
+    if (dto.sourceApplicationId) {
+      const application = await this.requireApplication(dto.sourceApplicationId);
+      const opportunity = await this.requireOpportunity(application.opportunityId);
+      const hydrated = await this.ensureOpportunityWorkspace(opportunity);
+      if (hydrated.ownerWorkspaceId !== workspaceId) {
+        throw new ForbiddenException(
+          'Talent pool sources must belong to the active client workspace',
+        );
+      }
+    }
+    if (dto.sourceJobId && !(await this.escrowRepository.getById(dto.sourceJobId))) {
+      throw new NotFoundException('Escrow job not found');
+    }
+  }
+
+  private async validateAutomationRuleTarget(
+    workspaceId: string,
+    kind: MarketplaceAutomationRuleRecord['kind'],
+    targetId: string | null,
+  ) {
+    if (!targetId) {
+      return;
+    }
+    if (kind === 'saved_search_digest') {
+      const search = await this.marketplaceRepository.getSavedSearchById(targetId);
+      if (!search || search.workspaceId !== workspaceId) {
+        throw new NotFoundException('Marketplace saved search not found');
+      }
+      return;
+    }
+    if (kind === 'talent_pool_digest') {
+      await this.requireTalentPoolInWorkspace(targetId, workspaceId);
+      return;
+    }
+    if (kind === 'invite_followup') {
+      const opportunity = await this.requireOpportunity(targetId);
+      const hydrated = await this.ensureOpportunityWorkspace(opportunity);
+      if (hydrated.ownerWorkspaceId !== workspaceId) {
+        throw new NotFoundException('Marketplace opportunity not found');
+      }
+      return;
+    }
+    if (kind === 'rehire_digest' && !(await this.escrowRepository.getById(targetId))) {
+      throw new NotFoundException('Escrow job not found');
+    }
+  }
+
+  private async toTalentPoolView(
+    pool: MarketplaceTalentPoolRecord,
+    workspaceId: string,
+  ): Promise<MarketplaceTalentPoolView> {
+    const [members, invites, opportunities] = await Promise.all([
+      this.marketplaceRepository.listTalentPoolMembers(),
+      this.marketplaceRepository.listOpportunityInvites(),
+      this.marketplaceRepository.listOpportunities(),
+    ]);
+    const workspaceOpportunityIds = new Set(
+      opportunities
+        .filter((opportunity) => opportunity.ownerWorkspaceId === workspaceId)
+        .map((opportunity) => opportunity.id),
+    );
+
+    return {
+      ...pool,
+      members: await Promise.all(
+        members
+          .filter((member) => member.poolId === pool.id)
+          .sort((left, right) => right.updatedAt - left.updatedAt)
+          .map(async (member) => {
+            const user = await this.usersService.getRequiredById(member.profileUserId);
+            const profile = await this.toTalentSummary(user);
+            const invite = invites
+              .filter(
+                (candidate) =>
+                  candidate.invitedProfileUserId === member.profileUserId &&
+                  workspaceOpportunityIds.has(candidate.opportunityId),
+              )
+              .sort((left, right) => right.updatedAt - left.updatedAt)[0];
+            return {
+              ...member,
+              profile,
+              reviewAverage: profile.reputation.averageRating,
+              activeInviteStatus: invite?.status ?? null,
+            };
+          }),
+      ),
+    };
+  }
+
+  private async buildLifecycleDigestForWorkspace(
+    workspace: WorkspaceSummary,
+  ): Promise<MarketplaceLifecycleDigest> {
+    const [
+      savedSearches,
+      pools,
+      members,
+      invites,
+      opportunities,
+      reviews,
+    ] = await Promise.all([
+      this.marketplaceRepository.listSavedSearches(),
+      this.marketplaceRepository.listTalentPools(),
+      this.marketplaceRepository.listTalentPoolMembers(),
+      this.marketplaceRepository.listOpportunityInvites(),
+      this.marketplaceRepository.listOpportunities(),
+      this.marketplaceRepository.listReviews(),
+    ]);
+    const scopedPools = pools.filter((pool) => pool.workspaceId === workspace.workspaceId);
+    const poolIds = new Set(scopedPools.map((pool) => pool.id));
+    const scopedMembers = members.filter((member) => poolIds.has(member.poolId));
+    const scopedSearches = savedSearches.filter(
+      (search) =>
+        search.workspaceId === workspace.workspaceId && search.kind === 'talent',
+    );
+    const scopedOpportunities = opportunities.filter(
+      (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
+    );
+    const opportunityIds = new Set(scopedOpportunities.map((item) => item.id));
+    const scopedInvites = invites.filter((invite) =>
+      opportunityIds.has(invite.opportunityId),
+    );
+    const scopedJobs = (
+      await Promise.all(
+        scopedOpportunities
+          .filter((opportunity) => opportunity.hiredJobId)
+          .map(async (opportunity) => {
+            const job = await this.escrowRepository.getById(opportunity.hiredJobId!);
+            if (!job) {
+              return null;
+            }
+            return (await this.escrowOnchainAuthority.mergeJob(job)).job;
+          }),
+      )
+    ).filter((job): job is EscrowJobRecord => job !== null);
+    const rehireCandidates = await this.buildRehireCandidates(scopedJobs, reviews);
+    const tasks = this.buildLifecycleTasks({
+      searches: scopedSearches,
+      pools: scopedPools,
+      members: scopedMembers,
+      invites: scopedInvites,
+      opportunities: scopedOpportunities,
+      rehireCandidates,
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      workspace: {
+        workspaceId: workspace.workspaceId,
+        kind: workspace.kind,
+        organizationId: workspace.organizationId,
+        organizationKind: workspace.organizationKind,
+      },
+      poolSummary: {
+        poolCount: scopedPools.length,
+        trackedTalentCount: scopedMembers.length,
+        contactedCount: scopedMembers.filter((member) => member.stage === 'contacted')
+          .length,
+        interviewingCount: scopedMembers.filter(
+          (member) => member.stage === 'interviewing',
+        ).length,
+        offeredCount: scopedMembers.filter((member) => member.stage === 'offered')
+          .length,
+        rehireReadyCount: scopedMembers.filter(
+          (member) => member.stage === 'rehire_ready',
+        ).length,
+      },
+      rehireCandidates,
+      tasks,
+    };
+  }
+
+  private buildLifecycleTasks(input: {
+    searches: MarketplaceSavedSearchRecord[];
+    pools: MarketplaceTalentPoolRecord[];
+    members: MarketplaceTalentPoolMemberRecord[];
+    invites: MarketplaceOpportunityInviteRecord[];
+    opportunities: MarketplaceOpportunityRecord[];
+    rehireCandidates: MarketplaceRehireCandidateView[];
+  }): MarketplaceLifecycleTask[] {
+    const now = Date.now();
+    const poolById = new Map(input.pools.map((pool) => [pool.id, pool]));
+    const opportunityById = new Map(
+      input.opportunities.map((opportunity) => [opportunity.id, opportunity]),
+    );
+    const tasks: MarketplaceLifecycleTask[] = [];
+
+    for (const search of input.searches) {
+      if (now - search.updatedAt < 7 * 24 * hourMs) {
+        continue;
+      }
+      tasks.push({
+        id: `saved-search-${search.id}`,
+        kind: 'saved_search_refresh',
+        priority: search.lastResultCount > 0 ? 'medium' : 'low',
+        title: `Refresh saved search: ${search.label}`,
+        detail: `Last refreshed ${Math.max(
+          1,
+          Math.floor((now - search.updatedAt) / (24 * hourMs)),
+        )} day(s) ago with ${search.lastResultCount} result(s).`,
+        relatedEntityId: search.id,
+      });
+    }
+
+    for (const invite of input.invites) {
+      if (invite.status !== 'pending' || now - invite.updatedAt < 3 * 24 * hourMs) {
+        continue;
+      }
+      const opportunity = opportunityById.get(invite.opportunityId);
+      tasks.push({
+        id: `invite-${invite.id}`,
+        kind: 'invite_followup',
+        priority: 'high',
+        title: `Follow up invite: ${opportunity?.title ?? invite.opportunityId}`,
+        detail: `Pending for ${Math.max(
+          1,
+          Math.floor((now - invite.updatedAt) / (24 * hourMs)),
+        )} day(s) without an application.`,
+        relatedEntityId: opportunity?.id ?? invite.opportunityId,
+      });
+    }
+
+    for (const member of input.members) {
+      if (
+        !['saved', 'contacted'].includes(member.stage) ||
+        now - member.updatedAt < 5 * 24 * hourMs
+      ) {
+        continue;
+      }
+      const pool = poolById.get(member.poolId);
+      tasks.push({
+        id: `pool-${member.id}`,
+        kind: 'pool_followup',
+        priority: member.stage === 'contacted' ? 'high' : 'medium',
+        title: `Advance talent pool candidate: ${member.profileSlug}`,
+        detail: `${pool?.label ?? 'Talent pool'} has not progressed this candidate since ${Math.max(
+          1,
+          Math.floor((now - member.updatedAt) / (24 * hourMs)),
+        )} day(s).`,
+        relatedEntityId: pool?.id ?? member.poolId,
+      });
+    }
+
+    for (const candidate of input.rehireCandidates.slice(0, 4)) {
+      tasks.push({
+        id: `rehire-${candidate.jobId}`,
+        kind: 'rehire_prompt',
+        priority:
+          candidate.relationshipStrength === 'repeat_ready'
+            ? 'high'
+            : candidate.relationshipStrength === 'trusted'
+              ? 'medium'
+              : 'low',
+        title: `Rehire prompt: ${candidate.profile.displayName}`,
+        detail: `Previous escrow contract "${candidate.title}" is ready for a repeat brief.`,
+        relatedEntityId: candidate.jobId,
+      });
+    }
+
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return tasks
+      .sort(
+        (left, right) =>
+          priorityOrder[left.priority] - priorityOrder[right.priority] ||
+          left.title.localeCompare(right.title),
+      )
+      .slice(0, 12);
+  }
+
+  private async buildRehireCandidates(
+    jobs: EscrowJobRecord[],
+    reviews: MarketplaceReviewRecord[],
+  ): Promise<MarketplaceRehireCandidateView[]> {
+    const candidates = await Promise.all(
+      jobs
+        .filter((job) => job.status === 'completed' || job.status === 'resolved')
+        .map(async (job) => {
+          const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+          if (!workerUserId) {
+            return null;
+          }
+          const workerUser = await this.usersService.getRequiredById(workerUserId);
+          const profile = await this.toTalentSummary(workerUser);
+          if (!profile.profileSlug) {
+            return null;
+          }
+          const visibleReviews = reviews.filter(
+            (review) =>
+              review.jobId === job.id &&
+              review.revieweeUserId === workerUserId &&
+              review.revieweeRole === 'worker' &&
+              review.visibilityStatus === 'visible',
+          );
+          const reviewAverage =
+            visibleReviews.length === 0
+              ? profile.reputation.averageRating
+              : Number(
+                  (
+                    visibleReviews.reduce((sum, review) => sum + review.rating, 0) /
+                    visibleReviews.length
+                  ).toFixed(1),
+                );
+          const disputedCount = job.milestones.filter(
+            (milestone) =>
+              milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+          ).length;
+          const relationshipStrength =
+            reviewAverage !== null && reviewAverage >= 4.8 && disputedCount === 0
+              ? ('repeat_ready' as const)
+              : reviewAverage !== null && reviewAverage >= 4
+                ? ('trusted' as const)
+                : ('watch' as const);
+          const completedAt =
+            Math.max(
+              job.updatedAt,
+              ...job.milestones.map((milestone) =>
+                Math.max(milestone.releasedAt ?? 0, milestone.resolvedAt ?? 0),
+              ),
+            ) || null;
+          return {
+            jobId: job.id,
+            completedAt,
+            title: job.title,
+            profile,
+            reviewAverage,
+            relationshipStrength,
+          } satisfies MarketplaceRehireCandidateView;
+        }),
+    );
+
+    return candidates
+      .filter((candidate): candidate is MarketplaceRehireCandidateView => candidate !== null)
+      .sort(
+        (left, right) =>
+          (right.completedAt ?? 0) - (left.completedAt ?? 0) ||
+          right.profile.completedEscrowCount - left.profile.completedEscrowCount,
+      )
+      .slice(0, 8);
+  }
+
+  private async toAutomationRuleView(
+    rule: MarketplaceAutomationRuleRecord,
+    workspace: WorkspaceSummary,
+    digest?: MarketplaceLifecycleDigest,
+  ): Promise<MarketplaceAutomationRuleView> {
+    const lifecycleDigest =
+      digest ?? (await this.buildLifecycleDigestForWorkspace(workspace));
+    const pendingTaskCount = lifecycleDigest.tasks.filter((task) =>
+      this.matchesAutomationRule(rule, task),
+    ).length;
+    return {
+      ...rule,
+      pendingTaskCount,
+      summary: this.describeAutomationRule(rule, pendingTaskCount),
+    };
+  }
+
+  private matchesAutomationRule(
+    rule: MarketplaceAutomationRuleRecord,
+    task: MarketplaceLifecycleTask,
+  ) {
+    if (
+      rule.kind === 'saved_search_digest' &&
+      task.kind === 'saved_search_refresh'
+    ) {
+      return !rule.targetId || task.relatedEntityId === rule.targetId;
+    }
+    if (
+      rule.kind === 'talent_pool_digest' &&
+      task.kind === 'pool_followup'
+    ) {
+      return !rule.targetId || task.relatedEntityId === rule.targetId;
+    }
+    if (rule.kind === 'invite_followup' && task.kind === 'invite_followup') {
+      return !rule.targetId || task.relatedEntityId === rule.targetId;
+    }
+    if (rule.kind === 'rehire_digest' && task.kind === 'rehire_prompt') {
+      return !rule.targetId || task.relatedEntityId === rule.targetId;
+    }
+    return false;
+  }
+
+  private describeAutomationRule(
+    rule: MarketplaceAutomationRuleRecord,
+    pendingTaskCount: number,
+  ) {
+    const kindLabel: Record<MarketplaceAutomationRuleRecord['kind'], string> = {
+      saved_search_digest: 'Saved-search refresh',
+      talent_pool_digest: 'Talent-pool follow-up',
+      invite_followup: 'Invite follow-up',
+      rehire_digest: 'Rehire prompts',
+    };
+    return `${kindLabel[rule.kind]} on ${rule.schedule} cadence with ${pendingTaskCount} pending task${pendingTaskCount === 1 ? '' : 's'}.`;
+  }
+
+  private sumMilestoneAmounts(milestones: EscrowMilestoneRecord[]) {
+    const total = milestones.reduce((sum, milestone) => {
+      const parsed = Number(milestone.amount);
+      return Number.isFinite(parsed) ? sum + parsed : sum;
+    }, 0);
+    return total > 0 ? String(total) : null;
+  }
+
   private normalizeSavedSearchQuery(
     kind: MarketplaceSavedSearchRecord['kind'],
     query: Record<string, string | number | boolean | null>,
@@ -4793,23 +5651,25 @@ export class MarketplaceService {
         'open',
         'limited',
         'unavailable',
-      ]),
+      ] as const),
       cryptoReadiness: asOptionalEnum(query.cryptoReadiness, [
         'wallet_only',
         'smart_account_ready',
         'escrow_power_user',
-      ]),
+      ] as const),
       engagementType: asOptionalEnum(query.engagementType, [
         'fixed_scope',
         'milestone_retainer',
         'advisory',
-      ]),
+      ] as const),
       verificationLevel: asOptionalEnum(query.verificationLevel, [
         'wallet_verified',
         'wallet_and_escrow_history',
         'wallet_escrow_and_delivery',
-      ]),
-      sort: asOptionalEnum(query.sort, ['relevance', 'recent']) ?? 'relevance',
+      ] as const),
+      sort:
+        asOptionalEnum(query.sort, ['relevance', 'recent'] as const) ??
+        'relevance',
       limit: asPositiveInt(query.limit) ?? 24,
     };
   }
@@ -4826,16 +5686,18 @@ export class MarketplaceService {
         'fixed_scope',
         'milestone_retainer',
         'advisory',
-      ]),
+      ] as const),
       cryptoReadinessRequired: asOptionalEnum(query.cryptoReadinessRequired, [
         'wallet_only',
         'smart_account_ready',
         'escrow_power_user',
-      ]),
+      ] as const),
       minBudget: asOptionalString(query.minBudget),
       maxBudget: asOptionalString(query.maxBudget),
       timezoneOverlapHours: asPositiveInt(query.timezoneOverlapHours),
-      sort: asOptionalEnum(query.sort, ['relevance', 'recent']) ?? 'relevance',
+      sort:
+        asOptionalEnum(query.sort, ['relevance', 'recent'] as const) ??
+        'relevance',
       limit: asPositiveInt(query.limit) ?? 24,
     };
   }
@@ -4845,7 +5707,7 @@ export class MarketplaceService {
   ): Record<string, string | number | boolean | null> {
     return Object.fromEntries(
       Object.entries(query).filter(([, value]) => value !== undefined),
-    );
+    ) as Record<string, string | number | boolean | null>;
   }
 
   private async requireReviewableJob(jobId: string) {

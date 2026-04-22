@@ -1062,3 +1062,32 @@
   - passed: `git diff --check`
   - blocked: `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/smoke/local/theme-toggle.spec.ts --project=local-smoke`
     - blocked by unrelated existing API TypeScript build failures in marketplace/organizations modules during Playwright webServer startup
+
+## Update (2026-04-22, Post-Phase-8 Retention Layer)
+- Implemented the next full marketplace slice after Phase 8 as one repo-side pass:
+  - client talent pools with staged members and source references
+  - workspace automation rules for saved-search, pool, invite, and rehire follow-up
+  - lifecycle digest reads with pending task generation and repeat-hire prompts
+  - completed-job rehire shortcut that seeds a private repeat brief, auto-publishes when escrow-ready, and re-invites the prior worker
+- Backend changes:
+  - added controller/service routes for talent pools, automation rules, lifecycle digest, and rehire opportunity creation
+  - added Postgres migration `026_marketplace_retention_phase.sql`
+  - extended file/Postgres marketplace persistence for pools, pool members, and automation rules
+  - extended analytics/intelligence responses with retention metrics
+- Frontend changes:
+  - `apps/web` marketplace workspace now renders retention metrics, talent-pool management, automation rules, lifecycle tasks, save-to-pool actions, and rehire prompts
+  - `apps/admin` moderation intelligence now shows retention counts alongside funnel/liquidity QA
+- Changed files:
+  `services/api/src/modules/marketplace/{marketplace.controller.ts,marketplace.dto.ts,marketplace.service.ts,marketplace.types.ts}`
+  `services/api/src/persistence/{persistence.types.ts,file/file-persistence.store.ts,file/file.marketplace.repositories.ts,postgres/postgres.marketplace.repositories.ts}`
+  `services/api/src/persistence/postgres/migrations/026_marketplace_retention_phase.sql`
+  `apps/web/src/{app/marketplace/workspace.tsx,lib/api.ts}`
+  `apps/admin/src/{app/marketplace/moderation-console.tsx,lib/api.ts}`
+  `services/api/test/{marketplace.controller.integration.spec.ts,marketplace.service.spec.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - filtered marketplace/web typecheck grep passed with no matches for the touched retention files
+  - full repo API/web typechecks still fail in unrelated existing escrow/operations/organizations/web fixture areas outside this slice
+- Next likely step:
+  - either formalize this retention lane into a named post-Phase-8 plan/doc set
+  - or switch back to staged deployment and launch evidence work
