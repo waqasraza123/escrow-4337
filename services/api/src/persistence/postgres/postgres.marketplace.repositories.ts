@@ -278,7 +278,9 @@ type MarketplaceTalentSearchDocumentRow = QueryResultRow & {
   availability: MarketplaceProfileRecord['availability'];
   preferred_engagements_json: MarketplaceEngagementType[];
   crypto_readiness: MarketplaceCryptoReadiness;
-  verification_level: MarketplaceProfileRecord['moderationStatus'] | 'unverified';
+  verification_level:
+    | MarketplaceProfileRecord['moderationStatus']
+    | 'unverified';
   ranking_json: MarketplaceRankingFeatureSnapshot;
   reasons_json: MarketplaceSearchReason[];
   updated_at_ms: string;
@@ -606,7 +608,9 @@ function mapApplicationRevision(
     deliveryApproach: row.delivery_approach,
     milestonePlanSummary: row.milestone_plan_summary,
     estimatedStartAt:
-      row.estimated_start_at_ms === null ? null : Number(row.estimated_start_at_ms),
+      row.estimated_start_at_ms === null
+        ? null
+        : Number(row.estimated_start_at_ms),
     relevantProofArtifacts: row.relevant_proof_artifacts_json ?? [],
     portfolioUrls: row.portfolio_urls_json ?? [],
     revisionReason: row.revision_reason,
@@ -679,7 +683,9 @@ function mapContractDraft(
     metadataHash: row.metadata_hash,
     revisions: row.revisions_json ?? [],
     clientApprovedAt:
-      row.client_approved_at_ms === null ? null : Number(row.client_approved_at_ms),
+      row.client_approved_at_ms === null
+        ? null
+        : Number(row.client_approved_at_ms),
     applicantApprovedAt:
       row.applicant_approved_at_ms === null
         ? null
@@ -762,8 +768,8 @@ function mapTalentSearchDocument(
     availability: row.availability,
     preferredEngagements: row.preferred_engagements_json ?? [],
     cryptoReadiness: row.crypto_readiness,
-    verificationLevel: row.verification_level as
-      | MarketplaceTalentSearchDocument['verificationLevel'],
+    verificationLevel:
+      row.verification_level as MarketplaceTalentSearchDocument['verificationLevel'],
     ranking: row.ranking_json,
     reasons: row.reasons_json ?? [],
     updatedAt: Number(row.updated_at_ms),
@@ -799,7 +805,9 @@ function mapOpportunitySearchDocument(
   };
 }
 
-function mapSavedSearch(row: MarketplaceSavedSearchRow): MarketplaceSavedSearchRecord {
+function mapSavedSearch(
+  row: MarketplaceSavedSearchRow,
+): MarketplaceSavedSearchRecord {
   return {
     id: row.id,
     userId: row.user_id,
@@ -814,7 +822,9 @@ function mapSavedSearch(row: MarketplaceSavedSearchRow): MarketplaceSavedSearchR
   };
 }
 
-function mapTalentPool(row: MarketplaceTalentPoolRow): MarketplaceTalentPoolRecord {
+function mapTalentPool(
+  row: MarketplaceTalentPoolRow,
+): MarketplaceTalentPoolRecord {
   return {
     id: row.id,
     ownerUserId: row.owner_user_id,
@@ -1578,7 +1588,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     return result.rows.map(mapApplicationRevision);
   }
 
-  async saveApplicationRevision(revision: MarketplaceApplicationRevisionRecord) {
+  async saveApplicationRevision(
+    revision: MarketplaceApplicationRevisionRecord,
+  ) {
     await this.db.query(
       `
         INSERT INTO marketplace_application_revisions (
@@ -1616,7 +1628,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         JSON.stringify(revision.screeningAnswers),
         revision.deliveryApproach,
         revision.milestonePlanSummary,
-        revision.estimatedStartAt === null ? null : String(revision.estimatedStartAt),
+        revision.estimatedStartAt === null
+          ? null
+          : String(revision.estimatedStartAt),
         JSON.stringify(revision.relevantProofArtifacts),
         JSON.stringify(revision.portfolioUrls),
         revision.revisionReason,
@@ -1913,7 +1927,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     return result.rows.map(mapApplicationDecision);
   }
 
-  async saveApplicationDecision(decision: MarketplaceApplicationDecisionRecord) {
+  async saveApplicationDecision(
+    decision: MarketplaceApplicationDecisionRecord,
+  ) {
     await this.db.query(
       `
         INSERT INTO marketplace_application_decisions (

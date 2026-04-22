@@ -87,13 +87,11 @@ import type {
   MarketplaceApplicationComparisonResponse,
   MarketplaceApplicationComparisonView,
   MarketplaceApplicationDecisionRecord,
-  MarketplaceApplicationDecisionView,
   MarketplaceApplicationDossier,
   MarketplaceApplicationDossierResponse,
   MarketplaceApplicationRecord,
   MarketplaceApplicationRevisionRecord,
   MarketplaceApplicationRevisionResponse,
-  MarketplaceApplicationRevisionView,
   MarketplaceApplicationTimelineResponse,
   MarketplaceApplicationTimelineView,
   MarketplaceApplicationView,
@@ -110,7 +108,6 @@ import type {
   MarketplaceDigestResponse,
   MarketplaceDigestsResponse,
   MarketplaceDigestStats,
-  MarketplaceDigestStatus,
   MarketplaceDigestView,
   MarketplaceAutomationRunResponse,
   MarketplaceAutomationRunsResponse,
@@ -126,8 +123,6 @@ import type {
   MarketplaceContractDraftRecord,
   MarketplaceContractDraftResponse,
   MarketplaceContractDraftRevisionRecord,
-  MarketplaceContractDraftStatus,
-  MarketplaceContractDraftView,
   MarketplaceContractMetadataSnapshot,
   MarketplaceCryptoReadiness,
   MarketplaceEscrowStats,
@@ -162,7 +157,6 @@ import type {
   MarketplaceNotificationPreferencesView,
   MarketplaceNotificationResponse,
   MarketplaceNotificationsResponse,
-  MarketplaceNotificationStatus,
   MarketplaceNotificationView,
   MarketplaceNoHireReasonStat,
   MarketplaceOfferMilestoneDraft,
@@ -185,7 +179,6 @@ import type {
   MarketplaceProfilesListResponse,
   MarketplaceProfileView,
   MarketplaceReputationSnapshot,
-  MarketplaceRankingFeatureSnapshot,
   MarketplaceReviewRecord,
   MarketplaceReviewResponse,
   MarketplaceReviewView,
@@ -262,9 +255,10 @@ function normalizeScreeningAnswers(values: MarketplaceScreeningAnswer[]) {
 
 function normalizeOfferMilestones(
   values: Array<
-    MarketplaceOfferMilestoneDraft | (Omit<MarketplaceOfferMilestoneDraft, 'dueAt'> & {
-      dueAt?: number | null;
-    })
+    | MarketplaceOfferMilestoneDraft
+    | (Omit<MarketplaceOfferMilestoneDraft, 'dueAt'> & {
+        dueAt?: number | null;
+      })
   >,
 ): MarketplaceOfferMilestoneDraft[] {
   return values.map((milestone) => ({
@@ -330,7 +324,9 @@ function asOptionalEnum<T extends readonly string[]>(
   if (typeof value !== 'string') {
     return undefined;
   }
-  return allowed.includes(value as T[number]) ? (value as T[number]) : undefined;
+  return allowed.includes(value as T[number])
+    ? (value as T[number])
+    : undefined;
 }
 
 function asPositiveInt(value: string | number | boolean | null | undefined) {
@@ -352,7 +348,10 @@ function daysSince(timestamp: number | null | undefined, now: number) {
   return Math.max(0, Math.floor((now - timestamp) / (24 * hourMs)));
 }
 
-function pickFundedVolumeBand(totalContracts: number, averageBand: MarketplaceEscrowStats['averageContractValueBand']) {
+function pickFundedVolumeBand(
+  totalContracts: number,
+  averageBand: MarketplaceEscrowStats['averageContractValueBand'],
+) {
   if (totalContracts === 0) {
     return 'none' as const;
   }
@@ -613,12 +612,16 @@ export class MarketplaceService {
       ...(query.skill ? [query.skill.trim().toLowerCase()] : []),
       ...parseQueryList(query.skills),
     ]);
-    const documents = await this.marketplaceRepository.listTalentSearchDocuments();
+    const documents =
+      await this.marketplaceRepository.listTalentSearchDocuments();
     const inviteIndex = await this.getOpportunityInviteIndex();
     const results = await Promise.all(
       documents
         .filter((document) => {
-          if (query.availability && document.availability !== query.availability) {
+          if (
+            query.availability &&
+            document.availability !== query.availability
+          ) {
             return false;
           }
           if (
@@ -667,26 +670,32 @@ export class MarketplaceService {
           );
         })
         .slice(0, query.limit)
-        .map(async (document): Promise<MarketplaceTalentSearchResult | null> => {
-          const profile = await this.marketplaceRepository.getProfileByUserId(
-            document.profileUserId,
-          );
-          if (!profile) {
-            return null;
-          }
+        .map(
+          async (document): Promise<MarketplaceTalentSearchResult | null> => {
+            const profile = await this.marketplaceRepository.getProfileByUserId(
+              document.profileUserId,
+            );
+            if (
+              !profile ||
+              profile.moderationStatus !== 'visible' ||
+              !this.isProfileComplete(profile)
+            ) {
+              return null;
+            }
 
-          return {
-            profile: await this.toProfileView(profile),
-            reasons: document.reasons,
-            ranking: document.ranking,
-            inviteStatus: inviteIndex.get(document.profileUserId) ?? null,
-          };
-        }),
+            return {
+              profile: await this.toProfileView(profile),
+              reasons: document.reasons,
+              ranking: document.ranking,
+              inviteStatus: inviteIndex.get(document.profileUserId) ?? null,
+            };
+          },
+        ),
     );
 
     return {
-      results: results.filter((result): result is MarketplaceTalentSearchResult =>
-        result !== null,
+      results: results.filter(
+        (result): result is MarketplaceTalentSearchResult => result !== null,
       ),
     };
   }
@@ -973,8 +982,7 @@ export class MarketplaceService {
           }
           if (
             query.cryptoReadinessRequired &&
-            document.cryptoReadinessRequired !==
-              query.cryptoReadinessRequired
+            document.cryptoReadinessRequired !== query.cryptoReadinessRequired
           ) {
             return false;
           }
@@ -1058,8 +1066,8 @@ export class MarketplaceService {
     await this.trackMarketplaceEvent({
       actorUserId,
       actorWorkspaceId: actorUserId
-        ? (await this.organizationsService.buildWorkspaceContext(actorUserId))
-            .activeWorkspace?.workspaceId ?? null
+        ? ((await this.organizationsService.buildWorkspaceContext(actorUserId))
+            .activeWorkspace?.workspaceId ?? null)
         : null,
       surface: dto.surface,
       entityType: dto.entityType,
@@ -1082,10 +1090,14 @@ export class MarketplaceService {
   async getAnalyticsOverview(
     userId: string,
   ): Promise<MarketplaceAnalyticsOverviewResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     await this.refreshSearchReadModels();
     return {
-      overview: await this.buildAnalyticsOverview(userId, context.activeWorkspace),
+      overview: await this.buildAnalyticsOverview(
+        userId,
+        context.activeWorkspace,
+      ),
     };
   }
 
@@ -1109,15 +1121,18 @@ export class MarketplaceService {
     );
     const opportunities = (
       await Promise.all(
-        (await this.marketplaceRepository.listOpportunities()).map((opportunity) =>
-          this.ensureOpportunityWorkspace(opportunity),
+        (await this.marketplaceRepository.listOpportunities()).map(
+          (opportunity) => this.ensureOpportunityWorkspace(opportunity),
         ),
       )
     )
-      .filter((opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId)
+      .filter(
+        (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
+      )
       .sort(
         (left, right) =>
-          (right.publishedAt ?? right.updatedAt) - (left.publishedAt ?? left.updatedAt),
+          (right.publishedAt ?? right.updatedAt) -
+          (left.publishedAt ?? left.updatedAt),
       );
     const anchorOpportunity = opportunities[0] ?? null;
 
@@ -1130,14 +1145,12 @@ export class MarketplaceService {
           ? anchorOpportunity.requiredSkills.slice(0, 5).join(', ')
           : undefined),
       timezone:
-        query.timezoneOverlapHours !== undefined
-          ? undefined
-          : undefined,
+        query.timezoneOverlapHours !== undefined ? undefined : undefined,
       availability: undefined,
       cryptoReadiness:
-        query.cryptoReadinessRequired ?? anchorOpportunity?.cryptoReadinessRequired,
-      engagementType:
-        query.engagementType ?? anchorOpportunity?.engagementType,
+        query.cryptoReadinessRequired ??
+        anchorOpportunity?.cryptoReadinessRequired,
+      engagementType: query.engagementType ?? anchorOpportunity?.engagementType,
       verificationLevel: undefined,
       sort: 'relevance',
       limit: query.limit,
@@ -1164,10 +1177,11 @@ export class MarketplaceService {
       skill: query.skill,
       skills:
         query.skills ??
-        (profile?.skills.length ? profile.skills.slice(0, 5).join(', ') : undefined),
+        (profile?.skills.length
+          ? profile.skills.slice(0, 5).join(', ')
+          : undefined),
       category: undefined,
-      engagementType:
-        query.engagementType ?? profile?.preferredEngagements[0],
+      engagementType: query.engagementType ?? profile?.preferredEngagements[0],
       cryptoReadinessRequired:
         query.cryptoReadiness ?? profile?.cryptoReadiness,
       minBudget: undefined,
@@ -1181,7 +1195,8 @@ export class MarketplaceService {
       results: search.results.map((result) => ({
         ...result,
         inviteStatus:
-          inviteStatusByOpportunityId.get(result.opportunity.id) ?? result.inviteStatus,
+          inviteStatusByOpportunityId.get(result.opportunity.id) ??
+          result.inviteStatus,
       })),
     };
   }
@@ -1190,7 +1205,8 @@ export class MarketplaceService {
     userId: string,
     query: MarketplaceSavedSearchesQueryDto,
   ): Promise<MarketplaceSavedSearchesResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const searches = (await this.marketplaceRepository.listSavedSearches())
       .filter(
         (search) =>
@@ -1201,7 +1217,10 @@ export class MarketplaceService {
 
     return {
       searches: searches.map((search) =>
-        this.toSavedSearchView(search, context.activeWorkspace?.workspaceId ?? null),
+        this.toSavedSearchView(
+          search,
+          context.activeWorkspace?.workspaceId ?? null,
+        ),
       ),
     };
   }
@@ -1210,9 +1229,13 @@ export class MarketplaceService {
     userId: string,
     dto: CreateMarketplaceSavedSearchDto,
   ): Promise<MarketplaceSavedSearchResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const normalizedQuery = this.normalizeSavedSearchQuery(dto.kind, dto.query);
-    const resultCount = await this.getSavedSearchResultCount(dto.kind, normalizedQuery);
+    const resultCount = await this.getSavedSearchResultCount(
+      dto.kind,
+      normalizedQuery,
+    );
     const now = Date.now();
     const record: MarketplaceSavedSearchRecord = {
       id: randomUUID(),
@@ -1261,7 +1284,8 @@ export class MarketplaceService {
   }
 
   async deleteSavedSearch(userId: string, searchId: string) {
-    const search = await this.marketplaceRepository.getSavedSearchById(searchId);
+    const search =
+      await this.marketplaceRepository.getSavedSearchById(searchId);
     if (!search || search.userId !== userId) {
       throw new NotFoundException('Marketplace saved search not found');
     }
@@ -1269,7 +1293,9 @@ export class MarketplaceService {
     return { ok: true as const };
   }
 
-  async listTalentPools(userId: string): Promise<MarketplaceTalentPoolsResponse> {
+  async listTalentPools(
+    userId: string,
+  ): Promise<MarketplaceTalentPoolsResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
     const pools = (await this.marketplaceRepository.listTalentPools()).filter(
       (pool) => pool.workspaceId === workspace.workspaceId,
@@ -1311,7 +1337,10 @@ export class MarketplaceService {
     dto: AddMarketplaceTalentPoolMemberDto,
   ): Promise<MarketplaceTalentPoolResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const pool = await this.requireTalentPoolInWorkspace(poolId, workspace.workspaceId);
+    const pool = await this.requireTalentPoolInWorkspace(
+      poolId,
+      workspace.workspaceId,
+    );
     const profile = await this.marketplaceRepository.getProfileBySlug(
       dto.profileSlug.trim().toLowerCase(),
     );
@@ -1360,8 +1389,12 @@ export class MarketplaceService {
     dto: UpdateMarketplaceTalentPoolMemberDto,
   ): Promise<MarketplaceTalentPoolResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const pool = await this.requireTalentPoolInWorkspace(poolId, workspace.workspaceId);
-    const member = await this.marketplaceRepository.getTalentPoolMemberById(memberId);
+    const pool = await this.requireTalentPoolInWorkspace(
+      poolId,
+      workspace.workspaceId,
+    );
+    const member =
+      await this.marketplaceRepository.getTalentPoolMemberById(memberId);
     if (!member || member.poolId !== pool.id) {
       throw new NotFoundException('Marketplace talent pool member not found');
     }
@@ -1369,8 +1402,7 @@ export class MarketplaceService {
     const next: MarketplaceTalentPoolMemberRecord = {
       ...member,
       stage: dto.stage ?? member.stage,
-      note:
-        dto.note !== undefined ? normalizeMaybeText(dto.note) : member.note,
+      note: dto.note !== undefined ? normalizeMaybeText(dto.note) : member.note,
       updatedAt: now,
     };
     await this.marketplaceRepository.saveTalentPoolMember(next);
@@ -1390,9 +1422,9 @@ export class MarketplaceService {
     userId: string,
   ): Promise<MarketplaceAutomationRulesResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
-      (rule) => rule.workspaceId === workspace.workspaceId,
-    );
+    const rules = (
+      await this.marketplaceRepository.listAutomationRules()
+    ).filter((rule) => rule.workspaceId === workspace.workspaceId);
     const digest = await this.buildLifecycleDigestForWorkspace(workspace);
     const runs = (await this.marketplaceRepository.listAutomationRuns()).filter(
       (run) => run.workspaceId === workspace.workspaceId,
@@ -1400,7 +1432,9 @@ export class MarketplaceService {
 
     return {
       rules: await Promise.all(
-        rules.map((rule) => this.toAutomationRuleView(rule, workspace, digest, runs)),
+        rules.map((rule) =>
+          this.toAutomationRuleView(rule, workspace, digest, runs),
+        ),
       ),
     };
   }
@@ -1411,7 +1445,11 @@ export class MarketplaceService {
   ): Promise<MarketplaceAutomationRuleResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
     const targetId = normalizeMaybeText(dto.targetId);
-    await this.validateAutomationRuleTarget(workspace.workspaceId, dto.kind, targetId);
+    await this.validateAutomationRuleTarget(
+      workspace.workspaceId,
+      dto.kind,
+      targetId,
+    );
     const now = Date.now();
     const rule: MarketplaceAutomationRuleRecord = {
       id: randomUUID(),
@@ -1444,8 +1482,14 @@ export class MarketplaceService {
       throw new NotFoundException('Marketplace automation rule not found');
     }
     const targetId =
-      dto.targetId !== undefined ? normalizeMaybeText(dto.targetId) : rule.targetId;
-    await this.validateAutomationRuleTarget(workspace.workspaceId, rule.kind, targetId);
+      dto.targetId !== undefined
+        ? normalizeMaybeText(dto.targetId)
+        : rule.targetId;
+    await this.validateAutomationRuleTarget(
+      workspace.workspaceId,
+      rule.kind,
+      targetId,
+    );
     const next: MarketplaceAutomationRuleRecord = {
       ...rule,
       label: dto.label?.trim() ?? rule.label,
@@ -1465,22 +1509,25 @@ export class MarketplaceService {
     userId: string,
   ): Promise<MarketplaceAutomationRunsResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
-      (rule) => rule.workspaceId === workspace.workspaceId,
-    );
+    const rules = (
+      await this.marketplaceRepository.listAutomationRules()
+    ).filter((rule) => rule.workspaceId === workspace.workspaceId);
     const ruleById = new Map(rules.map((rule) => [rule.id, rule]));
     const runs = (await this.marketplaceRepository.listAutomationRuns()).filter(
       (run) => run.workspaceId === workspace.workspaceId,
     );
     return {
-      runs: runs.map((run) => this.toAutomationRunView(run, ruleById.get(run.ruleId))),
+      runs: runs.map((run) =>
+        this.toAutomationRunView(run, ruleById.get(run.ruleId)),
+      ),
     };
   }
 
   async listNotifications(
     userId: string,
   ): Promise<MarketplaceNotificationsResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     return {
       notifications: this.filterNotificationsForWorkspace(
         await this.marketplaceRepository.listNotifications(),
@@ -1493,7 +1540,8 @@ export class MarketplaceService {
   async markAllNotificationsRead(
     userId: string,
   ): Promise<MarketplaceNotificationsResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const workspaceId = context.activeWorkspace?.workspaceId ?? null;
     const notifications = this.filterNotificationsForWorkspace(
       await this.marketplaceRepository.listNotifications(),
@@ -1520,17 +1568,15 @@ export class MarketplaceService {
     notificationId: string,
     dto: UpdateMarketplaceNotificationDto,
   ): Promise<MarketplaceNotificationResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const workspaceId = context.activeWorkspace?.workspaceId ?? null;
     const notification =
       await this.marketplaceRepository.getNotificationById(notificationId);
     if (
       !notification ||
-      !this.filterNotificationsForWorkspace(
-        [notification],
-        userId,
-        workspaceId,
-      ).length
+      !this.filterNotificationsForWorkspace([notification], userId, workspaceId)
+        .length
     ) {
       throw new NotFoundException('Marketplace notification not found');
     }
@@ -1588,7 +1634,8 @@ export class MarketplaceService {
   }
 
   async listDigests(userId: string): Promise<MarketplaceDigestsResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     return {
       digests: this.filterDigestsForWorkspace(
         await this.marketplaceRepository.listDigests(),
@@ -1602,9 +1649,9 @@ export class MarketplaceService {
     userId: string,
   ): Promise<MarketplaceDigestDispatchRunsResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const runs = (await this.marketplaceRepository.listDigestDispatchRuns()).filter(
-      (run) => run.workspaceId === workspace.workspaceId,
-    );
+    const runs = (
+      await this.marketplaceRepository.listDigestDispatchRuns()
+    ).filter((run) => run.workspaceId === workspace.workspaceId);
     return {
       runs: await Promise.all(
         runs.map((run) => this.toDigestDispatchRunView(run)),
@@ -1616,7 +1663,8 @@ export class MarketplaceService {
     userId: string,
     dto: GenerateMarketplaceDigestDto,
   ): Promise<MarketplaceDigestResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const digest = await this.buildDigestForWorkspace({
       userId,
       workspace: context.activeWorkspace,
@@ -1633,16 +1681,21 @@ export class MarketplaceService {
     dto: DispatchMarketplaceDigestsDto,
   ): Promise<MarketplaceDigestDispatchRunResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const recipients = await this.listWorkspaceDigestRecipients(userId, workspace);
-    const existingRuns = (await this.marketplaceRepository.listDigestDispatchRuns()).filter(
-      (run) => run.workspaceId === workspace.workspaceId,
+    const recipients = await this.listWorkspaceDigestRecipients(
+      userId,
+      workspace,
     );
+    const existingRuns = (
+      await this.marketplaceRepository.listDigestDispatchRuns()
+    ).filter((run) => run.workspaceId === workspace.workspaceId);
     const runId = randomUUID();
     const now = Date.now();
     const results: MarketplaceDigestDispatchRecipient[] = [];
 
     for (const recipient of recipients) {
-      const preferences = await this.getNotificationPreferencesRecord(recipient.userId);
+      const preferences = await this.getNotificationPreferencesRecord(
+        recipient.userId,
+      );
       if (preferences.digestCadence === 'manual') {
         results.push({
           userId: recipient.userId,
@@ -1725,7 +1778,8 @@ export class MarketplaceService {
     digestId: string,
     dto: UpdateMarketplaceDigestDto,
   ): Promise<MarketplaceDigestResponse> {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const workspaceId = context.activeWorkspace?.workspaceId ?? null;
     const digest = await this.marketplaceRepository.getDigestById(digestId);
     if (
@@ -1766,12 +1820,14 @@ export class MarketplaceService {
     dto: DispatchMarketplaceAutomationRunsDto,
   ): Promise<MarketplaceAutomationRunsResponse> {
     const workspace = await this.requireClientRetentionWorkspace(userId);
-    const rules = (await this.marketplaceRepository.listAutomationRules()).filter(
+    const rules = (
+      await this.marketplaceRepository.listAutomationRules()
+    ).filter(
       (rule) => rule.workspaceId === workspace.workspaceId && rule.enabled,
     );
-    const existingRuns = (await this.marketplaceRepository.listAutomationRuns()).filter(
-      (run) => run.workspaceId === workspace.workspaceId,
-    );
+    const existingRuns = (
+      await this.marketplaceRepository.listAutomationRuns()
+    ).filter((run) => run.workspaceId === workspace.workspaceId);
     const runs: MarketplaceAutomationRunRecord[] = [];
     for (const rule of rules) {
       if (
@@ -1825,7 +1881,11 @@ export class MarketplaceService {
     dto: CreateMarketplaceOpportunityInviteDto,
   ): Promise<MarketplaceOpportunityInviteResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     const profile = await this.marketplaceRepository.getProfileBySlug(
       dto.profileSlug.trim().toLowerCase(),
     );
@@ -1838,7 +1898,9 @@ export class MarketplaceService {
       );
     }
 
-    const existing = (await this.marketplaceRepository.listOpportunityInvites()).find(
+    const existing = (
+      await this.marketplaceRepository.listOpportunityInvites()
+    ).find(
       (invite) =>
         invite.opportunityId === opportunityId &&
         invite.invitedProfileUserId === profile.userId,
@@ -1948,7 +2010,9 @@ export class MarketplaceService {
         'Only marketplace participants can submit job reviews',
       );
     }
-    const reviewerRole = participantRoles.includes('client') ? 'client' : 'worker';
+    const reviewerRole = participantRoles.includes('client')
+      ? 'client'
+      : 'worker';
     const revieweeRole = reviewerRole === 'client' ? 'worker' : 'client';
     const revieweeUserId = await this.resolveEscrowParticipantUserId(
       job,
@@ -1960,13 +2024,17 @@ export class MarketplaceService {
       );
     }
     if (revieweeUserId === userId) {
-      throw new ConflictException('A marketplace participant cannot review themself');
+      throw new ConflictException(
+        'A marketplace participant cannot review themself',
+      );
     }
     const existing = (await this.marketplaceRepository.listReviews()).find(
       (review) => review.jobId === jobId && review.reviewerUserId === userId,
     );
     if (existing) {
-      throw new ConflictException('A marketplace review already exists for this job');
+      throw new ConflictException(
+        'A marketplace review already exists for this job',
+      );
     }
     const now = Date.now();
     const review: MarketplaceReviewRecord = {
@@ -2011,7 +2079,9 @@ export class MarketplaceService {
       workspaceId: null,
       kind: 'review_received',
       title: `New review on ${job.title}`,
-      detail: dto.headline?.trim() || `You received a ${dto.rating}/5 marketplace review.`,
+      detail:
+        dto.headline?.trim() ||
+        `You received a ${dto.rating}/5 marketplace review.`,
       actorUserId: userId,
       relatedJobId: jobId,
     });
@@ -2038,7 +2108,10 @@ export class MarketplaceService {
         'Only the client-side marketplace participant can create a rehire opportunity',
       );
     }
-    const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+    const workerUserId = await this.resolveEscrowParticipantUserId(
+      job,
+      'worker',
+    );
     if (!workerUserId) {
       throw new ConflictException(
         'The previous worker could not be resolved into a marketplace account',
@@ -2062,7 +2135,8 @@ export class MarketplaceService {
         [
           `Previous escrow job: ${job.title}`,
           `Rehire candidate: ${workerSummary.displayName}`,
-          dto.message?.trim() || 'Resume delivery under a new milestone-backed brief.',
+          dto.message?.trim() ||
+            'Resume delivery under a new milestone-backed brief.',
         ].join('\n\n'),
       category: job.category,
       currencyAddress: job.onchain.currencyAddress,
@@ -2132,7 +2206,9 @@ export class MarketplaceService {
       profileSlug: workerSummary.profileSlug,
       addedByUserId: userId,
       stage: 'rehire_ready',
-      note: dto.message?.trim() || 'Seeded automatically from a completed escrow contract.',
+      note:
+        dto.message?.trim() ||
+        'Seeded automatically from a completed escrow contract.',
       sourceOpportunityId: opportunity.id,
       sourceApplicationId: null,
       sourceJobId: job.id,
@@ -2150,7 +2226,11 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceApplicationsListResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
 
     const applications = (await this.marketplaceRepository.listApplications())
       .filter((application) => application.opportunityId === opportunityId)
@@ -2168,7 +2248,11 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceMatchesResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     const applications = (
       await this.marketplaceRepository.listApplications()
     ).filter((application) => application.opportunityId === opportunityId);
@@ -2194,8 +2278,10 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    const applicantWorkspace = await this.ensureApplicationWorkspace(application);
-    const opportunityWorkspace = await this.ensureOpportunityWorkspace(opportunity);
+    const applicantWorkspace =
+      await this.ensureApplicationWorkspace(application);
+    const opportunityWorkspace =
+      await this.ensureOpportunityWorkspace(opportunity);
     const canAccessAsApplicant =
       applicantWorkspace.applicantWorkspaceId !== null &&
       (await this.organizationsService.findAccessibleWorkspace(
@@ -2225,11 +2311,12 @@ export class MarketplaceService {
     opportunityId: string,
     dto: ApplyToOpportunityDto,
   ): Promise<MarketplaceOpportunityResponse> {
-    const freelancerWorkspace = await this.organizationsService.requireWorkspace(
-      userId,
-      'freelancer',
-      'applyToOpportunity',
-    );
+    const freelancerWorkspace =
+      await this.organizationsService.requireWorkspace(
+        userId,
+        'freelancer',
+        'applyToOpportunity',
+      );
     const opportunity = await this.requireOpportunity(opportunityId);
     const applicant = await this.usersService.getRequiredById(userId);
 
@@ -2247,7 +2334,10 @@ export class MarketplaceService {
       throw new ForbiddenException('Marketplace opportunity is not available');
     }
 
-    const profile = await this.requireProfileByUserId(userId, freelancerWorkspace);
+    const profile = await this.requireProfileByUserId(
+      userId,
+      freelancerWorkspace,
+    );
     if (profile.moderationStatus === 'suspended') {
       throw new ForbiddenException('Suspended marketplace talent cannot apply');
     }
@@ -2336,7 +2426,9 @@ export class MarketplaceService {
       reason: existing ? 'Resubmitted application' : null,
       createdAt: now,
     });
-    const matchingInvite = (await this.marketplaceRepository.listOpportunityInvites()).find(
+    const matchingInvite = (
+      await this.marketplaceRepository.listOpportunityInvites()
+    ).find(
       (invite) =>
         invite.opportunityId === opportunityId &&
         invite.invitedProfileUserId === userId &&
@@ -2463,7 +2555,8 @@ export class MarketplaceService {
       )
     )
       .filter(
-        (application) => application.applicantWorkspaceId === workspace.workspaceId,
+        (application) =>
+          application.applicantWorkspaceId === workspace.workspaceId,
       )
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
@@ -2509,7 +2602,9 @@ export class MarketplaceService {
       );
     }
 
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     const profile = await this.requireProfileByUserId(userId);
     this.validateScreeningAnswers(
       opportunity.screeningQuestions,
@@ -2520,7 +2615,9 @@ export class MarketplaceService {
     application.coverNote = dto.coverNote;
     application.proposedRate = dto.proposedRate ?? null;
     application.selectedWalletAddress = selectedWallet.address;
-    application.screeningAnswers = normalizeScreeningAnswers(dto.screeningAnswers);
+    application.screeningAnswers = normalizeScreeningAnswers(
+      dto.screeningAnswers,
+    );
     application.deliveryApproach = dto.deliveryApproach;
     application.milestonePlanSummary = dto.milestonePlanSummary;
     application.estimatedStartAt = dto.estimatedStartAt ?? null;
@@ -2590,8 +2687,13 @@ export class MarketplaceService {
   ): Promise<MarketplaceInterviewThreadResponse> {
     const application = await this.requireApplication(applicationId);
     await this.assertApplicationTimelineAccess(userId, application);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
-    const thread = await this.getOrCreateInterviewThread(application, opportunity);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
+    const thread = await this.getOrCreateInterviewThread(
+      application,
+      opportunity,
+    );
     return {
       thread: await this.toInterviewThreadView(thread),
     };
@@ -2603,15 +2705,24 @@ export class MarketplaceService {
     dto: CreateMarketplaceInterviewMessageDto,
   ): Promise<MarketplaceInterviewThreadResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
-    const access = await this.getApplicationAccess(userId, application, opportunity);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
+    const access = await this.getApplicationAccess(
+      userId,
+      application,
+      opportunity,
+    );
     if (!access.asApplicant && !access.asOwner) {
       throw new ForbiddenException(
         'You do not have access to this marketplace interview thread',
       );
     }
 
-    const thread = await this.getOrCreateInterviewThread(application, opportunity);
+    const thread = await this.getOrCreateInterviewThread(
+      application,
+      opportunity,
+    );
     const senderWorkspaceId = access.asOwner
       ? opportunity.ownerWorkspaceId
       : application.applicantWorkspaceId;
@@ -2631,14 +2742,18 @@ export class MarketplaceService {
     thread.status = 'open';
     thread.updatedAt = now;
     await this.marketplaceRepository.saveInterviewThread(thread);
-    if (application.status === 'submitted' || application.status === 'shortlisted') {
+    if (
+      application.status === 'submitted' ||
+      application.status === 'shortlisted'
+    ) {
       application.status = 'interviewing';
       application.updatedAt = now;
       await this.marketplaceRepository.saveApplication(application);
       await this.recordApplicationDecision(application, {
         actorUserId: userId,
         action: 'interview_started',
-        reason: dto.kind === 'clarification' ? 'Clarification thread opened' : null,
+        reason:
+          dto.kind === 'clarification' ? 'Clarification thread opened' : null,
         createdAt: now,
       });
     }
@@ -2664,7 +2779,9 @@ export class MarketplaceService {
       relatedJobId: null,
     });
     await this.emitNotification({
-      userId: access.asOwner ? application.applicantUserId : opportunity.ownerUserId,
+      userId: access.asOwner
+        ? application.applicantUserId
+        : opportunity.ownerUserId,
       workspaceId: access.asOwner
         ? application.applicantWorkspaceId
         : opportunity.ownerWorkspaceId,
@@ -2687,8 +2804,14 @@ export class MarketplaceService {
     dto: CreateMarketplaceOfferDto,
   ): Promise<MarketplaceOfferResponse> {
     const application = await this.requireApplication(applicationId);
-    const opportunity = await this.requireOpportunity(application.opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     this.assertOpportunityOpenForDecision(opportunity);
     if (
       application.status === 'rejected' ||
@@ -2813,7 +2936,9 @@ export class MarketplaceService {
           .ownerWorkspaceId,
         kind: 'offer_response',
         title: 'Offer accepted',
-        detail: dto.message?.trim() || 'The applicant accepted the marketplace offer.',
+        detail:
+          dto.message?.trim() ||
+          'The applicant accepted the marketplace offer.',
         actorUserId: userId,
         relatedOpportunityId: application.opportunityId,
         relatedApplicationId: application.id,
@@ -3052,7 +3177,11 @@ export class MarketplaceService {
     }
     const application = await this.requireApplication(draft.applicationId);
     const opportunity = await this.requireOpportunity(draft.opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     if (draft.convertedJobId) {
       return {
         applicationId: application.id,
@@ -3068,33 +3197,49 @@ export class MarketplaceService {
     opportunityId: string,
   ): Promise<MarketplaceApplicationComparisonResponse> {
     const opportunity = await this.requireOpportunity(opportunityId);
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
-    const applications = (await this.marketplaceRepository.listApplications()).filter(
-      (application) => application.opportunityId === opportunityId,
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
     );
-    const revisions = await this.marketplaceRepository.listApplicationRevisions();
+    const applications = (
+      await this.marketplaceRepository.listApplications()
+    ).filter((application) => application.opportunityId === opportunityId);
+    const revisions =
+      await this.marketplaceRepository.listApplicationRevisions();
     const messages = await this.marketplaceRepository.listInterviewMessages();
     const offers = await this.marketplaceRepository.listOffers();
-    const decisions = await this.marketplaceRepository.listApplicationDecisions();
+    const decisions =
+      await this.marketplaceRepository.listApplicationDecisions();
 
     const candidates = await Promise.all(
       applications.map(async (application) => {
-        const latestRevision = revisions
-          .filter((revision) => revision.applicationId === application.id)
-          .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null;
-        const latestOffer = offers
-          .filter((entry) => entry.applicationId === application.id)
-          .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null;
-        const latestMessageAt = messages
-          .filter((entry) => entry.applicationId === application.id)
-          .sort((left, right) => right.createdAt - left.createdAt)[0]?.createdAt ?? null;
+        const latestRevision =
+          revisions
+            .filter((revision) => revision.applicationId === application.id)
+            .sort(
+              (left, right) => right.revisionNumber - left.revisionNumber,
+            )[0] ?? null;
+        const latestOffer =
+          offers
+            .filter((entry) => entry.applicationId === application.id)
+            .sort(
+              (left, right) => right.revisionNumber - left.revisionNumber,
+            )[0] ?? null;
+        const latestMessageAt =
+          messages
+            .filter((entry) => entry.applicationId === application.id)
+            .sort((left, right) => right.createdAt - left.createdAt)[0]
+            ?.createdAt ?? null;
         const decisionCount = decisions.filter(
           (decision) => decision.applicationId === application.id,
         ).length;
         const contractDraftStatus =
-          (await this.marketplaceRepository.getContractDraftByApplicationId(
-            application.id,
-          ))?.status ?? null;
+          (
+            await this.marketplaceRepository.getContractDraftByApplicationId(
+              application.id,
+            )
+          )?.status ?? null;
         return {
           application: await this.toApplicationView(application, userId),
           latestRevision,
@@ -3169,7 +3314,11 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     this.assertOpportunityOpenForDecision(opportunity);
 
     const now = Date.now();
@@ -3205,7 +3354,8 @@ export class MarketplaceService {
       workspaceId: application.applicantWorkspaceId,
       kind: 'application_status_changed',
       title: `Shortlisted for ${opportunity.title}`,
-      detail: 'The client moved your proposal into the shortlist and may continue with interviews or offers.',
+      detail:
+        'The client moved your proposal into the shortlist and may continue with interviews or offers.',
       actorUserId: userId,
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
@@ -3222,7 +3372,11 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     this.assertOpportunityOpenForDecision(opportunity);
 
     const now = Date.now();
@@ -3278,7 +3432,11 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
-    await this.assertOpportunityOwner(userId, opportunity, 'reviewApplications');
+    await this.assertOpportunityOwner(
+      userId,
+      opportunity,
+      'reviewApplications',
+    );
     this.assertOpportunityOpenForDecision(opportunity);
     const contractDraft =
       await this.marketplaceRepository.getContractDraftByApplicationId(
@@ -3300,7 +3458,9 @@ export class MarketplaceService {
     const offers = (await this.marketplaceRepository.listOffers()).filter(
       (offer) => offer.applicationId === application.id,
     );
-    const hasAcceptedOffer = offers.some((offer) => offer.status === 'accepted');
+    const hasAcceptedOffer = offers.some(
+      (offer) => offer.status === 'accepted',
+    );
     if (offers.length > 0 && !hasAcceptedOffer) {
       throw new ConflictException(
         'An accepted marketplace offer is required before creating the escrow contract',
@@ -3422,7 +3582,8 @@ export class MarketplaceService {
       workspaceId: application.applicantWorkspaceId,
       kind: 'application_status_changed',
       title: `Hired into escrow: ${opportunity.title}`,
-      detail: 'The client converted your accepted marketplace proposal into an escrow contract.',
+      detail:
+        'The client converted your accepted marketplace proposal into an escrow contract.',
       actorUserId: userId,
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
@@ -3606,7 +3767,9 @@ export class MarketplaceService {
           .map(async (profile) => ({
             ...(await this.toProfileView(profile)),
             moderationStatus: profile.moderationStatus,
-            identityReview: await this.getIdentityRiskReviewView(profile.userId),
+            identityReview: await this.getIdentityRiskReviewView(
+              profile.userId,
+            ),
             riskSignals: await this.buildRiskSignalsForUser(
               await this.usersService.getRequiredById(profile.userId),
               'worker',
@@ -3742,7 +3905,9 @@ export class MarketplaceService {
     await this.usersService.getRequiredById(targetUserId);
     const now = Date.now();
     const existing =
-      await this.marketplaceRepository.getIdentityRiskReviewByUserId(targetUserId);
+      await this.marketplaceRepository.getIdentityRiskReviewByUserId(
+        targetUserId,
+      );
     const review: MarketplaceIdentityRiskReviewRecord = {
       id: existing?.id ?? randomUUID(),
       subjectUserId: targetUserId,
@@ -3970,7 +4135,8 @@ export class MarketplaceService {
   }
 
   private async requireContractDraft(draftId: string) {
-    const draft = await this.marketplaceRepository.getContractDraftById(draftId);
+    const draft =
+      await this.marketplaceRepository.getContractDraftById(draftId);
     if (!draft) {
       throw new NotFoundException('Marketplace contract draft not found');
     }
@@ -3991,17 +4157,17 @@ export class MarketplaceService {
     application: MarketplaceApplicationRecord,
     opportunity?: MarketplaceOpportunityRecord,
   ) {
-    const hydratedApplication = await this.ensureApplicationWorkspace(application);
+    const hydratedApplication =
+      await this.ensureApplicationWorkspace(application);
     const hydratedOpportunity =
-      opportunity ?? (await this.requireOpportunity(hydratedApplication.opportunityId));
+      opportunity ??
+      (await this.requireOpportunity(hydratedApplication.opportunityId));
     const asApplicant =
       hydratedApplication.applicantWorkspaceId !== null &&
-      (
-        await this.organizationsService.findAccessibleWorkspace(
-          userId,
-          hydratedApplication.applicantWorkspaceId,
-        )
-      ) !== null;
+      (await this.organizationsService.findAccessibleWorkspace(
+        userId,
+        hydratedApplication.applicantWorkspaceId,
+      )) !== null;
     const asOwner = await this.canAccessOpportunityAsOwner(
       userId,
       hydratedOpportunity,
@@ -4088,7 +4254,9 @@ export class MarketplaceService {
   }
 
   private async getNextApplicationRevisionNumber(applicationId: string) {
-    const revisions = (await this.marketplaceRepository.listApplicationRevisions())
+    const revisions = (
+      await this.marketplaceRepository.listApplicationRevisions()
+    )
       .filter((revision) => revision.applicationId === applicationId)
       .sort((left, right) => right.revisionNumber - left.revisionNumber);
     return (revisions[0]?.revisionNumber ?? 0) + 1;
@@ -4194,7 +4362,9 @@ export class MarketplaceService {
     if (existing) {
       return existing;
     }
-    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
     return this.createInitialContractDraft(application, opportunity, offer);
   }
 
@@ -4255,7 +4425,9 @@ export class MarketplaceService {
       .sort((left, right) => left.createdAt - right.createdAt);
     const messageViews = await Promise.all(
       messages.map(async (message) => {
-        const sender = await this.usersService.getRequiredById(message.senderUserId);
+        const sender = await this.usersService.getRequiredById(
+          message.senderUserId,
+        );
         return {
           ...message,
           senderEmail: sender.email,
@@ -4272,12 +4444,15 @@ export class MarketplaceService {
     application: MarketplaceApplicationRecord,
     viewerUserId?: string,
   ): Promise<MarketplaceApplicationTimelineView> {
-    const revisions = (await this.marketplaceRepository.listApplicationRevisions())
+    const revisions = (
+      await this.marketplaceRepository.listApplicationRevisions()
+    )
       .filter((revision) => revision.applicationId === application.id)
       .sort((left, right) => left.revisionNumber - right.revisionNumber);
-    const thread = (await this.marketplaceRepository.listInterviewThreads())
-      .filter((entry) => entry.applicationId === application.id)
-      .sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
+    const thread =
+      (await this.marketplaceRepository.listInterviewThreads())
+        .filter((entry) => entry.applicationId === application.id)
+        .sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
     const offers = (await this.marketplaceRepository.listOffers())
       .filter((offer) => offer.applicationId === application.id)
       .sort(
@@ -4285,7 +4460,9 @@ export class MarketplaceService {
           left.revisionNumber - right.revisionNumber ||
           left.createdAt - right.createdAt,
       );
-    const decisions = (await this.marketplaceRepository.listApplicationDecisions())
+    const decisions = (
+      await this.marketplaceRepository.listApplicationDecisions()
+    )
       .filter((decision) => decision.applicationId === application.id)
       .sort((left, right) => left.createdAt - right.createdAt);
     const contractDraft =
@@ -4485,7 +4662,9 @@ export class MarketplaceService {
     profile: MarketplaceProfileRecord,
   ): Promise<MarketplaceTalentSearchDocument> {
     const hydratedProfile = await this.ensureProfileWorkspace(profile);
-    const user = await this.usersService.getRequiredById(hydratedProfile.userId);
+    const user = await this.usersService.getRequiredById(
+      hydratedProfile.userId,
+    );
     const escrowStats = await this.getEscrowStats(user, 'worker');
     const reputation = await this.buildReputationSnapshot(user, 'worker');
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
@@ -4502,7 +4681,9 @@ export class MarketplaceService {
       reputation.averageRating === null ? 0 : reputation.averageRating * 6;
     const hireBoost = Math.min(
       22,
-      Math.round((reputation.publicReviewCount + escrowStats.completionCount) / 2),
+      Math.round(
+        (reputation.publicReviewCount + escrowStats.completionCount) / 2,
+      ),
     );
     const score = Math.max(
       5,
@@ -4599,7 +4780,8 @@ export class MarketplaceService {
   private async buildOpportunitySearchDocument(
     opportunity: MarketplaceOpportunityRecord,
   ): Promise<MarketplaceOpportunitySearchDocument> {
-    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const hydratedOpportunity =
+      await this.ensureOpportunityWorkspace(opportunity);
     const owner = await this.usersService.getRequiredById(
       hydratedOpportunity.ownerUserId,
     );
@@ -4788,15 +4970,13 @@ export class MarketplaceService {
         continue;
       }
       const key = `${event.searchKind}:${event.queryLabel}`;
-      const current =
-        grouped.get(key) ??
-        {
-          searchKind: event.searchKind,
-          queryLabel: event.queryLabel,
-          impressions: 0,
-          resultClicks: 0,
-          saveCount: 0,
-        };
+      const current = grouped.get(key) ?? {
+        searchKind: event.searchKind,
+        queryLabel: event.queryLabel,
+        impressions: 0,
+        resultClicks: 0,
+        saveCount: 0,
+      };
       if (event.eventType === 'search_impression') {
         current.impressions += event.resultCount;
       }
@@ -4817,10 +4997,10 @@ export class MarketplaceService {
       .slice(0, 8);
   }
 
-  private async buildLiquidityByCategory(
+  private buildLiquidityByCategory(
     profiles: MarketplaceProfileRecord[],
     opportunities: MarketplaceOpportunityRecord[],
-  ): Promise<MarketplaceLiquiditySlice[]> {
+  ): MarketplaceLiquiditySlice[] {
     const demand = new Map<string, number>();
     const supply = new Map<string, number>();
     for (const opportunity of opportunities) {
@@ -4874,13 +5054,15 @@ export class MarketplaceService {
       .slice(0, 8);
   }
 
-  private async buildLiquidityByTimezone(
+  private buildLiquidityByTimezone(
     profiles: MarketplaceProfileRecord[],
     opportunities: MarketplaceOpportunityRecord[],
-  ): Promise<MarketplaceLiquiditySlice[]> {
+  ): MarketplaceLiquiditySlice[] {
     const supply = new Map<string, number>();
     const demand = new Map<string, number>();
-    const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
+    const profileByUserId = new Map(
+      profiles.map((profile) => [profile.userId, profile]),
+    );
     for (const profile of profiles) {
       if (
         profile.moderationStatus === 'visible' &&
@@ -4899,7 +5081,8 @@ export class MarketplaceService {
         continue;
       }
       const ownerTimezone =
-        profileByUserId.get(opportunity.ownerUserId)?.timezone ?? 'unattributed';
+        profileByUserId.get(opportunity.ownerUserId)?.timezone ??
+        'unattributed';
       demand.set(ownerTimezone, (demand.get(ownerTimezone) ?? 0) + 1);
     }
     return Array.from(new Set([...demand.keys(), ...supply.keys()]))
@@ -4961,7 +5144,10 @@ export class MarketplaceService {
               (24 * hourMs),
           ),
           applicationCount: opportunityApplications.length,
-          shortlistCount: countDecisionActions(opportunityDecisions, 'shortlisted'),
+          shortlistCount: countDecisionActions(
+            opportunityDecisions,
+            'shortlisted',
+          ),
           offerCount:
             countDecisionActions(opportunityDecisions, 'offer_sent') +
             countDecisionActions(opportunityDecisions, 'offer_countered'),
@@ -5012,7 +5198,8 @@ export class MarketplaceService {
     const scopedOpportunities =
       workspace?.kind === 'client'
         ? opportunities.filter(
-            (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
+            (opportunity) =>
+              opportunity.ownerWorkspaceId === workspace.workspaceId,
           )
         : opportunities.filter((opportunity) =>
             applications.some(
@@ -5029,10 +5216,15 @@ export class MarketplaceService {
             ),
           )
         : applications.filter(
-            (application) => application.applicantWorkspaceId === workspace?.workspaceId,
+            (application) =>
+              application.applicantWorkspaceId === workspace?.workspaceId,
           );
-    const scopedApplicationIds = new Set(scopedApplications.map((item) => item.id));
-    const scopedOpportunityIds = new Set(scopedOpportunities.map((item) => item.id));
+    const scopedApplicationIds = new Set(
+      scopedApplications.map((item) => item.id),
+    );
+    const scopedOpportunityIds = new Set(
+      scopedOpportunities.map((item) => item.id),
+    );
     const scopedDecisions = decisions.filter(
       (decision) =>
         scopedApplicationIds.has(decision.applicationId) ||
@@ -5112,8 +5304,9 @@ export class MarketplaceService {
         releasedMilestones: roleJobs.reduce(
           (sum, job) =>
             sum +
-            job.milestones.filter((milestone) => milestone.status === 'released')
-              .length,
+            job.milestones.filter(
+              (milestone) => milestone.status === 'released',
+            ).length,
           0,
         ),
         disputedMilestones: roleJobs.reduce(
@@ -5121,12 +5314,13 @@ export class MarketplaceService {
             sum +
             job.milestones.filter(
               (milestone) =>
-                milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+                milestone.status === 'disputed' ||
+                milestone.disputedAt !== undefined,
             ).length,
           0,
         ),
       }),
-      liquidity: await this.buildLiquidityByCategory(profiles, opportunities),
+      liquidity: this.buildLiquidityByCategory(profiles, opportunities),
       noHireReasons: this.buildNoHireReasonStats(scopedDecisions),
       topSearches: this.buildTopSearchStats(scopedEvents),
       stalledItems:
@@ -5136,12 +5330,17 @@ export class MarketplaceService {
               applications,
               decisions,
             )
-          : this.buildStalledOpportunityViews(opportunities, scopedApplications, scopedDecisions),
+          : this.buildStalledOpportunityViews(
+              opportunities,
+              scopedApplications,
+              scopedDecisions,
+            ),
       retention: {
         talentPools:
           workspace?.kind === 'client'
-            ? talentPools.filter((pool) => pool.workspaceId === workspace.workspaceId)
-                .length
+            ? talentPools.filter(
+                (pool) => pool.workspaceId === workspace.workspaceId,
+              ).length
             : 0,
         trackedTalent:
           workspace?.kind === 'client'
@@ -5218,11 +5417,15 @@ export class MarketplaceService {
     const hiredJobs = jobs.filter((job) =>
       opportunities.some((opportunity) => opportunity.hiredJobId === job.id),
     );
-    const rehireCandidates = await this.buildRehireCandidates(hiredJobs, reviews);
+    const rehireCandidates = await this.buildRehireCandidates(
+      hiredJobs,
+      reviews,
+    );
     const pendingLifecycleTasks =
       savedSearches.filter(
         (search) =>
-          search.kind === 'talent' && Date.now() - search.updatedAt >= 7 * 24 * hourMs,
+          search.kind === 'talent' &&
+          Date.now() - search.updatedAt >= 7 * 24 * hourMs,
       ).length +
       (await this.marketplaceRepository.listOpportunityInvites()).filter(
         (invite) =>
@@ -5236,9 +5439,9 @@ export class MarketplaceService {
       ).length +
       rehireCandidates.length;
     const retentionWorkspaceIds = new Set(
-      talentPools.map((pool) => pool.workspaceId).concat(
-        automationRules.map((rule) => rule.workspaceId),
-      ),
+      talentPools
+        .map((pool) => pool.workspaceId)
+        .concat(automationRules.map((rule) => rule.workspaceId)),
     );
     const funnel = this.buildFunnelStages({
       searchImpressions: events
@@ -5277,7 +5480,8 @@ export class MarketplaceService {
           sum +
           job.milestones.filter(
             (milestone) =>
-              milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+              milestone.status === 'disputed' ||
+              milestone.disputedAt !== undefined,
           ).length,
         0,
       ),
@@ -5304,104 +5508,110 @@ export class MarketplaceService {
       if (event.eventType !== 'result_click' || !event.entityId) {
         continue;
       }
-      clickCounts.set(event.entityId, (clickCounts.get(event.entityId) ?? 0) + 1);
+      clickCounts.set(
+        event.entityId,
+        (clickCounts.get(event.entityId) ?? 0) + 1,
+      );
     }
-    const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
+    const profileMap = new Map(
+      profiles.map((profile) => [profile.userId, profile]),
+    );
     const opportunityMap = new Map(
       opportunities.map((opportunity) => [opportunity.id, opportunity]),
     );
     const profileRankingAudit = talentDocuments
       .map((document) => {
-          const profile = profileMap.get(document.profileUserId);
-          if (!profile) {
-            return null;
-          }
-          const hireCount = decisions.filter(
-            (decision) =>
-              decision.action === 'hired' &&
-              applications.find(
-                (application) =>
-                  application.id === decision.applicationId &&
-                  application.applicantUserId === document.profileUserId,
-              ),
-          ).length;
-          const noHireCount = decisions.filter(
-            (decision) =>
-              decision.action === 'no_hire' &&
-              applications.find(
-                (application) =>
-                  application.id === decision.applicationId &&
-                  application.applicantUserId === document.profileUserId,
-              ),
-          ).length;
-          const outcomeScore =
-            hireCount * 18 +
-            (reviewAverageByUser.get(document.profileUserId) ?? 0) * 8 -
-            noHireCount * 4;
-          return {
-            entityType: 'profile',
-            entityId: document.profileUserId,
-            label: document.displayName,
-            score: document.ranking.score,
-            outcomeScore,
-            momentumScore:
-              Math.max(0, 100 - document.ranking.recencyDays * 4) +
-              (clickCounts.get(document.profileUserId) ?? 0) * 3,
-            moderationStatus: profile.moderationStatus,
-            reasons: document.reasons,
-            signals: {
-              completionRate: document.ranking.completionRate,
-              disputeRate: document.ranking.disputeRate,
-              inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
-              responseRate: document.ranking.responseRate,
-              reviewAverage: reviewAverageByUser.get(document.profileUserId) ?? null,
-              hireCount,
-              noHireCount,
-              recencyDays: document.ranking.recencyDays,
-            },
-          } satisfies MarketplaceRankingAuditEntry;
-        })
-        .filter(Boolean) as MarketplaceRankingAuditEntry[];
+        const profile = profileMap.get(document.profileUserId);
+        if (!profile) {
+          return null;
+        }
+        const hireCount = decisions.filter(
+          (decision) =>
+            decision.action === 'hired' &&
+            applications.find(
+              (application) =>
+                application.id === decision.applicationId &&
+                application.applicantUserId === document.profileUserId,
+            ),
+        ).length;
+        const noHireCount = decisions.filter(
+          (decision) =>
+            decision.action === 'no_hire' &&
+            applications.find(
+              (application) =>
+                application.id === decision.applicationId &&
+                application.applicantUserId === document.profileUserId,
+            ),
+        ).length;
+        const outcomeScore =
+          hireCount * 18 +
+          (reviewAverageByUser.get(document.profileUserId) ?? 0) * 8 -
+          noHireCount * 4;
+        return {
+          entityType: 'profile',
+          entityId: document.profileUserId,
+          label: document.displayName,
+          score: document.ranking.score,
+          outcomeScore,
+          momentumScore:
+            Math.max(0, 100 - document.ranking.recencyDays * 4) +
+            (clickCounts.get(document.profileUserId) ?? 0) * 3,
+          moderationStatus: profile.moderationStatus,
+          reasons: document.reasons,
+          signals: {
+            completionRate: document.ranking.completionRate,
+            disputeRate: document.ranking.disputeRate,
+            inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
+            responseRate: document.ranking.responseRate,
+            reviewAverage:
+              reviewAverageByUser.get(document.profileUserId) ?? null,
+            hireCount,
+            noHireCount,
+            recencyDays: document.ranking.recencyDays,
+          },
+        } satisfies MarketplaceRankingAuditEntry;
+      })
+      .filter(Boolean) as MarketplaceRankingAuditEntry[];
     const opportunityRankingAudit = opportunityDocuments
       .map((document) => {
-          const opportunity = opportunityMap.get(document.opportunityId);
-          if (!opportunity) {
-            return null;
-          }
-          const hireCount = decisions.filter(
-            (decision) =>
-              decision.opportunityId === document.opportunityId &&
-              decision.action === 'hired',
-          ).length;
-          const noHireCount = decisions.filter(
-            (decision) =>
-              decision.opportunityId === document.opportunityId &&
-              decision.action === 'no_hire',
-          ).length;
-          return {
-            entityType: 'opportunity',
-            entityId: document.opportunityId,
-            label: document.title,
-            score: document.ranking.score,
-            outcomeScore: hireCount * 18 - noHireCount * 5,
-            momentumScore:
-              Math.max(0, 100 - document.ranking.recencyDays * 4) +
-              (clickCounts.get(document.opportunityId) ?? 0) * 3,
-            moderationStatus: opportunity.moderationStatus,
-            reasons: document.reasons,
-            signals: {
-              completionRate: document.ranking.completionRate,
-              disputeRate: document.ranking.disputeRate,
-              inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
-              responseRate: document.ranking.responseRate,
-              reviewAverage: null,
-              hireCount,
-              noHireCount,
-              recencyDays: document.ranking.recencyDays,
-            },
-          } satisfies MarketplaceRankingAuditEntry;
-        })
-        .filter(Boolean) as MarketplaceRankingAuditEntry[];
+        const opportunity = opportunityMap.get(document.opportunityId);
+        if (!opportunity) {
+          return null;
+        }
+        const hireCount = decisions.filter(
+          (decision) =>
+            decision.opportunityId === document.opportunityId &&
+            decision.action === 'hired',
+        ).length;
+        const noHireCount = decisions.filter(
+          (decision) =>
+            decision.opportunityId === document.opportunityId &&
+            decision.action === 'no_hire',
+        ).length;
+        return {
+          entityType: 'opportunity',
+          entityId: document.opportunityId,
+          label: document.title,
+          score: document.ranking.score,
+          outcomeScore: hireCount * 18 - noHireCount * 5,
+          momentumScore:
+            Math.max(0, 100 - document.ranking.recencyDays * 4) +
+            (clickCounts.get(document.opportunityId) ?? 0) * 3,
+          moderationStatus: opportunity.moderationStatus,
+          reasons: document.reasons,
+          signals: {
+            completionRate: document.ranking.completionRate,
+            disputeRate: document.ranking.disputeRate,
+            inviteAcceptanceRate: document.ranking.inviteAcceptanceRate,
+            responseRate: document.ranking.responseRate,
+            reviewAverage: null,
+            hireCount,
+            noHireCount,
+            recencyDays: document.ranking.recencyDays,
+          },
+        } satisfies MarketplaceRankingAuditEntry;
+      })
+      .filter(Boolean) as MarketplaceRankingAuditEntry[];
     const rankingAudit: MarketplaceRankingAuditEntry[] = [
       ...profileRankingAudit,
       ...opportunityRankingAudit,
@@ -5409,9 +5619,9 @@ export class MarketplaceService {
       .sort(
         (left, right) =>
           right.score +
-            right.outcomeScore +
-            right.momentumScore -
-            (left.score + left.outcomeScore + left.momentumScore),
+          right.outcomeScore +
+          right.momentumScore -
+          (left.score + left.outcomeScore + left.momentumScore),
       )
       .slice(0, 12);
     const cadenceCounts = {
@@ -5469,11 +5679,11 @@ export class MarketplaceService {
     return {
       generatedAt: new Date().toISOString(),
       funnel,
-      liquidityByCategory: await this.buildLiquidityByCategory(
+      liquidityByCategory: this.buildLiquidityByCategory(
         profiles,
         opportunities,
       ),
-      liquidityByTimezone: await this.buildLiquidityByTimezone(
+      liquidityByTimezone: this.buildLiquidityByTimezone(
         profiles,
         opportunities,
       ),
@@ -5520,7 +5730,8 @@ export class MarketplaceService {
           (preferences) => preferences.analyticsDigestEnabled,
         ).length,
         totalDigests: digests.length,
-        freshDigests: digests.filter((digest) => digest.status === 'fresh').length,
+        freshDigests: digests.filter((digest) => digest.status === 'fresh')
+          .length,
         acknowledgedDigests: digests.filter(
           (digest) => digest.status === 'acknowledged',
         ).length,
@@ -5559,7 +5770,9 @@ export class MarketplaceService {
     profile: MarketplaceProfileRecord,
   ): Promise<MarketplaceProfileView> {
     const hydratedProfile = await this.ensureProfileWorkspace(profile);
-    const user = await this.usersService.getRequiredById(hydratedProfile.userId);
+    const user = await this.usersService.getRequiredById(
+      hydratedProfile.userId,
+    );
     const escrowStats = await this.getEscrowStats(user, 'worker');
     const verifiedWalletAddress = this.getVerifiedWalletAddress(user);
     return {
@@ -5580,7 +5793,8 @@ export class MarketplaceService {
   private async toOpportunityView(
     opportunity: MarketplaceOpportunityRecord,
   ): Promise<MarketplaceOpportunityView> {
-    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const hydratedOpportunity =
+      await this.ensureOpportunityWorkspace(opportunity);
     const owner = await this.usersService.getRequiredById(
       hydratedOpportunity.ownerUserId,
     );
@@ -5603,7 +5817,8 @@ export class MarketplaceService {
     viewerUserId?: string,
     prefetchedApplications?: MarketplaceApplicationRecord[],
   ): Promise<MarketplaceOpportunityDetailView> {
-    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const hydratedOpportunity =
+      await this.ensureOpportunityWorkspace(opportunity);
     const base = await this.toOpportunityView(hydratedOpportunity);
     const applications =
       prefetchedApplications ??
@@ -5613,7 +5828,10 @@ export class MarketplaceService {
 
     if (
       viewerUserId &&
-      (await this.canAccessOpportunityAsOwner(viewerUserId, hydratedOpportunity))
+      (await this.canAccessOpportunityAsOwner(
+        viewerUserId,
+        hydratedOpportunity,
+      ))
     ) {
       const sortedApplications = await Promise.all(
         applications.map(async (application) => ({
@@ -5640,7 +5858,8 @@ export class MarketplaceService {
     application: MarketplaceApplicationRecord,
     viewerUserId?: string,
   ): Promise<MarketplaceApplicationView> {
-    const hydratedApplication = await this.ensureApplicationWorkspace(application);
+    const hydratedApplication =
+      await this.ensureApplicationWorkspace(application);
     const applicantUser = await this.usersService.getRequiredById(
       hydratedApplication.applicantUserId,
     );
@@ -5732,7 +5951,9 @@ export class MarketplaceService {
     const invitedUser = await this.usersService.getRequiredById(
       invite.invitedProfileUserId,
     );
-    const ownerUser = await this.usersService.getRequiredById(opportunity.ownerUserId);
+    const ownerUser = await this.usersService.getRequiredById(
+      opportunity.ownerUserId,
+    );
     const talent = await this.toTalentSummary(invitedUser);
     return {
       id: invite.id,
@@ -5758,7 +5979,10 @@ export class MarketplaceService {
 
   private async getOpportunityInviteIndex() {
     const invites = await this.marketplaceRepository.listOpportunityInvites();
-    const latestByProfile = new Map<string, MarketplaceOpportunityInviteRecord>();
+    const latestByProfile = new Map<
+      string,
+      MarketplaceOpportunityInviteRecord
+    >();
     for (const invite of invites) {
       const existing = latestByProfile.get(invite.invitedProfileUserId);
       if (!existing || invite.updatedAt > existing.updatedAt) {
@@ -5781,7 +6005,10 @@ export class MarketplaceService {
     );
   }
 
-  private async requireTalentPoolInWorkspace(poolId: string, workspaceId: string) {
+  private async requireTalentPoolInWorkspace(
+    poolId: string,
+    workspaceId: string,
+  ) {
     const pool = await this.marketplaceRepository.getTalentPoolById(poolId);
     if (!pool || pool.workspaceId !== workspaceId) {
       throw new NotFoundException('Marketplace talent pool not found');
@@ -5797,7 +6024,9 @@ export class MarketplaceService {
     >,
   ) {
     if (dto.sourceOpportunityId) {
-      const opportunity = await this.requireOpportunity(dto.sourceOpportunityId);
+      const opportunity = await this.requireOpportunity(
+        dto.sourceOpportunityId,
+      );
       const hydrated = await this.ensureOpportunityWorkspace(opportunity);
       if (hydrated.ownerWorkspaceId !== workspaceId) {
         throw new ForbiddenException(
@@ -5806,8 +6035,12 @@ export class MarketplaceService {
       }
     }
     if (dto.sourceApplicationId) {
-      const application = await this.requireApplication(dto.sourceApplicationId);
-      const opportunity = await this.requireOpportunity(application.opportunityId);
+      const application = await this.requireApplication(
+        dto.sourceApplicationId,
+      );
+      const opportunity = await this.requireOpportunity(
+        application.opportunityId,
+      );
       const hydrated = await this.ensureOpportunityWorkspace(opportunity);
       if (hydrated.ownerWorkspaceId !== workspaceId) {
         throw new ForbiddenException(
@@ -5815,7 +6048,10 @@ export class MarketplaceService {
         );
       }
     }
-    if (dto.sourceJobId && !(await this.escrowRepository.getById(dto.sourceJobId))) {
+    if (
+      dto.sourceJobId &&
+      !(await this.escrowRepository.getById(dto.sourceJobId))
+    ) {
       throw new NotFoundException('Escrow job not found');
     }
   }
@@ -5829,7 +6065,8 @@ export class MarketplaceService {
       return;
     }
     if (kind === 'saved_search_digest') {
-      const search = await this.marketplaceRepository.getSavedSearchById(targetId);
+      const search =
+        await this.marketplaceRepository.getSavedSearchById(targetId);
       if (!search || search.workspaceId !== workspaceId) {
         throw new NotFoundException('Marketplace saved search not found');
       }
@@ -5847,7 +6084,10 @@ export class MarketplaceService {
       }
       return;
     }
-    if (kind === 'rehire_digest' && !(await this.escrowRepository.getById(targetId))) {
+    if (
+      kind === 'rehire_digest' &&
+      !(await this.escrowRepository.getById(targetId))
+    ) {
       throw new NotFoundException('Escrow job not found');
     }
   }
@@ -5874,7 +6114,9 @@ export class MarketplaceService {
           .filter((member) => member.poolId === pool.id)
           .sort((left, right) => right.updatedAt - left.updatedAt)
           .map(async (member) => {
-            const user = await this.usersService.getRequiredById(member.profileUserId);
+            const user = await this.usersService.getRequiredById(
+              member.profileUserId,
+            );
             const profile = await this.toTalentSummary(user);
             const invite = invites
               .filter(
@@ -5897,27 +6139,26 @@ export class MarketplaceService {
   private async buildLifecycleDigestForWorkspace(
     workspace: WorkspaceSummary,
   ): Promise<MarketplaceLifecycleDigest> {
-    const [
-      savedSearches,
-      pools,
-      members,
-      invites,
-      opportunities,
-      reviews,
-    ] = await Promise.all([
-      this.marketplaceRepository.listSavedSearches(),
-      this.marketplaceRepository.listTalentPools(),
-      this.marketplaceRepository.listTalentPoolMembers(),
-      this.marketplaceRepository.listOpportunityInvites(),
-      this.marketplaceRepository.listOpportunities(),
-      this.marketplaceRepository.listReviews(),
-    ]);
-    const scopedPools = pools.filter((pool) => pool.workspaceId === workspace.workspaceId);
+    const [savedSearches, pools, members, invites, opportunities, reviews] =
+      await Promise.all([
+        this.marketplaceRepository.listSavedSearches(),
+        this.marketplaceRepository.listTalentPools(),
+        this.marketplaceRepository.listTalentPoolMembers(),
+        this.marketplaceRepository.listOpportunityInvites(),
+        this.marketplaceRepository.listOpportunities(),
+        this.marketplaceRepository.listReviews(),
+      ]);
+    const scopedPools = pools.filter(
+      (pool) => pool.workspaceId === workspace.workspaceId,
+    );
     const poolIds = new Set(scopedPools.map((pool) => pool.id));
-    const scopedMembers = members.filter((member) => poolIds.has(member.poolId));
+    const scopedMembers = members.filter((member) =>
+      poolIds.has(member.poolId),
+    );
     const scopedSearches = savedSearches.filter(
       (search) =>
-        search.workspaceId === workspace.workspaceId && search.kind === 'talent',
+        search.workspaceId === workspace.workspaceId &&
+        search.kind === 'talent',
     );
     const scopedOpportunities = opportunities.filter(
       (opportunity) => opportunity.ownerWorkspaceId === workspace.workspaceId,
@@ -5931,7 +6172,9 @@ export class MarketplaceService {
         scopedOpportunities
           .filter((opportunity) => opportunity.hiredJobId)
           .map(async (opportunity) => {
-            const job = await this.escrowRepository.getById(opportunity.hiredJobId!);
+            const job = await this.escrowRepository.getById(
+              opportunity.hiredJobId!,
+            );
             if (!job) {
               return null;
             }
@@ -5939,7 +6182,10 @@ export class MarketplaceService {
           }),
       )
     ).filter((job): job is EscrowJobRecord => job !== null);
-    const rehireCandidates = await this.buildRehireCandidates(scopedJobs, reviews);
+    const rehireCandidates = await this.buildRehireCandidates(
+      scopedJobs,
+      reviews,
+    );
     const tasks = this.buildLifecycleTasks({
       searches: scopedSearches,
       pools: scopedPools,
@@ -5960,13 +6206,15 @@ export class MarketplaceService {
       poolSummary: {
         poolCount: scopedPools.length,
         trackedTalentCount: scopedMembers.length,
-        contactedCount: scopedMembers.filter((member) => member.stage === 'contacted')
-          .length,
+        contactedCount: scopedMembers.filter(
+          (member) => member.stage === 'contacted',
+        ).length,
         interviewingCount: scopedMembers.filter(
           (member) => member.stage === 'interviewing',
         ).length,
-        offeredCount: scopedMembers.filter((member) => member.stage === 'offered')
-          .length,
+        offeredCount: scopedMembers.filter(
+          (member) => member.stage === 'offered',
+        ).length,
         rehireReadyCount: scopedMembers.filter(
           (member) => member.stage === 'rehire_ready',
         ).length,
@@ -6009,7 +6257,10 @@ export class MarketplaceService {
     }
 
     for (const invite of input.invites) {
-      if (invite.status !== 'pending' || now - invite.updatedAt < 3 * 24 * hourMs) {
+      if (
+        invite.status !== 'pending' ||
+        now - invite.updatedAt < 3 * 24 * hourMs
+      ) {
         continue;
       }
       const opportunity = opportunityById.get(invite.opportunityId);
@@ -6079,13 +6330,19 @@ export class MarketplaceService {
   ): Promise<MarketplaceRehireCandidateView[]> {
     const candidates = await Promise.all(
       jobs
-        .filter((job) => job.status === 'completed' || job.status === 'resolved')
+        .filter(
+          (job) => job.status === 'completed' || job.status === 'resolved',
+        )
         .map(async (job) => {
-          const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+          const workerUserId = await this.resolveEscrowParticipantUserId(
+            job,
+            'worker',
+          );
           if (!workerUserId) {
             return null;
           }
-          const workerUser = await this.usersService.getRequiredById(workerUserId);
+          const workerUser =
+            await this.usersService.getRequiredById(workerUserId);
           const profile = await this.toTalentSummary(workerUser);
           if (!profile.profileSlug) {
             return null;
@@ -6102,16 +6359,21 @@ export class MarketplaceService {
               ? profile.reputation.averageRating
               : Number(
                   (
-                    visibleReviews.reduce((sum, review) => sum + review.rating, 0) /
-                    visibleReviews.length
+                    visibleReviews.reduce(
+                      (sum, review) => sum + review.rating,
+                      0,
+                    ) / visibleReviews.length
                   ).toFixed(1),
                 );
           const disputedCount = job.milestones.filter(
             (milestone) =>
-              milestone.status === 'disputed' || milestone.disputedAt !== undefined,
+              milestone.status === 'disputed' ||
+              milestone.disputedAt !== undefined,
           ).length;
           const relationshipStrength =
-            reviewAverage !== null && reviewAverage >= 4.8 && disputedCount === 0
+            reviewAverage !== null &&
+            reviewAverage >= 4.8 &&
+            disputedCount === 0
               ? ('repeat_ready' as const)
               : reviewAverage !== null && reviewAverage >= 4
                 ? ('trusted' as const)
@@ -6135,11 +6397,15 @@ export class MarketplaceService {
     );
 
     return candidates
-      .filter((candidate): candidate is MarketplaceRehireCandidateView => candidate !== null)
+      .filter(
+        (candidate): candidate is MarketplaceRehireCandidateView =>
+          candidate !== null,
+      )
       .sort(
         (left, right) =>
           (right.completedAt ?? 0) - (left.completedAt ?? 0) ||
-          right.profile.completedEscrowCount - left.profile.completedEscrowCount,
+          right.profile.completedEscrowCount -
+            left.profile.completedEscrowCount,
       )
       .slice(0, 8);
   }
@@ -6211,7 +6477,9 @@ export class MarketplaceService {
   private async toDigestDispatchRunView(
     run: MarketplaceDigestDispatchRunRecord,
   ): Promise<MarketplaceDigestDispatchRunView> {
-    const triggeredBy = await this.usersService.getRequiredById(run.triggeredByUserId);
+    const triggeredBy = await this.usersService.getRequiredById(
+      run.triggeredByUserId,
+    );
     const dispatched = run.recipients.filter(
       (recipient) => recipient.result === 'dispatched',
     );
@@ -6233,8 +6501,9 @@ export class MarketplaceService {
 
   private async getNotificationPreferencesRecord(userId: string) {
     return (
-      (await this.marketplaceRepository.getNotificationPreferencesByUserId(userId)) ??
-      this.createDefaultNotificationPreferences(userId)
+      (await this.marketplaceRepository.getNotificationPreferencesByUserId(
+        userId,
+      )) ?? this.createDefaultNotificationPreferences(userId)
     );
   }
 
@@ -6298,12 +6567,15 @@ export class MarketplaceService {
     userId: string,
     workspace: WorkspaceSummary,
   ) {
-    const memberships = await this.organizationsService.listOrganizationMemberships(
-      userId,
-      workspace.organizationId,
-    );
+    const memberships =
+      await this.organizationsService.listOrganizationMemberships(
+        userId,
+        workspace.organizationId,
+      );
     return memberships.memberships
-      .filter((membership) => membership.workspaceIds.includes(workspace.workspaceId))
+      .filter((membership) =>
+        membership.workspaceIds.includes(workspace.workspaceId),
+      )
       .map((membership) => ({
         userId: membership.userId,
         userEmail: membership.userEmail,
@@ -6354,7 +6626,9 @@ export class MarketplaceService {
     ).length;
     const skippedCount = recipients.length - dispatchedCount;
     const label =
-      mode === 'due' ? 'due marketplace digests' : 'enabled marketplace digests';
+      mode === 'due'
+        ? 'due marketplace digests'
+        : 'enabled marketplace digests';
     if (dispatchedCount === 0) {
       return skippedCount === 0
         ? `No ${label} were dispatched.`
@@ -6395,7 +6669,9 @@ export class MarketplaceService {
     cadence?: MarketplaceDigestCadence;
     dispatchRunId?: string | null;
   }): Promise<MarketplaceDigestRecord> {
-    const preferences = await this.getNotificationPreferencesRecord(input.userId);
+    const preferences = await this.getNotificationPreferencesRecord(
+      input.userId,
+    );
     const workspaceId = input.workspace?.workspaceId ?? null;
     const notifications = this.filterNotificationsForWorkspace(
       await this.marketplaceRepository.listNotifications(),
@@ -6619,7 +6895,9 @@ export class MarketplaceService {
     relatedJobId?: string | null;
     relatedAutomationRunId?: string | null;
   }) {
-    const preferences = await this.getNotificationPreferencesRecord(input.userId);
+    const preferences = await this.getNotificationPreferencesRecord(
+      input.userId,
+    );
     if (!this.isNotificationKindEnabled(preferences, input.kind)) {
       return null;
     }
@@ -6655,10 +6933,7 @@ export class MarketplaceService {
     ) {
       return !rule.targetId || task.relatedEntityId === rule.targetId;
     }
-    if (
-      rule.kind === 'talent_pool_digest' &&
-      task.kind === 'pool_followup'
-    ) {
+    if (rule.kind === 'talent_pool_digest' && task.kind === 'pool_followup') {
       return !rule.targetId || task.relatedEntityId === rule.targetId;
     }
     if (rule.kind === 'invite_followup' && task.kind === 'invite_followup') {
@@ -6696,7 +6971,9 @@ export class MarketplaceService {
     query: Record<string, string | number | boolean | null>,
   ) {
     const normalized = Object.fromEntries(
-      Object.entries(query).filter(([, value]) => value !== null && value !== ''),
+      Object.entries(query).filter(
+        ([, value]) => value !== null && value !== '',
+      ),
     );
     if (kind === 'talent') {
       return this.compactSavedSearchQuery({
@@ -6724,7 +7001,9 @@ export class MarketplaceService {
           'wallet_and_escrow_history',
           'wallet_escrow_and_delivery',
         ]),
-        sort: asOptionalEnum(normalized.sort, ['relevance', 'recent']) ?? 'relevance',
+        sort:
+          asOptionalEnum(normalized.sort, ['relevance', 'recent']) ??
+          'relevance',
         limit: asPositiveInt(normalized.limit) ?? 24,
       });
     }
@@ -6745,7 +7024,8 @@ export class MarketplaceService {
       minBudget: asOptionalString(normalized.minBudget),
       maxBudget: asOptionalString(normalized.maxBudget),
       timezoneOverlapHours: asPositiveInt(normalized.timezoneOverlapHours),
-      sort: asOptionalEnum(normalized.sort, ['relevance', 'recent']) ?? 'relevance',
+      sort:
+        asOptionalEnum(normalized.sort, ['relevance', 'recent']) ?? 'relevance',
       limit: asPositiveInt(normalized.limit) ?? 24,
     });
   }
@@ -6755,9 +7035,7 @@ export class MarketplaceService {
     query: Record<string, string | number | boolean | null>,
   ) {
     if (kind === 'talent') {
-      const results = await this.searchTalent(
-        this.toTalentSearchQuery(query),
-      );
+      const results = await this.searchTalent(this.toTalentSearchQuery(query));
       return results.results.length;
     }
     const results = await this.searchOpportunities(
@@ -6854,9 +7132,12 @@ export class MarketplaceService {
   private async toReviewView(
     review: MarketplaceReviewRecord,
   ): Promise<MarketplaceReviewView> {
-    const reviewerUser = await this.usersService.getRequiredById(review.reviewerUserId);
-    const reviewerProfile =
-      await this.marketplaceRepository.getProfileByUserId(review.reviewerUserId);
+    const reviewerUser = await this.usersService.getRequiredById(
+      review.reviewerUserId,
+    );
+    const reviewerProfile = await this.marketplaceRepository.getProfileByUserId(
+      review.reviewerUserId,
+    );
     const moderatedBy = review.moderatedByUserId
       ? await this.usersService.getRequiredById(review.moderatedByUserId)
       : null;
@@ -6865,7 +7146,9 @@ export class MarketplaceService {
       reviewer: {
         userId: reviewerUser.id,
         displayName:
-          reviewerProfile?.displayName ?? reviewerUser.email.split('@')[0] ?? reviewerUser.id,
+          reviewerProfile?.displayName ??
+          reviewerUser.email.split('@')[0] ??
+          reviewerUser.id,
         role: review.reviewerRole,
       },
       reviewee: {
@@ -6884,7 +7167,9 @@ export class MarketplaceService {
   private async toIdentityRiskReviewView(
     review: MarketplaceIdentityRiskReviewRecord,
   ): Promise<MarketplaceIdentityRiskReviewView> {
-    const operator = await this.usersService.getRequiredById(review.reviewedByUserId);
+    const operator = await this.usersService.getRequiredById(
+      review.reviewedByUserId,
+    );
     return {
       ...review,
       reviewedBy: {
@@ -6927,17 +7212,16 @@ export class MarketplaceService {
   ) {
     if (role === 'client') {
       return (
-        (
-          await this.usersService.getByWalletAddress(job.onchain.clientAddress)
-        )?.id ?? null
+        (await this.usersService.getByWalletAddress(job.onchain.clientAddress))
+          ?.id ?? null
       );
     }
     if (job.contractorParticipation?.joinedUserId) {
       return job.contractorParticipation.joinedUserId;
     }
     return (
-      (await this.usersService.getByWalletAddress(job.onchain.workerAddress))?.id ??
-      null
+      (await this.usersService.getByWalletAddress(job.onchain.workerAddress))
+        ?.id ?? null
     );
   }
 
@@ -6949,8 +7233,14 @@ export class MarketplaceService {
     const normalizedWallets = new Set(
       user.wallets.map((wallet) => normalizeEvmAddress(wallet.address)),
     );
-    const clientUserId = await this.resolveEscrowParticipantUserId(job, 'client');
-    const workerUserId = await this.resolveEscrowParticipantUserId(job, 'worker');
+    const clientUserId = await this.resolveEscrowParticipantUserId(
+      job,
+      'client',
+    );
+    const workerUserId = await this.resolveEscrowParticipantUserId(
+      job,
+      'worker',
+    );
     if (
       clientUserId === user.id ||
       normalizedWallets.has(normalizeEvmAddress(job.onchain.clientAddress))
@@ -7001,7 +7291,9 @@ export class MarketplaceService {
     role: 'client' | 'worker',
   ): Promise<MarketplaceReputationSnapshot> {
     const escrowStats = await this.getEscrowStats(user, role);
-    const visibleReviews = (await this.marketplaceRepository.listReviews()).filter(
+    const visibleReviews = (
+      await this.marketplaceRepository.listReviews()
+    ).filter(
       (review) =>
         review.revieweeUserId === user.id &&
         review.revieweeRole === role &&
@@ -7205,10 +7497,7 @@ export class MarketplaceService {
         'An active off-platform payment report is open for this subject.',
       );
     }
-    if (
-      reputation.revisionRate !== null &&
-      reputation.revisionRate >= 35
-    ) {
+    if (reputation.revisionRate !== null && reputation.revisionRate >= 35) {
       pushSignal(
         'revision_heavy_delivery',
         reputation.revisionRate >= 60 ? 'high' : 'medium',
@@ -7355,7 +7644,9 @@ export class MarketplaceService {
   private async toTalentSummary(
     user: UserRecord,
   ): Promise<MarketplaceTalentSummary> {
-    const rawProfile = await this.marketplaceRepository.getProfileByUserId(user.id);
+    const rawProfile = await this.marketplaceRepository.getProfileByUserId(
+      user.id,
+    );
     const profile = rawProfile
       ? await this.ensureProfileWorkspace(rawProfile)
       : null;
@@ -7748,16 +8039,16 @@ export class MarketplaceService {
     opportunity: MarketplaceOpportunityRecord,
     capability?: keyof WorkspaceSummary['capabilities'],
   ) {
-    if (!(await this.canAccessOpportunityAsOwner(userId, opportunity, capability))) {
+    if (
+      !(await this.canAccessOpportunityAsOwner(userId, opportunity, capability))
+    ) {
       const message =
         capability === 'reviewApplications'
           ? 'Only a client workspace with review access can do that'
           : capability === 'createOpportunity'
             ? 'Only a client workspace with authoring access can do that'
             : 'Only the client who owns the opportunity can do that';
-      throw new ForbiddenException(
-        message,
-      );
+      throw new ForbiddenException(message);
     }
   }
 
@@ -7766,7 +8057,8 @@ export class MarketplaceService {
     opportunity: MarketplaceOpportunityRecord,
     capability?: keyof WorkspaceSummary['capabilities'],
   ) {
-    const hydratedOpportunity = await this.ensureOpportunityWorkspace(opportunity);
+    const hydratedOpportunity =
+      await this.ensureOpportunityWorkspace(opportunity);
     if (hydratedOpportunity.ownerWorkspaceId) {
       const workspace = await this.organizationsService.findAccessibleWorkspace(
         userId,
@@ -7826,7 +8118,10 @@ export class MarketplaceService {
   private async ensureApplicationWorkspace(
     application: MarketplaceApplicationRecord,
   ) {
-    if (application.applicantOrganizationId && application.applicantWorkspaceId) {
+    if (
+      application.applicantOrganizationId &&
+      application.applicantWorkspaceId
+    ) {
       return application;
     }
 
@@ -7848,14 +8143,15 @@ export class MarketplaceService {
     userId: string,
     workspaceKind: WorkspaceSummary['kind'],
   ) {
-    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const context =
+      await this.organizationsService.buildWorkspaceContext(userId);
     const workspace =
       context.workspaces.find(
-        (candidate) =>
-          candidate.kind === workspaceKind &&
-          candidate.isDefault,
+        (candidate) => candidate.kind === workspaceKind && candidate.isDefault,
       ) ??
-      context.workspaces.find((candidate) => candidate.kind === workspaceKind) ??
+      context.workspaces.find(
+        (candidate) => candidate.kind === workspaceKind,
+      ) ??
       null;
     if (!workspace) {
       throw new NotFoundException(

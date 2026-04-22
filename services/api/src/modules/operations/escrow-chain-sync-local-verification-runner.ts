@@ -833,6 +833,13 @@ async function seedPersistedJob(
       chainSync: null,
       executionFailureWorkflow: null,
       staleWorkflow: null,
+      commercial: null,
+    },
+    projectRoom: {
+      submissions: [],
+      messages: [],
+      activity: [],
+      supportCases: [],
     },
     onchain: {
       chainId: DEFAULT_CHAIN_ID,

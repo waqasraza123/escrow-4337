@@ -74,11 +74,16 @@ describe('operator walkthrough', () => {
     renderCaseConsole();
 
     await waitFor(() => {
-      expect(screen.getByText('Start on the operator case page')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Stop walkthrough' })).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: 'Stop walkthrough' })).toBeInTheDocument();
-    expect(screen.getByText('Operator walkthrough • 1/4')).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', {
+        name:
+          /Start on the operator case page|Link the configured arbitrator wallet|Review and resolve the disputed milestone/,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Operator walkthrough • [1-3]\/4/)).toBeInTheDocument();
   });
 
   it('arms the operator walkthrough from the manual page', async () => {

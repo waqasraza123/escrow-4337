@@ -170,24 +170,28 @@ describe('Escrow export support', () => {
       ]),
     );
     const resolveExecution = jobHistoryBody.timeline.find(
-      (entry) => entry.source === 'execution' && entry.label === 'resolve_dispute',
+      (entry) =>
+        entry.source === 'execution' && entry.label === 'resolve_dispute',
     );
-    expect(resolveExecution?.detail).toEqual(
-      expect.objectContaining({
-        requestId: expect.stringMatching(/^svc_/),
-        correlationId: expect.stringMatching(/^exec_/),
-        idempotencyKey: null,
-        operationKey: expect.stringMatching(/^resolve_dispute_/),
-      }),
-    );
-    expect(jobHistoryBody.summary.executionTraces.traces[0]).toEqual(
-      expect.objectContaining({
-        traceId: expect.stringMatching(/^exec_/),
-        correlationId: expect.stringMatching(/^exec_/),
-        requestIds: [expect.stringMatching(/^svc_/)],
-        operationKeys: [expect.stringMatching(/_/)],
-      }),
-    );
+    expect(resolveExecution?.detail).toBeDefined();
+    if (
+      !resolveExecution?.detail ||
+      typeof resolveExecution.detail !== 'object' ||
+      Array.isArray(resolveExecution.detail)
+    ) {
+      throw new Error('Expected resolve execution detail object');
+    }
+    expect(resolveExecution.detail.requestId).toMatch(/^svc_/);
+    expect(resolveExecution.detail.correlationId).toMatch(/^exec_/);
+    expect(resolveExecution.detail.idempotencyKey).toBeNull();
+    expect(resolveExecution.detail.operationKey).toMatch(/^resolve_dispute_/);
+
+    const firstTrace = jobHistoryBody.summary.executionTraces.traces[0];
+    expect(firstTrace).toBeDefined();
+    expect(firstTrace?.traceId).toMatch(/^exec_/);
+    expect(firstTrace?.correlationId).toMatch(/^exec_/);
+    expect(firstTrace?.requestIds[0]).toMatch(/^svc_/);
+    expect(firstTrace?.operationKeys[0]).toMatch(/_/);
 
     const disputeCase = await escrowService.getExportDocument(
       createResponse.jobId,

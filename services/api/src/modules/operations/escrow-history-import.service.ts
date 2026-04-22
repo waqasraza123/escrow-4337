@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { z } from 'zod';
 import { ESCROW_REPOSITORY } from '../../persistence/persistence.tokens';
@@ -137,6 +133,10 @@ const executionSchema = z.object({
   actorAddress: z.string().min(1),
   chainId: z.number().int().positive(),
   contractAddress: z.string().min(1),
+  requestId: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  operationKey: z.string().min(1).optional(),
   txHash: z.string().min(1).optional(),
   status: z.enum(['confirmed', 'failed']),
   blockNumber: z.number().int().nonnegative().optional(),
@@ -236,9 +236,9 @@ function stableSerialize(value: unknown): string {
   }
 
   if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(
-      ([left], [right]) => left.localeCompare(right),
-    );
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, nestedValue]) => nestedValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right));
     return `{${entries
       .map(
         ([key, nestedValue]) =>
@@ -336,6 +336,13 @@ function toSyntheticJobRecord(
       chainSync: null,
       executionFailureWorkflow: null,
       staleWorkflow: null,
+      commercial: null,
+    },
+    projectRoom: {
+      submissions: [],
+      messages: [],
+      activity: [],
+      supportCases: [],
     },
     audit: structuredClone(audit),
     executions: structuredClone(executions),

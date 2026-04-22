@@ -613,9 +613,7 @@ describe('EscrowChainSyncService', () => {
       mirrorStatus: 'persisted',
       persistedVia: 'replace_range',
     });
-    expect(persistedEvents[0]?.correlationId).toMatch(
-      /^finalized_ingestion_/,
-    );
+    expect(persistedEvents[0]?.correlationId).toMatch(/^finalized_ingestion_/);
     expect(
       new Set(persistedEvents.map((event) => event.correlationId)).size,
     ).toBe(1);

@@ -204,7 +204,10 @@ export const createMarketplaceSavedSearchSchema = z
   .object({
     kind: z.enum(['talent', 'opportunity']),
     label: z.string().trim().min(1).max(120),
-    query: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+    query: z.record(
+      z.string(),
+      z.union([z.string(), z.number(), z.boolean(), z.null()]),
+    ),
     alertFrequency: z.enum(['manual', 'daily', 'weekly']).default('manual'),
   })
   .strict();

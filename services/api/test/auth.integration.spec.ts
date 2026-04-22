@@ -92,57 +92,33 @@ describe('Auth integration', () => {
       code: sentOtps[0]?.code ?? '',
     });
 
-    expect(verifyResult.user).toEqual(
-      expect.objectContaining({
-        email: email.toLowerCase(),
-        shariahMode: false,
-        defaultExecutionWalletAddress: null,
-        wallets: [],
-        capabilities: expect.objectContaining({
-          escrowResolution: expect.objectContaining({
-            allowed: false,
-          }),
-          marketplaceModeration: expect.objectContaining({
-            allowed: false,
-          }),
-        }),
-      }),
+    expect(verifyResult.user.email).toBe(email.toLowerCase());
+    expect(verifyResult.user.shariahMode).toBe(false);
+    expect(verifyResult.user.defaultExecutionWalletAddress).toBeNull();
+    expect(verifyResult.user.wallets).toEqual([]);
+    expect(verifyResult.user.capabilities.escrowResolution.allowed).toBe(false);
+    expect(verifyResult.user.capabilities.marketplaceModeration.allowed).toBe(
+      false,
     );
     expect(verifyResult.accessToken).toEqual(expect.any(String));
     expect(verifyResult.refreshToken).toEqual(expect.any(String));
 
     const meResult = await authService.me(verifyResult.user.id);
-    expect(meResult).toEqual(
-      expect.objectContaining({
-        email: email.toLowerCase(),
-        shariahMode: false,
-        defaultExecutionWalletAddress: null,
-        wallets: [],
-        capabilities: expect.objectContaining({
-          escrowOperations: expect.objectContaining({
-            allowed: false,
-          }),
-        }),
-      }),
-    );
+    expect(meResult.email).toBe(email.toLowerCase());
+    expect(meResult.shariahMode).toBe(false);
+    expect(meResult.defaultExecutionWalletAddress).toBeNull();
+    expect(meResult.wallets).toEqual([]);
+    expect(meResult.capabilities.escrowOperations.allowed).toBe(false);
 
     const shariahResult = await authService.setShariah(
       verifyResult.user.id,
       true,
     );
-    expect(shariahResult).toEqual(
-      expect.objectContaining({
-        email: email.toLowerCase(),
-        shariahMode: true,
-        defaultExecutionWalletAddress: null,
-        wallets: [],
-        capabilities: expect.objectContaining({
-          jobHistoryImport: expect.objectContaining({
-            allowed: false,
-          }),
-        }),
-      }),
-    );
+    expect(shariahResult.email).toBe(email.toLowerCase());
+    expect(shariahResult.shariahMode).toBe(true);
+    expect(shariahResult.defaultExecutionWalletAddress).toBeNull();
+    expect(shariahResult.wallets).toEqual([]);
+    expect(shariahResult.capabilities.jobHistoryImport.allowed).toBe(false);
 
     const refreshResult = await authService.refresh({
       refreshToken: verifyResult.refreshToken,

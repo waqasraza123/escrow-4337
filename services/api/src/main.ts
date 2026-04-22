@@ -19,10 +19,16 @@ async function bootstrap() {
   app.use((request: Request, response: Response, next: NextFunction) => {
     const context = readRequestExecutionContext(request);
     (
-      request as Request & { requestId?: string; idempotencyKey?: string | null }
+      request as Request & {
+        requestId?: string;
+        idempotencyKey?: string | null;
+      }
     ).requestId = context.requestId;
     (
-      request as Request & { requestId?: string; idempotencyKey?: string | null }
+      request as Request & {
+        requestId?: string;
+        idempotencyKey?: string | null;
+      }
     ).idempotencyKey = context.idempotencyKey;
     response.setHeader('x-request-id', context.requestId);
     next();

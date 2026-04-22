@@ -118,12 +118,13 @@ export class MarketplaceController {
   @Get('recommendations/opportunities')
   getOpportunityRecommendations(
     @User() user: ReqUser,
-    @Query(
-      new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema),
-    )
+    @Query(new ZodValidationPipe(marketplaceDto.marketplaceProfilesQuerySchema))
     query: marketplaceDto.MarketplaceProfilesQueryDto,
   ) {
-    return this.marketplaceService.getOpportunityRecommendations(user.id, query);
+    return this.marketplaceService.getOpportunityRecommendations(
+      user.id,
+      query,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -269,9 +270,7 @@ export class MarketplaceController {
     @User() user: ReqUser,
     @Param('id') id: string,
     @Body(
-      new ZodValidationPipe(
-        marketplaceDto.updateMarketplaceNotificationSchema,
-      ),
+      new ZodValidationPipe(marketplaceDto.updateMarketplaceNotificationSchema),
     )
     body: marketplaceDto.UpdateMarketplaceNotificationDto,
   ) {
@@ -314,9 +313,7 @@ export class MarketplaceController {
   @Post('digests/generate')
   generateDigest(
     @User() user: ReqUser,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.generateMarketplaceDigestSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.generateMarketplaceDigestSchema))
     body: marketplaceDto.GenerateMarketplaceDigestDto,
   ) {
     return this.marketplaceService.generateDigest(user.id, body);
@@ -339,9 +336,7 @@ export class MarketplaceController {
   updateDigest(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.updateMarketplaceDigestSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.updateMarketplaceDigestSchema))
     body: marketplaceDto.UpdateMarketplaceDigestDto,
   ) {
     return this.marketplaceService.updateDigest(user.id, id, body);
@@ -367,9 +362,7 @@ export class MarketplaceController {
     @User() user: ReqUser,
     @Param('id') id: string,
     @Body(
-      new ZodValidationPipe(
-        marketplaceDto.runMarketplaceAutomationRuleSchema,
-      ),
+      new ZodValidationPipe(marketplaceDto.runMarketplaceAutomationRuleSchema),
     )
     body: marketplaceDto.RunMarketplaceAutomationRuleDto,
   ) {
@@ -566,9 +559,7 @@ export class MarketplaceController {
   withdrawApplication(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema))
     body: marketplaceDto.ApplicationDecisionNoteDto,
   ) {
     return this.marketplaceService.withdrawApplication(user.id, id, body);
@@ -579,9 +570,7 @@ export class MarketplaceController {
   shortlistApplication(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema))
     body: marketplaceDto.ApplicationDecisionNoteDto = {},
   ) {
     return this.marketplaceService.shortlistApplication(user.id, id, body);
@@ -592,9 +581,7 @@ export class MarketplaceController {
   rejectApplication(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema))
     body: marketplaceDto.ApplicationDecisionNoteDto,
   ) {
     return this.marketplaceService.rejectApplication(user.id, id, body);
@@ -621,7 +608,10 @@ export class MarketplaceController {
 
   @UseGuards(AuthGuard)
   @Get('applications/:id/interview')
-  getApplicationInterviewThread(@User() user: ReqUser, @Param('id') id: string) {
+  getApplicationInterviewThread(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+  ) {
     return this.marketplaceService.getApplicationInterviewThread(user.id, id);
   }
 
@@ -649,9 +639,7 @@ export class MarketplaceController {
   createApplicationOffer(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.createMarketplaceOfferSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.createMarketplaceOfferSchema))
     body: marketplaceDto.CreateMarketplaceOfferDto,
   ) {
     return this.marketplaceService.createApplicationOffer(user.id, id, body);
@@ -662,9 +650,7 @@ export class MarketplaceController {
   hireApplication(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.applicationDecisionNoteSchema))
     body: marketplaceDto.ApplicationDecisionNoteDto = {},
   ) {
     return this.marketplaceService.hireApplication(user.id, id, body);
@@ -687,9 +673,7 @@ export class MarketplaceController {
   respondToMarketplaceOffer(
     @User() user: ReqUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(marketplaceDto.respondToMarketplaceOfferSchema),
-    )
+    @Body(new ZodValidationPipe(marketplaceDto.respondToMarketplaceOfferSchema))
     body: marketplaceDto.RespondToMarketplaceOfferDto,
   ) {
     return this.marketplaceService.respondToMarketplaceOffer(user.id, id, body);
@@ -707,7 +691,9 @@ export class MarketplaceController {
     @User() user: ReqUser,
     @Param('id') id: string,
     @Body(
-      new ZodValidationPipe(marketplaceDto.reviseMarketplaceContractDraftSchema),
+      new ZodValidationPipe(
+        marketplaceDto.reviseMarketplaceContractDraftSchema,
+      ),
     )
     body: marketplaceDto.ReviseMarketplaceContractDraftDto,
   ) {
@@ -724,7 +710,9 @@ export class MarketplaceController {
     @User() user: ReqUser,
     @Param('id') id: string,
     @Body(
-      new ZodValidationPipe(marketplaceDto.approveMarketplaceContractDraftSchema),
+      new ZodValidationPipe(
+        marketplaceDto.approveMarketplaceContractDraftSchema,
+      ),
     )
     body: marketplaceDto.ApproveMarketplaceContractDraftDto,
   ) {
@@ -741,7 +729,9 @@ export class MarketplaceController {
     @User() user: ReqUser,
     @Param('id') id: string,
     @Body(
-      new ZodValidationPipe(marketplaceDto.convertMarketplaceContractDraftSchema),
+      new ZodValidationPipe(
+        marketplaceDto.convertMarketplaceContractDraftSchema,
+      ),
     )
     body: marketplaceDto.ConvertMarketplaceContractDraftDto,
   ) {

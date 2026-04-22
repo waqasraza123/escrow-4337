@@ -54,7 +54,9 @@ export class FileOrganizationsRepository implements OrganizationsRepository {
   async getOrganizationById(id: string) {
     return this.store.read((data) => {
       const organization = data.organizations[id];
-      return organization ? cloneValue(normalizeOrganization(organization)) : null;
+      return organization
+        ? cloneValue(normalizeOrganization(organization))
+        : null;
     });
   }
 
@@ -64,7 +66,9 @@ export class FileOrganizationsRepository implements OrganizationsRepository {
       const organization = Object.values(data.organizations).find(
         (candidate) => candidate.slug === normalizedSlug,
       );
-      return organization ? cloneValue(normalizeOrganization(organization)) : null;
+      return organization
+        ? cloneValue(normalizeOrganization(organization))
+        : null;
     });
   }
 

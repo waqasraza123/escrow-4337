@@ -133,6 +133,20 @@
   - run `Promotion Review`
   - preserve `release-dossier` and `release-pointer-staging`
 
+## Update (2026-04-22, Marketplace Plan Remaining-Work Assessment)
+- Assessed the active marketplace plan against repo memory and current local session state.
+- Current best summary:
+  - repo-side marketplace phases `1..8` are largely implemented
+  - Phase 8 is still marked code-only and intentionally unverified in this checkout
+  - Phase 0 is repo-complete but still blocked on real staging proof and release evidence
+- Remaining work clusters:
+  - real staging validation for email, relay, bundler/paymaster, and escrow execution providers
+  - real `Deployed Smoke` -> `Launch Candidate` -> `Promotion Review` execution with preserved reviewed artifacts
+  - broader browser-proof hardening for workspace/lane flows and ranking/search conversion surfaces
+  - deferred post-plan capabilities such as advanced ranking/search indexing, richer in-product comms, open bidding, and multi-contractor escrow composition
+- Verification for this assessment:
+  - docs-only review; no code/tests/builds run
+
 ## Update (2026-04-21, Phase 1 Agency Identity Completion)
 - Completed the remaining repo-side Phase 1 identity/workspace slice without running verification.
 - Backend changes:
@@ -1229,3 +1243,32 @@
     - full `pnpm --filter web typecheck` still has unrelated existing errors in `src/app/milestone-lifecycle.spec.ts`, `src/app/project-room.tsx`, and `src/test/fixtures.ts`
 - Next likely step:
   - add operator-facing digest dispatch analytics or a scheduler/worker entry point that triggers the same due-dispatch path outside the workspace UI
+
+## Update (2026-04-22, Remaining Repo Work Closeout)
+- Closed the remaining repo-side blockers that were preventing the marketplace plan checkout from verifying cleanly:
+  - fixed zero-safe internal commercial reconciliation math in escrow
+  - restored public marketplace profile-search filtering for hidden/incomplete profiles
+  - updated stale web/admin marketplace walkthrough/detail specs to the current API/UI contracts
+  - normalized job-history import digest comparison so JSON-imported execution records match local persisted timelines even when optional fields are omitted instead of stored as `undefined`
+  - fixed fresh-Postgres migration FK type mismatches for marketplace job references
+- Backend changes:
+  - `services/api/src/modules/escrow/escrow.service.ts`
+  - `services/api/src/modules/marketplace/marketplace.service.ts`
+  - `services/api/src/modules/operations/escrow-history-import.service.ts`
+  - `services/api/src/persistence/postgres/migrations/{026_marketplace_retention_phase.sql,028_marketplace_notifications.sql}`
+- Frontend/admin test changes:
+  - `apps/web/src/app/marketplace/{marketplace-page.spec.tsx,profiles/[slug]/profile-detail.spec.tsx,opportunities/[id]/opportunity-detail.spec.tsx}`
+  - `apps/admin/src/app/operator-walkthrough.spec.tsx`
+- Verification:
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow.service.spec.ts test/marketplace.service.spec.ts test/escrow-health.service.spec.ts test/escrow-chain-sync.service.spec.ts`
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-page.spec.tsx`
+  - passed: `pnpm --filter web test 'src/app/marketplace/opportunities/[id]/opportunity-detail.spec.tsx'`
+  - passed: `pnpm --filter web test 'src/app/marketplace/profiles/[slug]/profile-detail.spec.tsx'`
+  - passed: `pnpm --filter admin test src/app/operator-walkthrough.spec.tsx`
+  - passed: `pnpm --filter escrow4334-api test -- --runTestsByPath test/escrow-history-import.service.spec.ts`
+  - passed: `env PLAYWRIGHT_LOCAL_SERVER_MODE=built pnpm e2e:smoke:local`
+  - passed: `pnpm verify:ci`
+- Remaining work is now external rather than repo-side:
+  - real staged `Deployed Smoke` -> `Launch Candidate` -> `Promotion Review`
+  - live provider validation with real staging secrets/URLs
+  - preserved reviewed release artifacts (`release-dossier`, `release-pointer-staging`)

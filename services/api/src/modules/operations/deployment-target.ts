@@ -23,9 +23,7 @@ export function readDeploymentTargetEnvironment(
       return rawValue;
     }
 
-    throw new Error(
-      `${envName} must be one of staging or production when set`,
-    );
+    throw new Error(`${envName} must be one of staging or production when set`);
   }
 
   return null;
@@ -35,7 +33,8 @@ export function isStrictDeploymentValidationEnvironment(
   env: NodeJS.ProcessEnv = process.env,
 ) {
   return (
-    env.NODE_ENV === 'production' || readDeploymentTargetEnvironment(env) !== null
+    env.NODE_ENV === 'production' ||
+    readDeploymentTargetEnvironment(env) !== null
   );
 }
 

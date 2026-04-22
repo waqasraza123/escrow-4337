@@ -193,7 +193,7 @@ function buildProjectRoomPath(jobId: string) {
 export function ProjectRoom(props: ProjectRoomProps) {
   const { initialJobId } = props;
   const { messages } = useWebI18n();
-  const roomMessages = messages.projectRoom;
+  const roomMessages = messages.publicMarketplace.projectRoom;
 
   const [tokens, setTokens] = useState<SessionTokens | null>(null);
   const [room, setRoom] = useState<ProjectRoomView | null>(null);

@@ -470,37 +470,44 @@ describe('EscrowService', () => {
     });
 
     await expect(
-      escrowService.fundJob(clientUserId, createdJob.jobId, {
-        amount: '20',
-      }, {
-        requestId: 'req_failed_fund',
-        idempotencyKey: 'fund-failure-1',
-      }),
+      escrowService.fundJob(
+        clientUserId,
+        createdJob.jobId,
+        {
+          amount: '20',
+        },
+        {
+          requestId: 'req_failed_fund',
+          idempotencyKey: 'fund-failure-1',
+        },
+      ),
     ).rejects.toBeInstanceOf(BadGatewayException);
 
     await expect(
-      escrowService.fundJob(clientUserId, createdJob.jobId, {
-        amount: '20',
-      }, {
-        requestId: 'req_failed_fund_retry',
-        idempotencyKey: 'fund-failure-1',
-      }),
+      escrowService.fundJob(
+        clientUserId,
+        createdJob.jobId,
+        {
+          amount: '20',
+        },
+        {
+          requestId: 'req_failed_fund_retry',
+          idempotencyKey: 'fund-failure-1',
+        },
+      ),
     ).rejects.toBeInstanceOf(BadGatewayException);
 
     const auditBundle = await escrowService.getAuditBundle(createdJob.jobId);
     expect(auditBundle.bundle.job.fundedAmount).toBeNull();
     expect(auditBundle.bundle.executions).toHaveLength(2);
-    expect(auditBundle.bundle.executions[1]).toEqual(
-      expect.objectContaining({
-        action: 'fund_job',
-        status: 'failed',
-        requestId: 'req_failed_fund',
-        idempotencyKey: 'fund-failure-1',
-        operationKey: expect.stringMatching(/^fund_job_/),
-        correlationId: expect.stringMatching(/^exec_/),
-        failureCode: 'relay_rejected',
-      }),
-    );
+    const failedFundingExecution = auditBundle.bundle.executions[1];
+    expect(failedFundingExecution?.action).toBe('fund_job');
+    expect(failedFundingExecution?.status).toBe('failed');
+    expect(failedFundingExecution?.requestId).toBe('req_failed_fund');
+    expect(failedFundingExecution?.idempotencyKey).toBe('fund-failure-1');
+    expect(failedFundingExecution?.operationKey).toMatch(/^fund_job_/);
+    expect(failedFundingExecution?.correlationId).toMatch(/^exec_/);
+    expect(failedFundingExecution?.failureCode).toBe('relay_rejected');
   });
 
   it('replays create-job success for the same idempotency key without creating duplicates', async () => {
@@ -549,15 +556,12 @@ describe('EscrowService', () => {
     expect(jobs.jobs).toHaveLength(1);
     const auditBundle = await escrowService.getAuditBundle(first.jobId);
     expect(auditBundle.bundle.executions).toHaveLength(1);
-    expect(auditBundle.bundle.executions[0]).toEqual(
-      expect.objectContaining({
-        action: 'create_job',
-        requestId: 'req_create_job',
-        idempotencyKey: 'create-job-1',
-        operationKey: expect.stringMatching(/^create_job_/),
-        correlationId: expect.stringMatching(/^exec_/),
-      }),
-    );
+    const createExecution = auditBundle.bundle.executions[0];
+    expect(createExecution?.action).toBe('create_job');
+    expect(createExecution?.requestId).toBe('req_create_job');
+    expect(createExecution?.idempotencyKey).toBe('create-job-1');
+    expect(createExecution?.operationKey).toMatch(/^create_job_/);
+    expect(createExecution?.correlationId).toMatch(/^exec_/);
   });
 
   it('replays confirmed funding for the same idempotency key without duplicating execution history', async () => {
@@ -603,14 +607,10 @@ describe('EscrowService', () => {
       (execution) => execution.action === 'fund_job',
     );
     expect(fundExecutions).toHaveLength(1);
-    expect(fundExecutions[0]).toEqual(
-      expect.objectContaining({
-        requestId: 'req_fund_job',
-        idempotencyKey: 'fund-job-1',
-        operationKey: expect.stringMatching(/^fund_job_/),
-        correlationId: expect.stringMatching(/^exec_/),
-      }),
-    );
+    expect(fundExecutions[0]?.requestId).toBe('req_fund_job');
+    expect(fundExecutions[0]?.idempotencyKey).toBe('fund-job-1');
+    expect(fundExecutions[0]?.operationKey).toMatch(/^fund_job_/);
+    expect(fundExecutions[0]?.correlationId).toMatch(/^exec_/);
   });
 
   it('lists jobs for the current participant with derived roles', async () => {

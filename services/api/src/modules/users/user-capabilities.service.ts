@@ -48,7 +48,8 @@ export class UserCapabilitiesService {
 
     if (!capability.allowed) {
       throw new ForbiddenException(
-        capability.reason ?? 'Authenticated user is not authorized for this action',
+        capability.reason ??
+          'Authenticated user is not authorized for this action',
       );
     }
 

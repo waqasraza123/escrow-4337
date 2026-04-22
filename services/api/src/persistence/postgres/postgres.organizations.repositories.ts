@@ -108,7 +108,9 @@ function mapWorkspace(row: WorkspaceRow): WorkspaceRecord {
   };
 }
 
-export class PostgresOrganizationsRepository implements OrganizationsRepository {
+export class PostgresOrganizationsRepository
+  implements OrganizationsRepository
+{
   constructor(private readonly db: PostgresDatabaseService) {}
 
   async getOrganizationById(id: string) {

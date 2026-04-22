@@ -87,10 +87,7 @@ export type MarketplaceAutomationRuleKind =
   | 'talent_pool_digest'
   | 'invite_followup'
   | 'rehire_digest';
-export type MarketplaceAutomationRuleSchedule =
-  | 'manual'
-  | 'daily'
-  | 'weekly';
+export type MarketplaceAutomationRuleSchedule = 'manual' | 'daily' | 'weekly';
 export type MarketplaceNotificationKind =
   | 'talent_invite_received'
   | 'application_received'
@@ -946,13 +943,15 @@ export type MarketplaceApplicationView = Omit<
 export type MarketplaceApplicationRevisionView =
   MarketplaceApplicationRevisionRecord;
 
-export type MarketplaceInterviewMessageView = MarketplaceInterviewMessageRecord & {
-  senderEmail: string;
-};
+export type MarketplaceInterviewMessageView =
+  MarketplaceInterviewMessageRecord & {
+    senderEmail: string;
+  };
 
-export type MarketplaceInterviewThreadView = MarketplaceInterviewThreadRecord & {
-  messages: MarketplaceInterviewMessageView[];
-};
+export type MarketplaceInterviewThreadView =
+  MarketplaceInterviewThreadRecord & {
+    messages: MarketplaceInterviewMessageView[];
+  };
 
 export type MarketplaceOfferView = MarketplaceOfferRecord;
 
@@ -1010,12 +1009,14 @@ export type MarketplaceOpportunityInviteView = {
   talent: MarketplaceTalentSummary;
 };
 
-export type MarketplaceTalentPoolMemberView =
-  Omit<MarketplaceTalentPoolMemberRecord, 'profileUserId' | 'profileSlug'> & {
-    profile: MarketplaceTalentSummary;
-    reviewAverage: number | null;
-    activeInviteStatus: MarketplaceOpportunityInviteStatus | null;
-  };
+export type MarketplaceTalentPoolMemberView = Omit<
+  MarketplaceTalentPoolMemberRecord,
+  'profileUserId' | 'profileSlug'
+> & {
+  profile: MarketplaceTalentSummary;
+  reviewAverage: number | null;
+  activeInviteStatus: MarketplaceOpportunityInviteStatus | null;
+};
 
 export type MarketplaceTalentPoolView = MarketplaceTalentPoolRecord & {
   members: MarketplaceTalentPoolMemberView[];
@@ -1071,14 +1072,12 @@ export type MarketplaceRehireCandidateView = {
 
 export type MarketplaceLifecycleDigest = {
   generatedAt: string;
-  workspace:
-    | {
-        workspaceId: string;
-        kind: 'client' | 'freelancer';
-        organizationId: string;
-        organizationKind: 'personal' | 'client' | 'agency';
-      }
-    | null;
+  workspace: {
+    workspaceId: string;
+    kind: 'client' | 'freelancer';
+    organizationId: string;
+    organizationKind: 'personal' | 'client' | 'agency';
+  } | null;
   poolSummary: {
     poolCount: number;
     trackedTalentCount: number;
@@ -1270,14 +1269,12 @@ export type MarketplaceStalledItem = {
 
 export type MarketplaceAnalyticsOverview = {
   generatedAt: string;
-  workspace:
-    | {
-        workspaceId: string;
-        kind: 'client' | 'freelancer';
-        organizationId: string;
-        organizationKind: 'personal' | 'client' | 'agency';
-      }
-    | null;
+  workspace: {
+    workspaceId: string;
+    kind: 'client' | 'freelancer';
+    organizationId: string;
+    organizationKind: 'personal' | 'client' | 'agency';
+  } | null;
   summary: {
     searchImpressions: number;
     resultClicks: number;

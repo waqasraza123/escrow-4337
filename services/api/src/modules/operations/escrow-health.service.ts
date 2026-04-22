@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -923,10 +922,7 @@ export class EscrowHealthService {
   }
 
   private async requireOperatorAccess(userId: string) {
-    return this.userCapabilities.requireCapability(
-      userId,
-      'escrowOperations',
-    );
+    return this.userCapabilities.requireCapability(userId, 'escrowOperations');
   }
 
   private requireFailedExecutionDiagnostics(job: EscrowJobRecord) {

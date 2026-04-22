@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { User, type ReqUser } from '../../common/decorators/user.decorator';
 import { ZodValidationPipe } from '../../common/zod.pipe';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -55,7 +48,10 @@ export class OrganizationsController {
     @User() user: ReqUser,
     @Param('organizationId') organizationId: string,
   ) {
-    return this.organizations.listOrganizationInvitations(user.id, organizationId);
+    return this.organizations.listOrganizationInvitations(
+      user.id,
+      organizationId,
+    );
   }
 
   @Get('organizations/:organizationId/memberships')
@@ -63,7 +59,10 @@ export class OrganizationsController {
     @User() user: ReqUser,
     @Param('organizationId') organizationId: string,
   ) {
-    return this.organizations.listOrganizationMemberships(user.id, organizationId);
+    return this.organizations.listOrganizationMemberships(
+      user.id,
+      organizationId,
+    );
   }
 
   @Get('role-capabilities')
@@ -87,7 +86,11 @@ export class OrganizationsController {
     @Param('organizationId') organizationId: string,
     @Param('invitationId') invitationId: string,
   ) {
-    return this.organizations.revokeInvitation(user.id, organizationId, invitationId);
+    return this.organizations.revokeInvitation(
+      user.id,
+      organizationId,
+      invitationId,
+    );
   }
 
   @Post('invitations/:invitationId/accept')

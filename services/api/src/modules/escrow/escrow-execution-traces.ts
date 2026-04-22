@@ -1,6 +1,4 @@
-import type {
-  EscrowContractAction,
-} from './onchain/escrow-contract.types';
+import type { EscrowContractAction } from './onchain/escrow-contract.types';
 import type {
   EscrowExecutionRecord,
   EscrowExecutionTraceGroup,
@@ -14,14 +12,19 @@ function executionAt(execution: EscrowExecutionRecord) {
 function uniqueStrings(values: Array<string | null | undefined>) {
   return Array.from(
     new Set(
-      values.filter((value): value is string => typeof value === 'string' && value.length > 0),
+      values.filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0,
+      ),
     ),
   );
 }
 
 function uniqueNumbers(values: Array<number | null | undefined>) {
   return Array.from(
-    new Set(values.filter((value): value is number => typeof value === 'number')),
+    new Set(
+      values.filter((value): value is number => typeof value === 'number'),
+    ),
   ).sort((left, right) => left - right);
 }
 
@@ -47,7 +50,6 @@ export function buildExecutionTraceSummary(
   const grouped = new Map<string, EscrowExecutionRecord[]>();
   let confirmedExecutions = 0;
   let failedExecutions = 0;
-  let pendingExecutions = 0;
   let requestTaggedExecutions = 0;
   let correlationTaggedExecutions = 0;
   let idempotentExecutions = 0;
@@ -106,8 +108,12 @@ export function buildExecutionTraceSummary(
 
       return {
         traceId,
-        correlationId: sortedExecutions.find((execution) => execution.correlationId)?.correlationId ?? null,
-        requestIds: uniqueStrings(sortedExecutions.map((execution) => execution.requestId ?? null)),
+        correlationId:
+          sortedExecutions.find((execution) => execution.correlationId)
+            ?.correlationId ?? null,
+        requestIds: uniqueStrings(
+          sortedExecutions.map((execution) => execution.requestId ?? null),
+        ),
         idempotencyKeys: uniqueStrings(
           sortedExecutions.map((execution) => execution.idempotencyKey ?? null),
         ),
@@ -121,8 +127,12 @@ export function buildExecutionTraceSummary(
         txHashes,
         statusCounts: {
           pending: 0,
-          confirmed: sortedExecutions.filter((execution) => execution.status === 'confirmed').length,
-          failed: sortedExecutions.filter((execution) => execution.status === 'failed').length,
+          confirmed: sortedExecutions.filter(
+            (execution) => execution.status === 'confirmed',
+          ).length,
+          failed: sortedExecutions.filter(
+            (execution) => execution.status === 'failed',
+          ).length,
         },
         firstSubmittedAt: sortedExecutions[0]?.submittedAt ?? 0,
         latestSubmittedAt: latestExecution?.submittedAt ?? 0,
@@ -145,7 +155,10 @@ export function buildExecutionTraceSummary(
     traceCount: traces.length,
     confirmedExecutions,
     failedExecutions,
-    pendingExecutions: Math.max(executions.length - confirmedExecutions - failedExecutions, 0),
+    pendingExecutions: Math.max(
+      executions.length - confirmedExecutions - failedExecutions,
+      0,
+    ),
     requestTaggedExecutions,
     correlationTaggedExecutions,
     idempotentExecutions,

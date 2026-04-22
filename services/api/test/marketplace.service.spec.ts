@@ -218,7 +218,10 @@ describe('MarketplaceService', () => {
         description: 'Used to verify workspace review capability enforcement.',
       }),
     );
-    await marketplaceService.publishOpportunity(clientUserId, created.opportunity.id);
+    await marketplaceService.publishOpportunity(
+      clientUserId,
+      created.opportunity.id,
+    );
     await marketplaceService.upsertProfile(
       applicantUserId,
       buildProfileInput({
@@ -246,8 +249,15 @@ describe('MarketplaceService', () => {
     jest
       .spyOn(organizationsService, 'findAccessibleWorkspace')
       .mockImplementation(async (userId, workspaceId) => {
-        const workspace = await originalFindAccessibleWorkspace(userId, workspaceId);
-        if (!workspace || userId !== clientUserId || workspace.kind !== 'client') {
+        const workspace = await originalFindAccessibleWorkspace(
+          userId,
+          workspaceId,
+        );
+        if (
+          !workspace ||
+          userId !== clientUserId ||
+          workspace.kind !== 'client'
+        ) {
           return workspace;
         }
         return {
@@ -260,7 +270,10 @@ describe('MarketplaceService', () => {
       });
 
     await expect(
-      marketplaceService.getOpportunityApplications(clientUserId, created.opportunity.id),
+      marketplaceService.getOpportunityApplications(
+        clientUserId,
+        created.opportunity.id,
+      ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -279,8 +292,15 @@ describe('MarketplaceService', () => {
     jest
       .spyOn(organizationsService, 'findAccessibleWorkspace')
       .mockImplementation(async (userId, workspaceId) => {
-        const workspace = await originalFindAccessibleWorkspace(userId, workspaceId);
-        if (!workspace || userId !== clientUserId || workspace.kind !== 'client') {
+        const workspace = await originalFindAccessibleWorkspace(
+          userId,
+          workspaceId,
+        );
+        if (
+          !workspace ||
+          userId !== clientUserId ||
+          workspace.kind !== 'client'
+        ) {
           return workspace;
         }
         return {
@@ -293,7 +313,10 @@ describe('MarketplaceService', () => {
       });
 
     await expect(
-      marketplaceService.publishOpportunity(clientUserId, created.opportunity.id),
+      marketplaceService.publishOpportunity(
+        clientUserId,
+        created.opportunity.id,
+      ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -479,10 +502,13 @@ describe('MarketplaceService', () => {
       updatedAt: now,
     });
 
-    const firstDispatch = await marketplaceService.dispatchDigests(clientUserId, {
-      mode: 'due',
-      trigger: 'manual',
-    });
+    const firstDispatch = await marketplaceService.dispatchDigests(
+      clientUserId,
+      {
+        mode: 'due',
+        trigger: 'manual',
+      },
+    );
     expect(firstDispatch.run.dispatchedCount).toBe(2);
     expect(
       firstDispatch.run.recipients.every(
@@ -490,15 +516,18 @@ describe('MarketplaceService', () => {
       ),
     ).toBe(true);
 
-    const dispatchedDigests = (await marketplaceRepository.listDigests()).filter(
-      (digest) => digest.dispatchRunId === firstDispatch.run.id,
-    );
+    const dispatchedDigests = (
+      await marketplaceRepository.listDigests()
+    ).filter((digest) => digest.dispatchRunId === firstDispatch.run.id);
     expect(dispatchedDigests).toHaveLength(2);
 
-    const secondDispatch = await marketplaceService.dispatchDigests(clientUserId, {
-      mode: 'due',
-      trigger: 'manual',
-    });
+    const secondDispatch = await marketplaceService.dispatchDigests(
+      clientUserId,
+      {
+        mode: 'due',
+        trigger: 'manual',
+      },
+    );
     expect(secondDispatch.run.dispatchedCount).toBe(0);
     expect(
       secondDispatch.run.recipients.map((recipient) => recipient.reason),
@@ -1187,7 +1216,13 @@ async function createSharedClientWorkspace(
       setActive: true,
     },
   );
-  await organizationsService.selectWorkspace(ownerUserId, workspace.workspaceId);
-  await organizationsService.selectWorkspace(memberUserId, workspace.workspaceId);
+  await organizationsService.selectWorkspace(
+    ownerUserId,
+    workspace.workspaceId,
+  );
+  await organizationsService.selectWorkspace(
+    memberUserId,
+    workspace.workspaceId,
+  );
   return workspace;
 }

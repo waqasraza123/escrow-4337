@@ -2,11 +2,13 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderApp } from '@escrow4334/frontend-core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { WebI18nProvider } from '../../../../lib/i18n';
+import type { MarketplaceProfile } from '../../../../lib/api';
 
 const { mockedWebApi } = vi.hoisted(() => ({
   mockedWebApi: {
     getMarketplaceProfile: vi.fn(),
     reportMarketplaceProfile: vi.fn(),
+    recordMarketplaceInteraction: vi.fn(),
   },
 }));
 
@@ -21,6 +23,8 @@ describe('marketplace profile detail', () => {
     mockedWebApi.getMarketplaceProfile.mockResolvedValue({
       profile: {
         userId: 'user-1',
+        organizationId: null,
+        workspaceId: null,
         slug: 'builder-one',
         displayName: 'Builder One',
         headline: 'Full-stack contractor',
@@ -55,10 +59,33 @@ describe('marketplace profile detail', () => {
           averageContractValueBand: 'medium',
           completedByCategory: [{ category: 'software-development', count: 3 }],
         },
+        reputation: {
+          subjectUserId: 'user-1',
+          role: 'worker',
+          identityConfidence: 'wallet_verified',
+          publicReviewCount: 2,
+          averageRating: 4.8,
+          ratingBreakdown: {
+            oneStar: 0,
+            twoStar: 0,
+            threeStar: 0,
+            fourStar: 1,
+            fiveStar: 1,
+          },
+          totalContracts: 3,
+          completionRate: 100,
+          disputeRate: 0,
+          onTimeDeliveryRate: 100,
+          responseRate: 95,
+          inviteAcceptanceRate: 80,
+          revisionRate: 10,
+          averageContractValueBand: 'medium',
+        },
+        publicReviews: [],
         completedEscrowCount: 3,
         isComplete: true,
       },
-    });
+    } satisfies { profile: MarketplaceProfile });
 
     renderApp(
       <WebI18nProvider initialLocale="ar">
@@ -80,7 +107,7 @@ describe('marketplace profile detail', () => {
       'href',
       '/app/marketplace',
     );
-    expect(screen.getByText('محفظة موثقة')).toBeInTheDocument();
+    expect(screen.getAllByText('محفظة موثقة').length).toBeGreaterThan(0);
     expect(
       screen.getByText('0x1111111111111111111111111111111111111111'),
     ).toHaveAttribute('data-ltr', 'true');

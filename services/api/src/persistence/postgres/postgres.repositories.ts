@@ -434,27 +434,29 @@ function mapContractorParticipation(
 
 function mapProjectRoom(row: JobRow): EscrowProjectRoomRecord {
   return {
-    submissions: (row.project_room_json?.submissions ?? []).map((submission) => ({
-      ...submission,
-      artifacts: (submission.artifacts ?? []).map((artifact) => ({
-        ...artifact,
-        mimeType: artifact.mimeType ?? null,
-        byteSize: artifact.byteSize ?? null,
-        storageKind: 'external_url',
-      })),
-      revisionRequest: submission.revisionRequest
-        ? {
-            ...submission.revisionRequest,
-          }
-        : null,
-      approval: submission.approval
-        ? {
-            ...submission.approval,
-            note: submission.approval.note ?? null,
-          }
-        : null,
-      deliveredAt: submission.deliveredAt ?? null,
-    })),
+    submissions: (row.project_room_json?.submissions ?? []).map(
+      (submission) => ({
+        ...submission,
+        artifacts: (submission.artifacts ?? []).map((artifact) => ({
+          ...artifact,
+          mimeType: artifact.mimeType ?? null,
+          byteSize: artifact.byteSize ?? null,
+          storageKind: 'external_url',
+        })),
+        revisionRequest: submission.revisionRequest
+          ? {
+              ...submission.revisionRequest,
+            }
+          : null,
+        approval: submission.approval
+          ? {
+              ...submission.approval,
+              note: submission.approval.note ?? null,
+            }
+          : null,
+        deliveredAt: submission.deliveredAt ?? null,
+      }),
+    ),
     messages: (row.project_room_json?.messages ?? []).map((message) => ({
       ...message,
       senderRole: message.senderRole === 'client' ? 'client' : 'worker',
@@ -466,26 +468,29 @@ function mapProjectRoom(row: JobRow): EscrowProjectRoomRecord {
       relatedSubmissionId: entry.relatedSubmissionId ?? null,
       detail: entry.detail ?? null,
     })),
-    supportCases: (row.project_room_json?.supportCases ?? []).map((supportCase) => ({
-      ...supportCase,
-      milestoneIndex: supportCase.milestoneIndex ?? null,
-      ownerUserId: supportCase.ownerUserId ?? null,
-      ownerEmail: supportCase.ownerEmail ?? null,
-      feeDecision: supportCase.feeDecision ?? null,
-      feeDecisionNote: supportCase.feeDecisionNote ?? null,
-      feeImpactAmount: supportCase.feeImpactAmount ?? null,
-      resolvedAt: supportCase.resolvedAt ?? null,
-      messages: (supportCase.messages ?? []).map((message) => ({
-        ...message,
-        authorRole:
-          message.authorRole === 'operator'
-            ? 'operator'
-            : message.authorRole === 'client'
-              ? 'client'
-              : 'worker',
-        visibility: message.visibility === 'internal' ? 'internal' : 'external',
-      })),
-    })),
+    supportCases: (row.project_room_json?.supportCases ?? []).map(
+      (supportCase) => ({
+        ...supportCase,
+        milestoneIndex: supportCase.milestoneIndex ?? null,
+        ownerUserId: supportCase.ownerUserId ?? null,
+        ownerEmail: supportCase.ownerEmail ?? null,
+        feeDecision: supportCase.feeDecision ?? null,
+        feeDecisionNote: supportCase.feeDecisionNote ?? null,
+        feeImpactAmount: supportCase.feeImpactAmount ?? null,
+        resolvedAt: supportCase.resolvedAt ?? null,
+        messages: (supportCase.messages ?? []).map((message) => ({
+          ...message,
+          authorRole:
+            message.authorRole === 'operator'
+              ? 'operator'
+              : message.authorRole === 'client'
+                ? 'client'
+                : 'worker',
+          visibility:
+            message.visibility === 'internal' ? 'internal' : 'external',
+        })),
+      }),
+    ),
   };
 }
 

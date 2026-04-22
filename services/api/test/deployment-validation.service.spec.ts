@@ -6,6 +6,7 @@ import { EscrowContractConfigService } from '../src/modules/escrow/onchain/escro
 import { EscrowChainSyncDaemonDeploymentService } from '../src/modules/operations/escrow-chain-sync-daemon-deployment.service';
 import { EscrowChainSyncDaemonMonitoringService } from '../src/modules/operations/escrow-chain-sync-daemon-monitoring.service';
 import { DeploymentValidationService } from '../src/modules/operations/deployment-validation.service';
+import type { DeploymentCheck } from '../src/modules/operations/deployment-validation.types';
 import { OperationsConfigService } from '../src/modules/operations/operations.config';
 import { PersistenceConfigService } from '../src/persistence/persistence.config';
 import { SmartAccountConfigService } from '../src/modules/wallet/provisioning/smart-account.config';
@@ -58,6 +59,13 @@ describe('DeploymentValidationService', () => {
     global.fetch = originalFetch;
   });
 
+  function findCheck(
+    checks: DeploymentCheck[],
+    id: string,
+  ): DeploymentCheck | undefined {
+    return checks.find((check) => check.id === id);
+  }
+
   it('reports a green deployment validation result when configuration and probes pass', async () => {
     const fetchMock = jest.mocked(global.fetch);
     fetchMock.mockImplementation((input, init) => {
@@ -67,7 +75,9 @@ describe('DeploymentValidationService', () => {
         expect(readHeader(init?.headers, 'x-api-key')).toBeNull();
         return Promise.resolve(new Response('', { status: 400 }));
       }
-      if (url === 'https://relay.example.com/wallets/smart-accounts/provision') {
+      if (
+        url === 'https://relay.example.com/wallets/smart-accounts/provision'
+      ) {
         expect(init?.method).toBe('POST');
         expect(readHeader(init?.headers, 'x-api-key')).toBeNull();
         return Promise.resolve(new Response('', { status: 400 }));
@@ -90,42 +100,14 @@ describe('DeploymentValidationService', () => {
     const report = await service.runValidation();
 
     expect(report.ok).toBe(true);
-    expect(report.checks.find((check) => check.id === 'database')).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
+    expect(findCheck(report.checks, 'database')?.status).toBe('ok');
+    expect(findCheck(report.checks, 'bundler')?.status).toBe('ok');
+    expect(findCheck(report.checks, 'email-relay-auth')?.status).toBe('ok');
+    expect(findCheck(report.checks, 'smart-account-relay-auth')?.status).toBe(
+      'ok',
     );
-    expect(report.checks.find((check) => check.id === 'bundler')).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
-    );
-    expect(
-      report.checks.find((check) => check.id === 'email-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
-    );
-    expect(
-      report.checks.find((check) => check.id === 'smart-account-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
-    );
-    expect(
-      report.checks.find((check) => check.id === 'escrow-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
-    );
-    expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-      }),
-    );
+    expect(findCheck(report.checks, 'escrow-relay-auth')?.status).toBe('ok');
+    expect(findCheck(report.checks, 'paymaster')?.status).toBe('ok');
   });
 
   it('uses authenticated provider validation URL overrides when they are configured', async () => {
@@ -151,7 +133,9 @@ describe('DeploymentValidationService', () => {
         url === 'https://relay.example.com/wallets/smart-accounts/provision' ||
         url === 'https://escrow.example.com/escrow/execute'
       ) {
-        throw new Error(`Default validation route should not be called: ${url}`);
+        throw new Error(
+          `Default validation route should not be called: ${url}`,
+        );
       }
       if (url === 'https://bundler.example.com') {
         return Promise.resolve(jsonResponse({ result: '0x14a34' }));
@@ -166,36 +150,24 @@ describe('DeploymentValidationService', () => {
     const report = await service.runValidation();
 
     expect(report.ok).toBe(true);
-    expect(
-      report.checks.find((check) => check.id === 'email-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-        metadata: expect.objectContaining({
-          url: 'https://email.example.com/custom/email-check',
-        }),
-      }),
+    const emailCheck = findCheck(report.checks, 'email-relay-auth');
+    const smartAccountCheck = findCheck(
+      report.checks,
+      'smart-account-relay-auth',
     );
-    expect(
-      report.checks.find((check) => check.id === 'smart-account-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-        metadata: expect.objectContaining({
-          url: 'https://relay.example.com/custom/provision-check',
-        }),
-      }),
-    );
-    expect(
-      report.checks.find((check) => check.id === 'escrow-relay-auth'),
-    ).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-        metadata: expect.objectContaining({
-          url: 'https://escrow.example.com/custom/execute-check',
-        }),
-      }),
-    );
+    const escrowCheck = findCheck(report.checks, 'escrow-relay-auth');
+    expect(emailCheck?.status).toBe('ok');
+    expect(emailCheck?.metadata).toMatchObject({
+      url: 'https://email.example.com/custom/email-check',
+    });
+    expect(smartAccountCheck?.status).toBe('ok');
+    expect(smartAccountCheck?.metadata).toMatchObject({
+      url: 'https://relay.example.com/custom/provision-check',
+    });
+    expect(escrowCheck?.status).toBe('ok');
+    expect(escrowCheck?.metadata).toMatchObject({
+      url: 'https://escrow.example.com/custom/execute-check',
+    });
   });
 
   it('fails when migrations are pending and warns when the paymaster does not expose eth_chainId', async () => {
@@ -229,16 +201,8 @@ describe('DeploymentValidationService', () => {
     const report = await service.runValidation();
 
     expect(report.ok).toBe(false);
-    expect(report.checks.find((check) => check.id === 'database')).toEqual(
-      expect.objectContaining({
-        status: 'failed',
-      }),
-    );
-    expect(report.checks.find((check) => check.id === 'paymaster')).toEqual(
-      expect.objectContaining({
-        status: 'warning',
-      }),
-    );
+    expect(findCheck(report.checks, 'database')?.status).toBe('failed');
+    expect(findCheck(report.checks, 'paymaster')?.status).toBe('warning');
   });
 
   it('fails deployment validation when an authenticated relay route rejects credentials', async () => {
@@ -251,7 +215,9 @@ describe('DeploymentValidationService', () => {
         expect(readHeader(init?.headers, 'x-api-key')).toBe('email-key');
         return Promise.resolve(new Response('', { status: 401 }));
       }
-      if (url === 'https://relay.example.com/wallets/smart-accounts/provision') {
+      if (
+        url === 'https://relay.example.com/wallets/smart-accounts/provision'
+      ) {
         return Promise.resolve(new Response('', { status: 400 }));
       }
       if (url === 'https://escrow.example.com/escrow/execute') {

@@ -359,7 +359,9 @@ function normalizeNotificationPreferences(
   };
 }
 
-function normalizeDigest(digest: MarketplaceDigestRecord): MarketplaceDigestRecord {
+function normalizeDigest(
+  digest: MarketplaceDigestRecord,
+): MarketplaceDigestRecord {
   return {
     ...digest,
     workspaceId: digest.workspaceId?.trim() || null,
@@ -402,7 +404,9 @@ function normalizeOpportunityInvite(
   };
 }
 
-function normalizeReview(review: MarketplaceReviewRecord): MarketplaceReviewRecord {
+function normalizeReview(
+  review: MarketplaceReviewRecord,
+): MarketplaceReviewRecord {
   return {
     ...review,
     headline: review.headline?.trim() || null,
@@ -485,9 +489,8 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
 
   async saveTalentSearchDocument(document: MarketplaceTalentSearchDocument) {
     await this.store.write((data) => {
-      data.marketplaceTalentSearchDocuments[document.profileUserId] = cloneValue(
-        normalizeTalentSearchDocument(document),
-      );
+      data.marketplaceTalentSearchDocuments[document.profileUserId] =
+        cloneValue(normalizeTalentSearchDocument(document));
     });
   }
 
@@ -559,7 +562,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async getApplicationRevisionById(revisionId: string) {
     return this.store.read((data) => {
       const revision = data.marketplaceApplicationRevisions[revisionId];
-      return revision ? cloneValue(normalizeApplicationRevision(revision)) : null;
+      return revision
+        ? cloneValue(normalizeApplicationRevision(revision))
+        : null;
     });
   }
 
@@ -571,7 +576,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     );
   }
 
-  async saveApplicationRevision(revision: MarketplaceApplicationRevisionRecord) {
+  async saveApplicationRevision(
+    revision: MarketplaceApplicationRevisionRecord,
+  ) {
     await this.store.write((data) => {
       data.marketplaceApplicationRevisions[revision.id] = cloneValue(
         normalizeApplicationRevision(revision),
@@ -681,7 +688,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async getApplicationDecisionById(decisionId: string) {
     return this.store.read((data) => {
       const decision = data.marketplaceApplicationDecisions[decisionId];
-      return decision ? cloneValue(normalizeApplicationDecision(decision)) : null;
+      return decision
+        ? cloneValue(normalizeApplicationDecision(decision))
+        : null;
     });
   }
 
@@ -693,7 +702,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
     );
   }
 
-  async saveApplicationDecision(decision: MarketplaceApplicationDecisionRecord) {
+  async saveApplicationDecision(
+    decision: MarketplaceApplicationDecisionRecord,
+  ) {
     await this.store.write((data) => {
       data.marketplaceApplicationDecisions[decision.id] = cloneValue(
         normalizeApplicationDecision(decision),
@@ -747,7 +758,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
 
   async saveTalentPool(pool: MarketplaceTalentPoolRecord) {
     await this.store.write((data) => {
-      data.marketplaceTalentPools[pool.id] = cloneValue(normalizeTalentPool(pool));
+      data.marketplaceTalentPools[pool.id] = cloneValue(
+        normalizeTalentPool(pool),
+      );
     });
   }
 
@@ -823,7 +836,9 @@ export class FileMarketplaceRepository implements MarketplaceRepository {
   async getNotificationById(notificationId: string) {
     return this.store.read((data) => {
       const notification = data.marketplaceNotifications[notificationId];
-      return notification ? cloneValue(normalizeNotification(notification)) : null;
+      return notification
+        ? cloneValue(normalizeNotification(notification))
+        : null;
     });
   }
 

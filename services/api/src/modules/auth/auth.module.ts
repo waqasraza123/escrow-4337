@@ -14,7 +14,12 @@ import { OtpStore } from './otp.store';
 import { SessionsService } from './sessions.service';
 
 @Module({
-  imports: [PersistenceModule, UsersModule, OrganizationsModule, AuthEmailModule],
+  imports: [
+    PersistenceModule,
+    UsersModule,
+    OrganizationsModule,
+    AuthEmailModule,
+  ],
   controllers: [AuthController],
   providers: [
     AuthConfigService,

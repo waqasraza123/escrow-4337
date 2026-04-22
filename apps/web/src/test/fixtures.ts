@@ -222,6 +222,12 @@ export function createJobView(): JobView {
         disputeEvidenceUrls: [],
       },
     ],
+    operations: {
+      chainSync: null,
+      executionFailureWorkflow: null,
+      staleWorkflow: null,
+      commercial: null,
+    },
     onchain: {
       chainId: 84532,
       contractAddress: '0xcontract',

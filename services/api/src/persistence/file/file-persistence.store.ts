@@ -133,8 +133,7 @@ export class FilePersistenceStore {
         parsed.marketplaceNotificationPreferences ?? {},
       marketplaceDigests: parsed.marketplaceDigests ?? {},
       marketplaceDigestDispatchRuns: parsed.marketplaceDigestDispatchRuns ?? {},
-      marketplaceOpportunityInvites:
-        parsed.marketplaceOpportunityInvites ?? {},
+      marketplaceOpportunityInvites: parsed.marketplaceOpportunityInvites ?? {},
       marketplaceAbuseReports: parsed.marketplaceAbuseReports ?? {},
       marketplaceReviews: parsed.marketplaceReviews ?? {},
       marketplaceIdentityRiskReviews:

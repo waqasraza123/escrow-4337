@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS marketplace_talent_pool_members (
   note TEXT NULL,
   source_opportunity_id TEXT NULL REFERENCES marketplace_opportunities(id) ON DELETE SET NULL,
   source_application_id TEXT NULL REFERENCES marketplace_applications(id) ON DELETE SET NULL,
-  source_job_id TEXT NULL REFERENCES escrow_jobs(id) ON DELETE SET NULL,
+  source_job_id UUID NULL REFERENCES escrow_jobs(id) ON DELETE SET NULL,
   created_at_ms BIGINT NOT NULL,
   updated_at_ms BIGINT NOT NULL
 );

@@ -72,7 +72,9 @@ export interface OrganizationsRepository {
     organizationId: string,
   ): Promise<OrganizationInvitationRecord[]>;
   listWorkspacesByUserId(userId: string): Promise<WorkspaceRecord[]>;
-  listWorkspacesByOrganizationId(organizationId: string): Promise<WorkspaceRecord[]>;
+  listWorkspacesByOrganizationId(
+    organizationId: string,
+  ): Promise<WorkspaceRecord[]>;
   getWorkspaceById(id: string): Promise<WorkspaceRecord | null>;
   saveOrganization(organization: OrganizationRecord): Promise<void>;
   saveMembership(membership: OrganizationMembershipRecord): Promise<void>;
@@ -164,7 +166,9 @@ export interface MarketplaceRepository {
   ): Promise<MarketplaceOpportunityRecord | null>;
   listOpportunities(): Promise<MarketplaceOpportunityRecord[]>;
   saveOpportunity(opportunity: MarketplaceOpportunityRecord): Promise<void>;
-  listOpportunitySearchDocuments(): Promise<MarketplaceOpportunitySearchDocument[]>;
+  listOpportunitySearchDocuments(): Promise<
+    MarketplaceOpportunitySearchDocument[]
+  >;
   saveOpportunitySearchDocument(
     document: MarketplaceOpportunitySearchDocument,
   ): Promise<void>;
@@ -216,14 +220,18 @@ export interface MarketplaceRepository {
   listSavedSearches(): Promise<MarketplaceSavedSearchRecord[]>;
   saveSavedSearch(search: MarketplaceSavedSearchRecord): Promise<void>;
   deleteSavedSearch(searchId: string): Promise<void>;
-  getTalentPoolById(poolId: string): Promise<MarketplaceTalentPoolRecord | null>;
+  getTalentPoolById(
+    poolId: string,
+  ): Promise<MarketplaceTalentPoolRecord | null>;
   listTalentPools(): Promise<MarketplaceTalentPoolRecord[]>;
   saveTalentPool(pool: MarketplaceTalentPoolRecord): Promise<void>;
   getTalentPoolMemberById(
     memberId: string,
   ): Promise<MarketplaceTalentPoolMemberRecord | null>;
   listTalentPoolMembers(): Promise<MarketplaceTalentPoolMemberRecord[]>;
-  saveTalentPoolMember(member: MarketplaceTalentPoolMemberRecord): Promise<void>;
+  saveTalentPoolMember(
+    member: MarketplaceTalentPoolMemberRecord,
+  ): Promise<void>;
   getAutomationRuleById(
     ruleId: string,
   ): Promise<MarketplaceAutomationRuleRecord | null>;
@@ -242,7 +250,9 @@ export interface MarketplaceRepository {
   getNotificationPreferencesByUserId(
     userId: string,
   ): Promise<MarketplaceNotificationPreferencesRecord | null>;
-  listNotificationPreferences(): Promise<MarketplaceNotificationPreferencesRecord[]>;
+  listNotificationPreferences(): Promise<
+    MarketplaceNotificationPreferencesRecord[]
+  >;
   saveNotificationPreferences(
     preferences: MarketplaceNotificationPreferencesRecord,
   ): Promise<void>;
@@ -258,7 +268,9 @@ export interface MarketplaceRepository {
     inviteId: string,
   ): Promise<MarketplaceOpportunityInviteRecord | null>;
   listOpportunityInvites(): Promise<MarketplaceOpportunityInviteRecord[]>;
-  saveOpportunityInvite(invite: MarketplaceOpportunityInviteRecord): Promise<void>;
+  saveOpportunityInvite(
+    invite: MarketplaceOpportunityInviteRecord,
+  ): Promise<void>;
   getAbuseReportById(
     reportId: string,
   ): Promise<MarketplaceAbuseReportRecord | null>;
@@ -302,7 +314,10 @@ export type PersistenceFileData = {
   escrowChainEvents: Record<string, EscrowChainEventRecord>;
   escrowOnchainProjections: Record<string, EscrowOnchainProjectionRecord>;
   marketplaceProfiles: Record<string, MarketplaceProfileRecord>;
-  marketplaceTalentSearchDocuments: Record<string, MarketplaceTalentSearchDocument>;
+  marketplaceTalentSearchDocuments: Record<
+    string,
+    MarketplaceTalentSearchDocument
+  >;
   marketplaceOpportunities: Record<string, MarketplaceOpportunityRecord>;
   marketplaceOpportunitySearchDocuments: Record<
     string,
@@ -326,7 +341,10 @@ export type PersistenceFileData = {
   >;
   marketplaceSavedSearches: Record<string, MarketplaceSavedSearchRecord>;
   marketplaceTalentPools: Record<string, MarketplaceTalentPoolRecord>;
-  marketplaceTalentPoolMembers: Record<string, MarketplaceTalentPoolMemberRecord>;
+  marketplaceTalentPoolMembers: Record<
+    string,
+    MarketplaceTalentPoolMemberRecord
+  >;
   marketplaceAutomationRules: Record<string, MarketplaceAutomationRuleRecord>;
   marketplaceAutomationRuns: Record<string, MarketplaceAutomationRunRecord>;
   marketplaceNotifications: Record<string, MarketplaceNotificationRecord>;
@@ -335,11 +353,23 @@ export type PersistenceFileData = {
     MarketplaceNotificationPreferencesRecord
   >;
   marketplaceDigests: Record<string, MarketplaceDigestRecord>;
-  marketplaceDigestDispatchRuns: Record<string, MarketplaceDigestDispatchRunRecord>;
-  marketplaceOpportunityInvites: Record<string, MarketplaceOpportunityInviteRecord>;
+  marketplaceDigestDispatchRuns: Record<
+    string,
+    MarketplaceDigestDispatchRunRecord
+  >;
+  marketplaceOpportunityInvites: Record<
+    string,
+    MarketplaceOpportunityInviteRecord
+  >;
   marketplaceAbuseReports: Record<string, MarketplaceAbuseReportRecord>;
   marketplaceReviews: Record<string, MarketplaceReviewRecord>;
-  marketplaceIdentityRiskReviews: Record<string, MarketplaceIdentityRiskReviewRecord>;
-  marketplaceInteractionEvents: Record<string, MarketplaceInteractionEventRecord>;
+  marketplaceIdentityRiskReviews: Record<
+    string,
+    MarketplaceIdentityRiskReviewRecord
+  >;
+  marketplaceInteractionEvents: Record<
+    string,
+    MarketplaceInteractionEventRecord
+  >;
   walletLinkChallenges: Record<string, WalletLinkChallengeRecord>;
 };

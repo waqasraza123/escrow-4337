@@ -8,7 +8,6 @@ import type {
   EscrowChainEventRecord,
   EscrowChainSyncRecord,
   EscrowContractorParticipationRecord,
-  EscrowExecutionRecord,
   EscrowFailureRemediationStatus,
   EscrowExecutionFailureWorkflowRecord,
   EscrowJobRecord,
@@ -503,8 +502,8 @@ export class FileEscrowRepository implements EscrowRepository {
   }) {
     return this.store.read((data) => {
       const jobs = input.jobId
-        ? [data.escrowJobs[input.jobId]].filter(
-            (job): job is EscrowJobRecord => Boolean(job),
+        ? [data.escrowJobs[input.jobId]].filter((job): job is EscrowJobRecord =>
+            Boolean(job),
           )
         : Object.values(data.escrowJobs);
 

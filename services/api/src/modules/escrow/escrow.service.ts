@@ -54,6 +54,7 @@ import type {
   EscrowCommercialRecord,
   EscrowCommercialIssueRecord,
   EscrowExecutionRecord,
+  EscrowFeeLedgerEntryRecord,
   EscrowParticipantRole,
   EscrowProjectActivityView,
   EscrowProjectDeliverSubmissionResponse,
@@ -67,7 +68,6 @@ import type {
   EscrowProjectSubmissionView,
   EscrowSupportCaseResponse,
   EscrowSupportCaseSeverity,
-  EscrowSupportCaseStatus,
   EscrowSupportCaseView,
   EscrowSupportOperationsDashboardResponse,
   FundJobResponse,
@@ -90,7 +90,10 @@ import { buildEscrowExportDocument } from './escrow-export';
 const MINOR_UNIT_SCALE = 1_000_000n;
 const amountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
 
-function parseAmountToMinorUnits(amount: string): bigint {
+function parseAmountToMinorUnits(
+  amount: string,
+  options?: { allowZero?: boolean },
+): bigint {
   if (!amountPattern.test(amount)) {
     throw new BadRequestException('Invalid amount format');
   }
@@ -100,11 +103,15 @@ function parseAmountToMinorUnits(amount: string): bigint {
   const minorUnits =
     BigInt(wholePart) * MINOR_UNIT_SCALE + BigInt(normalizedFraction);
 
-  if (minorUnits <= 0n) {
+  if (minorUnits === 0n && !options?.allowZero) {
     throw new BadRequestException('Amount must be greater than zero');
   }
 
   return minorUnits;
+}
+
+function parseAmountToMinorUnitsAllowZero(amount: string): bigint {
+  return parseAmountToMinorUnits(amount, { allowZero: true });
 }
 
 function normalizeAmount(amount: string): string {
@@ -273,15 +280,10 @@ function formatMinorUnits(minorUnits: bigint): string {
     : wholeUnits.toString();
 }
 
-function addAmounts(left: string, right: string): string {
-  return formatMinorUnits(
-    parseAmountToMinorUnits(left) + parseAmountToMinorUnits(right),
-  );
-}
-
 function subtractAmounts(left: string, right: string): string {
   const value =
-    parseAmountToMinorUnits(left) - parseAmountToMinorUnits(right);
+    parseAmountToMinorUnitsAllowZero(left) -
+    parseAmountToMinorUnitsAllowZero(right);
   return formatMinorUnits(value > 0n ? value : 0n);
 }
 
@@ -291,13 +293,16 @@ function sumAmounts(values: Array<string | null | undefined>): string {
       if (!value) {
         return total;
       }
-      return total + parseAmountToMinorUnits(value);
+      return total + parseAmountToMinorUnitsAllowZero(value);
     }, 0n),
   );
 }
 
 function amountsEqual(left: string, right: string) {
-  return parseAmountToMinorUnits(left) === parseAmountToMinorUnits(right);
+  return (
+    parseAmountToMinorUnitsAllowZero(left) ===
+    parseAmountToMinorUnitsAllowZero(right)
+  );
 }
 
 function calculatePlatformFeeAmount(amount: string, feeBps: number): string {
@@ -926,8 +931,9 @@ export class EscrowService {
 
     return {
       summary: {
-        openCaseCount: cases.filter((supportCase) => supportCase.status !== 'resolved')
-          .length,
+        openCaseCount: cases.filter(
+          (supportCase) => supportCase.status !== 'resolved',
+        ).length,
         criticalCaseCount: cases.filter(
           (supportCase) =>
             supportCase.status !== 'resolved' &&
@@ -938,8 +944,7 @@ export class EscrowService {
         ).length,
         totalRealizedFees: sumAmounts(
           jobViews.map(
-            (job) =>
-              job.commercial.reconciliation?.recordedRealizedFees ?? '0',
+            (job) => job.commercial.reconciliation?.recordedRealizedFees ?? '0',
           ),
         ),
         totalWorkerPayouts: sumAmounts(
@@ -982,7 +987,8 @@ export class EscrowService {
       reason: dto.reason,
       status: 'open',
       severity:
-        dto.severity ?? this.defaultSupportSeverity(dto.reason, job.fundedAmount),
+        dto.severity ??
+        this.defaultSupportSeverity(dto.reason, job.fundedAmount),
       subject: dto.subject.trim(),
       description: dto.description.trim(),
       createdByUserId: user.id,
@@ -991,7 +997,10 @@ export class EscrowService {
       ownerEmail: null,
       feeDecision: null,
       feeDecisionNote: null,
-      feeImpactAmount: this.estimateSupportFeeImpact(job, dto.milestoneIndex ?? null),
+      feeImpactAmount: this.estimateSupportFeeImpact(
+        job,
+        dto.milestoneIndex ?? null,
+      ),
       openedAt: now,
       updatedAt: now,
       resolvedAt: null,
@@ -1046,7 +1055,9 @@ export class EscrowService {
           : null
         : 'external';
     if (!visibility) {
-      throw new ForbiddenException('Only operators can post internal support notes');
+      throw new ForbiddenException(
+        'Only operators can post internal support notes',
+      );
     }
     const now = Date.now();
     supportCase.messages.push({
@@ -1075,7 +1086,11 @@ export class EscrowService {
     this.refreshCommercialReconciliation(job, now);
     await this.escrowRepository.save(job);
     return {
-      supportCase: await this.toSupportCaseView(job, supportCase, operatorAccess),
+      supportCase: await this.toSupportCaseView(
+        job,
+        supportCase,
+        operatorAccess,
+      ),
     };
   }
 
@@ -1383,7 +1398,9 @@ export class EscrowService {
     });
     updatedJob.updatedAt = now;
     await this.escrowRepository.save(updatedJob);
-    const emailMap = await this.buildProjectRoomEmailMap(updatedJob.projectRoom);
+    const emailMap = await this.buildProjectRoomEmailMap(
+      updatedJob.projectRoom,
+    );
     return {
       submission: this.toProjectSubmissionView(updatedSubmission, emailMap),
       mutation,
@@ -1759,7 +1776,8 @@ export class EscrowService {
   ): Promise<MilestoneMutationResponse> {
     const job = await this.getJobOrThrow(jobId);
     await this.userCapabilities.requireCapability(userId, 'escrowResolution');
-    const actorAddress = await this.escrowActorService.resolveArbitrator(userId);
+    const actorAddress =
+      await this.escrowActorService.resolveArbitrator(userId);
     const milestone = this.getMilestoneOrThrow(job, milestoneIndex);
     const replayed = await this.maybeReplayJobMutation({
       job,
@@ -1877,8 +1895,13 @@ export class EscrowService {
   }
 
   private toJobView(job: EscrowJobRecord): EscrowJobView {
-    const { audit, executions, contractorParticipation, projectRoom, ...jobView } =
-      cloneValue(job);
+    const {
+      audit,
+      executions,
+      contractorParticipation,
+      projectRoom,
+      ...jobView
+    } = cloneValue(job);
     void audit;
     void executions;
     void projectRoom;
@@ -1893,7 +1916,8 @@ export class EscrowService {
   private toPublicJobViewFromRecord(
     job: Omit<EscrowJobRecord, 'audit' | 'executions'>,
   ): EscrowPublicJobView {
-    const { contractorParticipation, projectRoom, ...jobView } = cloneValue(job);
+    const { contractorParticipation, projectRoom, ...jobView } =
+      cloneValue(job);
     void projectRoom;
 
     return {
@@ -1974,12 +1998,13 @@ export class EscrowService {
   private async requireJobSupportAccess(job: EscrowJobRecord, userId: string) {
     const user = await this.usersService.getRequiredById(userId);
     const roles = this.resolveParticipantRoles(job, user);
-    const operatorAccess =
-      (
-        await this.userCapabilities.getCapabilitiesForUser(userId)
-      ).escrowOperations.allowed;
+    const operatorAccess = (
+      await this.userCapabilities.getCapabilitiesForUser(userId)
+    ).escrowOperations.allowed;
     if (roles.length === 0 && !operatorAccess) {
-      throw new ForbiddenException('You do not have access to this support queue');
+      throw new ForbiddenException(
+        'You do not have access to this support queue',
+      );
     }
     return {
       user,
@@ -2009,8 +2034,10 @@ export class EscrowService {
     job: EscrowJobRecord,
     submission: EscrowProjectSubmissionRecord,
   ) {
-    const latest = this.ensureProjectRoom(job).submissions
-      .filter((entry) => entry.milestoneIndex === submission.milestoneIndex)
+    const latest = this.ensureProjectRoom(job)
+      .submissions.filter(
+        (entry) => entry.milestoneIndex === submission.milestoneIndex,
+      )
       .sort((left, right) => right.createdAt - left.createdAt)[0];
     if (!latest || latest.id !== submission.id) {
       throw new ConflictException(
@@ -2019,9 +2046,7 @@ export class EscrowService {
     }
   }
 
-  private async buildProjectRoomEmailMap(
-    projectRoom: EscrowProjectRoomRecord,
-  ) {
+  private async buildProjectRoomEmailMap(projectRoom: EscrowProjectRoomRecord) {
     const userIds = new Set<string>();
     for (const submission of projectRoom.submissions) {
       userIds.add(submission.submittedByUserId);
@@ -2075,7 +2100,8 @@ export class EscrowService {
       submittedBy: {
         userId: submission.submittedByUserId,
         email:
-          emailMap.get(submission.submittedByUserId) ?? submission.submittedByUserId,
+          emailMap.get(submission.submittedByUserId) ??
+          submission.submittedByUserId,
       },
       revisionRequest: submission.revisionRequest
         ? {
@@ -2120,6 +2146,7 @@ export class EscrowService {
     return {
       source: 'room',
       id: activity.id,
+      jobId: activity.jobId,
       type: activity.type,
       actorRole: activity.actorRole,
       milestoneIndex: activity.milestoneIndex,
@@ -2149,7 +2176,9 @@ export class EscrowService {
     supportCase: EscrowJobRecord['projectRoom']['supportCases'][number],
     includeInternal: boolean,
   ): Promise<EscrowSupportCaseView> {
-    const emailMap = await this.buildProjectRoomEmailMap(this.ensureProjectRoom(job));
+    const emailMap = await this.buildProjectRoomEmailMap(
+      this.ensureProjectRoom(job),
+    );
     return {
       id: supportCase.id,
       jobId: supportCase.jobId,
@@ -2159,6 +2188,7 @@ export class EscrowService {
       severity: supportCase.severity,
       subject: supportCase.subject,
       description: supportCase.description,
+      createdByRole: supportCase.createdByRole,
       ownerUserId: supportCase.ownerUserId,
       ownerEmail: supportCase.ownerEmail,
       feeDecision: supportCase.feeDecision,
@@ -2175,7 +2205,9 @@ export class EscrowService {
       },
       messages: supportCase.messages
         .slice()
-        .filter((message) => includeInternal || message.visibility === 'external')
+        .filter(
+          (message) => includeInternal || message.visibility === 'external',
+        )
         .sort((left, right) => left.createdAt - right.createdAt)
         .map((message) => ({
           id: message.id,
@@ -2196,8 +2228,8 @@ export class EscrowService {
     includeInternal: boolean,
   ) {
     return Promise.all(
-      this.ensureProjectRoom(job).supportCases
-        .slice()
+      this.ensureProjectRoom(job)
+        .supportCases.slice()
         .sort((left, right) => right.updatedAt - left.updatedAt)
         .map((supportCase) =>
           this.toSupportCaseView(job, supportCase, includeInternal),
@@ -2340,20 +2372,27 @@ export class EscrowService {
   ) {
     const room = this.ensureProjectRoom(sourceJob);
     const emailMap = await this.buildProjectRoomEmailMap(room);
+    const roomActivity: EscrowProjectRoomActivityView[] = room.activity.map(
+      (activity) => this.toProjectRoomActivityView(activity, emailMap),
+    );
+    const auditActivity: EscrowProjectRoomActivityView[] = sourceJob.audit.map(
+      (event) => this.mapAuditToProjectActivity(event),
+    );
     return {
       job: this.toJobView(job),
       participantRoles,
       submissions: room.submissions
         .slice()
         .sort((left, right) => right.createdAt - left.createdAt)
-        .map((submission) => this.toProjectSubmissionView(submission, emailMap)),
+        .map((submission) =>
+          this.toProjectSubmissionView(submission, emailMap),
+        ),
       messages: room.messages
         .slice()
         .sort((left, right) => right.createdAt - left.createdAt)
         .map((message) => this.toProjectMessageView(message, emailMap)),
-      activity: room.activity
-        .map((activity) => this.toProjectRoomActivityView(activity, emailMap))
-        .concat(sourceJob.audit.map((event) => this.mapAuditToProjectActivity(event)))
+      activity: roomActivity
+        .concat(auditActivity)
         .sort((left, right) => right.createdAt - left.createdAt),
       supportCases: await this.toSupportCaseViews(sourceJob, false),
     };
@@ -2430,6 +2469,10 @@ export class EscrowService {
     });
 
     if (action === 'release') {
+      const feeSource: EscrowFeeLedgerEntryRecord['source'] =
+        source === 'dispute_resolution_release'
+          ? 'dispute_resolution_release'
+          : 'milestone_release';
       const feeAmount = calculatePlatformFeeAmount(
         milestone.amount,
         this.getPlatformFeeBpsForMilestone(commercial, milestone, at),
@@ -2440,7 +2483,7 @@ export class EscrowService {
           jobId: job.id,
           milestoneIndex,
           kind: 'platform_fee_accrued',
-          source,
+          source: feeSource,
           amount: feeAmount,
           currencyAddress: job.onchain.currencyAddress,
           treasuryAccountRef: commercial.treasuryAccount.accountRef,
@@ -2570,7 +2613,8 @@ export class EscrowService {
       issues.push({
         code: 'payout_mismatch',
         severity: 'critical',
-        summary: 'Worker payout ledger does not match released milestone value.',
+        summary:
+          'Worker payout ledger does not match released milestone value.',
         detail: `${recordedReleasedAmount} recorded vs ${expectedReleasedAmount} expected.`,
       });
     }
@@ -2578,7 +2622,8 @@ export class EscrowService {
       issues.push({
         code: 'payout_mismatch',
         severity: 'critical',
-        summary: 'Client refund ledger does not match refunded milestone value.',
+        summary:
+          'Client refund ledger does not match refunded milestone value.',
         detail: `${recordedRefundedAmount} recorded vs ${expectedRefundedAmount} expected.`,
       });
     }
@@ -2595,7 +2640,8 @@ export class EscrowService {
         code: 'stuck_funding',
         severity: 'warning',
         summary: 'Contract has not been funded yet.',
-        detail: 'Use support workflows for funding blockers or wallet friction.',
+        detail:
+          'Use support workflows for funding blockers or wallet friction.',
       });
     }
     if (
@@ -2604,7 +2650,8 @@ export class EscrowService {
       issues.push({
         code: 'support_followup',
         severity: 'warning',
-        summary: 'An unresolved fee exception request still needs operator review.',
+        summary:
+          'An unresolved fee exception request still needs operator review.',
         detail: null,
       });
     }

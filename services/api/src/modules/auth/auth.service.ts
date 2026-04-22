@@ -109,7 +109,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    const workspaceContext = await this.organizations.buildWorkspaceContextForUser(user);
+    const workspaceContext =
+      await this.organizations.buildWorkspaceContextForUser(user);
     return toUserProfile(
       workspaceContext.user,
       this.userCapabilities.buildCapabilities(workspaceContext.user),
@@ -122,7 +123,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Not found');
     }
-    const workspaceContext = await this.organizations.buildWorkspaceContextForUser(user);
+    const workspaceContext =
+      await this.organizations.buildWorkspaceContextForUser(user);
     return toUserProfile(
       workspaceContext.user,
       this.userCapabilities.buildCapabilities(workspaceContext.user),

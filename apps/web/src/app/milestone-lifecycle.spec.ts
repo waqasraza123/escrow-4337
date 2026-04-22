@@ -35,6 +35,12 @@ function createJob(
       status: 'pending',
       ...override,
     })),
+    operations: {
+      chainSync: null,
+      executionFailureWorkflow: null,
+      staleWorkflow: null,
+      commercial: null,
+    },
     onchain: {
       chainId: 84532,
       contractAddress: '0xcontract',

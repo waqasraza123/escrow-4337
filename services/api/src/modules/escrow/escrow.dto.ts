@@ -16,7 +16,10 @@ const emailSchema = z
   .email()
   .max(320)
   .transform((value) => value.toLowerCase());
-const sha256Schema = z.string().trim().regex(/^[a-fA-F0-9]{64}$/);
+const sha256Schema = z
+  .string()
+  .trim()
+  .regex(/^[a-fA-F0-9]{64}$/);
 
 export const createJobSchema = z
   .object({
@@ -147,9 +150,7 @@ export const createSupportCaseSchema = z
       'dispute_followup',
       'release_delay',
     ]),
-    severity: z
-      .enum(['routine', 'elevated', 'critical'])
-      .optional(),
+    severity: z.enum(['routine', 'elevated', 'critical']).optional(),
     milestoneIndex: z.number().int().min(0).nullable().optional(),
     subject: z.string().trim().min(1).max(160),
     description: z.string().trim().min(1).max(4000),

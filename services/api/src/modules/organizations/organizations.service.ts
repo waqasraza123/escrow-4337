@@ -6,9 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import {
-  ORGANIZATIONS_REPOSITORY,
-} from '../../persistence/persistence.tokens';
+import { ORGANIZATIONS_REPOSITORY } from '../../persistence/persistence.tokens';
 import type { OrganizationsRepository } from '../../persistence/persistence.types';
 import { UsersService } from '../users/users.service';
 import type { UserRecord } from '../users/users.types';
@@ -39,7 +37,10 @@ import {
   type WorkspaceSummary,
 } from './organizations.types';
 
-type ManagedOrganizationKind = Extract<OrganizationRecord['kind'], 'client' | 'agency'>;
+type ManagedOrganizationKind = Extract<
+  OrganizationRecord['kind'],
+  'client' | 'agency'
+>;
 type ManagedOrganizationInvitationRole = OrganizationInvitationRecord['role'];
 
 function slugify(input: string) {
@@ -61,7 +62,9 @@ function getOwnerRoleForOrganization(
   return kind === 'agency' ? 'agency_owner' : 'client_owner';
 }
 
-function getWorkspaceKindForOrganization(kind: ManagedOrganizationKind): WorkspaceKind {
+function getWorkspaceKindForOrganization(
+  kind: ManagedOrganizationKind,
+): WorkspaceKind {
   return kind === 'agency' ? 'freelancer' : 'client';
 }
 
@@ -116,7 +119,9 @@ export class OrganizationsService {
       const existing = grouped.get(workspace.organizationId);
       if (existing) {
         existing.workspaces.push(workspace);
-        existing.roles = Array.from(new Set([...existing.roles, ...workspace.roles])).sort();
+        existing.roles = Array.from(
+          new Set([...existing.roles, ...workspace.roles]),
+        ).sort();
         continue;
       }
       grouped.set(workspace.organizationId, {
@@ -139,16 +144,21 @@ export class OrganizationsService {
   async listMemberships(userId: string): Promise<MembershipsListResponse> {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(userId);
-    const organizations = await this.organizationsRepository.listOrganizationsByUserId(userId);
-    const organizationsById = new Map(organizations.map((organization) => [organization.id, organization]));
-    const workspaces = await this.organizationsRepository.listWorkspacesByUserId(userId);
+    const organizations =
+      await this.organizationsRepository.listOrganizationsByUserId(userId);
+    const organizationsById = new Map(
+      organizations.map((organization) => [organization.id, organization]),
+    );
+    const workspaces =
+      await this.organizationsRepository.listWorkspacesByUserId(userId);
     const workspaceIdsByOrg = new Map<string, string[]>();
     for (const workspace of workspaces) {
       const ids = workspaceIdsByOrg.get(workspace.organizationId) ?? [];
       ids.push(workspace.id);
       workspaceIdsByOrg.set(workspace.organizationId, ids);
     }
-    const memberships = await this.organizationsRepository.listMembershipsByUserId(userId);
+    const memberships =
+      await this.organizationsRepository.listMembershipsByUserId(userId);
     const views: OrganizationMembershipView[] = memberships
       .map((membership) => {
         const organization = organizationsById.get(membership.organizationId);
@@ -165,7 +175,9 @@ export class OrganizationsService {
           organizationKind: organization.kind,
           role: membership.role,
           status: membership.status,
-          workspaceIds: (workspaceIdsByOrg.get(membership.organizationId) ?? []).sort(),
+          workspaceIds: (
+            workspaceIdsByOrg.get(membership.organizationId) ?? []
+          ).sort(),
         } satisfies OrganizationMembershipView;
       })
       .filter(Boolean) as OrganizationMembershipView[];
@@ -178,14 +190,19 @@ export class OrganizationsService {
     organizationId: string,
   ): Promise<MembershipsListResponse> {
     await this.ensurePersonalWorkspaceGraph(userId);
-    const organization = await this.requireOrganizationAccess(userId, organizationId);
-    const workspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(
+    const organization = await this.requireOrganizationAccess(
+      userId,
       organizationId,
     );
+    const workspaces =
+      await this.organizationsRepository.listWorkspacesByOrganizationId(
+        organizationId,
+      );
     const workspaceIds = workspaces.map((workspace) => workspace.id).sort();
-    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
-      organizationId,
-    );
+    const memberships =
+      await this.organizationsRepository.listMembershipsByOrganizationId(
+        organizationId,
+      );
     const usersById = new Map<string, string>();
     for (const membership of memberships) {
       const memberUser = await this.usersService.getById(membership.userId);
@@ -212,9 +229,8 @@ export class OrganizationsService {
   ): Promise<OrganizationInvitationsListResponse> {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(user.id);
-    const invitations = await this.organizationsRepository.listInvitationsByUserEmail(
-      user.email,
-    );
+    const invitations =
+      await this.organizationsRepository.listInvitationsByUserEmail(user.email);
     const pendingInvitations = invitations.filter(
       (invitation) => invitation.status === 'pending',
     );
@@ -229,9 +245,10 @@ export class OrganizationsService {
   ): Promise<OrganizationInvitationsListResponse> {
     await this.ensurePersonalWorkspaceGraph(userId);
     await this.requireOrganizationAccess(userId, organizationId);
-    const invitations = await this.organizationsRepository.listInvitationsByOrganizationId(
-      organizationId,
-    );
+    const invitations =
+      await this.organizationsRepository.listInvitationsByOrganizationId(
+        organizationId,
+      );
     return {
       invitations: await this.toInvitationViews(invitations),
     };
@@ -248,7 +265,8 @@ export class OrganizationsService {
     const ownerRole = getOwnerRoleForOrganization(organizationKind);
     const workspaceKind = getWorkspaceKindForOrganization(organizationKind);
     const slug = dto.slug ?? slugify(dto.name);
-    const existing = await this.organizationsRepository.getOrganizationBySlug(slug);
+    const existing =
+      await this.organizationsRepository.getOrganizationBySlug(slug);
     if (existing) {
       throw new ConflictException('Organization slug is already in use');
     }
@@ -311,7 +329,10 @@ export class OrganizationsService {
   ): Promise<OrganizationInvitationResponse> {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(user.id);
-    const organization = await this.requireOrganizationManagement(user.id, organizationId);
+    const organization = await this.requireOrganizationManagement(
+      user.id,
+      organizationId,
+    );
     if (!getAllowedInvitationRoles(organization.kind).includes(dto.role)) {
       throw new BadRequestException(
         `Role ${dto.role} is not valid for ${organization.kind} organizations`,
@@ -331,9 +352,7 @@ export class OrganizationsService {
     );
     if (existingPending) {
       return {
-        invitation: (
-          await this.toInvitationViews([existingPending])
-        )[0] as OrganizationInvitationView,
+        invitation: (await this.toInvitationViews([existingPending]))[0],
       };
     }
 
@@ -352,7 +371,7 @@ export class OrganizationsService {
     };
     await this.organizationsRepository.saveInvitation(invitation);
     return {
-      invitation: (await this.toInvitationViews([invitation]))[0] as OrganizationInvitationView,
+      invitation: (await this.toInvitationViews([invitation]))[0],
     };
   }
 
@@ -363,13 +382,14 @@ export class OrganizationsService {
   ): Promise<OrganizationInvitationResponse> {
     await this.ensurePersonalWorkspaceGraph(userId);
     await this.requireOrganizationManagement(userId, organizationId);
-    const invitation = await this.organizationsRepository.getInvitationById(invitationId);
+    const invitation =
+      await this.organizationsRepository.getInvitationById(invitationId);
     if (!invitation || invitation.organizationId !== organizationId) {
       throw new NotFoundException('Invitation not found');
     }
     if (invitation.status !== 'pending') {
       return {
-        invitation: (await this.toInvitationViews([invitation]))[0] as OrganizationInvitationView,
+        invitation: (await this.toInvitationViews([invitation]))[0],
       };
     }
     const revoked = {
@@ -379,7 +399,7 @@ export class OrganizationsService {
     };
     await this.organizationsRepository.saveInvitation(revoked);
     return {
-      invitation: (await this.toInvitationViews([revoked]))[0] as OrganizationInvitationView,
+      invitation: (await this.toInvitationViews([revoked]))[0],
     };
   }
 
@@ -390,9 +410,8 @@ export class OrganizationsService {
   ): Promise<WorkspaceSelectionResponse> {
     const user = await this.usersService.getRequiredById(userId);
     await this.ensurePersonalWorkspaceGraph(user.id);
-    const invitation = await this.organizationsRepository.getInvitationById(
-      invitationId,
-    );
+    const invitation =
+      await this.organizationsRepository.getInvitationById(invitationId);
     if (!invitation || invitation.status !== 'pending') {
       throw new NotFoundException('Invitation not found');
     }
@@ -402,9 +421,10 @@ export class OrganizationsService {
       );
     }
 
-    const existingMemberships = await this.organizationsRepository.listMembershipsByOrganizationId(
-      invitation.organizationId,
-    );
+    const existingMemberships =
+      await this.organizationsRepository.listMembershipsByOrganizationId(
+        invitation.organizationId,
+      );
     const now = Date.now();
     const matchingMembership = existingMemberships.find(
       (membership) =>
@@ -429,21 +449,28 @@ export class OrganizationsService {
       updatedAt: now,
     });
 
-    const workspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(
-      invitation.organizationId,
-    );
+    const workspaces =
+      await this.organizationsRepository.listWorkspacesByOrganizationId(
+        invitation.organizationId,
+      );
     const preferredWorkspace =
       workspaces.find(
-        (workspace) => workspace.kind === getWorkspaceKindForRole(invitation.role),
+        (workspace) =>
+          workspace.kind === getWorkspaceKindForRole(invitation.role),
       ) ??
       workspaces[0] ??
       null;
     if (dto.setActive !== false && preferredWorkspace) {
-      await this.usersService.setActiveWorkspace(user.id, preferredWorkspace.id);
+      await this.usersService.setActiveWorkspace(
+        user.id,
+        preferredWorkspace.id,
+      );
     }
     const context = await this.buildWorkspaceContext(user.id);
     if (!context.activeWorkspace) {
-      throw new NotFoundException('No active workspace is available after accepting the invitation');
+      throw new NotFoundException(
+        'No active workspace is available after accepting the invitation',
+      );
     }
     return {
       activeWorkspace: context.activeWorkspace,
@@ -460,7 +487,9 @@ export class OrganizationsService {
       (candidate) => candidate.workspaceId === workspaceId,
     );
     if (!workspace) {
-      throw new NotFoundException('Workspace not found for the authenticated user');
+      throw new NotFoundException(
+        'Workspace not found for the authenticated user',
+      );
     }
 
     await this.usersService.setActiveWorkspace(userId, workspace.workspaceId);
@@ -529,8 +558,9 @@ export class OrganizationsService {
   ): Promise<WorkspaceSummary | null> {
     const context = await this.buildWorkspaceContext(userId);
     return (
-      context.workspaces.find((workspace) => workspace.workspaceId === workspaceId) ??
-      null
+      context.workspaces.find(
+        (workspace) => workspace.workspaceId === workspaceId,
+      ) ?? null
     );
   }
 
@@ -541,14 +571,17 @@ export class OrganizationsService {
       this.organizationsRepository.listMembershipsByUserId(user.id),
       this.organizationsRepository.listWorkspacesByUserId(user.id),
     ]);
-    const organizationsById = new Map(organizations.map((organization) => [organization.id, organization]));
+    const organizationsById = new Map(
+      organizations.map((organization) => [organization.id, organization]),
+    );
     const membershipsByOrganizationId = new Map<string, OrganizationRole[]>();
     for (const membership of memberships) {
-      const roles = membershipsByOrganizationId.get(membership.organizationId) ?? [];
+      const roles =
+        membershipsByOrganizationId.get(membership.organizationId) ?? [];
       roles.push(membership.role);
       membershipsByOrganizationId.set(
         membership.organizationId,
-        Array.from(new Set(roles)).sort() as OrganizationRole[],
+        Array.from(new Set(roles)).sort(),
       );
     }
 
@@ -572,18 +605,27 @@ export class OrganizationsService {
       ) ?? null;
     if (!activeWorkspace) {
       activeWorkspace =
-        workspaceSummaries.find((workspace) => workspace.kind === 'client' && workspace.isDefault) ??
+        workspaceSummaries.find(
+          (workspace) => workspace.kind === 'client' && workspace.isDefault,
+        ) ??
         workspaceSummaries[0] ??
         null;
-      if (activeWorkspace && hydratedUser.activeWorkspaceId !== activeWorkspace.workspaceId) {
-        await this.usersService.setActiveWorkspace(user.id, activeWorkspace.workspaceId);
+      if (
+        activeWorkspace &&
+        hydratedUser.activeWorkspaceId !== activeWorkspace.workspaceId
+      ) {
+        await this.usersService.setActiveWorkspace(
+          user.id,
+          activeWorkspace.workspaceId,
+        );
       }
     }
 
     return {
       user: {
         ...hydratedUser,
-        activeWorkspaceId: activeWorkspace?.workspaceId ?? hydratedUser.activeWorkspaceId,
+        activeWorkspaceId:
+          activeWorkspace?.workspaceId ?? hydratedUser.activeWorkspaceId,
       },
       workspaces: workspaceSummaries.sort((left, right) =>
         left.label.localeCompare(right.label),
@@ -594,9 +636,11 @@ export class OrganizationsService {
 
   private async ensurePersonalWorkspaceGraph(userId: string) {
     let user = await this.usersService.getRequiredById(userId);
-    const organizations = await this.organizationsRepository.listOrganizationsByUserId(userId);
+    const organizations =
+      await this.organizationsRepository.listOrganizationsByUserId(userId);
     const personalOrganization =
-      organizations.find((organization) => organization.kind === 'personal') ?? null;
+      organizations.find((organization) => organization.kind === 'personal') ??
+      null;
     const now = Date.now();
     const personal =
       personalOrganization ??
@@ -613,8 +657,13 @@ export class OrganizationsService {
       await this.organizationsRepository.saveOrganization(personal);
     }
 
-    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(personal.id);
-    const membershipRoles = new Set(memberships.map((membership) => membership.role));
+    const memberships =
+      await this.organizationsRepository.listMembershipsByOrganizationId(
+        personal.id,
+      );
+    const membershipRoles = new Set(
+      memberships.map((membership) => membership.role),
+    );
     if (!membershipRoles.has('client_owner')) {
       await this.organizationsRepository.saveMembership({
         id: randomUUID(),
@@ -638,8 +687,13 @@ export class OrganizationsService {
       });
     }
 
-    const workspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(personal.id);
-    const clientWorkspace = workspaces.find((workspace) => workspace.kind === 'client');
+    const workspaces =
+      await this.organizationsRepository.listWorkspacesByOrganizationId(
+        personal.id,
+      );
+    const clientWorkspace = workspaces.find(
+      (workspace) => workspace.kind === 'client',
+    );
     if (!clientWorkspace) {
       await this.organizationsRepository.saveWorkspace({
         id: randomUUID(),
@@ -652,7 +706,9 @@ export class OrganizationsService {
         updatedAt: now,
       });
     }
-    const freelancerWorkspace = workspaces.find((workspace) => workspace.kind === 'freelancer');
+    const freelancerWorkspace = workspaces.find(
+      (workspace) => workspace.kind === 'freelancer',
+    );
     if (!freelancerWorkspace) {
       await this.organizationsRepository.saveWorkspace({
         id: randomUUID(),
@@ -667,15 +723,19 @@ export class OrganizationsService {
     }
 
     if (!user.activeWorkspaceId) {
-      const nextWorkspaces = await this.organizationsRepository.listWorkspacesByOrganizationId(
-        personal.id,
-      );
+      const nextWorkspaces =
+        await this.organizationsRepository.listWorkspacesByOrganizationId(
+          personal.id,
+        );
       const defaultWorkspace =
         nextWorkspaces.find((workspace) => workspace.kind === 'client') ??
         nextWorkspaces[0] ??
         null;
       if (defaultWorkspace) {
-        user = await this.usersService.setActiveWorkspace(userId, defaultWorkspace.id);
+        user = await this.usersService.setActiveWorkspace(
+          userId,
+          defaultWorkspace.id,
+        );
       }
     }
 
@@ -708,7 +768,8 @@ export class OrganizationsService {
   ): WorkspaceCapabilities {
     const next = createEmptyWorkspaceCapabilities();
     if (workspaceKind === 'client') {
-      const canClient = roles.includes('client_owner') || roles.includes('client_recruiter');
+      const canClient =
+        roles.includes('client_owner') || roles.includes('client_recruiter');
       next.createOpportunity = canClient;
       next.reviewApplications = canClient;
       next.manageWorkspace = roles.includes('client_owner');
@@ -729,18 +790,22 @@ export class OrganizationsService {
     userId: string,
     organizationId: string,
   ): Promise<OrganizationRecord> {
-    const organization = await this.organizationsRepository.getOrganizationById(
-      organizationId,
-    );
+    const organization =
+      await this.organizationsRepository.getOrganizationById(organizationId);
     if (!organization) {
       throw new NotFoundException('Organization not found');
     }
-    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
-      organizationId,
+    const memberships =
+      await this.organizationsRepository.listMembershipsByOrganizationId(
+        organizationId,
+      );
+    const hasAccess = memberships.some(
+      (membership) => membership.userId === userId,
     );
-    const hasAccess = memberships.some((membership) => membership.userId === userId);
     if (!hasAccess) {
-      throw new NotFoundException('Organization not found for the authenticated user');
+      throw new NotFoundException(
+        'Organization not found for the authenticated user',
+      );
     }
     return organization;
   }
@@ -749,20 +814,23 @@ export class OrganizationsService {
     userId: string,
     organizationId: string,
   ): Promise<OrganizationRecord> {
-    const organization = await this.requireOrganizationAccess(userId, organizationId);
+    const organization = await this.requireOrganizationAccess(
+      userId,
+      organizationId,
+    );
     if (organization.kind === 'personal') {
       throw new BadRequestException(
         'Personal workspaces do not support organization invitation management',
       );
     }
     const ownerRole = getOwnerRoleForOrganization(organization.kind);
-    const memberships = await this.organizationsRepository.listMembershipsByOrganizationId(
-      organizationId,
-    );
+    const memberships =
+      await this.organizationsRepository.listMembershipsByOrganizationId(
+        organizationId,
+      );
     const canManage = memberships.some(
       (membership) =>
-        membership.userId === userId &&
-        membership.role === ownerRole,
+        membership.userId === userId && membership.role === ownerRole,
     );
     if (!canManage) {
       throw new BadRequestException(
@@ -787,7 +855,9 @@ export class OrganizationsService {
       ),
     );
     const organizationsById = new Map(
-      organizations.filter(Boolean).map((organization) => [organization!.id, organization!]),
+      organizations
+        .filter(Boolean)
+        .map((organization) => [organization!.id, organization!]),
     );
     const workspaceIdsByOrg = new Map<string, string[]>();
     await Promise.all(

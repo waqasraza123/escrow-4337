@@ -252,22 +252,20 @@ export class DeploymentValidationService {
     const checks: DeploymentCheck[] = [];
     const targetEnvironment = readDeploymentTargetEnvironment();
 
-    checks.push(
-      {
-        id: 'deployment-target',
-        status: 'ok',
-        summary: targetEnvironment
-          ? `Deployment validation is enforcing the ${targetEnvironment} target contract.`
-          : 'Deployment validation is running without an explicit staging/production target contract.',
-        details: targetEnvironment
-          ? undefined
-          : 'Set DEPLOYMENT_TARGET_ENVIRONMENT, LAUNCH_CANDIDATE_ENVIRONMENT, or DEPLOYED_SMOKE_ENVIRONMENT to enforce deployed browser target and CORS alignment checks.',
-        metadata: {
-          targetEnvironment,
-          strictValidation: isStrictDeploymentValidationEnvironment(),
-        },
+    checks.push({
+      id: 'deployment-target',
+      status: 'ok',
+      summary: targetEnvironment
+        ? `Deployment validation is enforcing the ${targetEnvironment} target contract.`
+        : 'Deployment validation is running without an explicit staging/production target contract.',
+      details: targetEnvironment
+        ? undefined
+        : 'Set DEPLOYMENT_TARGET_ENVIRONMENT, LAUNCH_CANDIDATE_ENVIRONMENT, or DEPLOYED_SMOKE_ENVIRONMENT to enforce deployed browser target and CORS alignment checks.',
+      metadata: {
+        targetEnvironment,
+        strictValidation: isStrictDeploymentValidationEnvironment(),
       },
-    );
+    });
 
     checks.push(
       this.captureCheck(
