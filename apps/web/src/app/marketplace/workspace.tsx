@@ -61,8 +61,17 @@ import {
   type UserProfile,
   type WorkspaceSummary,
 } from '../../lib/api';
-
-const sessionStorageKey = 'escrow4337.web.session';
+import {
+  buildProjectRoomHref,
+  createDefaultNotificationPreferences,
+  getLaneFromInvitation,
+  getWorkspaceLane,
+  readMarketplaceSession,
+  splitList,
+  workspaceMatchesLane,
+  writeMarketplaceSession,
+  fromDateInput,
+} from './shared';
 
 type ProfileDraft = {
   slug: string;
@@ -179,43 +188,6 @@ type AutomationRuleDraft = {
   enabled: boolean;
 };
 
-function readSession(): SessionTokens | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(sessionStorageKey);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw) as SessionTokens;
-  } catch {
-    return null;
-  }
-}
-
-function writeSession(tokens: SessionTokens | null) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  if (!tokens) {
-    window.localStorage.removeItem(sessionStorageKey);
-    return;
-  }
-
-  window.localStorage.setItem(sessionStorageKey, JSON.stringify(tokens));
-}
-
-function splitList(input: string) {
-  return input
-    .split(/\n|,/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 function toDateInput(value: number | null) {
   if (!value) {
     return '';
@@ -223,15 +195,6 @@ function toDateInput(value: number | null) {
 
   const iso = new Date(value).toISOString();
   return iso.slice(0, 16);
-}
-
-function fromDateInput(value: string) {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function createEmptyProfileDraft(): ProfileDraft {
@@ -355,54 +318,6 @@ function createEmptyAutomationRuleDraft(): AutomationRuleDraft {
   };
 }
 
-function createDefaultNotificationPreferences(
-  userId = 'workspace-user',
-): MarketplaceNotificationPreferences {
-  const now = Date.now();
-  return {
-    userId,
-    digestCadence: 'manual',
-    talentInvitesEnabled: true,
-    applicationActivityEnabled: true,
-    interviewMessagesEnabled: true,
-    offerActivityEnabled: true,
-    reviewActivityEnabled: true,
-    automationActivityEnabled: true,
-    lifecycleDigestEnabled: true,
-    analyticsDigestEnabled: true,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function getWorkspaceLane(workspace: WorkspaceSummary): LaneKind {
-  if (workspace.kind === 'client') {
-    return 'client';
-  }
-  return workspace.organizationKind === 'agency' ? 'agency' : 'freelancer';
-}
-
-function buildProjectRoomHref(
-  contractPath: string | null,
-  jobId: string | null,
-) {
-  const basePath = contractPath ?? (jobId ? `/app/contracts/${jobId}` : null);
-  if (!basePath) {
-    return null;
-  }
-
-  const [pathname, search = ''] = basePath.split('?');
-  return `${pathname}/room${search ? `?${search}` : ''}`;
-}
-
-function getLaneFromInvitation(
-  invitation: Pick<OrganizationInvitation, 'role'>,
-): LaneKind {
-  return invitation.role === 'client_owner' || invitation.role === 'client_recruiter'
-    ? 'client'
-    : 'agency';
-}
-
 function slugifyWorkspaceName(value: string) {
   return value
     .toLowerCase()
@@ -515,6 +430,7 @@ export function MarketplaceWorkspace() {
   const { messages } = useWebI18n();
   const marketplaceMessages = messages.publicMarketplace;
   const workspaceMessages = marketplaceMessages.workspace;
+  const clientConsoleMessages = marketplaceMessages.clientConsole;
   const [tokens, setTokens] = useState<SessionTokens | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [contracts, setContracts] = useState<JobView[]>([]);
@@ -659,15 +575,6 @@ export function MarketplaceWorkspace() {
   const canApplyToOpportunity = workspaceCapabilities.applyToOpportunity;
   const canCreateOpportunity = workspaceCapabilities.createOpportunity;
   const canReviewApplications = workspaceCapabilities.reviewApplications;
-  const workspaceMatchesLane = (
-    workspace: WorkspaceSummary,
-    lane: LaneKind,
-  ) =>
-    lane === 'client'
-      ? workspace.kind === 'client'
-      : lane === 'agency'
-        ? workspace.kind === 'freelancer' && workspace.organizationKind === 'agency'
-        : workspace.kind === 'freelancer' && workspace.organizationKind !== 'agency';
   const findWorkspaceWithCapability = (
     lane: LaneKind,
     capability: keyof typeof workspaceCapabilities,
@@ -1009,7 +916,7 @@ export function MarketplaceWorkspace() {
   }
 
   useEffect(() => {
-    const stored = readSession();
+    const stored = readMarketplaceSession();
     setTokens(stored);
     void loadWorkspace(stored);
   }, []);
@@ -1057,7 +964,7 @@ export function MarketplaceWorkspace() {
     if (tokens) {
       await webApi.logout(tokens.refreshToken);
     }
-    writeSession(null);
+    writeMarketplaceSession(null);
     setTokens(null);
     setMessage(workspaceMessages.messages.sessionCleared);
     await loadWorkspace(null);
@@ -2476,6 +2383,25 @@ export function MarketplaceWorkspace() {
                       )}
                     </button>
                   ))}
+                  {isClientWorkspace ? (
+                    <Link
+                      className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                      data-testid="workspace-client-console-link"
+                      href="/app/marketplace/client"
+                    >
+                      {clientConsoleMessages.actions.openClientConsole}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : isClientWorkspace ? (
+                <div className={styles.inlineActions}>
+                  <Link
+                    className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                    data-testid="workspace-client-console-link"
+                    href="/app/marketplace/client"
+                  >
+                    {clientConsoleMessages.actions.openClientConsole}
+                  </Link>
                 </div>
               ) : null}
             </div>
@@ -2612,6 +2538,14 @@ export function MarketplaceWorkspace() {
                     >
                       {workspaceMessages.onboarding.client.action}
                     </button>
+                    {isClientWorkspace ? (
+                      <Link
+                        className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                        href="/app/marketplace/client"
+                      >
+                        {clientConsoleMessages.actions.openClientConsole}
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </SharedCard>

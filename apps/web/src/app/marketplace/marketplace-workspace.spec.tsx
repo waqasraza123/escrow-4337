@@ -2188,6 +2188,92 @@ describe('marketplace workspace', () => {
     ).toBeInTheDocument();
   });
 
+  it('surfaces the dedicated client console entry point from the client workspace lane', async () => {
+    seedJsonStorage(sessionStorageKey, {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+    });
+    mockedWebApi.listMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.me.mockResolvedValue({
+      id: 'client-1',
+      email: 'client@example.com',
+      shariahMode: false,
+      defaultExecutionWalletAddress: null,
+      wallets: [],
+      capabilities: {},
+      workspaces: [
+        {
+          workspaceId: 'workspace-client-1',
+          kind: 'client',
+          label: 'Personal client workspace',
+          slug: 'personal-client-client-1',
+          organizationId: 'org-personal-1',
+          organizationName: 'Personal workspace',
+          organizationSlug: 'personal-client-1',
+          organizationKind: 'personal',
+          roles: ['client_owner'],
+          capabilities: {
+            manageProfile: false,
+            applyToOpportunity: false,
+            createOpportunity: true,
+            reviewApplications: true,
+            manageWorkspace: true,
+          },
+          isDefault: true,
+        },
+      ],
+      activeWorkspace: {
+        workspaceId: 'workspace-client-1',
+        kind: 'client',
+        label: 'Personal client workspace',
+        slug: 'personal-client-client-1',
+        organizationId: 'org-personal-1',
+        organizationName: 'Personal workspace',
+        organizationSlug: 'personal-client-1',
+        organizationKind: 'personal',
+        roles: ['client_owner'],
+        capabilities: {
+          manageProfile: false,
+          applyToOpportunity: false,
+          createOpportunity: true,
+          reviewApplications: true,
+          manageWorkspace: true,
+        },
+        isDefault: true,
+      },
+    });
+    mockedWebApi.getMyMarketplaceProfile.mockRejectedValue(new Error('missing'));
+    mockedWebApi.listMyMarketplaceOpportunities.mockResolvedValue({
+      opportunities: [],
+    });
+    mockedWebApi.listMyMarketplaceApplications.mockResolvedValue({
+      applications: [],
+    });
+    mockedWebApi.listJobs.mockResolvedValue({
+      jobs: [],
+    });
+
+    renderApp(
+      <WebI18nProvider initialLocale="en">
+        <MarketplaceWorkspacePage />
+      </WebI18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My opportunities' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('workspace-client-console-link')).toHaveAttribute(
+      'href',
+      '/app/marketplace/client',
+    );
+    expect(
+      screen.getAllByRole('link', { name: 'Open client console' }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('lets a client owner invite collaborators and accept the pending invitation into the client lane', async () => {
     seedJsonStorage(sessionStorageKey, {
       accessToken: 'access-token-123',

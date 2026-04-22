@@ -1272,3 +1272,49 @@
   - real staged `Deployed Smoke` -> `Launch Candidate` -> `Promotion Review`
   - live provider validation with real staging secrets/URLs
   - preserved reviewed release artifacts (`release-dossier`, `release-pointer-staging`)
+
+## Update (2026-04-22, Fresh Postgres Migration Integrity Gate)
+- Added a dedicated fresh-Postgres migration verifier so schema/FK regressions fail before Playwright startup:
+  - new root command: `pnpm verify:migrations:fresh`
+  - `pnpm verify:ci` now runs that verifier after the repo build and before `e2e:smoke:local`
+  - the verifier boots a disposable Postgres instance, applies every API migration on an empty database, checks that pending migrations reach zero, then re-runs migrations to prove idempotence
+- Runtime behavior:
+  - prefers an ephemeral native Postgres cluster when `initdb`/`pg_ctl` are available locally
+  - falls back to the repo Docker Compose Postgres stack when native binaries are unavailable
+  - `infra/postgres/docker-compose.yml` now accepts `POSTGRES_CONTAINER_NAME` override so disposable compose runs do not collide with the default local container name
+- Changed files:
+  `scripts/verify-fresh-postgres-migrations.mjs`
+  `scripts/verify-ci.sh`
+  `package.json`
+  `infra/postgres/docker-compose.yml`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm verify:migrations:fresh`
+  - passed: `pnpm verify:ci`
+  - passed: `git diff --check`
+- Next likely step:
+  - if more hardening is needed, keep infra/startup regressions moving earlier in `verify:ci` so Playwright only exercises product behavior rather than schema/bootstrap failures
+
+## Update (2026-04-22, Client Console Route Family)
+- Implemented the dedicated client marketplace console under `/app/marketplace/client...` and kept `/app/marketplace` as the workspace/lane entry shell:
+  - added app-router client pages for `dashboard`, `opportunities`, `applicants`, `interviews`, `offers`, `contracts`, `funding`, and `disputes`
+  - extracted shared marketplace session/lane helpers from `apps/web/src/app/marketplace/workspace.tsx` into `apps/web/src/app/marketplace/shared.ts`
+  - added `apps/web/src/app/marketplace/client-console.tsx` to load route-scoped client data and actions from existing `webApi` reads/mutations
+  - added a dedicated `publicMarketplace.clientConsole` i18n namespace and a client-console CTA from the workspace shell
+- Browser/test coverage:
+  - added `apps/web/src/app/marketplace/client-console.spec.tsx` for dashboard prioritization, blocked non-client posture, opportunity create/publish/pause flows, applicant review actions, interview replies, offer rendering, and contract/funding/dispute deep links
+  - extended `apps/web/src/app/marketplace/marketplace-workspace.spec.tsx` with client-console entry-point regression coverage
+  - extended `tests/e2e/flows/marketplace-exact-flow.ts` with `clientSurface: 'console' | 'workspace'`
+  - added `tests/e2e/specs/journeys/local/marketplace-client-console-flow.spec.ts` to drive the exact hire-to-dispute browser canary through the dedicated client routes
+- Changed files:
+  `apps/web/src/app/{app/marketplace/client/{page.tsx,opportunities/page.tsx,applicants/page.tsx,interviews/page.tsx,offers/page.tsx,contracts/page.tsx,funding/page.tsx,disputes/page.tsx},marketplace/{client-console.tsx,client-console.spec.tsx,marketplace-workspace.spec.tsx,shared.ts,workspace.tsx}}`
+  `apps/web/src/lib/i18n.tsx`
+  `tests/e2e/{flows/marketplace-exact-flow.ts,specs/journeys/local/marketplace-client-console-flow.spec.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/client-console.spec.tsx src/app/marketplace/marketplace-workspace.spec.tsx`
+  - passed: `pnpm --filter web typecheck`
+  - passed: `PLAYWRIGHT_PROFILE=local pnpm exec playwright test tests/e2e/specs/journeys/local/marketplace-client-console-flow.spec.ts --project=local-journeys --list`
+  - passed: `git diff --check`
+- Not run:
+  - full browser execution of `tests/e2e/specs/journeys/local/marketplace-client-console-flow.spec.ts`

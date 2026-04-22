@@ -51,6 +51,7 @@ type MarketplaceExactFlowInput = {
   disputeEvidenceUrl: string;
   resolutionAction: 'release' | 'refund';
   resolutionNote: string;
+  clientSurface?: 'workspace' | 'console';
   exportProbeFactory?: (jobId: string) => ExportProbe[];
 };
 
@@ -89,6 +90,12 @@ function marketplaceCardByTitle(
     .locator(`[data-testid^="${testIdPrefix}"]`)
     .filter({ hasText: title })
     .first();
+}
+
+async function openClientConsole(page: Page, webBaseUrl: string) {
+  await clickWorkspaceAction(page.getByRole('link', { name: 'Open client console' }));
+  await page.waitForURL(`${webBaseUrl}/app/marketplace/client`);
+  await expect(page.getByText('Client navigation')).toBeVisible();
 }
 
 async function saveMarketplaceProfile(input: {
@@ -166,6 +173,7 @@ export async function runAuthenticatedMarketplaceExactFlow(
     adminBaseUrl,
     clientPage,
     clientProfile,
+    clientSurface = 'workspace',
     contractorDisplayName,
     contractorPage,
     contractorProfile,
@@ -188,6 +196,14 @@ export async function runAuthenticatedMarketplaceExactFlow(
     profile: clientProfile,
   });
 
+  if (clientSurface === 'console') {
+    await openClientConsole(clientPage, webBaseUrl);
+    await clickWorkspaceAction(
+      clientPage.getByRole('link', { name: 'Opportunities' }),
+    );
+    await clientPage.waitForURL(`${webBaseUrl}/app/marketplace/client/opportunities`);
+  }
+
   await clientPage.getByLabel('Title', { exact: true }).fill(opportunity.title);
   await clientPage.getByLabel('Summary', { exact: true }).fill(opportunity.summary);
   await clientPage
@@ -205,19 +221,28 @@ export async function runAuthenticatedMarketplaceExactFlow(
   await clientPage.getByLabel('Timeline', { exact: true }).fill(opportunity.timeline);
   await clientPage.getByRole('button', { name: 'Create draft brief' }).click();
   await expect(
-    clientPage.getByText('Decision-ready marketplace brief created as draft.'),
+    clientPage.getByText(
+      clientSurface === 'console'
+        ? 'Decision-ready client brief created as draft.'
+        : 'Decision-ready marketplace brief created as draft.',
+    ),
   ).toBeVisible();
 
-  const draftOpportunityCard = marketplaceCardByTitle(
-    clientPage,
-    'marketplace-my-opportunity-',
-    opportunity.title,
-  );
+  const draftOpportunityCard =
+    clientSurface === 'console'
+      ? marketplaceCardByTitle(clientPage, 'client-console-opportunity-', opportunity.title)
+      : marketplaceCardByTitle(clientPage, 'marketplace-my-opportunity-', opportunity.title);
   await expect(draftOpportunityCard).toBeVisible();
   await clickWorkspaceAction(
     draftOpportunityCard.getByRole('button', { name: 'Publish' }),
   );
-  await expect(clientPage.getByText('Marketplace brief published.')).toBeVisible();
+  await expect(
+    clientPage.getByText(
+      clientSurface === 'console'
+        ? 'Client brief published.'
+        : 'Marketplace brief published.',
+    ),
+  ).toBeVisible();
 
   const publicBriefLink = draftOpportunityCard.getByRole('link', {
     name: 'View public brief',
@@ -231,10 +256,14 @@ export async function runAuthenticatedMarketplaceExactFlow(
     throw new Error('Unable to derive opportunity id from public brief href');
   }
 
-  const clientOpportunityCard = clientPage.getByTestId(
-    `marketplace-my-opportunity-${opportunityId}`,
-  );
-  await expect(clientOpportunityCard.getByText('Public brief • Published')).toBeVisible();
+  const clientOpportunityCard =
+    clientSurface === 'console'
+      ? clientPage.getByTestId(`client-console-opportunity-${opportunityId}`)
+      : clientPage.getByTestId(`marketplace-my-opportunity-${opportunityId}`);
+  await expect(clientOpportunityCard).toBeVisible();
+  if (clientSurface !== 'console') {
+    await expect(clientOpportunityCard.getByText('Public brief • Published')).toBeVisible();
+  }
 
   const contractorLaneProof = await saveMarketplaceProfile({
     page: contractorPage,
@@ -270,24 +299,49 @@ export async function runAuthenticatedMarketplaceExactFlow(
   await expect(submittedApplicationCard.getByText('Submitted')).toBeVisible();
 
   await clientPage.reload();
-  await clickWorkspaceAction(
-    clientOpportunityCard.getByRole('button', { name: 'Load review board' }),
-  );
-  await expect(clientOpportunityCard.getByText(contractorDisplayName)).toBeVisible();
-  await clickWorkspaceAction(
-    clientOpportunityCard.getByRole('button', { name: 'Shortlist' }),
-  );
-  await expect(clientPage.getByText('Application shortlisted.')).toBeVisible();
-  await clickWorkspaceAction(
-    clientOpportunityCard.getByRole('button', { name: 'Hire into escrow' }),
-  );
-  await expect(
-    clientPage.getByText(/Application hired and escrow contract .* created\./),
-  ).toBeVisible();
+  let clientContractLink: Locator;
+  if (clientSurface === 'console') {
+    await clientPage.goto(`${webBaseUrl}/app/marketplace/client/applicants`);
+    const applicantCard = clientPage
+      .locator('[data-testid^="client-console-applicant-"]')
+      .filter({ hasText: contractorDisplayName })
+      .first();
+    await expect(applicantCard).toBeVisible();
+    await clickWorkspaceAction(
+      applicantCard.getByRole('button', { name: 'Shortlist' }),
+    );
+    await expect(clientPage.getByText('Applicant shortlisted.')).toBeVisible();
+    await clickWorkspaceAction(
+      applicantCard.getByRole('button', { name: 'Hire into escrow' }),
+    );
+    await expect(clientPage.getByText('Applicant hired into escrow.')).toBeVisible();
 
-  const clientContractLink = clientOpportunityCard.getByRole('link', {
-    name: 'View contract',
-  });
+    await clientPage.goto(`${webBaseUrl}/app/marketplace/client/funding`);
+    await expect(
+      clientPage.getByRole('heading', { name: 'Funding and join readiness' }),
+    ).toBeVisible();
+    clientContractLink = clientPage.getByRole('link', { name: 'Open contract' }).first();
+  } else {
+    await clickWorkspaceAction(
+      clientOpportunityCard.getByRole('button', { name: 'Load review board' }),
+    );
+    await expect(clientOpportunityCard.getByText(contractorDisplayName)).toBeVisible();
+    await clickWorkspaceAction(
+      clientOpportunityCard.getByRole('button', { name: 'Shortlist' }),
+    );
+    await expect(clientPage.getByText('Application shortlisted.')).toBeVisible();
+    await clickWorkspaceAction(
+      clientOpportunityCard.getByRole('button', { name: 'Hire into escrow' }),
+    );
+    await expect(
+      clientPage.getByText(/Application hired and escrow contract .* created\./),
+    ).toBeVisible();
+
+    clientContractLink = clientOpportunityCard.getByRole('link', {
+      name: 'View contract',
+    });
+  }
+
   await expect(clientContractLink).toBeVisible();
   await expect(clientContractLink).toHaveAttribute('href', /\/app\/contracts\//);
   const clientContractHref = await clientContractLink.getAttribute('href');
