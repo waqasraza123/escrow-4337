@@ -898,6 +898,8 @@ export function OperatorConsole({
     operatorCapabilities?.jobHistoryImport.allowed ?? false;
   const jobHistoryImportCapabilityReason =
     operatorCapabilities?.jobHistoryImport.reason ?? null;
+  const canModerateMarketplace =
+    operatorCapabilities?.marketplaceModeration.allowed ?? false;
   const canResolveDisputes =
     operatorCapabilities?.escrowResolution.allowed ?? false;
   const resolveDisputesCapabilityReason =
@@ -1590,30 +1592,54 @@ export function OperatorConsole({
           title={frame.title}
           description={frame.copy}
           summary={
-            <FactGrid className="md:grid-cols-2">
-              <FactItem label="API base URL" value={adminApi.baseUrl} dir="ltr" />
-              <FactItem
-                label="Backend profile"
-                value={
-                  runtimeProfile
-                    ? messages.labels.runtimeProfile[runtimeProfile.profile]
-                    : messages.common.loading
-                }
-              />
-              <FactItem
-                label="Loaded case"
-                value={audit?.bundle.job.id || messages.common.unavailable}
-                dir="ltr"
-              />
-              <FactItem
-                label="Pressure"
-                value={
-                  caseBrief
-                    ? messages.labels.pressure[caseBrief.pressure]
-                    : messages.common.loading
-                }
-              />
-            </FactGrid>
+            view === 'dashboard' ? (
+              <FactGrid className="md:grid-cols-2 xl:grid-cols-4">
+                <FactItem
+                  label="Session"
+                  value={accessToken ? messages.common.authenticated : messages.common.signedOut}
+                />
+                <FactItem
+                  label="Resolution queue"
+                  value={canResolveDisputes ? 'Ready' : 'Blocked'}
+                />
+                <FactItem
+                  label="Operations queue"
+                  value={canAccessOperations ? 'Ready' : 'Blocked'}
+                />
+                <FactItem
+                  label="Marketplace moderation"
+                  value={canModerateMarketplace ? 'Ready' : 'Blocked'}
+                />
+              </FactGrid>
+            ) : (
+              <FactGrid className="md:grid-cols-2 xl:grid-cols-4">
+                <FactItem
+                  label="Loaded case"
+                  value={audit?.bundle.job.id || messages.common.unavailable}
+                  dir="ltr"
+                />
+                <FactItem
+                  label="Pressure"
+                  value={
+                    caseBrief
+                      ? messages.labels.pressure[caseBrief.pressure]
+                      : messages.common.loading
+                  }
+                />
+                <FactItem
+                  label="Resolution capability"
+                  value={canResolveDisputes ? 'Ready' : 'Blocked'}
+                />
+                <FactItem
+                  label="Backend profile"
+                  value={
+                    runtimeProfile
+                      ? messages.labels.runtimeProfile[runtimeProfile.profile]
+                      : messages.common.loading
+                  }
+                />
+              </FactGrid>
+            )
           }
         />
       </RevealSection>
@@ -1629,6 +1655,7 @@ export function OperatorConsole({
           title="Backend profile validation"
         >
           <FactGrid className={styles.summaryGrid}>
+            <FactItem label="API base URL" value={adminApi.baseUrl} dir="ltr" />
             <FactItem
               label="Profile"
               value={
@@ -2980,7 +3007,7 @@ export function OperatorConsole({
                       <p>{`Open disputes ${job.counts.openDisputes} · Failed executions ${job.counts.failedExecutions}`}</p>
                       <small>{job.jobId}</small>
                       <div className={styles.inlineActions}>
-                        <a href={`/cases/${job.jobId}`}>Open case route</a>
+                        <a href={`/operator/cases/${job.jobId}`}>Open case route</a>
                         <button
                           type="button"
                           className={styles.secondaryButton}

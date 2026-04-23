@@ -61,7 +61,7 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-import Home from './page';
+import Home from './operator/page';
 
 function renderHome(initialLocale: 'en' | 'ar' = 'en') {
   return renderApp(
@@ -71,7 +71,7 @@ function renderHome(initialLocale: 'en' | 'ar' = 'en') {
   );
 }
 
-describe('admin page', () => {
+describe('operator dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedAdminApi.baseUrl = localApiBaseUrl;
@@ -83,12 +83,12 @@ describe('admin page', () => {
     mockedAdminApi.getEscrowChainSyncDaemonHealth.mockResolvedValue(null);
   });
 
-  it('renders the public-only operator scope shell before any lookup', async () => {
+  it('renders the operator home shell before any lookup', async () => {
     renderHome();
 
     expect(
       screen.getByRole('heading', {
-        name: 'Review disputes and execution issues from the public audit trail.',
+        name: 'Run the operator queue from one dedicated home.',
       }),
     ).toBeInTheDocument();
     expect(

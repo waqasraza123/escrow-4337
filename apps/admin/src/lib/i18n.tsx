@@ -36,6 +36,95 @@ const adminMessages = {
       yes: 'Yes',
       no: 'No',
     },
+    landing: {
+      topBar: {
+        label: 'Milestone Escrow',
+        meta:
+          'Client-facing entry for escrow-first hiring, while operator tools stay under the dedicated operator route family.',
+      },
+      operatorAccess: 'Operator access',
+      hero: {
+        eyebrow: 'Escrow-first hiring on Base',
+        title: 'Launch client work from a product landing, not an operator console.',
+        copy:
+          'Open the marketplace, move into milestone-funded work, and keep dispute resolution, moderation, and operations tooling behind the dedicated operator surface.',
+        stats: [
+          { label: 'Settlement rail', value: 'Base + USDC milestones' },
+          { label: 'Hiring posture', value: 'Decision-ready briefs' },
+          { label: 'Trust layer', value: 'Operator-reviewed disputes' },
+          { label: 'Workflow', value: 'Marketplace to escrow handoff' },
+        ],
+      },
+      value: {
+        eyebrow: 'Why teams use it',
+        title: 'Structured hiring with escrow discipline built in',
+        cards: [
+          {
+            title: 'Publish work with clear outcomes',
+            body:
+              'Briefs stay scoped around deliverables, acceptance criteria, and milestone funding instead of open-ended bidding noise.',
+          },
+          {
+            title: 'Move strong fits into escrow fast',
+            body:
+              'The product already bridges shortlist and hire decisions into the escrow flow without asking clients to rebuild context.',
+          },
+          {
+            title: 'Keep trust and resolution operational',
+            body:
+              'Disputes, moderation, and workflow health still exist, but they live behind operator-only entry points instead of the public root.',
+          },
+        ],
+      },
+      workflow: {
+        eyebrow: 'Hiring flow',
+        title: 'How the client path works',
+        steps: [
+          {
+            title: '1. Browse or publish',
+            body:
+              'Open the marketplace to review talent supply or move directly into a structured brief when you already know the work to ship.',
+          },
+          {
+            title: '2. Select the strongest fit',
+            body:
+              'Evaluate applicants and move the selected engagement into the escrow-backed contract flow instead of managing a side channel.',
+          },
+          {
+            title: '3. Deliver and settle with auditability',
+            body:
+              'Milestone delivery, release, dispute, and final resolution remain visible through the platform instead of disappearing into manual follow-up.',
+          },
+        ],
+      },
+      trust: {
+        eyebrow: 'Trust and safety',
+        title: 'Client-facing confidence without public diagnostics noise',
+        copy:
+          'The operator stack still handles moderation, support, dispute review, chain-sync posture, and reconciliation tooling. The public landing only explains the product posture that clients need to understand.',
+        points: [
+          {
+            title: 'Operator review stays available',
+            body:
+              'Dedicated operator routes still own dispute review, moderation, and operations health when intervention is required.',
+          },
+          {
+            title: 'Escrow state stays auditable',
+            body:
+              'Milestone funding and settlement stay grounded in the same API and escrow contracts already used by the operator workflows.',
+          },
+        ],
+      },
+      cta: {
+        eyebrow: 'Start',
+        title: 'Choose the product path that fits the current job',
+        copy:
+          'Use the main product surface for browsing, authentication, and direct escrow authoring. Use operator access only when you need the internal queue.',
+        marketplace: 'Browse marketplace',
+        signIn: 'Open workspace sign-in',
+        startEscrow: 'Start a direct escrow',
+      },
+    },
     topBar: {
       label: 'Bilingual operator UI',
       meta:
@@ -67,9 +156,9 @@ const adminMessages = {
     frame: {
       dashboard: {
         eyebrow: 'Operator Console',
-        title: 'Review disputes and execution issues from the public audit trail.',
+        title: 'Run the operator queue from one dedicated home.',
         copy:
-          'This surface stays within the existing public audit endpoint. It is organized around operator tasks: dispute triage, receipt inspection, milestone posture review, and explicit visibility into what still requires backend authorization work.',
+          'Use the operator route to restore session authority, review cross-job attention, open case work, and reach moderation without treating raw runtime diagnostics as the headline content.',
       },
       case: {
         eyebrow: 'Operator Case',
@@ -146,6 +235,95 @@ const adminMessages = {
       yes: 'نعم',
       no: 'لا',
     },
+    landing: {
+      topBar: {
+        label: 'ضمان المراحل',
+        meta:
+          'مدخل موجه للعملاء للتوظيف القائم على الضمان، بينما تبقى أدوات المشغّل داخل مسارات المشغّل المخصصة.',
+      },
+      operatorAccess: 'دخول المشغّل',
+      hero: {
+        eyebrow: 'توظيف قائم على الضمان فوق Base',
+        title: 'ابدأ مسار العميل من صفحة منتج، لا من لوحة تشغيل داخلية.',
+        copy:
+          'افتح السوق، وانتقل إلى العمل الممول بالمراحل، مع إبقاء حل النزاعات والإشراف والأدوات التشغيلية خلف واجهة المشغّل المخصصة.',
+        stats: [
+          { label: 'مسار التسوية', value: 'Base + USDC بالمراحل' },
+          { label: 'وضع التوظيف', value: 'موجزات جاهزة للقرار' },
+          { label: 'طبقة الثقة', value: 'نزاعات يراجعها المشغّل' },
+          { label: 'سير العمل', value: 'انتقال من السوق إلى الضمان' },
+        ],
+      },
+      value: {
+        eyebrow: 'لماذا تستخدمه الفرق',
+        title: 'توظيف منظم مع انضباط الضمان مدمجاً',
+        cards: [
+          {
+            title: 'انشر عملاً بنتائج واضحة',
+            body:
+              'تبقى الموجزات مركزة على المخرجات ومعايير القبول وتمويل المراحل بدلاً من فوضى المزايدات المفتوحة.',
+          },
+          {
+            title: 'انقل أفضل المرشحين إلى الضمان بسرعة',
+            body:
+              'يربط المنتج بالفعل بين قرارات الاختيار والتوظيف وبين تدفق الضمان من دون مطالبة العميل بإعادة بناء السياق.',
+          },
+          {
+            title: 'أبقِ الثقة والحسم في المسار التشغيلي',
+            body:
+              'لا تزال النزاعات والإشراف وصحة التشغيل موجودة، لكنها تعيش خلف نقاط دخول خاصة بالمشغّل بدلاً من الجذر العام.',
+          },
+        ],
+      },
+      workflow: {
+        eyebrow: 'مسار التوظيف',
+        title: 'كيف يعمل مسار العميل',
+        steps: [
+          {
+            title: '1. تصفح أو انشر',
+            body:
+              'افتح السوق لمراجعة العرض المتاح أو انتقل مباشرة إلى موجز منظم عندما تعرف العمل المطلوب شحنه.',
+          },
+          {
+            title: '2. اختر الأنسب',
+            body:
+              'قيّم المتقدمين وانقل التعاقد المختار إلى تدفق عقد مدعوم بالضمان بدلاً من إدارة قنوات جانبية.',
+          },
+          {
+            title: '3. سلّم وسوِّ مع قابلية للتدقيق',
+            body:
+              'يبقى التسليم والإفراج والنزاع والحسم النهائي للمراحل ظاهراً عبر المنصة بدلاً من أن يضيع في المتابعة اليدوية.',
+          },
+        ],
+      },
+      trust: {
+        eyebrow: 'الثقة والسلامة',
+        title: 'ثقة موجهة للعميل بدون ضجيج تشخيصي علني',
+        copy:
+          'لا تزال طبقة المشغّل تتولى الإشراف والدعم ومراجعة النزاعات ووضع مزامنة السلسلة وأدوات المطابقة. صفحة الهبوط العامة تشرح فقط الوضع الذي يحتاج العميل إلى فهمه.',
+        points: [
+          {
+            title: 'مراجعة المشغّل تبقى متاحة',
+            body:
+              'لا تزال مسارات المشغّل المخصصة تملك مراجعة النزاعات والإشراف وصحة التشغيل عندما تكون هناك حاجة إلى تدخل.',
+          },
+          {
+            title: 'حالة الضمان تبقى قابلة للتدقيق',
+            body:
+              'يبقى تمويل المراحل وتسويتها مستندين إلى نفس الـ API وعقود الضمان المستخدمة بالفعل في مسارات المشغّل.',
+          },
+        ],
+      },
+      cta: {
+        eyebrow: 'ابدأ',
+        title: 'اختر مسار المنتج المناسب لهذه المهمة',
+        copy:
+          'استخدم سطح المنتج الرئيسي للتصفح والتسجيل وتأليف الضمان المباشر. استخدم دخول المشغّل فقط عندما تحتاج إلى الصف الداخلي.',
+        marketplace: 'تصفح السوق',
+        signIn: 'افتح تسجيل الدخول',
+        startEscrow: 'ابدأ ضماناً مباشراً',
+      },
+    },
     topBar: {
       label: 'واجهة مشغّل ثنائية اللغة',
       meta:
@@ -177,9 +355,9 @@ const adminMessages = {
     frame: {
       dashboard: {
         eyebrow: 'لوحة المشغّل',
-        title: 'راجع النزاعات ومشكلات التنفيذ من سجل التدقيق العام.',
+        title: 'أدر صفوف المشغّل من صفحة رئيسية مخصصة.',
         copy:
-          'تبقى هذه الواجهة ضمن نقطة نهاية التدقيق العامة الحالية. وهي منظمة حول مهام المشغّل: فرز النزاعات، فحص الإيصالات، مراجعة وضع المراحل، وإظهار ما يزال يحتاج إلى عمل صلاحيات خلفي.',
+          'استخدم مسار المشغّل لاستعادة صلاحية الجلسة، ومراجعة الانتباه عبر الوظائف، وفتح القضايا، والوصول إلى الإشراف، من دون جعل تشخيصات التشغيل الخام هي المحتوى الرئيسي.',
       },
       case: {
         eyebrow: 'قضية المشغّل',

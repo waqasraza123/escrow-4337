@@ -39,7 +39,7 @@ describe('marketplace page', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'اعثر على المواهب، كوّن قائمة قصيرة بسرعة، ثم أغلق عبر الضمان.',
+          name: 'وظّف بسرعة أكبر عبر اكتشاف عام ومسار ضمان واضح واحد.',
         }),
       ).toBeInTheDocument();
     });
@@ -252,7 +252,7 @@ describe('marketplace page', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Find talent, shortlist fast, and close through escrow.',
+          name: 'Hire faster with public discovery and one clear escrow path.',
         }),
       ).toBeInTheDocument();
     });

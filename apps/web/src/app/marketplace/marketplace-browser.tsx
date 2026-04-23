@@ -247,7 +247,7 @@ export function MarketplaceBrowser() {
         <RevealSection className={styles.hero}>
           <div className={`${styles.heroContent} fx-fade-up`}>
             <p className={styles.eyebrow}>{marketplaceMessages.heroEyebrow}</p>
-            <h1>{marketplaceMessages.heroTitle}</h1>
+            <h1 className={styles.heroTitle}>{marketplaceMessages.heroTitle}</h1>
             <p className={styles.lead}>{marketplaceMessages.heroLead}</p>
             <div className={styles.ctaRow}>
               <Link

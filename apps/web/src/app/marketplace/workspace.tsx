@@ -662,6 +662,13 @@ export function MarketplaceWorkspace() {
     ] ?? code;
   const formatContractDraftStatus = (status: MarketplaceContractDraftStatus) =>
     workspaceMessages.contractDraft.statusValue[status];
+  const activeWorkspaceSummary = activeWorkspace
+    ? `${activeWorkspace.label} • ${
+        workspaceMessages.activeWorkspace.modeLabel[activeLane ?? 'client']
+      }`
+    : workspaceMessages.topBarLabel;
+  const activeLaneGuide = activeLane ? workspaceMessages.modeGuide[activeLane] : null;
+  const activeWorkspaceRoles = activeWorkspace?.roles.map(formatOrganizationRole).join(', ');
   const renderWorkspaceAction = (
     workspace: WorkspaceSummary | null,
   ) => {
@@ -2281,6 +2288,7 @@ export function MarketplaceWorkspace() {
       <RevealSection>
         <PageTopBar
           eyebrow={workspaceMessages.topBarLabel}
+          title={activeWorkspaceSummary}
           description={workspaceMessages.topBarMeta}
           className={styles.topBar}
           contentClassName={styles.topBarContent}
@@ -2351,61 +2359,117 @@ export function MarketplaceWorkspace() {
 
       {!loading && tokens && activeWorkspace ? (
         <RevealSection as="div" delay={0.06}>
-          <SurfaceCard className={styles.panel}>
+          <section className={`${styles.hero} grid gap-7`}>
             <div className={styles.stack}>
-              <span className={styles.metaLabel}>
+              <span className={styles.eyebrow}>
                 {workspaceMessages.activeWorkspace.eyebrow}
               </span>
-              <strong>
-                {activeWorkspace.label} •{' '}
-                {workspaceMessages.activeWorkspace.modeLabel[activeLane ?? 'client']}
-              </strong>
-              <p className={styles.stateText}>
-                {workspaceMessages.activeWorkspace.organizationLabel}:{' '}
-                {activeWorkspace.organizationName}
+              <h1>{activeWorkspace.label}</h1>
+              <p className={styles.heroCopy}>
+                {activeLaneGuide?.body ?? workspaceMessages.topBarMeta}
               </p>
-              <p className={styles.stateText}>
-                {workspaceMessages.activeWorkspace.roleLabel}:{' '}
-                {activeWorkspace.roles.map(formatOrganizationRole).join(', ')}
-              </p>
-              {availableWorkspaces.length > 1 ? (
-                <div className={styles.inlineActions}>
-                  {availableWorkspaces.map((workspace) => (
-                    <button
-                      key={workspace.workspaceId}
-                      type="button"
-                      disabled={workspace.workspaceId === activeWorkspace.workspaceId}
-                      onClick={() => void handleSelectWorkspace(workspace.workspaceId)}
-                    >
-                      {workspaceMessages.activeWorkspace.switchWorkspace(
-                        workspace.label,
-                        formatWorkspaceMode(workspace),
-                      )}
-                    </button>
-                  ))}
-                  {isClientWorkspace ? (
-                    <Link
-                      className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                      data-testid="workspace-client-console-link"
-                      href="/app/marketplace/client"
-                    >
-                      {clientConsoleMessages.actions.openClientConsole}
-                    </Link>
-                  ) : null}
-                </div>
-              ) : isClientWorkspace ? (
-                <div className={styles.inlineActions}>
+              <div className={styles.roleBar}>
+                <span className={styles.roleBadge}>
+                  {workspaceMessages.activeWorkspace.modeLabel[activeLane ?? 'client']}
+                </span>
+                {activeWorkspace.roles.map((role) => (
+                  <span key={role} className={styles.roleBadgeMuted}>
+                    {formatOrganizationRole(role)}
+                  </span>
+                ))}
+              </div>
+              <article className={styles.statusBanner}>
+                <strong>
+                  {workspaceMessages.activeWorkspace.organizationLabel}:{' '}
+                  {activeWorkspace.organizationName}
+                </strong>
+                {activeWorkspaceRoles ? (
+                  <p className={styles.stateText}>
+                    {workspaceMessages.activeWorkspace.roleLabel}: {activeWorkspaceRoles}
+                  </p>
+                ) : null}
+              </article>
+              <div className={styles.inlineActions}>
+                <Link
+                  className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                  href="/marketplace"
+                >
+                  {workspaceMessages.publicMarketplace}
+                </Link>
+                <Link
+                  className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                  href="/app/new-contract"
+                >
+                  {marketplaceMessages.directContractPath}
+                </Link>
+                {isClientWorkspace ? (
                   <Link
-                    className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                    className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
                     data-testid="workspace-client-console-link"
                     href="/app/marketplace/client"
                   >
                     {clientConsoleMessages.actions.openClientConsole}
                   </Link>
+                ) : null}
+              </div>
+            </div>
+            <div className={styles.heroCard}>
+              <span className={styles.metaLabel}>
+                {workspaceMessages.pipelineTitle}
+              </span>
+              <FactGrid className={styles.summaryGrid}>
+                <FactItem
+                  label={workspaceMessages.pipelineStats.publishedBriefs}
+                  value={
+                    myOpportunities.filter((opportunity) => opportunity.status === 'published')
+                      .length
+                  }
+                />
+                <FactItem
+                  label={workspaceMessages.pipelineStats.applicationsToReview}
+                  value={reviewableApplications}
+                />
+                <FactItem
+                  label={workspaceMessages.pipelineStats.strongMatchesLoaded}
+                  value={strongMatches}
+                />
+                <FactItem
+                  label={workspaceMessages.pipelineStats.hiresToEscrow}
+                  value={hiredOpportunities.length}
+                />
+                <FactItem
+                  label={workspaceMessages.pipelineStats.activeContracts}
+                  value={activeContracts.length}
+                />
+                <FactItem
+                  label={workspaceMessages.pipelineStats.myActiveApplications}
+                  value={activeApplications.length}
+                />
+              </FactGrid>
+              {availableWorkspaces.length > 1 ? (
+                <div className={styles.stack}>
+                  <span className={styles.metaLabel}>
+                    {workspaceMessages.modeGuide.title}
+                  </span>
+                  <div className={styles.inlineActions}>
+                    {availableWorkspaces.map((workspace) => (
+                      <button
+                        key={workspace.workspaceId}
+                        type="button"
+                        disabled={workspace.workspaceId === activeWorkspace.workspaceId}
+                        onClick={() => void handleSelectWorkspace(workspace.workspaceId)}
+                      >
+                        {workspaceMessages.activeWorkspace.switchWorkspace(
+                          workspace.label,
+                          formatWorkspaceMode(workspace),
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
-          </SurfaceCard>
+          </section>
         </RevealSection>
       ) : null}
 
@@ -2626,42 +2690,6 @@ export function MarketplaceWorkspace() {
           </SectionCard>
         </RevealSection>
       ) : null}
-
-      <RevealSection className={styles.grid} delay={0.08}>
-        <SectionCard
-          className={styles.panel}
-          eyebrow={workspaceMessages.overviewEyebrow}
-          headerClassName={styles.panelHeader}
-          title={workspaceMessages.pipelineTitle}
-        >
-          <FactGrid className={styles.summaryGrid}>
-            <FactItem
-              label={workspaceMessages.pipelineStats.publishedBriefs}
-              value={myOpportunities.filter((opportunity) => opportunity.status === 'published').length}
-            />
-            <FactItem
-              label={workspaceMessages.pipelineStats.applicationsToReview}
-              value={reviewableApplications}
-            />
-            <FactItem
-              label={workspaceMessages.pipelineStats.strongMatchesLoaded}
-              value={strongMatches}
-            />
-            <FactItem
-              label={workspaceMessages.pipelineStats.hiresToEscrow}
-              value={hiredOpportunities.length}
-            />
-            <FactItem
-              label={workspaceMessages.pipelineStats.activeContracts}
-              value={activeContracts.length}
-            />
-            <FactItem
-              label={workspaceMessages.pipelineStats.myActiveApplications}
-              value={activeApplications.length}
-            />
-          </FactGrid>
-        </SectionCard>
-      </RevealSection>
 
       {!loading && tokens ? (
         <RevealSection className={styles.grid} delay={0.082}>

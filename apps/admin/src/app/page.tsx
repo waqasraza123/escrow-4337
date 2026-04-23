@@ -1,10 +1,12 @@
-import styles from "./page.styles";
-import { OperatorConsole } from "./operator-console";
+import type { Metadata } from 'next';
+import { AdminLandingPage } from './landing-page';
+
+export const metadata: Metadata = {
+  title: 'Milestone Escrow',
+  description:
+    'Escrow-first hiring on Base with milestone funding, decision-ready briefs, and operator-backed trust workflows.',
+};
 
 export default function Home() {
-  return (
-    <main className={styles.page}>
-      <OperatorConsole view="dashboard" />
-    </main>
-  );
+  return <AdminLandingPage />;
 }

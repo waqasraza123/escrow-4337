@@ -28,6 +28,7 @@ const styles = {
   lookupRow:
     'flex flex-wrap gap-3 [&_input]:min-h-12 [&_input]:flex-[1_1_420px] [&_input]:rounded-[1rem] [&_input]:border [&_input]:border-[var(--field-border)] [&_input]:bg-[var(--field-bg)] [&_input]:px-4 [&_input]:py-3.5 [&_input]:text-[var(--foreground)] [&_input]:shadow-[var(--field-shadow)] [&_input]:backdrop-blur-xl',
   inlineActions: 'flex flex-wrap items-center gap-3',
+  landingCardGrid: 'grid gap-4 md:grid-cols-3',
   fieldGrid: 'flex flex-wrap items-stretch gap-3',
   field:
     'grid flex-[1_1_220px] gap-2 [&_span:first-child]:text-[0.76rem] [&_span:first-child]:font-semibold [&_span:first-child]:uppercase [&_span:first-child]:tracking-[0.1em] [&_span:first-child]:text-[var(--foreground-muted)] [&_input]:min-h-12 [&_input]:rounded-[1rem] [&_input]:border [&_input]:border-[var(--field-border)] [&_input]:bg-[var(--field-bg)] [&_input]:px-4 [&_input]:py-3.5 [&_input]:text-[var(--foreground)] [&_input]:shadow-[var(--field-shadow)] [&_input]:backdrop-blur-xl [&_select]:min-h-12 [&_select]:rounded-[1rem] [&_select]:border [&_select]:border-[var(--field-border)] [&_select]:bg-[var(--field-bg)] [&_select]:px-4 [&_select]:py-3.5 [&_select]:text-[var(--foreground)] [&_select]:backdrop-blur-xl [&_textarea]:min-h-28 [&_textarea]:resize-y [&_textarea]:rounded-[1rem] [&_textarea]:border [&_textarea]:border-[var(--field-border)] [&_textarea]:bg-[var(--field-bg)] [&_textarea]:px-4 [&_textarea]:py-3.5 [&_textarea]:text-[var(--foreground)] [&_textarea]:shadow-[var(--field-shadow)] [&_textarea]:backdrop-blur-xl',

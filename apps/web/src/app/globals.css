@@ -19,9 +19,9 @@
 :root,
 [data-theme='light'] {
   --foreground: #15311f;
-  --foreground-soft: #4d6957;
-  --foreground-muted: #6a8774;
-  --muted-foreground: #7a917f;
+  --foreground-soft: #365341;
+  --foreground-muted: #4a6755;
+  --muted-foreground: #5c7965;
   --background: #eff8f0;
   --background-strong: #f8fcf7;
   --surface-card: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(236, 247, 238, 0.94));
@@ -94,7 +94,7 @@
   --status-danger-fg: #8f2f49;
   --status-danger-border: rgba(190, 79, 104, 0.22);
   --status-muted-bg: rgba(38, 79, 55, 0.07);
-  --status-muted-fg: #4d6957;
+  --status-muted-fg: var(--foreground-soft);
   --status-muted-border: rgba(38, 79, 55, 0.12);
   --theme-switcher-bg: rgba(255, 255, 255, 0.78);
   --theme-switcher-shadow: inset 0 0 0 1px rgba(14, 96, 51, 0.12), 0 16px 30px rgba(17, 77, 43, 0.12);

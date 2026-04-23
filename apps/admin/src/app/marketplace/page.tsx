@@ -1,10 +1,5 @@
-import styles from '../page.styles';
-import { MarketplaceModerationConsole } from './moderation-console';
+import { redirect } from 'next/navigation';
 
-export default function MarketplaceModerationPage() {
-  return (
-    <main className={styles.page}>
-      <MarketplaceModerationConsole />
-    </main>
-  );
+export default function LegacyMarketplaceRedirectPage() {
+  redirect('/operator/marketplace');
 }

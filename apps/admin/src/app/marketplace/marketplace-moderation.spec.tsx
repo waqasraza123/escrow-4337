@@ -31,7 +31,7 @@ vi.mock('../../lib/api', () => ({
   adminApi: mockedAdminApi,
 }));
 
-import MarketplaceModerationPage from './page';
+import MarketplaceModerationPage from '../operator/marketplace/page';
 
 function renderModerationPage() {
   return renderApp(
@@ -465,6 +465,10 @@ describe('marketplace moderation page', () => {
       expect(screen.getByText('operator@example.com')).toBeInTheDocument();
     });
 
+    expect(screen.getByRole('link', { name: 'Operator home' })).toHaveAttribute(
+      'href',
+      '/operator',
+    );
     expect(screen.getByText('Theme')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Light' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dark' })).toBeInTheDocument();
@@ -676,5 +680,14 @@ describe('marketplace moderation page', () => {
       mockedAdminApi.listMarketplaceModerationOpportunities,
     ).not.toHaveBeenCalled();
     expect(mockedAdminApi.listMarketplaceModerationReports).not.toHaveBeenCalled();
+  });
+
+  it('points restore-session traffic back to operator home', () => {
+    renderModerationPage();
+
+    expect(screen.getByRole('link', { name: 'Restore session' })).toHaveAttribute(
+      'href',
+      '/operator',
+    );
   });
 });

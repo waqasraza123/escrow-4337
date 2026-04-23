@@ -19,21 +19,23 @@ const styles = {
     'bg-[image:var(--theme-switcher-option-active-bg)] text-[var(--theme-switcher-option-active-fg)] shadow-[var(--theme-switcher-option-active-shadow)]',
 
   hero:
-    'grid gap-6 overflow-hidden rounded-[2rem] border border-[var(--surface-border-strong)] bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(236,247,239,0.98))] p-7 shadow-[var(--surface-shadow-strong)] lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)] max-md:rounded-[1.5rem] max-md:p-5.5 dark:bg-[linear-gradient(145deg,rgba(8,18,30,0.98),rgba(9,26,20,0.98))]',
-  heroContent: 'grid content-start gap-4.5',
+    'relative grid gap-6 overflow-hidden rounded-[2rem] border border-[rgba(24,108,62,0.28)] bg-[linear-gradient(145deg,#08161d_0%,#0b1f24_38%,#10311d_100%)] p-7 shadow-[0_36px_100px_rgba(10,32,22,0.28)] lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)] max-md:rounded-[1.5rem] max-md:p-5.5 before:absolute before:inset-y-0 before:right-[-10%] before:w-[48%] before:bg-[radial-gradient(circle,rgba(62,176,110,0.18),transparent_68%)] before:content-[\'\'] after:absolute after:left-[-8%] after:top-[-20%] after:h-56 after:w-56 after:rounded-full after:bg-[radial-gradient(circle,rgba(112,227,162,0.14),transparent_72%)] after:content-[\'\']',
+  heroContent: 'relative z-10 grid content-start gap-5 self-center',
   eyebrow:
-    'text-[0.72rem] font-bold uppercase tracking-[0.2em] text-[var(--accent-eyebrow)]',
+    'text-[0.74rem] font-bold uppercase tracking-[0.22em] text-[rgba(138,240,184,0.92)]',
+  heroTitle:
+    'max-w-[11ch] text-[clamp(2.7rem,5vw,4.9rem)] font-semibold leading-[0.94] tracking-[-0.045em] text-[rgba(247,255,250,0.98)]',
   lead:
-    'max-w-[52ch] text-[1.04rem] leading-7 text-[var(--foreground-soft)] max-md:text-[0.98rem]',
+    'max-w-[56ch] text-[1.06rem] leading-7 text-[rgba(222,236,228,0.92)] max-md:text-[1rem]',
   ctaRow: 'flex flex-wrap items-center gap-3 max-md:w-full',
   ctaLink:
     'inline-flex min-h-[52px] items-center justify-center rounded-full border px-5.5 py-3.5 text-sm font-bold tracking-[-0.01em] transition duration-200 ease-out hover:-translate-y-0.5 max-md:w-full max-md:flex-1',
   ctaPrimary:
     'border-transparent bg-[image:var(--accent-gradient)] text-[var(--accent-strong-fg)] shadow-[var(--button-primary-shadow)]',
   ctaSecondary:
-    'border-[var(--button-secondary-border)] bg-[var(--button-secondary-bg)] text-[var(--foreground)] shadow-[var(--button-secondary-shadow)] backdrop-blur-xl hover:border-[var(--button-secondary-border-strong)]',
+    'border-[rgba(255,255,255,0.16)] bg-[rgba(247,252,248,0.95)] text-[#173423] shadow-[0_18px_38px_rgba(6,18,12,0.18)] backdrop-blur-xl hover:border-[rgba(255,255,255,0.28)]',
   ctaTertiary:
-    'border-[var(--interactive-border)] bg-[var(--interactive-bg)] text-[var(--foreground-soft)] hover:border-[var(--interactive-hover-border)] hover:text-[var(--foreground)]',
+    'border-[rgba(171,220,191,0.18)] bg-[rgba(255,255,255,0.06)] text-[rgba(238,247,242,0.96)] hover:border-[rgba(171,220,191,0.34)] hover:bg-[rgba(255,255,255,0.1)] hover:text-white',
   heroBadgeRow: 'flex flex-wrap items-center gap-2.5',
   heroBadge:
     'inline-flex items-center rounded-full border border-[rgba(46,161,91,0.18)] bg-[rgba(255,255,255,0.76)] px-3.5 py-2 text-[0.74rem] font-semibold text-[var(--foreground)] shadow-[var(--interactive-shadow)] backdrop-blur-xl dark:bg-[rgba(7,15,24,0.72)]',
@@ -96,17 +98,17 @@ const styles = {
   searchHero:
     'grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]',
   searchHeroShell:
-    'grid gap-4 rounded-[1.6rem] border border-[var(--surface-border)] bg-[var(--surface-card)] p-5 shadow-[var(--surface-shadow)] backdrop-blur-xl',
+    'relative z-10 grid gap-4 rounded-[1.7rem] border border-[rgba(171,220,191,0.14)] bg-[rgba(4,18,15,0.34)] p-5 shadow-[0_24px_58px_rgba(3,14,10,0.28)] backdrop-blur-xl',
   searchHeroBadges: 'flex flex-wrap gap-2.5',
   searchHeroBadge:
-    'inline-flex items-center rounded-full border border-[rgba(46,161,91,0.18)] bg-[var(--surface-soft)] px-3 py-1.5 text-[0.72rem] font-semibold text-[var(--foreground)]',
+    'inline-flex items-center rounded-full border border-[rgba(171,220,191,0.18)] bg-[rgba(255,255,255,0.05)] px-3.5 py-1.5 text-[0.74rem] font-semibold text-[rgba(233,244,237,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
   statStrip: 'grid gap-3 md:grid-cols-3',
   statPill:
-    'rounded-[1.2rem] border border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 shadow-[var(--interactive-shadow)]',
+    'rounded-[1.25rem] border border-[rgba(219,235,225,0.82)] bg-[rgba(248,252,249,0.96)] px-4 py-3.5 shadow-[0_16px_32px_rgba(8,21,15,0.16)]',
   statPillLabel:
-    'block text-[0.68rem] font-bold uppercase tracking-[0.14em] text-[var(--foreground-muted)]',
+    'block text-[0.68rem] font-bold uppercase tracking-[0.15em] text-[#5a7a67]',
   statPillValue:
-    'mt-2 block text-[0.96rem] font-semibold leading-6 text-[var(--foreground)]',
+    'mt-2 block text-[0.98rem] font-semibold leading-6 text-[#143120]',
 
   directoryShell: 'grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]',
   directoryRail:

@@ -1,16 +1,10 @@
-import styles from '../../page.styles';
-import { OperatorConsole } from '../../operator-console';
+import { redirect } from 'next/navigation';
 
-export default async function OperatorCasePage({
+export default async function LegacyOperatorCaseRedirectPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <main className={styles.page}>
-      <OperatorConsole view="case" initialJobId={id} />
-    </main>
-  );
+  redirect(`/operator/cases/${encodeURIComponent(id)}`);
 }

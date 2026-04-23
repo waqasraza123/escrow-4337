@@ -502,7 +502,7 @@ export function MarketplaceModerationConsole() {
         actions={
             <>
               <Button asChild variant="secondary">
-                <Link href="/">Operator home</Link>
+                <Link href="/operator">Operator home</Link>
               </Button>
               <ThemeToggle />
               {tokens ? (
@@ -511,7 +511,7 @@ export function MarketplaceModerationConsole() {
               </Button>
             ) : (
               <Button asChild>
-                <Link href="/">Restore session</Link>
+                <Link href="/operator">Restore session</Link>
               </Button>
             )}
           </>

@@ -127,7 +127,7 @@ function buildOperatorStep(
         actionLabel: context.currentJobId ? 'Open current case route' : undefined,
         onAction: context.currentJobId
           ? () => {
-              router.push(`/cases/${context.currentJobId}`);
+              router.push(`/operator/cases/${context.currentJobId}`);
             }
           : undefined,
         stopHint: 'You can restart it anytime from Walkthrough or Help.',

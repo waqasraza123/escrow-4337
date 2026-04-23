@@ -94,6 +94,11 @@ describe('operator walkthrough', () => {
     const user = userEvent.setup();
     renderApp(<OperatorCaseFlowHelpPage />);
 
+    expect(screen.getByRole('link', { name: 'Go to dashboard' })).toHaveAttribute(
+      'href',
+      '/operator',
+    );
+
     await user.click(screen.getByRole('button', { name: 'Start operator walkthrough' }));
 
     expect(window.localStorage.getItem(operatorWalkthroughStorageKey)).toContain(

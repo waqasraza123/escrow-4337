@@ -189,28 +189,28 @@ const webMessages = {
       navWorkspace: 'Marketplace workspace',
       openWorkspace: 'Open workspace',
       directContractPath: 'Direct contract path',
-      heroEyebrow: 'Escrow-first marketplace',
-      heroTitle: 'Find talent, shortlist fast, and close through escrow.',
+      heroEyebrow: 'Escrow-backed hiring on Base',
+      heroTitle: 'Hire faster with public discovery and one clear escrow path.',
       heroLead:
-        'Browse visible talent and public briefs, then move the winner into one milestone contract.',
+        'Review visible talent signals, compare real client briefs, and move the best match into a milestone contract with funding, approval, and dispute steps already defined.',
       heroBadges: [
-        'Verified talent signals',
-        'Public briefs + private hiring lanes',
-        'Escrow-backed close',
+        'Readable proof before outreach',
+        'Private shortlist after public discovery',
+        'One milestone path from hire to release',
       ],
       loadFailure: 'Unable to load the marketplace feed right now.',
       stats: {
         visibleTalentTitle: (count: number) =>
           `${count} visible talent profile${count === 1 ? '' : 's'}`,
         visibleTalentBody:
-          'Profiles shown only after completion and visibility review.',
+          'Profiles surface only after proof, completion, and visibility review.',
         openBriefsTitle: (count: number) =>
           `${count} open brief${count === 1 ? '' : 's'}`,
         openBriefsBody:
-          'Public briefs stay browseable while private lanes stay controlled.',
-        escrowCloseTitle: 'One winner closes into escrow',
+          'Teams can publish publicly first, then continue hiring inside a private workspace.',
+        escrowCloseTitle: 'Shortlist publicly, contract privately',
         escrowCloseBody:
-          'The marketplace sources the hire, not a separate settlement path.',
+          'The selected hire moves into the same milestone escrow flow used for funding and release.',
       },
       results: {
         kickerTalent: 'Talent profile',
@@ -1829,27 +1829,27 @@ const webMessages = {
       navWorkspace: 'مساحة عمل السوق',
       openWorkspace: 'افتح مساحة العمل',
       directContractPath: 'المسار المباشر للعقد',
-      heroEyebrow: 'سوق يبدأ بالضمان',
-      heroTitle: 'اعثر على المواهب، كوّن قائمة قصيرة بسرعة، ثم أغلق عبر الضمان.',
+      heroEyebrow: 'توظيف مدعوم بالضمان على Base',
+      heroTitle: 'وظّف بسرعة أكبر عبر اكتشاف عام ومسار ضمان واضح واحد.',
       heroLead:
-        'تصفح المواهب الظاهرة والعروض العامة، ثم انقل الاختيار الفائز إلى عقد مراحل واحد.',
+        'راجع إشارات المواهب الظاهرة وقارن العروض الحقيقية، ثم انقل أفضل اختيار إلى عقد مراحل واحد تكون فيه خطوات التمويل والمراجعة والنزاع واضحة من البداية.',
       heroBadges: [
-        'إشارات موهبة موثقة',
-        'عروض عامة مع مسارات توظيف خاصة',
-        'إغلاق مدعوم بالضمان',
+        'إثبات واضح قبل بدء التواصل',
+        'قائمة قصيرة خاصة بعد الاكتشاف العام',
+        'مسار مراحل واحد من التوظيف حتى الإفراج',
       ],
       loadFailure: 'تعذر تحميل تغذية السوق حالياً.',
       stats: {
         visibleTalentTitle: (count: number) =>
           `${count} ملف موهبة ظاهر`,
         visibleTalentBody:
-          'لا تظهر الملفات إلا بعد اكتمالها ومراجعة الظهور.',
+          'لا تظهر الملفات إلا بعد اكتمال الإثباتات والملف ومراجعة الظهور.',
         openBriefsTitle: (count: number) => `${count} عرض موجز مفتوح`,
         openBriefsBody:
-          'تظل العروض العامة قابلة للتصفح بينما تبقى المسارات الخاصة مضبوطة.',
-        escrowCloseTitle: 'كل فائز يغلق داخل الضمان',
+          'يمكن للفرق النشر علناً أولاً ثم متابعة التوظيف داخل مساحة عمل خاصة.',
+        escrowCloseTitle: 'قائمة علنية وعقد خاص',
         escrowCloseBody:
-          'السوق هنا لاكتشاف المرشح وليس مسار تسوية منفصل.',
+          'ينتقل الاختيار النهائي إلى مسار ضمان المراحل نفسه المستخدم للتمويل والإفراج.',
       },
       results: {
         kickerTalent: 'ملف موهبة',

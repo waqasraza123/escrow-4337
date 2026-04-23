@@ -913,7 +913,7 @@ describe('marketplace workspace', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'إنشاء مواصفات التوظيف' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'السوق العام' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'السوق العام' })[0]).toHaveAttribute(
       'href',
       '/marketplace',
     );

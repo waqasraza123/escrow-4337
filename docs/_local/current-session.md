@@ -3,6 +3,54 @@
 ## Date
 - 2026-04-21
 
+## Update (2026-04-22, Admin Public Landing and Operator Route Split)
+- Reworked `apps/admin` around a public root plus dedicated operator routes:
+  - `/` is now a client-facing landing page with product-value, workflow, trust, and CTA sections
+  - `/operator` now owns the existing operator dashboard
+  - `/operator/cases/[id]` now owns operator case review
+  - `/operator/marketplace` now owns marketplace moderation
+  - legacy `/cases/[id]` and `/marketplace` now redirect into the operator route family
+- Updated operator-facing navigation and framing without changing capability logic:
+  - operator hero copy now summarizes queue/readiness posture instead of leading with API/runtime diagnostics
+  - walkthrough, help/manual, moderation, and dispute-queue links now point to `/operator` and `/operator/cases/<job-id>`
+  - added `NEXT_PUBLIC_WEB_BASE_URL` so landing CTAs can target a separately deployed `apps/web` origin while still falling back to same-origin routes locally
+- Changed files:
+  `apps/admin/.env.example`
+  `apps/admin/README.md`
+  `apps/admin/src/app/{page.tsx,landing-page.tsx,layout.tsx,page.styles.ts,operator-console.tsx,operator-walkthrough.tsx,landing-page.spec.tsx,route-redirects.spec.ts}`
+  `apps/admin/src/app/{cases/[id]/page.tsx,marketplace/page.tsx,help/layout.tsx,help/operator-case-flow/page.tsx}`
+  `apps/admin/src/app/operator/{page.tsx,marketplace/page.tsx}`
+  `apps/admin/src/app/operator/cases/[id]/{page.tsx,page.spec.tsx}`
+  `apps/admin/src/app/{page.spec.tsx,operator-walkthrough.spec.tsx}`
+  `apps/admin/src/app/marketplace/{moderation-console.tsx,marketplace-moderation.spec.tsx}`
+  `apps/admin/src/lib/{i18n.tsx,public-app-url.ts}`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter admin test`
+  - passed: `pnpm --filter admin typecheck`
+  - passed: `git diff --check`
+
+## Update (2026-04-22, Freelancer Light-Theme Contrast Fix)
+- Tightened the light-theme secondary and muted text tokens on `apps/web` so freelancer-facing workspace copy reads more clearly against pale panel and status backgrounds.
+- Changed files:
+  `apps/web/src/app/globals.css`
+- Verification:
+  - passed: `pnpm --filter web typecheck`
+  - passed: `git diff --check`
+
+## Update (2026-04-22, Marketplace Hero Readability Pass)
+- Improved the public marketplace hero for clearer text hierarchy and better contrast:
+  - rewrote the hero eyebrow/title/lead and stat copy in English and Arabic
+  - switched the hero surface to a higher-contrast dark presentation with explicit hero text colors
+  - strengthened CTA, badge, and stat-pill contrast so the section is readable in both themes
+- Changed files:
+  `apps/web/src/app/{marketing.styles.ts}`
+  `apps/web/src/app/marketplace/{marketplace-browser.tsx,marketplace-page.spec.tsx}`
+  `apps/web/src/lib/i18n.tsx`
+- Verification:
+  - passed: `pnpm --filter web test src/app/marketplace/marketplace-page.spec.tsx`
+  - passed: `pnpm --filter web typecheck`
+
 ## Update (2026-04-22, Admin Theme Alignment)
 - Re-themed `apps/admin` to match the web app visual system:
   - added admin light/dark theme state with cookie-backed persistence via `escrow4334-admin-theme`
