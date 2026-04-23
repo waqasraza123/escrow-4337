@@ -3,6 +3,20 @@
 ## Date
 - 2026-04-21
 
+## Update (2026-04-23, Tailored Product Favicon)
+- Replaced the stock Next favicons in both frontend apps with a repo-specific SVG mark:
+  - dark escrow vault/shield silhouette
+  - stepped milestone bars inside the shield to reflect milestone-funded settlement
+  - cyan/green glow aligned with the current product theme tokens
+- Changed files:
+  `apps/web/src/app/{icon.svg}`
+  `apps/admin/src/app/{icon.svg}`
+  removed: `apps/web/src/app/favicon.ico`
+  removed: `apps/admin/src/app/favicon.ico`
+- Verification:
+  - passed: `pnpm --filter admin build`
+  - passed: `pnpm --filter web build`
+
 ## Update (2026-04-22, Admin Public Landing and Operator Route Split)
 - Reworked `apps/admin` around a public root plus dedicated operator routes:
   - `/` is now a client-facing landing page with product-value, workflow, trust, and CTA sections

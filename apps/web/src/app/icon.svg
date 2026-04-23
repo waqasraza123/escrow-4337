@@ -1,0 +1,36 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071526"/>
+      <stop offset="1" stop-color="#0E7B52"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="20" y1="18" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8DEFFF"/>
+      <stop offset="1" stop-color="#9FF6DC"/>
+    </linearGradient>
+    <linearGradient id="steps" x1="23" y1="23" x2="41" y2="43" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6ECFF"/>
+      <stop offset="1" stop-color="#9FF6DC"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)"/>
+  <circle cx="49" cy="15" r="6" fill="#84E9C5" fill-opacity="0.24"/>
+  <circle cx="16" cy="50" r="7" fill="#8DEFFF" fill-opacity="0.12"/>
+  <path
+    d="M32 13L45 19.5V30.5C45 41 38.1667 47.1667 32 51C25.8333 47.1667 19 41 19 30.5V19.5L32 13Z"
+    fill="#071526"
+    fill-opacity="0.18"
+    stroke="url(#glow)"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M24 28C24.9 23.8 27.9333 21.7 32 21.7C36.0667 21.7 39.1 23.8 40 28"
+    stroke="url(#glow)"
+    stroke-width="3"
+    stroke-linecap="round"
+  />
+  <rect x="22.5" y="31" width="6" height="10" rx="1.5" fill="url(#steps)"/>
+  <rect x="29" y="27" width="6" height="14" rx="1.5" fill="url(#steps)"/>
+  <rect x="35.5" y="23" width="6" height="18" rx="1.5" fill="url(#steps)"/>
+</svg>
