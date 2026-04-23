@@ -28,6 +28,9 @@ export const metadata: Metadata = {
   title: "Milestone Escrow Admin",
   description:
     "Client-facing entry and operator tooling for milestone escrow hiring workflows.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default async function RootLayout({

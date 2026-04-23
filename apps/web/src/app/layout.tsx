@@ -35,6 +35,9 @@ export const metadata: Metadata = {
   title: "Milestone Escrow",
   description:
     "Milestone escrow for crypto-native agency and client service work on Base.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default async function RootLayout({

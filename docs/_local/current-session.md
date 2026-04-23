@@ -8,9 +8,10 @@
   - dark escrow vault/shield silhouette
   - stepped milestone bars inside the shield to reflect milestone-funded settlement
   - cyan/green glow aligned with the current product theme tokens
+  - wired the icon through layout metadata and `public/favicon.svg` after the App Router `icon.svg` route caused a production-build prerender failure
 - Changed files:
-  `apps/web/src/app/{icon.svg}`
-  `apps/admin/src/app/{icon.svg}`
+  `apps/web/{public/favicon.svg,src/app/layout.tsx}`
+  `apps/admin/{public/favicon.svg,src/app/layout.tsx}`
   removed: `apps/web/src/app/favicon.ico`
   removed: `apps/admin/src/app/favicon.ico`
 - Verification:
