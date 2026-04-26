@@ -1,7 +1,43 @@
 # Current Session
 
 ## Date
-- 2026-04-21
+- 2026-04-26
+
+## Update (2026-04-26, Mobile Phase 1 Scaffold)
+- Added first mobile foundation slice:
+  - new `packages/product-core` workspace with platform-neutral API client/types, i18n, formatting, marketplace lane helpers, and product design tokens
+  - new `apps/mobile` Expo Router app pinned to Expo SDK 55 / React Native 0.83 / React 19.2
+  - mobile providers for TanStack Query, token-backed API access, SecureStore session restore, AsyncStorage locale/theme preferences, and token-driven theme mapping
+  - native UI primitives plus onboarding, OTP sign-in, setup readiness, marketplace browse/detail, contracts, and account/settings starter routes
+- Native SIWE/WalletConnect/Reown wallet adapter, full contract creation, delivery/dispute forms, and workspace summary parity remain future phases.
+- Changed files:
+  `apps/mobile/**`
+  `packages/product-core/**`
+  `pnpm-lock.yaml`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter @escrow4334/product-core typecheck`
+  - passed: `pnpm --filter mobile typecheck`
+  - passed: `pnpm --filter mobile exec expo config --type public`
+  - passed: `git diff --check`
+- Notes:
+  - `pnpm install` completed with existing peer/bin-link warnings, including `ts-node` bin warnings under `services/api` and React peer warnings unrelated to this mobile scaffold.
+  - Expo Metro boot smoke was attempted: default `8081` was occupied, and a retry on `8082` printed the project startup line but did not reach a ready prompt before it was stopped.
+  - Pre-existing dirty web edits were left untouched.
+
+## Update (2026-04-23, Public Hero Contrast Fix)
+- Fixed low-contrast text in the dark public hero surfaces in `apps/web`:
+  - applied the dedicated landing hero title class on `/`
+  - added shared high-contrast hero heading/summary tone helpers in marketing styles
+  - updated marketplace profile/opportunity detail heroes to use explicit light eyebrow, title, and summary styling instead of default `SectionHeading` colors
+- Changed files:
+  `apps/web/src/app/{marketing.styles.ts,page.tsx}`
+  `apps/web/src/app/marketplace/profiles/[slug]/profile-detail.tsx`
+  `apps/web/src/app/marketplace/opportunities/[id]/opportunity-detail.tsx`
+- Verification:
+  - passed: `pnpm --filter web test -- src/app/marketing-page.spec.tsx 'src/app/marketplace/profiles/[slug]/profile-detail.spec.tsx' 'src/app/marketplace/opportunities/[id]/opportunity-detail.spec.tsx'`
+  - passed: `pnpm --filter web typecheck`
+  - passed: `git diff --check`
 
 ## Update (2026-04-23, Tailored Product Favicon)
 - Replaced the stock Next favicons in both frontend apps with a repo-specific SVG mark:
