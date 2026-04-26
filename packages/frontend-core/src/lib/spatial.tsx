@@ -364,14 +364,16 @@ export function SpotlightButton(props: SpotlightButtonProps) {
   );
 }
 
-export function StickyActionRail(props: HTMLAttributes<HTMLDivElement>) {
-  const { children, className, ...rest } = props;
+type StickyActionRailProps = {
+  children?: ReactNode;
+  className?: string;
+};
+
+export function StickyActionRail(props: StickyActionRailProps) {
+  const { children, className } = props;
 
   return (
-    <div
-      className={cn('grid content-start gap-3 lg:sticky lg:top-24', className)}
-      {...rest}
-    >
+    <div className={cn('grid content-start gap-3 lg:sticky lg:top-24', className)}>
       {children}
     </div>
   );

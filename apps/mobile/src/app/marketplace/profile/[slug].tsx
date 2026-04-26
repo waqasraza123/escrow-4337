@@ -6,7 +6,9 @@ import {
   ChipWrap,
   EmptyState,
   Heading,
+  MetricRow,
   ScrollScreen,
+  SectionHeader,
   SkeletonCard,
   StatusBadge,
   SurfaceCard,
@@ -25,16 +27,37 @@ export default function ProfileDetailRoute() {
       {profile.isLoading ? <SkeletonCard /> : null}
       {profile.data ? (
         <>
-          <Heading tone="eyebrow">Talent profile</Heading>
-          <Heading>{profile.data.profile.displayName}</Heading>
-          <BodyText>{profile.data.profile.headline}</BodyText>
+          <SectionHeader
+            eyebrow="Talent profile"
+            title={profile.data.profile.displayName}
+            body={profile.data.profile.headline}
+          />
           <ChipWrap values={profile.data.profile.skills} />
-          <SurfaceCard>
-            <StatusBadge label={profile.data.profile.verificationLevel} tone="success" />
+
+          <SurfaceCard animated variant="elevated">
+            <StatusBadge
+              label={profile.data.profile.verificationLevel.replaceAll('_', ' ')}
+              tone="success"
+            />
             <BodyText>{profile.data.profile.bio}</BodyText>
-            <BodyText>
-              Completed escrows: {profile.data.profile.completedEscrowCount}
-            </BodyText>
+            <MetricRow
+              label="Completed escrows"
+              value={profile.data.profile.completedEscrowCount}
+            />
+            <MetricRow
+              label="Crypto readiness"
+              value={profile.data.profile.cryptoReadiness.replaceAll('_', ' ')}
+            />
+            <MetricRow label="Availability" value={profile.data.profile.availability} />
+          </SurfaceCard>
+
+          <SurfaceCard animated delay={80}>
+            <Heading size="section">Proof posture</Heading>
+            <MetricRow
+              label="Portfolio"
+              value={`${profile.data.profile.portfolioUrls.length} links`}
+            />
+            <MetricRow label="Proof artifacts" value={profile.data.profile.proofArtifacts.length} />
           </SurfaceCard>
         </>
       ) : profile.isError ? (

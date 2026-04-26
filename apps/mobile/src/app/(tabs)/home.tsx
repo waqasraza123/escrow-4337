@@ -7,7 +7,9 @@ import {
   BodyText,
   EmptyState,
   Heading,
+  MetricRow,
   ScrollScreen,
+  SectionHeader,
   SkeletonCard,
   StatusBadge,
   SurfaceCard,
@@ -22,25 +24,28 @@ export default function HomeRoute() {
 
   return (
     <ScrollScreen>
-      <Heading tone="eyebrow">Workspace</Heading>
-      <Heading>{user?.activeWorkspace?.label || 'Milestone Escrow'}</Heading>
-      <BodyText>
-        Mobile starts from the escrow tasks that matter most: setup, browse,
-        contracts, delivery, and disputes.
-      </BodyText>
+      <SectionHeader
+        eyebrow="Workspace"
+        title={user?.activeWorkspace?.label || 'Milestone Escrow'}
+        body="Mobile starts from the escrow tasks that matter most: setup, browse, contracts, delivery, and disputes."
+      />
 
       {runtime.isLoading ? (
         <SkeletonCard />
       ) : runtime.data ? (
-        <SurfaceCard>
+        <SurfaceCard animated variant="elevated">
           <View style={styles.row}>
-            <Heading style={styles.cardHeading}>Runtime</Heading>
+            <Heading size="section" style={styles.cardHeading}>
+              Runtime
+            </Heading>
             <StatusBadge
               label={runtime.data.profile}
               tone={runtime.data.profile === 'deployment-like' ? 'success' : 'warning'}
             />
           </View>
           <BodyText>{runtime.data.summary}</BodyText>
+          <MetricRow label="Email" value={runtime.data.providers.emailMode} />
+          <MetricRow label="Escrow" value={runtime.data.providers.escrowMode} />
         </SurfaceCard>
       ) : null}
 

@@ -127,13 +127,17 @@ export function MarketplaceOpportunityDetail({ id }: OpportunityDetailProps) {
             <RevealSection className={styles.hero}>
               <div className={`${styles.heroContent} fx-fade-up`}>
                 <SectionHeading
-                  eyebrow={marketplaceMessages.opportunityDetail.briefEyebrow(
-                    marketplaceMessages.labels.visibility[opportunity.visibility],
-                  )}
+                  eyebrow={
+                    <span className={styles.eyebrow}>
+                      {marketplaceMessages.opportunityDetail.briefEyebrow(
+                        marketplaceMessages.labels.visibility[opportunity.visibility],
+                      )}
+                    </span>
+                  }
                   title={opportunity.title}
-                  titleClassName="max-w-[11ch] text-[clamp(2.9rem,6vw,5.6rem)] leading-[0.92]"
+                  titleClassName={`${styles.heroHeadingTitleTone} max-w-[11ch] text-[clamp(2.9rem,6vw,5.6rem)] leading-[0.92]`}
                   description={opportunity.summary}
-                  descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
+                  descriptionClassName={styles.heroHeadingDescription}
                 />
                 <p className={styles.lead}>{opportunity.description}</p>
                 <div className={styles.ctaRow}>

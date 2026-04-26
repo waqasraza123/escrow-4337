@@ -44,7 +44,7 @@ export default function Home() {
             <Eyebrow className={styles.eyebrow}>
               {messages.marketing.heroEyebrow}
             </Eyebrow>
-            <h1>{messages.marketing.heroTitle}</h1>
+            <h1 className={styles.heroTitle}>{messages.marketing.heroTitle}</h1>
             <p className={styles.lead}>{messages.marketing.heroLead}</p>
             <div className={styles.ctaRow}>
               <Button

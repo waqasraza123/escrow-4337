@@ -1,15 +1,17 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
 import { supportedLocales } from '@escrow4334/product-core';
+import { WalletListCard, WalletSetupCard } from '@/features/wallet/MobileWalletSetupCard';
 import { useLocale } from '@/providers/locale';
 import { useSession } from '@/providers/session';
 import { useMobileTheme, type ThemePreference } from '@/providers/theme';
 import {
-  BodyText,
+  BottomActionBar,
   Heading,
+  MetricRow,
   PrimaryButton,
   ScrollScreen,
-  SecondaryButton,
+  SectionHeader,
+  SegmentedControl,
   StatusBadge,
   SurfaceCard,
 } from '@/ui/primitives';
@@ -22,77 +24,76 @@ export default function AccountRoute() {
   const theme = useMobileTheme();
 
   return (
-    <ScrollScreen>
-      <Heading tone="eyebrow">Settings</Heading>
-      <Heading>Account</Heading>
-      <BodyText>
-        Locale, theme, session, workspace, Shariah mode, and wallet summary
-        live here for the mobile app.
-      </BodyText>
+    <ScrollScreen
+      footer={
+        <BottomActionBar>
+          {user ? (
+            <PrimaryButton onPress={signOut}>Sign out</PrimaryButton>
+          ) : (
+            <PrimaryButton onPress={() => router.push('/sign-in')}>Sign in</PrimaryButton>
+          )}
+        </BottomActionBar>
+      }
+    >
+      <SectionHeader
+        eyebrow="Settings"
+        title="Account"
+        body="Locale, theme, session, workspace, Shariah mode, and wallet summary live here for mobile."
+      />
 
-      <SurfaceCard>
-        <Heading style={styles.cardHeading}>
+      <SurfaceCard animated variant="elevated">
+        <Heading size="section" style={styles.cardHeading}>
           {user?.email || 'Signed out'}
         </Heading>
         <StatusBadge
           label={user ? 'Authenticated' : 'Signed out'}
           tone={user ? 'success' : 'warning'}
         />
-        <BodyText>
-          Active workspace: {user?.activeWorkspace?.label || 'None selected'}
-        </BodyText>
-        <BodyText>
-          Wallets linked: {user?.wallets.length ?? 0}
-        </BodyText>
-      </SurfaceCard>
-
-      <SurfaceCard>
-        <Heading style={styles.cardHeading}>Language</Heading>
-        <View style={styles.optionRow}>
-          {supportedLocales.map((supportedLocale) => (
-            <SecondaryButton
-              key={supportedLocale}
-              onPress={() => locale.setLocale(supportedLocale)}
-            >
-              {supportedLocale.toUpperCase()}
-            </SecondaryButton>
-          ))}
-        </View>
-      </SurfaceCard>
-
-      <SurfaceCard>
-        <Heading style={styles.cardHeading}>Theme</Heading>
-        <View style={styles.optionRow}>
-          {themePreferences.map((preference) => (
-            <SecondaryButton
-              key={preference}
-              onPress={() => theme.setPreference(preference)}
-            >
-              {preference}
-            </SecondaryButton>
-          ))}
-        </View>
+        <MetricRow label="Workspace" value={user?.activeWorkspace?.label || 'None selected'} />
+        <MetricRow label="Wallets" value={user?.wallets.length ?? 0} />
+        <MetricRow label="Shariah mode" value={user?.shariahMode ? 'Enabled' : 'Disabled'} />
       </SurfaceCard>
 
       {user ? (
-        <PrimaryButton onPress={signOut}>Sign out</PrimaryButton>
-      ) : (
-        <PrimaryButton onPress={() => router.push('/sign-in')}>
-          Sign in
-        </PrimaryButton>
-      )}
+        <>
+          <WalletSetupCard user={user} />
+          <WalletListCard user={user} />
+        </>
+      ) : null}
+
+      <SurfaceCard animated delay={80}>
+        <Heading size="section" style={styles.cardHeading}>
+          Language
+        </Heading>
+        <SegmentedControl
+          value={locale.locale}
+          onChange={(nextLocale) => locale.setLocale(nextLocale)}
+          options={supportedLocales.map((supportedLocale) => ({
+            label: supportedLocale.toUpperCase(),
+            value: supportedLocale,
+          }))}
+        />
+      </SurfaceCard>
+
+      <SurfaceCard animated delay={140}>
+        <Heading size="section" style={styles.cardHeading}>
+          Theme
+        </Heading>
+        <SegmentedControl
+          value={theme.preference}
+          onChange={(preference) => theme.setPreference(preference)}
+          options={themePreferences.map((preference) => ({
+            label: preference,
+            value: preference,
+          }))}
+        />
+      </SurfaceCard>
     </ScrollScreen>
   );
 }
-
-const styles = StyleSheet.create({
+const styles = {
   cardHeading: {
     fontSize: 20,
     lineHeight: 26,
   },
-  optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-});
+} as const;

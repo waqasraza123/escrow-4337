@@ -69,6 +69,7 @@
   },
   "pnpm": {
     "overrides": {
+      "csstype": "3.2.3",
       "eslint": "8.57.0",
       "eslint-plugin-react-hooks": "4.6.0"
     }

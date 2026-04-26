@@ -122,11 +122,15 @@ export function MarketplaceProfileDetail({ slug }: ProfileDetailProps) {
             <RevealSection className={styles.hero}>
               <div className={`${styles.heroContent} fx-fade-up`}>
                 <SectionHeading
-                  eyebrow={marketplaceMessages.profileDetail.heroEyebrow}
+                  eyebrow={
+                    <span className={styles.eyebrow}>
+                      {marketplaceMessages.profileDetail.heroEyebrow}
+                    </span>
+                  }
                   title={profile.displayName}
-                  titleClassName="max-w-[10ch] text-[clamp(2.9rem,6vw,5.6rem)] leading-[0.92]"
+                  titleClassName={`${styles.heroHeadingTitleTone} max-w-[10ch] text-[clamp(2.9rem,6vw,5.6rem)] leading-[0.92]`}
                   description={profile.headline}
-                  descriptionClassName="text-[1.04rem] leading-7 text-[var(--foreground-soft)]"
+                  descriptionClassName={styles.heroHeadingDescription}
                 />
                 <p className={styles.lead}>{profile.bio}</p>
                 <div className={styles.ctaRow}>

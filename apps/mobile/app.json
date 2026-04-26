@@ -9,7 +9,18 @@
     "newArchEnabled": true,
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "metamask",
+          "trust",
+          "rainbow",
+          "uniswap",
+          "safe",
+          "zerion",
+          "coinbase-wallet"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +37,11 @@
       "autolinkingModuleResolution": true
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:4100"
+      "apiBaseUrl": "http://localhost:4100",
+      "reownProjectId": "",
+      "walletConnectMetadataUrl": "https://escrow4337.local",
+      "walletConnectIconUrl": "https://escrow4337.local/icon.png",
+      "walletChainId": 84532
     }
   }
 }

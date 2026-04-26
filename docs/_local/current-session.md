@@ -3,6 +3,73 @@
 ## Date
 - 2026-04-26
 
+## Update (2026-04-26, Mobile Wallet Commit/Push)
+- Prepared the native mobile wallet/setup work for branch publication.
+- Pre-push build initially exposed a shared frontend React/CSS type drift after adding the mobile React Native stack.
+- Added a root `csstype` pnpm override and tightened shared frontend primitive typing so `admin` production build passes before push.
+- Verification:
+  - passed: `pnpm --filter admin build`
+
+## Update (2026-04-26, Native Mobile Wallet Setup)
+- Added native mobile wallet setup to `apps/mobile`:
+  - installed Reown/AppKit React Native, EVM adapter, WalletConnect RN compat, random values, SVG, NetInfo, and Expo Application dependencies
+  - added Expo/Babel configuration for WalletConnect deep-linking and import-meta support
+  - added a mobile wallet provider that uses Reown/AppKit for EVM wallet connection, signs the backend-issued SIWE challenge with `personal_sign`, verifies through the existing wallet API, refreshes authenticated user state, and supports smart-account provisioning plus default-wallet updates
+  - made setup readiness actionable through `WalletSetupCard`
+  - added linked-wallet inspection/default actions to Account
+  - added `apps/mobile/.env.example` with API, Reown project id, chain id, and WalletConnect metadata knobs
+- Changed files:
+  `apps/mobile/{package.json,pnpm-lock dependencies via root lock,app.json,babel.config.js,.env.example}`
+  `apps/mobile/src/providers/{root.tsx,wallet.tsx,wallet-config.ts}`
+  `apps/mobile/src/features/{setup/SetupReadinessCard.tsx,wallet/MobileWalletSetupCard.tsx}`
+  `apps/mobile/src/app/(tabs)/account.tsx`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter mobile typecheck`
+  - passed: `pnpm --filter @escrow4334/product-core typecheck`
+  - passed: `pnpm --filter mobile exec expo config --type public`
+  - passed: `pnpm --filter mobile exec expo export --platform web --output-dir dist-web-smoke`
+- Notes:
+  - real wallet connection requires `EXPO_PUBLIC_REOWN_PROJECT_ID`
+  - no device-level wallet round trip was run in this shell
+
+## Update (2026-04-26, Mobile Polish Refinement)
+- Continued the mobile UI polish pass in `apps/mobile`:
+  - fixed `AnimatedReveal` so progressive content can animate out before unmounting
+  - tightened adaptive metrics for tiny phones, sticky footer scroll clearance, segmented controls, badges, metric rows, and full-width bottom actions
+  - refined tab bar safe-area sizing with a subtle active indicator
+  - improved marketplace/contracts loading density, contracts error handling, sign-in keyboard metadata, and the opportunity detail CTA so signed-in users do not hit a no-op
+- Changed files:
+  `apps/mobile/src/ui/{motion.tsx,primitives.tsx}`
+  `apps/mobile/src/app/{(auth)/sign-in.tsx,(tabs)/_layout.tsx,(tabs)/contracts.tsx,(tabs)/marketplace.tsx,marketplace/opportunity/[id].tsx}`
+  `docs/_local/current-session.md`
+- Verification:
+  - passed: `pnpm --filter mobile typecheck`
+  - passed: `pnpm --filter @escrow4334/product-core typecheck`
+  - passed: `pnpm --filter mobile exec expo config --type public`
+  - passed: `pnpm --filter mobile exec expo export --platform web --output-dir dist-web-smoke`
+  - passed: `git diff --check`
+
+## Update (2026-04-26, Mobile UI Polish and Motion)
+- Upgraded `apps/mobile` polish without adding animation dependencies:
+  - added a restrained reusable motion layer with built-in React Native `Animated`
+  - motion now supports entrance/reveal, press scale, skeleton pulse, and reduced-motion accessibility
+  - refined shared primitives for adaptive spacing, large-phone content rails, compact small-phone density, focused fields, segmented controls, premium list cards, metric rows, and sticky bottom actions
+  - improved Expo Router stack transitions, detail-route back headers, tab bar spacing/elevation, and keyboard/tab behavior
+  - refreshed onboarding, OTP sign-in, home, marketplace, profile/opportunity details, contracts, setup readiness, and account/settings to use the new hierarchy and interaction patterns
+- Changed files:
+  `apps/mobile/src/**`
+  `docs/{project-state.md,_local/current-session.md}`
+- Verification:
+  - passed: `pnpm --filter mobile typecheck`
+  - passed: `pnpm --filter @escrow4334/product-core typecheck`
+  - passed: `pnpm --filter mobile exec expo config --type public`
+  - passed: `pnpm --filter mobile exec expo export --platform web --output-dir dist-web-smoke`
+  - passed: `git diff --check`
+- Notes:
+  - no new animation library was introduced
+  - pre-existing dirty web edits were left untouched
+
 ## Update (2026-04-26, Mobile Phase 1 Scaffold)
 - Added first mobile foundation slice:
   - new `packages/product-core` workspace with platform-neutral API client/types, i18n, formatting, marketplace lane helpers, and product design tokens

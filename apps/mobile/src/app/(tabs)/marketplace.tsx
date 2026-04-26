@@ -1,19 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 import { api } from '@/providers/api';
 import {
-  BodyText,
-  ChipWrap,
   EmptyState,
   Field,
-  Heading,
-  PrimaryButton,
+  ListCard,
   ScrollScreen,
-  SecondaryButton,
+  SectionHeader,
+  SegmentedControl,
   SkeletonCard,
-  SurfaceCard,
 } from '@/ui/primitives';
 
 type MarketplaceTab = 'talent' | 'opportunities';
@@ -36,24 +32,24 @@ export default function MarketplaceRoute() {
   });
 
   const loading =
-    (tab === 'talent' && talent.isLoading) ||
-    (tab === 'opportunities' && opportunities.isLoading);
+    (tab === 'talent' && talent.isLoading) || (tab === 'opportunities' && opportunities.isLoading);
 
   return (
     <ScrollScreen>
-      <Heading tone="eyebrow">Discovery</Heading>
-      <Heading>Marketplace</Heading>
-      <BodyText>
-        Native browse starts with public profiles and opportunities, then
-        authenticated apply and workspace actions can build on this route.
-      </BodyText>
+      <SectionHeader
+        eyebrow="Discovery"
+        title="Marketplace"
+        body="Browse public profiles and scoped opportunities, then move into authenticated apply and workspace actions."
+      />
 
-      <View style={styles.tabs}>
-        <SecondaryButton onPress={() => setTab('talent')}>Talent</SecondaryButton>
-        <SecondaryButton onPress={() => setTab('opportunities')}>
-          Opportunities
-        </SecondaryButton>
-      </View>
+      <SegmentedControl
+        value={tab}
+        onChange={setTab}
+        options={[
+          { label: 'Talent', value: 'talent' },
+          { label: 'Opportunities', value: 'opportunities' },
+        ]}
+      />
 
       <Field
         autoCapitalize="none"
@@ -63,64 +59,65 @@ export default function MarketplaceRoute() {
         value={query}
       />
 
-      {loading ? <SkeletonCard /> : null}
+      {loading ? (
+        <>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </>
+      ) : null}
 
       {tab === 'talent'
-        ? talent.data?.profiles.map((profile) => (
-            <SurfaceCard key={profile.slug}>
-              <Heading style={styles.cardHeading}>{profile.displayName}</Heading>
-              <BodyText>{profile.headline}</BodyText>
-              <ChipWrap values={profile.skills.slice(0, 4)} />
-              <PrimaryButton
-                onPress={() =>
-                  router.push({
-                    pathname: '/marketplace/profile/[slug]',
-                    params: { slug: profile.slug },
-                  })
-                }
-              >
-                View profile
-              </PrimaryButton>
-            </SurfaceCard>
+        ? talent.data?.profiles.map((profile, index) => (
+            <ListCard
+              key={profile.slug}
+              title={profile.displayName}
+              body={profile.headline}
+              eyebrow={profile.verificationLevel.replaceAll('_', ' ')}
+              chips={profile.skills}
+              meta={profile.availability}
+              actionLabel="View profile"
+              delay={index * 45}
+              onPress={() =>
+                router.push({
+                  pathname: '/marketplace/profile/[slug]',
+                  params: { slug: profile.slug },
+                })
+              }
+            />
           ))
-        : opportunities.data?.opportunities.map((opportunity) => (
-            <SurfaceCard key={opportunity.id}>
-              <Heading style={styles.cardHeading}>{opportunity.title}</Heading>
-              <BodyText>{opportunity.summary}</BodyText>
-              <ChipWrap values={opportunity.requiredSkills.slice(0, 4)} />
-              <PrimaryButton
-                onPress={() =>
-                  router.push({
-                    pathname: '/marketplace/opportunity/[id]',
-                    params: { id: opportunity.id },
-                  })
-                }
-              >
-                View opportunity
-              </PrimaryButton>
-            </SurfaceCard>
+        : opportunities.data?.opportunities.map((opportunity, index) => (
+            <ListCard
+              key={opportunity.id}
+              title={opportunity.title}
+              body={opportunity.summary}
+              eyebrow={opportunity.category}
+              chips={opportunity.requiredSkills}
+              meta={opportunity.status}
+              actionLabel="View opportunity"
+              delay={index * 45}
+              onPress={() =>
+                router.push({
+                  pathname: '/marketplace/opportunity/[id]',
+                  params: { id: opportunity.id },
+                })
+              }
+            />
           ))}
+
+      {(tab === 'talent' && talent.isError) ||
+      (tab === 'opportunities' && opportunities.isError) ? (
+        <EmptyState
+          title="Marketplace unavailable"
+          body="The marketplace API could not be reached. Check the backend target and try again."
+        />
+      ) : null}
 
       {!loading &&
       ((tab === 'talent' && talent.data?.profiles.length === 0) ||
-        (tab === 'opportunities' &&
-          opportunities.data?.opportunities.length === 0)) ? (
-        <EmptyState
-          title="No matches"
-          body="Try a broader skill, category, or timezone search."
-        />
+        (tab === 'opportunities' && opportunities.data?.opportunities.length === 0)) ? (
+        <EmptyState title="No matches" body="Try a broader skill, category, or timezone search." />
       ) : null}
     </ScrollScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  tabs: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  cardHeading: {
-    fontSize: 20,
-    lineHeight: 26,
-  },
-});

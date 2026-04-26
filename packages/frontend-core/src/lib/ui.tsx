@@ -168,9 +168,12 @@ export function Button(
     },
 ) {
   const { asChild = false, className, variant, ...rest } = props;
-  const Comp = asChild ? Slot : 'button';
 
-  return <Comp className={cn(buttonVariants({ variant }), className)} {...rest} />;
+  if (asChild) {
+    return <Slot className={cn(buttonVariants({ variant }), className)} {...rest} />;
+  }
+
+  return <button className={cn(buttonVariants({ variant }), className)} {...rest} />;
 }
 
 export function Badge(

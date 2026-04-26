@@ -25,6 +25,10 @@ const styles = {
     'text-[0.74rem] font-bold uppercase tracking-[0.22em] text-[rgba(138,240,184,0.92)]',
   heroTitle:
     'max-w-[11ch] text-[clamp(2.7rem,5vw,4.9rem)] font-semibold leading-[0.94] tracking-[-0.045em] text-[rgba(247,255,250,0.98)]',
+  heroHeadingTitleTone:
+    'font-semibold tracking-[-0.045em] text-[rgba(247,255,250,0.98)]',
+  heroHeadingDescription:
+    'text-[1.04rem] leading-7 text-[rgba(222,236,228,0.92)] max-md:text-[1rem]',
   lead:
     'max-w-[56ch] text-[1.06rem] leading-7 text-[rgba(222,236,228,0.92)] max-md:text-[1rem]',
   ctaRow: 'flex flex-wrap items-center gap-3 max-md:w-full',

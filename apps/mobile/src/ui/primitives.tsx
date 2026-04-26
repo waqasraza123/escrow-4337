@@ -1,23 +1,50 @@
 import {
   ActivityIndicator,
+  Animated,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type PressableProps,
+  type StyleProp,
   type TextInputProps,
   type TextProps,
   type ViewStyle,
 } from 'react-native';
+import * as React from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  formatTimestamp,
-  previewHash,
-  type ProductStatusTone,
-} from '@escrow4334/product-core';
+import { formatTimestamp, previewHash, type ProductStatusTone } from '@escrow4334/product-core';
 import { useMobileTheme } from '@/providers/theme';
+import { AnimatedEntrance, PressableScale, usePulseAnimation } from './motion';
+
+export { AnimatedEntrance, AnimatedReveal } from './motion';
+
+export function useAdaptiveMetrics() {
+  const { width } = useWindowDimensions();
+  const tiny = width < 360;
+  const compact = width < 390;
+  const expanded = width >= 700;
+
+  return {
+    tiny,
+    compact,
+    expanded,
+    horizontal: tiny ? 12 : compact ? 14 : 18,
+    screenGap: tiny ? 10 : compact ? 12 : 16,
+    cardPadding: tiny ? 13 : compact ? 14 : 18,
+    contentMaxWidth: expanded ? 660 : undefined,
+    headingSize: tiny ? 24 : compact ? 26 : 30,
+    displaySize: tiny ? 30 : compact ? 32 : 38,
+    titleSize: tiny ? 19 : compact ? 20 : 22,
+    bodySize: compact ? 14 : 15,
+    buttonHeight: compact ? 48 : 52,
+    footerClearance: compact ? 112 : 124,
+  };
+}
 
 export function Screen({
   children,
@@ -29,21 +56,13 @@ export function Screen({
   style?: ViewStyle;
 }) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[
-        styles.safeArea,
-        { backgroundColor: theme.colors.background },
-        style,
-      ]}
+      style={[styles.safeArea, { backgroundColor: theme.colors.background }, style]}
     >
-      <View
-        style={[
-          styles.screen,
-          padded && { paddingHorizontal: theme.spacing.lg },
-        ]}
-      >
+      <View style={[styles.screen, padded && { paddingHorizontal: metrics.horizontal }]}>
         {children}
       </View>
     </SafeAreaView>
@@ -53,28 +72,49 @@ export function Screen({
 export function ScrollScreen({
   children,
   footer,
+  contentContainerStyle,
 }: {
   children: React.ReactNode;
   footer?: React.ReactNode;
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }) {
   const theme = useMobileTheme();
   const insets = useSafeAreaInsets();
+  const metrics = useAdaptiveMetrics();
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
       style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
     >
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={Keyboard.dismiss}
+        contentInsetAdjustmentBehavior="automatic"
+        scrollIndicatorInsets={{ bottom: footer ? metrics.footerClearance : insets.bottom }}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingHorizontal: theme.spacing.lg,
-            paddingBottom: footer ? theme.spacing.xl : insets.bottom + 32,
+            gap: metrics.screenGap,
+            paddingHorizontal: metrics.horizontal,
+            paddingBottom: footer ? insets.bottom + metrics.footerClearance : insets.bottom + 34,
+            paddingTop: metrics.tiny ? 10 : metrics.compact ? 12 : 18,
           },
+          contentContainerStyle,
         ]}
       >
-        {children}
+        <View
+          style={[
+            styles.contentRail,
+            {
+              gap: metrics.screenGap,
+              maxWidth: metrics.contentMaxWidth,
+            },
+          ]}
+        >
+          {children}
+        </View>
       </ScrollView>
       {footer}
     </SafeAreaView>
@@ -83,13 +123,16 @@ export function ScrollScreen({
 
 export function Heading({
   children,
+  size = 'display',
   tone = 'default',
   style,
   ...props
 }: TextProps & {
+  size?: 'display' | 'title' | 'section';
   tone?: 'default' | 'muted' | 'eyebrow';
 }) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   const color =
     tone === 'eyebrow'
       ? theme.colors.primary
@@ -97,11 +140,29 @@ export function Heading({
         ? theme.colors.foregroundSoft
         : theme.colors.foreground;
 
+  const headingStyle =
+    size === 'title'
+      ? {
+          fontSize: metrics.titleSize,
+          lineHeight: metrics.titleSize + 6,
+        }
+      : size === 'section'
+        ? {
+            fontSize: metrics.compact ? 18 : 20,
+            lineHeight: metrics.compact ? 24 : 26,
+          }
+        : {
+            fontSize: metrics.headingSize,
+            lineHeight: metrics.headingSize + 6,
+          };
+
   return (
     <Text
       {...props}
+      maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? 1.25}
       style={[
         tone === 'eyebrow' ? styles.eyebrow : styles.heading,
+        tone !== 'eyebrow' && headingStyle,
         { color },
         style,
       ]}
@@ -113,10 +174,20 @@ export function Heading({
 
 export function BodyText({ children, style, ...props }: TextProps) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   return (
     <Text
       {...props}
-      style={[styles.bodyText, { color: theme.colors.foregroundSoft }, style]}
+      maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? 1.35}
+      style={[
+        styles.bodyText,
+        {
+          color: theme.colors.foregroundSoft,
+          fontSize: metrics.bodySize,
+          lineHeight: metrics.bodySize + 7,
+        },
+        style,
+      ]}
     >
       {children}
     </Text>
@@ -125,21 +196,31 @@ export function BodyText({ children, style, ...props }: TextProps) {
 
 export function SurfaceCard({
   children,
+  animated,
+  delay,
+  variant = 'default',
   style,
 }: {
   children: React.ReactNode;
+  animated?: boolean;
+  delay?: number;
+  variant?: 'default' | 'soft' | 'elevated';
   style?: ViewStyle;
 }) {
   const theme = useMobileTheme();
-  return (
+  const metrics = useAdaptiveMetrics();
+  const card = (
     <View
       style={[
         styles.card,
         {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: variant === 'soft' ? theme.colors.surfaceStrong : theme.colors.surface,
           borderColor: theme.colors.border,
-          borderRadius: theme.radii.lg,
+          borderRadius: metrics.compact ? 18 : theme.radii.lg,
+          padding: metrics.cardPadding,
           shadowColor: theme.colors.shadow,
+          shadowOpacity: variant === 'elevated' ? 0.16 : 0.1,
+          elevation: variant === 'elevated' ? 3 : 1,
         },
         style,
       ]}
@@ -147,6 +228,8 @@ export function SurfaceCard({
       {children}
     </View>
   );
+
+  return animated ? <AnimatedEntrance delay={delay}>{card}</AnimatedEntrance> : card;
 }
 
 export function PrimaryButton({
@@ -160,34 +243,37 @@ export function PrimaryButton({
   loading?: boolean;
 }) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       disabled={disabled || loading}
       {...props}
-      style={(state) => [
+      style={({ pressed }) => [
         styles.button,
         {
           backgroundColor: theme.colors.primary,
           borderRadius: theme.radii.pill,
-          opacity: disabled ? 0.5 : state.pressed ? 0.86 : 1,
+          minHeight: metrics.buttonHeight,
+          opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
+          shadowColor: theme.colors.shadow,
         },
-        typeof style === 'function' ? style(state) : style,
+        typeof style === 'function' ? style({ pressed, hovered: false }) : style,
       ]}
+      pressedScale={0.982}
     >
       {loading ? (
         <ActivityIndicator color={theme.colors.primaryForeground} />
       ) : (
         <Text
-          style={[
-            styles.buttonText,
-            { color: theme.colors.primaryForeground },
-          ]}
+          maxFontSizeMultiplier={1.15}
+          numberOfLines={2}
+          style={[styles.buttonText, { color: theme.colors.primaryForeground }]}
         >
           {children}
         </Text>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -200,27 +286,34 @@ export function SecondaryButton({
   children: React.ReactNode;
 }) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       disabled={disabled}
       {...props}
-      style={(state) => [
+      style={({ pressed }) => [
         styles.button,
         {
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.borderStrong,
           borderWidth: StyleSheet.hairlineWidth,
           borderRadius: theme.radii.pill,
-          opacity: disabled ? 0.5 : state.pressed ? 0.82 : 1,
+          minHeight: metrics.buttonHeight,
+          opacity: disabled ? 0.5 : pressed ? 0.88 : 1,
         },
-        typeof style === 'function' ? style(state) : style,
+        typeof style === 'function' ? style({ pressed, hovered: false }) : style,
       ]}
+      pressedScale={0.986}
     >
-      <Text style={[styles.buttonText, { color: theme.colors.foreground }]}>
+      <Text
+        maxFontSizeMultiplier={1.15}
+        numberOfLines={2}
+        style={[styles.buttonText, { color: theme.colors.foreground }]}
+      >
         {children}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -231,21 +324,38 @@ export function Field({
   label: string;
 }) {
   const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
+  const [focused, setFocused] = React.useState(false);
   return (
     <View style={styles.fieldWrap}>
-      <Text style={[styles.fieldLabel, { color: theme.colors.foregroundMuted }]}>
+      <Text
+        maxFontSizeMultiplier={1.2}
+        style={[styles.fieldLabel, { color: theme.colors.foregroundMuted }]}
+      >
         {label}
       </Text>
       <TextInput
         {...props}
+        onBlur={(event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        }}
+        onFocus={(event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        }}
         placeholderTextColor={theme.colors.foregroundMuted}
+        selectionColor={theme.colors.primary}
         style={[
           styles.field,
           {
             backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
+            borderColor: focused ? theme.colors.primary : theme.colors.border,
             color: theme.colors.foreground,
             borderRadius: theme.radii.md,
+            minHeight: metrics.buttonHeight,
+            shadowColor: focused ? theme.colors.primary : 'transparent',
+            shadowOpacity: focused ? 0.12 : 0,
           },
           props.style,
         ]}
@@ -256,12 +366,7 @@ export function Field({
 
 export function Textarea(props: TextInputProps & { label: string }) {
   return (
-    <Field
-      {...props}
-      multiline
-      textAlignVertical="top"
-      style={[styles.textarea, props.style]}
-    />
+    <Field {...props} multiline textAlignVertical="top" style={[styles.textarea, props.style]} />
   );
 }
 
@@ -285,7 +390,11 @@ export function StatusBadge({
         },
       ]}
     >
-      <Text style={[styles.badgeText, { color: status.foreground }]}>
+      <Text
+        maxFontSizeMultiplier={1.15}
+        numberOfLines={2}
+        style={[styles.badgeText, { color: status.foreground }]}
+      >
         {label}
       </Text>
     </View>
@@ -309,38 +418,44 @@ export function ChipWrap({ values }: { values: string[] }) {
 export function EmptyState({
   title,
   body,
+  action,
 }: {
   title: string;
   body: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <SurfaceCard>
-      <Heading style={styles.cardHeading}>{title}</Heading>
+    <SurfaceCard variant="soft">
+      <Heading size="section" style={styles.cardHeading}>
+        {title}
+      </Heading>
       <BodyText>{body}</BodyText>
+      {action}
     </SurfaceCard>
   );
 }
 
 export function SkeletonCard() {
   const theme = useMobileTheme();
+  const opacity = usePulseAnimation();
   return (
     <SurfaceCard>
-      <View
+      <Animated.View
         style={[
           styles.skeletonLine,
-          { backgroundColor: theme.colors.surfaceSoft, width: '52%' },
+          { backgroundColor: theme.colors.surfaceSoft, opacity, width: '52%' },
         ]}
       />
-      <View
+      <Animated.View
         style={[
           styles.skeletonLine,
-          { backgroundColor: theme.colors.surfaceSoft, width: '86%' },
+          { backgroundColor: theme.colors.surfaceSoft, opacity, width: '86%' },
         ]}
       />
-      <View
+      <Animated.View
         style={[
           styles.skeletonLine,
-          { backgroundColor: theme.colors.surfaceSoft, width: '68%' },
+          { backgroundColor: theme.colors.surfaceSoft, opacity, width: '68%' },
         ]}
       />
     </SurfaceCard>
@@ -350,27 +465,36 @@ export function SkeletonCard() {
 export function BottomActionBar({ children }: { children: React.ReactNode }) {
   const theme = useMobileTheme();
   const insets = useSafeAreaInsets();
+  const metrics = useAdaptiveMetrics();
   return (
     <View
       style={[
         styles.bottomActionBar,
         {
+          paddingHorizontal: metrics.horizontal,
           paddingBottom: Math.max(insets.bottom, theme.spacing.md),
           backgroundColor: theme.colors.background,
           borderTopColor: theme.colors.border,
+          shadowColor: theme.colors.shadow,
         },
       ]}
     >
-      {children}
+      <View
+        style={[
+          styles.bottomActionRail,
+          {
+            gap: metrics.compact ? 8 : 10,
+            maxWidth: metrics.contentMaxWidth,
+          },
+        ]}
+      >
+        {children}
+      </View>
     </View>
   );
 }
 
-export function ReadinessChecklist({
-  items,
-}: {
-  items: Array<{ label: string; ready: boolean }>;
-}) {
+export function ReadinessChecklist({ items }: { items: Array<{ label: string; ready: boolean }> }) {
   return (
     <View style={styles.stackSmall}>
       {items.map((item) => (
@@ -425,6 +549,163 @@ export function MilestoneTimeline({
   );
 }
 
+export function SectionHeader({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow?: string;
+  title: string;
+  body?: string;
+}) {
+  return (
+    <AnimatedEntrance>
+      <View style={styles.sectionHeader}>
+        {eyebrow ? <Heading tone="eyebrow">{eyebrow}</Heading> : null}
+        <Heading>{title}</Heading>
+        {body ? <BodyText>{body}</BodyText> : null}
+      </View>
+    </AnimatedEntrance>
+  );
+}
+
+export function SegmentedControl<TValue extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: TValue;
+  options: Array<{ label: string; value: TValue }>;
+  onChange: (value: TValue) => void;
+}) {
+  const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
+  return (
+    <View
+      style={[
+        styles.segmented,
+        {
+          backgroundColor: theme.colors.surfaceSoft,
+          borderColor: theme.colors.border,
+          borderRadius: metrics.compact && options.length > 2 ? theme.radii.md : theme.radii.pill,
+        },
+      ]}
+    >
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <PressableScale
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(option.value)}
+            pressedScale={0.985}
+            style={[
+              styles.segmentedOption,
+              {
+                backgroundColor: active ? theme.colors.surface : 'transparent',
+                borderColor: active ? theme.colors.borderStrong : 'transparent',
+                borderRadius: metrics.compact && options.length > 2 ? theme.radii.sm : theme.radii.pill,
+                shadowColor: active ? theme.colors.shadow : 'transparent',
+                minHeight: metrics.compact ? 40 : 42,
+                paddingHorizontal: metrics.compact ? 8 : 12,
+              },
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.segmentedText,
+                {
+                  color: active ? theme.colors.foreground : theme.colors.foregroundMuted,
+                  fontSize: metrics.compact ? 12 : 13,
+                },
+              ]}
+            >
+              {option.label}
+            </Text>
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+export function ListCard({
+  title,
+  body,
+  eyebrow,
+  chips,
+  meta,
+  actionLabel,
+  onPress,
+  delay,
+}: {
+  title: string;
+  body: string;
+  eyebrow?: string;
+  chips?: string[];
+  meta?: string;
+  actionLabel?: string;
+  onPress?: () => void;
+  delay?: number;
+}) {
+  const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
+  const content = (
+    <SurfaceCard variant="elevated">
+      <View style={styles.listCardHeader}>
+        <View style={styles.listCardCopy}>
+          {eyebrow ? (
+            <Text style={[styles.listEyebrow, { color: theme.colors.primary }]}>{eyebrow}</Text>
+          ) : null}
+          <Heading size="section">{title}</Heading>
+        </View>
+        {meta && !metrics.tiny ? <StatusBadge label={meta} tone="muted" /> : null}
+      </View>
+      <BodyText numberOfLines={3}>{body}</BodyText>
+      {chips?.length ? <ChipWrap values={chips.slice(0, 5)} /> : null}
+      {meta && metrics.tiny ? <StatusBadge label={meta} tone="muted" /> : null}
+      {actionLabel ? (
+        <Text style={[styles.inlineAction, { color: theme.colors.primary }]}>{actionLabel}</Text>
+      ) : null}
+    </SurfaceCard>
+  );
+
+  return (
+    <AnimatedEntrance delay={delay}>
+      {onPress ? (
+        <PressableScale
+          accessibilityRole="button"
+          onPress={onPress}
+          pressedScale={0.992}
+          style={styles.fullWidth}
+        >
+          {content}
+        </PressableScale>
+      ) : (
+        content
+      )}
+    </AnimatedEntrance>
+  );
+}
+
+export function MetricRow({ label, value }: { label: string; value: string | number }) {
+  const theme = useMobileTheme();
+  return (
+    <View style={styles.metricRow}>
+      <Text style={[styles.metricLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
+      <Text
+        maxFontSizeMultiplier={1.2}
+        numberOfLines={3}
+        style={[styles.metricValue, { color: theme.colors.foreground }]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 export function HashText({ value }: { value?: string | null }) {
   const theme = useMobileTheme();
   return (
@@ -442,13 +723,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    gap: 16,
     paddingTop: 18,
+    alignItems: 'center',
+  },
+  contentRail: {
+    width: '100%',
+  },
+  fullWidth: {
+    width: '100%',
   },
   heading: {
     fontSize: 30,
     fontWeight: '700',
     lineHeight: 36,
+    letterSpacing: 0,
   },
   eyebrow: {
     fontSize: 12,
@@ -463,11 +751,9 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
-    padding: 18,
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.12,
     shadowRadius: 28,
-    elevation: 2,
+    width: '100%',
   },
   cardHeading: {
     fontSize: 20,
@@ -476,13 +762,17 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
     paddingHorizontal: 18,
     paddingVertical: 14,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    width: '100%',
   },
   buttonText: {
     fontSize: 15,
     fontWeight: '800',
+    textAlign: 'center',
   },
   fieldWrap: {
     gap: 8,
@@ -499,6 +789,8 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
   },
   textarea: {
     minHeight: 120,
@@ -506,12 +798,15 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     borderWidth: StyleSheet.hairlineWidth,
+    flexShrink: 1,
+    maxWidth: '100%',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '800',
+    textAlign: 'center',
   },
   chipWrap: {
     flexDirection: 'row',
@@ -524,9 +819,16 @@ const styles = StyleSheet.create({
   },
   bottomActionBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  bottomActionRail: {
+    width: '100%',
   },
   stackSmall: {
     gap: 10,
@@ -561,5 +863,72 @@ const styles = StyleSheet.create({
   hashText: {
     fontFamily: 'Courier',
     fontSize: 12,
+  },
+  sectionHeader: {
+    gap: 9,
+    width: '100%',
+  },
+  segmented: {
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    width: '100%',
+  },
+  segmentedOption: {
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+  },
+  segmentedText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  listCardHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  listCardCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  listEyebrow: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  inlineAction: {
+    fontSize: 14,
+    fontWeight: '900',
+    paddingTop: 2,
+  },
+  metricRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  metricLabel: {
+    flex: 0.9,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    flex: 1.1,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'right',
   },
 });
