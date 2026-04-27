@@ -1,5 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import {
   BodyText,
@@ -14,6 +16,8 @@ import {
   SurfaceCard,
 } from '@/ui/primitives';
 
+type MarketplaceProfileResponse = Awaited<ReturnType<typeof api.getMarketplaceProfile>>;
+
 export default function ProfileDetailRoute() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const profile = useQuery({
@@ -21,43 +25,54 @@ export default function ProfileDetailRoute() {
     queryKey: ['marketplace', 'profile', slug],
     queryFn: () => api.getMarketplaceProfile(slug),
   });
+  const profileSnapshot = useOfflineSnapshot<MarketplaceProfileResponse>({
+    cacheKey: slug ? createOfflineSnapshotCacheKey('marketplace-profile', 'public', slug) : null,
+    data: profile.data,
+    enabled: Boolean(slug),
+  });
+  const useProfileSnapshot =
+    !profile.data && Boolean(profileSnapshot.data) && (profile.isLoading || profile.isError);
+  const profileData = profile.data ?? (useProfileSnapshot ? profileSnapshot.data : null);
 
   return (
     <ScrollScreen>
-      {profile.isLoading ? <SkeletonCard /> : null}
-      {profile.data ? (
+      {profile.isLoading && !profileData ? <SkeletonCard /> : null}
+      {useProfileSnapshot ? (
+        <OfflineSnapshotNotice cachedAt={profileSnapshot.cachedAt} subject="talent profile" />
+      ) : null}
+      {profileData ? (
         <>
           <SectionHeader
             eyebrow="Talent profile"
-            title={profile.data.profile.displayName}
-            body={profile.data.profile.headline}
+            title={profileData.profile.displayName}
+            body={profileData.profile.headline}
           />
-          <ChipWrap values={profile.data.profile.skills} />
+          <ChipWrap values={profileData.profile.skills} />
 
           <SurfaceCard animated variant="elevated">
             <StatusBadge
-              label={profile.data.profile.verificationLevel.replaceAll('_', ' ')}
+              label={profileData.profile.verificationLevel.replaceAll('_', ' ')}
               tone="success"
             />
-            <BodyText>{profile.data.profile.bio}</BodyText>
+            <BodyText>{profileData.profile.bio}</BodyText>
             <MetricRow
               label="Completed escrows"
-              value={profile.data.profile.completedEscrowCount}
+              value={profileData.profile.completedEscrowCount}
             />
             <MetricRow
               label="Crypto readiness"
-              value={profile.data.profile.cryptoReadiness.replaceAll('_', ' ')}
+              value={profileData.profile.cryptoReadiness.replaceAll('_', ' ')}
             />
-            <MetricRow label="Availability" value={profile.data.profile.availability} />
+            <MetricRow label="Availability" value={profileData.profile.availability} />
           </SurfaceCard>
 
           <SurfaceCard animated delay={80}>
             <Heading size="section">Proof posture</Heading>
             <MetricRow
               label="Portfolio"
-              value={`${profile.data.profile.portfolioUrls.length} links`}
+              value={`${profileData.profile.portfolioUrls.length} links`}
             />
-            <MetricRow label="Proof artifacts" value={profile.data.profile.proofArtifacts.length} />
+            <MetricRow label="Proof artifacts" value={profileData.profile.proofArtifacts.length} />
           </SurfaceCard>
         </>
       ) : profile.isError ? (

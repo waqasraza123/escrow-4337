@@ -9,6 +9,8 @@ import {
   getMarketplaceLaneLabel,
   resolveMarketplaceLane,
 } from '@escrow4334/product-core';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
@@ -30,6 +32,26 @@ import {
 } from '@/ui/primitives';
 
 type MarketplaceTab = 'talent' | 'opportunities';
+type MarketplaceTalentResponse = Awaited<ReturnType<typeof api.listMarketplaceProfiles>>;
+type MarketplaceOpportunitiesResponse = Awaited<
+  ReturnType<typeof api.listMarketplaceOpportunities>
+>;
+type MarketplaceAnalyticsResponse = Awaited<
+  ReturnType<typeof api.getMarketplaceAnalyticsOverview>
+>;
+type MarketplaceApplicationsResponse = Awaited<
+  ReturnType<typeof api.listMyMarketplaceApplications>
+>;
+type MarketplaceClientOpportunitiesResponse = Awaited<
+  ReturnType<typeof api.listMyMarketplaceOpportunities>
+>;
+type MarketplaceNotificationsResponse = Awaited<
+  ReturnType<typeof api.listMarketplaceNotifications>
+>;
+
+function createMarketplaceSearchSnapshotId(search: { q: string; limit: number }) {
+  return `q=${encodeURIComponent(search.q.trim().toLowerCase())}&limit=${search.limit}`;
+}
 
 export default function MarketplaceRoute() {
   const { accessToken, user, setUser } = useSession();
@@ -39,6 +61,9 @@ export default function MarketplaceRoute() {
   const [query, setQuery] = useState('');
   const search = useMemo(() => ({ q: query.trim(), limit: 12 }), [query]);
   const workspace = user?.activeWorkspace ?? null;
+  const snapshotOwnerId = user?.id ?? 'public';
+  const searchSnapshotId = useMemo(() => createMarketplaceSearchSnapshotId(search), [search]);
+  const workspaceSnapshotId = workspace?.workspaceId ?? 'no-workspace';
 
   const talent = useQuery({
     enabled: tab === 'talent',
@@ -75,6 +100,113 @@ export default function MarketplaceRoute() {
     queryKey: ['marketplace', 'notifications', workspace?.workspaceId],
     queryFn: () => api.listMarketplaceNotifications(accessToken as string),
   });
+  const talentSnapshot = useOfflineSnapshot<MarketplaceTalentResponse>({
+    cacheKey: createOfflineSnapshotCacheKey(
+      'marketplace-talent',
+      snapshotOwnerId,
+      searchSnapshotId,
+    ),
+    data: talent.data,
+    enabled: tab === 'talent',
+  });
+  const opportunitiesSnapshot = useOfflineSnapshot<MarketplaceOpportunitiesResponse>({
+    cacheKey: createOfflineSnapshotCacheKey(
+      'marketplace-opportunities',
+      snapshotOwnerId,
+      searchSnapshotId,
+    ),
+    data: opportunities.data,
+    enabled: tab === 'opportunities',
+  });
+  const analyticsSnapshot = useOfflineSnapshot<MarketplaceAnalyticsResponse>({
+    cacheKey: user
+      ? createOfflineSnapshotCacheKey(
+          'marketplace-analytics',
+          user.id,
+          workspaceSnapshotId,
+        )
+      : null,
+    data: analytics.data,
+    enabled: Boolean(user),
+  });
+  const applicationsSnapshot = useOfflineSnapshot<MarketplaceApplicationsResponse>({
+    cacheKey: user
+      ? createOfflineSnapshotCacheKey(
+          'marketplace-applications',
+          user.id,
+          workspaceSnapshotId,
+        )
+      : null,
+    data: myApplications.data,
+    enabled: Boolean(user && workspace?.capabilities.applyToOpportunity),
+  });
+  const clientOpportunitiesSnapshot =
+    useOfflineSnapshot<MarketplaceClientOpportunitiesResponse>({
+      cacheKey: user
+        ? createOfflineSnapshotCacheKey(
+            'marketplace-client-opportunities',
+            user.id,
+            workspaceSnapshotId,
+          )
+        : null,
+      data: myOpportunities.data,
+      enabled: Boolean(user && workspace?.capabilities.createOpportunity),
+    });
+  const notificationsSnapshot = useOfflineSnapshot<MarketplaceNotificationsResponse>({
+    cacheKey: user
+      ? createOfflineSnapshotCacheKey(
+          'marketplace-notifications',
+          user.id,
+          workspaceSnapshotId,
+        )
+      : null,
+    data: notifications.data,
+    enabled: Boolean(user),
+  });
+
+  const useTalentSnapshot =
+    !talent.data &&
+    Boolean(talentSnapshot.data) &&
+    (networkGate.actionBlocked || talent.isError || talent.isLoading);
+  const useOpportunitiesSnapshot =
+    !opportunities.data &&
+    Boolean(opportunitiesSnapshot.data) &&
+    (networkGate.actionBlocked || opportunities.isError || opportunities.isLoading);
+  const useAnalyticsSnapshot =
+    !analytics.data &&
+    Boolean(analyticsSnapshot.data) &&
+    (networkGate.actionBlocked || analytics.isError || analytics.isLoading);
+  const useApplicationsSnapshot =
+    !myApplications.data &&
+    Boolean(applicationsSnapshot.data) &&
+    (networkGate.actionBlocked || myApplications.isError || myApplications.isLoading);
+  const useClientOpportunitiesSnapshot =
+    !myOpportunities.data &&
+    Boolean(clientOpportunitiesSnapshot.data) &&
+    (networkGate.actionBlocked || myOpportunities.isError || myOpportunities.isLoading);
+  const useNotificationsSnapshot =
+    !notifications.data &&
+    Boolean(notificationsSnapshot.data) &&
+    (networkGate.actionBlocked || notifications.isError || notifications.isLoading);
+  const talentData = talent.data ?? (useTalentSnapshot ? talentSnapshot.data : null);
+  const opportunitiesData =
+    opportunities.data ?? (useOpportunitiesSnapshot ? opportunitiesSnapshot.data : null);
+  const analyticsData = analytics.data ?? (useAnalyticsSnapshot ? analyticsSnapshot.data : null);
+  const applicationsData =
+    myApplications.data ?? (useApplicationsSnapshot ? applicationsSnapshot.data : null);
+  const clientOpportunitiesData =
+    myOpportunities.data ??
+    (useClientOpportunitiesSnapshot ? clientOpportunitiesSnapshot.data : null);
+  const notificationsData =
+    notifications.data ?? (useNotificationsSnapshot ? notificationsSnapshot.data : null);
+  const workspaceSnapshotCachedAt = [
+    useAnalyticsSnapshot ? analyticsSnapshot.cachedAt : null,
+    useApplicationsSnapshot ? applicationsSnapshot.cachedAt : null,
+    useClientOpportunitiesSnapshot ? clientOpportunitiesSnapshot.cachedAt : null,
+    useNotificationsSnapshot ? notificationsSnapshot.cachedAt : null,
+  ]
+    .filter((cachedAt): cachedAt is number => typeof cachedAt === 'number')
+    .sort((left, right) => right - left)[0] ?? null;
 
   const selectWorkspace = useMutation({
     mutationFn: async (workspaceId: string) => {
@@ -105,7 +237,8 @@ export default function MarketplaceRoute() {
   });
 
   const loading =
-    (tab === 'talent' && talent.isLoading) || (tab === 'opportunities' && opportunities.isLoading);
+    (tab === 'talent' && talent.isLoading && !talentData) ||
+    (tab === 'opportunities' && opportunities.isLoading && !opportunitiesData);
 
   return (
     <ScrollScreen>
@@ -116,12 +249,12 @@ export default function MarketplaceRoute() {
       />
 
       <MarketplaceWorkspacePanel
-        analytics={analytics.data?.overview}
-        applications={myApplications.data?.applications ?? []}
-        applicationsLoading={myApplications.isLoading}
-        notifications={notifications.data?.notifications ?? []}
-        opportunities={myOpportunities.data?.opportunities ?? []}
-        opportunitiesLoading={myOpportunities.isLoading}
+        analytics={analyticsData?.overview}
+        applications={applicationsData?.applications ?? []}
+        applicationsLoading={myApplications.isLoading && !applicationsData}
+        notifications={notificationsData?.notifications ?? []}
+        opportunities={clientOpportunitiesData?.opportunities ?? []}
+        opportunitiesLoading={myOpportunities.isLoading && !clientOpportunitiesData}
         onSelectWorkspace={(workspaceId) => {
           try {
             networkGate.requireOnline('Switching workspaces');
@@ -136,6 +269,12 @@ export default function MarketplaceRoute() {
         selectWorkspacePending={selectWorkspace.isPending}
         user={user}
       />
+      {workspaceSnapshotCachedAt ? (
+        <OfflineSnapshotNotice
+          cachedAt={workspaceSnapshotCachedAt}
+          subject="marketplace workspace summary"
+        />
+      ) : null}
 
       <SegmentedControl
         value={tab}
@@ -161,9 +300,18 @@ export default function MarketplaceRoute() {
           <SkeletonCard />
         </>
       ) : null}
+      {useTalentSnapshot ? (
+        <OfflineSnapshotNotice cachedAt={talentSnapshot.cachedAt} subject="talent results" />
+      ) : null}
+      {useOpportunitiesSnapshot ? (
+        <OfflineSnapshotNotice
+          cachedAt={opportunitiesSnapshot.cachedAt}
+          subject="opportunity results"
+        />
+      ) : null}
 
       {tab === 'talent'
-        ? talent.data?.profiles.map((profile, index) => (
+        ? talentData?.profiles.map((profile, index) => (
             <ListCard
               key={profile.slug}
               title={profile.displayName}
@@ -181,7 +329,7 @@ export default function MarketplaceRoute() {
               }
             />
           ))
-        : opportunities.data?.opportunities.map((opportunity, index) => (
+        : opportunitiesData?.opportunities.map((opportunity, index) => (
             <ListCard
               key={opportunity.id}
               title={opportunity.title}
@@ -206,15 +354,18 @@ export default function MarketplaceRoute() {
 
       {(tab === 'talent' && talent.isError) ||
       (tab === 'opportunities' && opportunities.isError) ? (
-        <EmptyState
-          title="Marketplace unavailable"
-          body="The marketplace API could not be reached. Check the backend target and try again."
-        />
+        (tab === 'talent' && !talentData) ||
+        (tab === 'opportunities' && !opportunitiesData) ? (
+          <EmptyState
+            title="Marketplace unavailable"
+            body="The marketplace API could not be reached. Check the backend target and try again."
+          />
+        ) : null
       ) : null}
 
       {!loading &&
-      ((tab === 'talent' && talent.data?.profiles.length === 0) ||
-        (tab === 'opportunities' && opportunities.data?.opportunities.length === 0)) ? (
+      ((tab === 'talent' && talentData?.profiles.length === 0) ||
+        (tab === 'opportunities' && opportunitiesData?.opportunities.length === 0)) ? (
         <EmptyState title="No matches" body="Try a broader skill, category, or timezone search." />
       ) : null}
     </ScrollScreen>

@@ -11,6 +11,8 @@ import {
 } from '@escrow4334/product-core';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -31,6 +33,8 @@ import {
   Textarea,
 } from '@/ui/primitives';
 
+type MarketplaceOpportunityResponse = Awaited<ReturnType<typeof api.getMarketplaceOpportunity>>;
+
 export default function OpportunityDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken, user } = useSession();
@@ -42,6 +46,17 @@ export default function OpportunityDetailRoute() {
     queryKey: ['marketplace', 'opportunity', id],
     queryFn: () => api.getMarketplaceOpportunity(id),
   });
+  const opportunitySnapshot = useOfflineSnapshot<MarketplaceOpportunityResponse>({
+    cacheKey: id ? createOfflineSnapshotCacheKey('marketplace-opportunity', 'public', id) : null,
+    data: opportunity.data,
+    enabled: Boolean(id),
+  });
+  const useOpportunitySnapshot =
+    !opportunity.data &&
+    Boolean(opportunitySnapshot.data) &&
+    (networkGate.actionBlocked || opportunity.isLoading || opportunity.isError);
+  const opportunityData =
+    opportunity.data ?? (useOpportunitySnapshot ? opportunitySnapshot.data : null);
   const walletOptions = useMemo(
     () => user?.wallets.map((wallet) => wallet.address) ?? [],
     [user?.wallets],
@@ -53,6 +68,9 @@ export default function OpportunityDetailRoute() {
     mutationFn: async (input: NativeApplicationInput) => {
       if (!accessToken || !id) {
         throw new Error('Sign in before applying.');
+      }
+      if (useOpportunitySnapshot) {
+        throw new Error('Refresh live opportunity state before submitting a proposal.');
       }
       networkGate.requireOnline('Submitting a marketplace application');
 
@@ -79,7 +97,7 @@ export default function OpportunityDetailRoute() {
   return (
     <ScrollScreen
       footer={
-        opportunity.data ? (
+        opportunityData ? (
           <BottomActionBar>
             <PrimaryButton
               onPress={() => {
@@ -101,6 +119,13 @@ export default function OpportunityDetailRoute() {
                   );
                   return;
                 }
+                if (useOpportunitySnapshot) {
+                  Alert.alert(
+                    'Live opportunity required',
+                    'Refresh live opportunity state before submitting a proposal.',
+                  );
+                  return;
+                }
                 try {
                   networkGate.requireOnline('Opening marketplace application');
                 } catch (error) {
@@ -119,33 +144,39 @@ export default function OpportunityDetailRoute() {
         ) : undefined
       }
     >
-      {opportunity.isLoading ? <SkeletonCard /> : null}
-      {opportunity.data ? (
+      {opportunity.isLoading && !opportunityData ? <SkeletonCard /> : null}
+      {useOpportunitySnapshot ? (
+        <OfflineSnapshotNotice
+          cachedAt={opportunitySnapshot.cachedAt}
+          subject="opportunity detail"
+        />
+      ) : null}
+      {opportunityData ? (
         <>
           <SectionHeader
             eyebrow="Opportunity"
-            title={opportunity.data.opportunity.title}
-            body={opportunity.data.opportunity.summary}
+            title={opportunityData.opportunity.title}
+            body={opportunityData.opportunity.summary}
           />
-          <ChipWrap values={opportunity.data.opportunity.requiredSkills} />
+          <ChipWrap values={opportunityData.opportunity.requiredSkills} />
 
           <SurfaceCard animated variant="elevated">
-            <StatusBadge label={opportunity.data.opportunity.status} tone="info" />
-            <BodyText>{opportunity.data.opportunity.description}</BodyText>
+            <StatusBadge label={opportunityData.opportunity.status} tone="info" />
+            <BodyText>{opportunityData.opportunity.description}</BodyText>
             <MetricRow
               label="Budget"
-              value={`${opportunity.data.opportunity.budgetMin || 'Open'} to ${
-                opportunity.data.opportunity.budgetMax || 'Open'
+              value={`${opportunityData.opportunity.budgetMin || 'Open'} to ${
+                opportunityData.opportunity.budgetMax || 'Open'
               }`}
             />
-            <MetricRow label="Applications" value={opportunity.data.opportunity.applicationCount} />
+            <MetricRow label="Applications" value={opportunityData.opportunity.applicationCount} />
             <MetricRow
               label="Engagement"
-              value={opportunity.data.opportunity.engagementType.replaceAll('_', ' ')}
+              value={opportunityData.opportunity.engagementType.replaceAll('_', ' ')}
             />
             <MetricRow
               label="Desired start"
-              value={formatTimestamp(opportunity.data.opportunity.desiredStartAt, {
+              value={formatTimestamp(opportunityData.opportunity.desiredStartAt, {
                 fallback: 'Flexible',
               })}
             />
@@ -153,17 +184,17 @@ export default function OpportunityDetailRoute() {
 
           <SurfaceCard animated delay={80}>
             <Heading size="section">Delivery expectations</Heading>
-            <ChipWrap values={opportunity.data.opportunity.outcomes.slice(0, 4)} />
-            <BodyText>{opportunity.data.opportunity.timeline}</BodyText>
+            <ChipWrap values={opportunityData.opportunity.outcomes.slice(0, 4)} />
+            <BodyText>{opportunityData.opportunity.timeline}</BodyText>
           </SurfaceCard>
 
           {applyOpen && canApply ? (
             <NativeApplicationForm
               defaultWallet={defaultWallet}
-              disabled={networkGate.actionBlocked || apply.isPending}
+              disabled={useOpportunitySnapshot || networkGate.actionBlocked || apply.isPending}
               onCancel={() => setApplyOpen(false)}
               onSubmit={(input) => apply.mutate(input)}
-              opportunity={opportunity.data.opportunity}
+              opportunity={opportunityData.opportunity}
               walletOptions={walletOptions}
             />
           ) : null}

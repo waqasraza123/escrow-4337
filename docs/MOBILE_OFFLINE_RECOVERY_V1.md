@@ -130,6 +130,9 @@ Selected high-value read surfaces now persist explicit offline snapshots:
 - contracts list and contract detail source data from `api.listJobs`
 - project-room state from `api.getProjectRoom`
 - marketplace review state from `api.getMarketplaceJobReviews`
+- public marketplace talent and opportunity search responses
+- public marketplace talent profile and opportunity detail responses
+- authenticated marketplace analytics, application posture, client opportunity posture, and notifications
 
 Snapshots are intentionally read-only. When a screen is rendered from snapshot data rather than live query data, it shows an `Offline snapshot` notice with the saved timestamp and disables write actions that depend on that stale state. Fresh successful query responses replace the previous snapshot. Snapshot keys use the authenticated user id and resource id, never access or refresh tokens.
 
@@ -137,7 +140,7 @@ Snapshot lifecycle rules:
 
 - sign-out clears saved snapshots for the signed-out user
 - failed session restore clears the snapshot namespace before returning to signed-out state
-- Account exposes a signed-in "Clear offline data" control for explicit local data removal
+- Account exposes a signed-in "Clear offline data" control that removes the full offline snapshot namespace, including public marketplace snapshots
 - snapshot clearing only targets keys under `escrow4337.offlineSnapshot.v1`, leaving locale, theme, WalletConnect, and secure token storage untouched
 
 ## Recovery Model
@@ -152,7 +155,7 @@ Current recovery behavior is manual and explicit:
 - Query caches for mobile read surfaces are also invalidated automatically after an offline/API-unreachable period recovers into a reachable API probe state.
 - Foreground resume triggers a bounded network/API refresh when the previous API probe is stale or unavailable.
 - Mutating actions produce direct reconnect-and-retry copy instead of generic API failures.
-- Selected contract and project-room read surfaces can still show the last saved participant-scoped snapshot after an offline start or backend outage.
+- Selected contract, project-room, and marketplace read surfaces can still show the last saved snapshot after an offline start or backend outage.
 
 This is appropriate for the current app because escrow, wallet, and identity mutations should not be silently queued without a stronger idempotency and replay contract.
 

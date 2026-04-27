@@ -3,7 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type OfflineSnapshotResource =
   | 'jobs'
   | 'project-room'
-  | 'marketplace-job-reviews';
+  | 'marketplace-job-reviews'
+  | 'marketplace-talent'
+  | 'marketplace-opportunities'
+  | 'marketplace-analytics'
+  | 'marketplace-applications'
+  | 'marketplace-client-opportunities'
+  | 'marketplace-notifications'
+  | 'marketplace-profile'
+  | 'marketplace-opportunity';
 
 export type OfflineSnapshotEnvelope<TData> = {
   version: 1;

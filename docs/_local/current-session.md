@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Marketplace Offline Snapshots)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery product slice without intentional tests/builds:
+  - extended offline snapshot resource keys to cover marketplace talent/opportunity search, public profile/detail reads, analytics, applications, client opportunities, and notifications
+  - hydrated the mobile marketplace tab from saved read-only snapshots when live data is missing during loading, API errors, or offline/API-unreachable states
+  - hydrated public marketplace profile and opportunity detail routes from saved snapshots with explicit offline-snapshot notices
+  - kept opportunity proposal submission live-only by blocking application form entry/submission from snapshot-rendered opportunity state
+  - changed Account "Clear offline data" to clear the full offline snapshot namespace so public marketplace snapshots are removed with account-scoped snapshots
+  - documented the expanded snapshot contract in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/offlineSnapshots.ts`
+  `apps/mobile/src/app/{(tabs)/account.tsx,(tabs)/marketplace.tsx,marketplace/profile/[slug].tsx,marketplace/opportunity/[id].tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - source-level checks pending; real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for marketplace snapshot hydration, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Foreground Recovery Probe)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery hardening slice without intentional tests/builds:

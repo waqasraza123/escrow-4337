@@ -35,13 +35,13 @@ export default function AccountRoute() {
   const [clearingSnapshots, setClearingSnapshots] = useState(false);
 
   async function handleClearOfflineSnapshots() {
-    if (!user || clearingSnapshots) {
+    if (clearingSnapshots) {
       return;
     }
 
     setClearingSnapshots(true);
     try {
-      const removed = await clearOfflineSnapshots({ userId: user.id });
+      const removed = await clearOfflineSnapshots();
       Alert.alert(
         'Offline data cleared',
         removed
@@ -97,9 +97,9 @@ export default function AccountRoute() {
               Offline data
             </Heading>
             <BodyText>
-              Contract and project-room snapshots are saved on this device for read-only access
-              during outages. They never include session tokens and are cleared automatically on
-              sign-out.
+              Contract, project-room, and marketplace snapshots are saved on this device for
+              read-only access during outages. They never include session tokens. Sign-out clears
+              account-scoped snapshots, and this control clears the full offline snapshot namespace.
             </BodyText>
             <SecondaryButton
               disabled={clearingSnapshots}
