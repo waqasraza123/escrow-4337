@@ -7,6 +7,7 @@ import {
   getJoinReadinessCopy,
   normalizeInviteToken,
 } from '@/features/contracts/contractor-join';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -147,6 +148,7 @@ export default function ContractorJoinRoute() {
         >
           Check readiness
         </PrimaryButton>
+        <NetworkActionNotice action="Contractor invite checks" />
       </SurfaceCard>
 
       {readiness.isError ? (
@@ -200,13 +202,16 @@ export default function ContractorJoinRoute() {
             </>
           ) : null}
           {canJoinContract(status) ? (
-            <PrimaryButton
-              disabled={networkGate.actionBlocked || join.isPending}
-              loading={join.isPending}
-              onPress={() => join.mutate()}
-            >
-              {copy.action}
-            </PrimaryButton>
+            <>
+              <NetworkActionNotice action="Contractor join" />
+              <PrimaryButton
+                disabled={networkGate.actionBlocked || join.isPending}
+                loading={join.isPending}
+                onPress={() => join.mutate()}
+              >
+                {copy.action}
+              </PrimaryButton>
+            </>
           ) : status === 'joined' ? (
             <PrimaryButton
               onPress={() =>

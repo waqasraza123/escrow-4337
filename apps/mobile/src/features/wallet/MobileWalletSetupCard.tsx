@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { previewHash, type UserProfile, type UserWallet } from '@escrow4334/product-core';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { useMobileWallet } from '@/providers/wallet';
 import { useMobileTheme } from '@/providers/theme';
@@ -159,13 +160,16 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
       ) : null}
 
       {primaryAction ? (
-        <PrimaryButton
-          disabled={busy || networkGate.actionBlocked}
-          loading={busy}
-          onPress={primaryAction.onPress}
-        >
-          {primaryAction.label}
-        </PrimaryButton>
+        <>
+          <NetworkActionNotice action="Wallet setup" />
+          <PrimaryButton
+            disabled={busy || networkGate.actionBlocked}
+            loading={busy}
+            onPress={primaryAction.onPress}
+          >
+            {primaryAction.label}
+          </PrimaryButton>
+        </>
       ) : hasDefaultSmartAccount ? (
         <StatusBadge label="Ready for escrow actions" tone="success" />
       ) : !wallet.configured ? (
@@ -242,6 +246,7 @@ export function WalletListCard({
         <BodyText>No wallets are linked to this account yet.</BodyText>
       ) : (
         <View style={styles.walletStack}>
+          <NetworkActionNotice action="Default wallet changes" />
           {wallets.map((item) => (
             <WalletListItem
               key={`${item.walletKind}-${item.address}`}

@@ -14,6 +14,7 @@ import {
   type MobileContractDraft,
   type MobileMilestoneDraft,
 } from '@/features/contracts/contract-drafts';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -179,6 +180,7 @@ export default function NewContractRoute() {
         <Heading size="section">Readiness</Heading>
         <ReadinessChecklist items={readiness} />
         <MetricRow label="Milestone total" value={formatAmount(totalAmount, { fallback: '0 USDC' })} />
+        <NetworkActionNotice action="Contract creation" />
       </SurfaceCard>
 
       <SurfaceCard animated delay={60}>

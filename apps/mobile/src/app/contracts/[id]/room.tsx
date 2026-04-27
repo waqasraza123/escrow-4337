@@ -18,6 +18,7 @@ import {
   type SupportCaseReason,
   type SupportCaseSeverity,
 } from '@escrow4334/product-core';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -875,6 +876,7 @@ export default function ContractProjectRoomRoute() {
           >
             Post submission
           </PrimaryButton>
+          <NetworkActionNotice action="Milestone submission" />
         </SurfaceCard>
       ) : null}
 
@@ -919,6 +921,7 @@ export default function ContractProjectRoomRoute() {
           >
             Approve submission
           </PrimaryButton>
+          <NetworkActionNotice action="Client review actions" />
         </SurfaceCard>
       ) : null}
 
@@ -936,6 +939,7 @@ export default function ContractProjectRoomRoute() {
           >
             Deliver approved submission
           </PrimaryButton>
+          <NetworkActionNotice action="Approved delivery" />
         </SurfaceCard>
       ) : null}
 
@@ -954,6 +958,7 @@ export default function ContractProjectRoomRoute() {
         >
           Post message
         </PrimaryButton>
+        <NetworkActionNotice action="Project-room messaging" />
         <MessageList messages={room.messages} />
       </SurfaceCard>
 
@@ -1007,6 +1012,7 @@ export default function ContractProjectRoomRoute() {
         >
           Open support case
         </PrimaryButton>
+        <NetworkActionNotice action="Support case updates" />
         <SupportCaseList
           supportCases={room.supportCases}
           selectedCaseId={selectedSupportCase?.id ?? ''}
@@ -1084,6 +1090,7 @@ export default function ContractProjectRoomRoute() {
             >
               Submit review
             </PrimaryButton>
+            <NetworkActionNotice action="Marketplace review" />
           </View>
         ) : null}
       </SurfaceCard>

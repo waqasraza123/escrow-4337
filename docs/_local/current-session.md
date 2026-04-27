@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Blocked Action Notices)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile recovery UX slice without intentional tests/builds:
+  - added `apps/mobile/src/features/network/NetworkActionNotice.tsx` as a shared blocked-action notice powered by `useNetworkActionGate()`
+  - surfaced blocked-action copy next to disabled sign-in, wallet setup/default-wallet, workspace switch, marketplace application, contract creation/funding/join, milestone, project-room, support, and review write controls
+  - documented the notice contract and current placements in Mobile Offline Recovery V1, plus updated durable project state
+- Changed files:
+  `apps/mobile/src/features/network/NetworkActionNotice.tsx`
+  `apps/mobile/src/app/{(auth)/sign-in.tsx,(tabs)/marketplace.tsx,contracts/new.tsx,contracts/join.tsx,contracts/[id].tsx,contracts/[id]/room.tsx,marketplace/opportunity/[id].tsx}`
+  `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device evidence for wallet-linking and project-room delivery paths, or add a read-only offline snapshot layer for selected contract/project-room views.
+
 ## Update (2026-04-27, Mobile Network Action Gate)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile recovery/code-quality slice without intentional tests/builds:

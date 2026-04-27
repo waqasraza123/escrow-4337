@@ -13,6 +13,7 @@ import {
   SurfaceCard,
 } from '@/ui/primitives';
 import { useSession } from '@/providers/session';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 
@@ -83,6 +84,7 @@ export default function SignInRoute() {
         />
 
         <NetworkStatusCard compact />
+        <NetworkActionNotice action="Sign-in" />
 
         <SurfaceCard animated>
           <Field

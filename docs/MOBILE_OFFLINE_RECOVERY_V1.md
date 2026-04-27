@@ -30,6 +30,8 @@ The slice is intentionally native-client focused. It does not introduce a durabl
 
 Screens should use this hook for authenticated writes instead of duplicating `network.offline || apiReachability.status === 'unreachable'`.
 
+`apps/mobile/src/features/network/NetworkActionNotice.tsx` is the shared blocked-action notice. It renders only when `useNetworkActionGate().actionBlocked` is true and gives users action-specific recovery copy next to disabled mutation controls.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -102,6 +104,14 @@ Current guarded mobile write surfaces:
 - `apps/mobile/src/app/contracts/[id]/room.tsx`
 - `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
 - `apps/mobile/src/providers/wallet.tsx`
+
+Current blocked-action notice placements:
+
+- sign-in
+- wallet setup and default wallet changes
+- marketplace workspace switching and opportunity applications
+- contract creation, funding, contractor join, milestone commit, and milestone actions
+- project-room submission, review, approved delivery, messages, support, and marketplace review capture
 
 ## Query Behavior
 

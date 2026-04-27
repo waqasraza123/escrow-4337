@@ -9,6 +9,7 @@ import {
   splitList,
   type MarketplaceOpportunityDetail,
 } from '@escrow4334/product-core';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -321,6 +322,7 @@ function NativeApplicationForm({
       <PrimaryButton disabled={disabled} loading={disabled} onPress={submit}>
         Submit application
       </PrimaryButton>
+      <NetworkActionNotice action="Marketplace application" />
       <SecondaryButton disabled={disabled} onPress={onCancel}>
         Cancel
       </SecondaryButton>

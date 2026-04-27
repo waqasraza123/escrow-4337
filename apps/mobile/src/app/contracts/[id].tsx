@@ -16,6 +16,7 @@ import {
   sumMilestoneAmounts,
   type MobileMilestoneDraft,
 } from '@/features/contracts/contract-drafts';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -229,6 +230,7 @@ export default function ContractDetailRoute() {
               Use milestone total
             </SecondaryButton>
           ) : null}
+          <NetworkActionNotice action="Contract funding" />
         </SurfaceCard>
       ) : null}
     </ScrollScreen>
@@ -513,6 +515,7 @@ function ContractMilestonesCard({
                 </>
               ) : null}
 
+              <NetworkActionNotice action={getMilestoneActionCopy(selectedAction.kind).title} />
               <PrimaryButton
                 disabled={networkGate.actionBlocked || executeAction.isPending}
                 loading={executeAction.isPending}
@@ -578,6 +581,7 @@ function ContractMilestonesCard({
           >
             Commit milestones
           </PrimaryButton>
+          <NetworkActionNotice action="Milestone commit" />
         </>
       )}
     </SurfaceCard>

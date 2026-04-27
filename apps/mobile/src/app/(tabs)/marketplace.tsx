@@ -9,6 +9,7 @@ import {
   getMarketplaceLaneLabel,
   resolveMarketplaceLane,
 } from '@escrow4334/product-core';
+import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -298,21 +299,24 @@ function MarketplaceWorkspacePanel({
         </View>
 
         {user.workspaces.length > 1 ? (
-          <SegmentedControl
-            value={workspace?.workspaceId ?? user.workspaces[0]?.workspaceId}
-            onChange={(workspaceId) => {
-              if (!selectWorkspacePending) {
-                onSelectWorkspace(workspaceId);
-              }
-            }}
-            options={user.workspaces.map((candidate) => ({
-              label:
-                candidate.organizationKind === 'agency'
-                  ? `Agency ${candidate.label}`
-                  : candidate.label,
-              value: candidate.workspaceId,
-            }))}
-          />
+          <>
+            <SegmentedControl
+              value={workspace?.workspaceId ?? user.workspaces[0]?.workspaceId}
+              onChange={(workspaceId) => {
+                if (!selectWorkspacePending) {
+                  onSelectWorkspace(workspaceId);
+                }
+              }}
+              options={user.workspaces.map((candidate) => ({
+                label:
+                  candidate.organizationKind === 'agency'
+                    ? `Agency ${candidate.label}`
+                    : candidate.label,
+                value: candidate.workspaceId,
+              }))}
+            />
+            <NetworkActionNotice action="Workspace switching" />
+          </>
         ) : null}
 
         <View style={styles.metricGrid}>
