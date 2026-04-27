@@ -24,7 +24,6 @@ import {
   type MarketplaceContractDraftStatus,
   type MarketplaceOffer,
   type MarketplaceOfferMilestoneDraft,
-  type MarketplaceInterviewMessageKind,
   type SessionTokens,
   type UserProfile,
   type WorkspaceSummary,
@@ -256,7 +255,7 @@ export function FreelancerConsole() {
 
   async function handlePostInterviewMessage(
     applicationId: string,
-    kind: MarketplaceInterviewMessageKind = 'interview',
+    kind: 'clarification' | 'interview' = 'interview',
   ) {
     if (!tokens) {
       return;
