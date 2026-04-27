@@ -795,16 +795,16 @@ export function FreelancerConsole() {
         {!loading && tokens && activeLane !== 'freelancer' ? (
           <EmptyStateCard
             className={styles.panel}
-            title={
-              freelancerWorkspace
-                ? workspaceMessages.workspace.switchRequiredTitle
-                : workspaceMessages.workspace.unavailableTitle
-            }
-            message={
-              freelancerWorkspace
-                ? workspaceMessages.workspace.switchRequiredBody
-                : workspaceMessages.workspace.unavailableBody
-            }
+              title={
+                freelancerWorkspace
+                  ? workspaceMessages.switchRequiredTitle
+                  : workspaceMessages.unavailableTitle
+              }
+              message={
+                freelancerWorkspace
+                  ? workspaceMessages.switchRequiredBody
+                  : workspaceMessages.unavailableBody
+              }
             messageClassName={styles.stateText}
           >
             <div className={styles.inlineActions}>
