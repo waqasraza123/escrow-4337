@@ -22,6 +22,8 @@ The slice is intentionally native-client focused. It does not introduce a durabl
 
 `apps/mobile/src/providers/root.tsx` mounts `MobileNetworkProvider` above `QueryProvider`. This ordering lets the network provider update React Query online state before screens issue normal query traffic.
 
+`apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx` mounts inside `QueryProvider` and watches network/API recovery. After the device or API moves from offline, skipped, or unreachable into a reachable API probe state, it invalidates the mobile read-query families that should replace stale snapshots: runtime profile, jobs, contractor join readiness, project room, marketplace job reviews, and marketplace reads. A short throttle prevents duplicate invalidation bursts during NetInfo/probe races.
+
 `apps/mobile/src/features/network/useNetworkActionGate.ts` is the screen-level mutation gate. It wraps `useMobileNetwork()` and exposes:
 
 - `actionBlocked`: `true` when the device is known offline or the escrow API is known unreachable
@@ -147,6 +149,7 @@ Current recovery behavior is manual and explicit:
 - Users can refresh native network state after reconnecting.
 - Manual refresh runs both NetInfo refresh and the API reachability probe.
 - Query caches are invalidated after manual refresh so visible surfaces can refetch.
+- Query caches for mobile read surfaces are also invalidated automatically after an offline/API-unreachable period recovers into a reachable API probe state.
 - Mutating actions produce direct reconnect-and-retry copy instead of generic API failures.
 - Selected contract and project-room read surfaces can still show the last saved participant-scoped snapshot after an offline start or backend outage.
 
@@ -156,7 +159,6 @@ This is appropriate for the current app because escrow, wallet, and identity mut
 
 - Durable offline mutation queue for low-risk writes only.
 - Per-mutation retry envelopes with idempotency keys, conflict copy, and user-visible pending state.
-- Background refresh after reconnect.
 - Device-level evidence on iOS and Android across airplane mode, captive portal, flaky LTE, and wallet deep-link return paths.
 
 ## Operational Notes

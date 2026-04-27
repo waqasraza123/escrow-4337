@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { MobileRecoveryRefreshBridge } from '@/features/network/MobileRecoveryRefreshBridge';
 import { LocaleProvider } from './locale';
 import { MobileNetworkProvider } from './network';
 import { QueryProvider } from './query';
@@ -10,6 +11,7 @@ export function RootProviders({ children }: { children: ReactNode }) {
   return (
     <MobileNetworkProvider>
       <QueryProvider>
+        <MobileRecoveryRefreshBridge />
         <MobileThemeProvider>
           <LocaleProvider>
             <SessionProvider>

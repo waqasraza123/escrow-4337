@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Auto Refresh)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery slice without intentional tests/builds:
+  - added `apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx`
+  - mounted it inside `QueryProvider` so it can consume both NetInfo/API reachability state and the React Query client
+  - when the app moves from offline/API-unreachable/skipped state to a reachable API probe, it invalidates runtime, jobs, contractor readiness, project-room, marketplace-review, and marketplace read-query families
+  - added a short throttle so NetInfo/probe races cannot create duplicate invalidation bursts
+  - documented the recovery bridge and removed background refresh from deferred work in Mobile Offline Recovery V1 plus durable project state
+- Changed files:
+  `apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx`
+  `apps/mobile/src/providers/root.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device evidence for offline snapshot hydration/clearing, automatic recovery refresh, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Offline Snapshot Lifecycle)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery hardening slice without intentional tests/builds:
