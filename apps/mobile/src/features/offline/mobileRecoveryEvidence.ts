@@ -117,6 +117,7 @@ export type MobileRecoveryEvidenceAuditEvent = {
     requiredScenarioCount: number;
     unreadableScenarios: MobileRecoveryEvidenceScenario[];
   };
+  bundleReviewDecision?: MobileRecoveryEvidenceAuditReviewDecisionSummary;
 };
 
 export type MobileRecoveryEvidenceScenarioCoverage = {
@@ -224,12 +225,21 @@ export type MobileRecoveryEvidenceAuditTrailEntry = {
   action: MobileRecoveryEvidenceAuditAction;
   bundleFingerprint?: string;
   bundleReady?: boolean;
+  bundleReviewDecision?: MobileRecoveryEvidenceAuditReviewDecisionSummary;
   id: string;
   outcome?: MobileRecoveryEvidenceOutcome;
   recordedAt: string;
   reportFingerprint?: string;
   reportId?: string;
   scenario?: MobileRecoveryEvidenceScenario;
+};
+
+export type MobileRecoveryEvidenceAuditReviewDecisionSummary = {
+  blockerCount: number;
+  status: MobileRecoveryEvidenceBundleReviewDecisionStatus;
+  validForExternalReview: boolean;
+  verificationValid: boolean;
+  warningCount: number;
 };
 
 export type MobileRecoveryEvidenceLedgerReview = {
@@ -848,6 +858,7 @@ function buildAuditTrailEntry(
     action: event.action,
     bundleFingerprint: event.bundleFingerprint,
     bundleReady: event.bundleReadiness?.ready,
+    bundleReviewDecision: event.bundleReviewDecision,
     id: event.id,
     outcome: event.outcome,
     recordedAt: event.recordedAt,

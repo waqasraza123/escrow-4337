@@ -145,6 +145,18 @@ function formatReviewDecisionList(values: string[], fallback: string) {
   return values.length > 2 ? `${visible} / +${values.length - 2} more` : visible;
 }
 
+function summarizeBundleReviewDecisionForAudit(
+  reviewDecision: MobileRecoveryEvidenceBundle['reviewDecision'],
+) {
+  return {
+    blockerCount: reviewDecision.blockers.length,
+    status: reviewDecision.status,
+    validForExternalReview: reviewDecision.validForExternalReview,
+    verificationValid: reviewDecision.summary.verificationValid,
+    warningCount: reviewDecision.warnings.length,
+  };
+}
+
 function formatCoverageSummary({
   coverage,
   historyLoading,
@@ -496,6 +508,7 @@ export function MobileRecoveryEvidenceCard({
               requiredScenarioCount: bundle.readiness.requiredScenarioCount,
               unreadableScenarios: bundle.readiness.unreadableScenarios,
             },
+            bundleReviewDecision: summarizeBundleReviewDecisionForAudit(bundle.reviewDecision),
             historyReportCount: history.length,
           });
           setAuditEvents(await listMobileRecoveryEvidenceAudit());
@@ -517,6 +530,7 @@ export function MobileRecoveryEvidenceCard({
           requiredScenarioCount: bundle.readiness.requiredScenarioCount,
           unreadableScenarios: bundle.readiness.unreadableScenarios,
         },
+        bundleReviewDecision: summarizeBundleReviewDecisionForAudit(bundle.reviewDecision),
         historyReportCount: history.length,
       });
 

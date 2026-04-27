@@ -3,6 +3,21 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Audit Decision Summary)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - bundle share/cancel audit events now store compact `bundleReviewDecision` metadata
+  - audit decision metadata includes status, blocker count, warning count, `validForExternalReview`, and verification validity only
+  - coverage-bundle `ledgerReview.auditTrail` carries that compact decision summary forward when available
+  - report bodies, blocker text, warning text, next-action text, and share-target details remain excluded from audit records
+  - documented audit decision-summary semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Decision-Gated Export)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
