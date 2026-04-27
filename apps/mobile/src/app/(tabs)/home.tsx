@@ -4,6 +4,7 @@ import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import { SetupReadinessCard } from '@/features/setup/SetupReadinessCard';
 import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
+import { SessionRestoreNotice } from '@/features/session/SessionRestoreNotice';
 import {
   BodyText,
   EmptyState,
@@ -32,6 +33,7 @@ export default function HomeRoute() {
       />
 
       <NetworkStatusCard compact />
+      <SessionRestoreNotice delay={50} />
 
       {runtime.isLoading ? (
         <SkeletonCard />

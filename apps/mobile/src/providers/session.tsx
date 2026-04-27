@@ -24,7 +24,9 @@ type ProfileSnapshotEnvelope = {
 
 type SessionContextValue = {
   accessToken: string | null;
+  profileSnapshotCachedAt: number | null;
   refreshToken: string | null;
+  restoredFromProfileSnapshot: boolean;
   user: UserProfile | null;
   restoring: boolean;
   signIn: (email: string, code: string) => Promise<UserProfile>;
@@ -91,7 +93,9 @@ function isTerminalSessionRestoreError(error: unknown) {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [profileSnapshotCachedAt, setProfileSnapshotCachedAt] = useState<number | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [restoredFromProfileSnapshot, setRestoredFromProfileSnapshot] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [restoring, setRestoring] = useState(true);
 
@@ -104,15 +108,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const applyUser = useCallback((nextUser: UserProfile | null) => {
-    setUser(nextUser);
+  const applyUser = useCallback(
+    (
+      nextUser: UserProfile | null,
+      options: { cachedAt?: number | null; restoredFromSnapshot?: boolean } = {},
+    ) => {
+      setUser(nextUser);
+      setRestoredFromProfileSnapshot(Boolean(nextUser && options.restoredFromSnapshot));
+      setProfileSnapshotCachedAt(nextUser ? options.cachedAt ?? Date.now() : null);
 
-    if (nextUser) {
-      void saveProfileSnapshot(nextUser).catch(() => undefined);
-    } else {
-      void clearProfileSnapshot().catch(() => undefined);
-    }
-  }, []);
+      if (nextUser && !options.restoredFromSnapshot) {
+        void saveProfileSnapshot(nextUser).catch(() => undefined);
+      } else if (!nextUser) {
+        void clearProfileSnapshot().catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   const refreshSession = useCallback(async () => {
     const storedRefreshToken =
@@ -174,7 +186,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           if (profileSnapshot && !isTerminalSessionRestoreError(error)) {
             if (mounted) {
-              applyUser(profileSnapshot.user);
+              applyUser(profileSnapshot.user, {
+                cachedAt: profileSnapshot.cachedAt,
+                restoredFromSnapshot: true,
+              });
             }
             return;
           }
@@ -233,7 +248,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SessionContextValue>(
     () => ({
       accessToken,
+      profileSnapshotCachedAt,
       refreshToken,
+      restoredFromProfileSnapshot,
       user,
       restoring,
       signIn,
@@ -244,7 +261,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       accessToken,
+      profileSnapshotCachedAt,
       refreshToken,
+      restoredFromProfileSnapshot,
       refreshSession,
       requestCode,
       restoring,

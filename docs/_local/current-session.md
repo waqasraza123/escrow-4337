@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Cached Session Notice)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery session visibility slice without intentional tests/builds:
+  - exposed `restoredFromProfileSnapshot` and `profileSnapshotCachedAt` from `useSession()`
+  - preserved the original secure profile snapshot timestamp when hydrating from a cached profile
+  - added `apps/mobile/src/features/session/SessionRestoreNotice.tsx`
+  - surfaced cached-profile session posture on Home and Account with saved timestamp and manual refresh action
+  - documented the visible cached-profile session contract in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/providers/session.tsx`
+  `apps/mobile/src/features/session/SessionRestoreNotice.tsx`
+  `apps/mobile/src/app/{(tabs)/home.tsx,(tabs)/account.tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for cached-profile session notice, offline cold-start restore, marketplace snapshot hydration, retention cleanup, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Offline Session Restore)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery session slice without intentional tests/builds:

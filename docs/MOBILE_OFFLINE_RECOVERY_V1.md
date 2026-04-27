@@ -138,6 +138,8 @@ Restore behavior:
 - if the access token is terminally invalid and a refresh token exists, rotate the refresh token before clearing the session
 - after successful sign-in, refresh, or profile read, replace the cached profile snapshot
 - if profile/refresh calls fail for a non-terminal outage and a profile snapshot exists, keep the stored tokens and hydrate `user` from the secure profile snapshot
+- expose `restoredFromProfileSnapshot` and `profileSnapshotCachedAt` through `useSession()`
+- Home and Account surface a cached-profile session notice with the saved timestamp and a manual session refresh action
 - if restore fails without a usable profile snapshot, clear tokens, clear the cached profile snapshot, clear offline snapshots, and return to signed-out state
 - sign-out clears tokens, the profile snapshot, and account-scoped offline snapshots before best-effort logout
 

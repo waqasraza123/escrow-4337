@@ -13,6 +13,7 @@ import {
   WalletSetupCard,
 } from '@/features/wallet/MobileWalletSetupCard';
 import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
+import { SessionRestoreNotice } from '@/features/session/SessionRestoreNotice';
 import { useLocale } from '@/providers/locale';
 import { useSession } from '@/providers/session';
 import { useMobileTheme, type ThemePreference } from '@/providers/theme';
@@ -147,6 +148,7 @@ export default function AccountRoute() {
       {user ? (
         <>
           <NetworkStatusCard />
+          <SessionRestoreNotice delay={30} />
           <SurfaceCard animated delay={40}>
             <Heading size="section" style={styles.cardHeading}>
               Offline data
