@@ -23,6 +23,7 @@ export default function SignInRoute() {
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const apiUnavailable = network.apiReachability.status === 'unreachable';
 
   const handleRequestCode = async () => {
     setSubmitting(true);
@@ -65,7 +66,9 @@ export default function SignInRoute() {
         footer={
           <BottomActionBar>
             <PrimaryButton
-              disabled={network.offline || !email.trim() || (codeSent && !code.trim())}
+              disabled={
+                network.offline || apiUnavailable || !email.trim() || (codeSent && !code.trim())
+              }
               loading={submitting}
               onPress={codeSent ? handleVerify : handleRequestCode}
             >

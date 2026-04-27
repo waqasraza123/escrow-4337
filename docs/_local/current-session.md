@@ -3,6 +3,25 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile API Reachability)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile recovery slice without intentional tests/builds:
+  - expanded the mobile network provider with API reachability status, latency, last check time, bounded runtime-profile probes, timeout copy, and stale-probe race protection
+  - kept React Query online state tied to native device connectivity while surfacing API outage posture separately
+  - updated the shared network card to show API reachability, probe latency, last API check, and latest probe failure
+  - made sign-in and wallet setup buttons stop early when the API is known unreachable, while existing provider guards still own the final action-level error copy
+  - updated Mobile Offline Recovery V1 and durable project state with the backend reachability contract
+- Changed files:
+  `apps/mobile/src/providers/network.tsx`
+  `apps/mobile/src/features/network/NetworkStatusCard.tsx`
+  `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
+  `apps/mobile/src/app/(auth)/sign-in.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - extend mobile-safe network guards across contract creation, contractor join, delivery/dispute, and project-room mutations before considering durable offline replay.
+
 ## Update (2026-04-27, Mobile Offline Recovery)
 - Started from a clean `dev` tree, confirmed `origin/dev` was up to date, and kept working without intentional tests/builds by request.
 - Implemented the next mobile hardening slice:
