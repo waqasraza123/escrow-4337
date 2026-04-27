@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Self-Verification)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - added deterministic self-verification helpers for report artifacts, ledger reviews, bundle review manifests, and complete coverage bundles
+  - coverage bundles now include a `verification` block with global checks, per-report artifact checks, per-scenario artifact link checks, reviewer checklist, and aggregate `valid` posture
+  - verification recomputes report checksums without the `artifact` block and recomputes ledger/review manifest checksums without their fingerprint field
+  - verification checks that `reviewManifest.ledgerReviewFingerprint` points at the included `ledgerReview`
+  - verification keeps the same non-cryptographic review-checksum semantics and does not claim share completion or tamper-proof proof
+  - documented self-verification semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/mobileRecoveryEvidence.ts`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Ledger Review)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:

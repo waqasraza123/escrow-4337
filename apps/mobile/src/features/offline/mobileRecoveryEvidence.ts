@@ -164,6 +164,7 @@ export type MobileRecoveryEvidenceBundle = {
   ledgerReview: MobileRecoveryEvidenceLedgerReview;
   readiness: MobileRecoveryEvidenceBundleReadiness;
   reviewManifest: MobileRecoveryEvidenceBundleReviewManifest;
+  verification: MobileRecoveryEvidenceBundleVerification;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
   reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>>;
 };
@@ -279,6 +280,36 @@ export type MobileRecoveryEvidenceBundleReviewManifest = {
     scenario: MobileRecoveryEvidenceScenario;
   }>;
   reviewerChecklist: string[];
+};
+
+export type MobileRecoveryEvidenceVerificationStatus = 'valid' | 'invalid' | 'missing';
+
+export type MobileRecoveryEvidenceFingerprintVerification = {
+  actual: string | null;
+  detail: string;
+  expected: string | null;
+  label: string;
+  status: MobileRecoveryEvidenceVerificationStatus;
+};
+
+export type MobileRecoveryEvidenceBundleVerification = {
+  schema: 'escrow4337.mobileRecoveryEvidence.bundleVerification.v1';
+  checkedAt: string;
+  checks: MobileRecoveryEvidenceFingerprintVerification[];
+  reportChecks: Array<
+    MobileRecoveryEvidenceFingerprintVerification & {
+      reportId: string;
+      scenario: MobileRecoveryEvidenceScenario;
+    }
+  >;
+  reviewerChecklist: string[];
+  scenarioArtifactChecks: Array<
+    MobileRecoveryEvidenceFingerprintVerification & {
+      reportId: string | null;
+      scenario: MobileRecoveryEvidenceScenario;
+    }
+  >;
+  valid: boolean;
 };
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
@@ -516,6 +547,141 @@ function getReportFingerprint(report: MobileRecoveryEvidenceReport) {
     report.artifact?.fingerprint.value ??
     buildEvidenceFingerprint(stripReportArtifact(report), 'legacy_report_without_artifact').value
   );
+}
+
+function buildFingerprintVerification({
+  actual,
+  detail,
+  expected,
+  label,
+}: {
+  actual: string | null;
+  detail: string;
+  expected: string | null;
+  label: string;
+}): MobileRecoveryEvidenceFingerprintVerification {
+  if (!expected || !actual) {
+    return {
+      actual,
+      detail,
+      expected,
+      label,
+      status: 'missing',
+    };
+  }
+
+  return {
+    actual,
+    detail,
+    expected,
+    label,
+    status: expected === actual ? 'valid' : 'invalid',
+  };
+}
+
+export function verifyMobileRecoveryEvidenceReportArtifact(
+  report: MobileRecoveryEvidenceReport,
+): MobileRecoveryEvidenceFingerprintVerification {
+  return buildFingerprintVerification({
+    actual: buildEvidenceFingerprint(stripReportArtifact(report), 'report_without_artifact').value,
+    detail: 'Recomputes the report artifact checksum from the report body without the artifact block.',
+    expected: report.artifact?.fingerprint.value ?? null,
+    label: 'Report artifact fingerprint',
+  });
+}
+
+export function verifyMobileRecoveryEvidenceLedgerReview(
+  ledgerReview: MobileRecoveryEvidenceLedgerReview,
+): MobileRecoveryEvidenceFingerprintVerification {
+  const { fingerprint, ...ledgerBody } = ledgerReview;
+
+  return buildFingerprintVerification({
+    actual: buildEvidenceFingerprint(ledgerBody, 'ledger_review_without_fingerprint').value,
+    detail: 'Recomputes the ledger-review checksum from ledger review content without the fingerprint field.',
+    expected: fingerprint?.value ?? null,
+    label: 'Ledger review fingerprint',
+  });
+}
+
+export function verifyMobileRecoveryEvidenceBundleReviewManifest(
+  reviewManifest: MobileRecoveryEvidenceBundleReviewManifest,
+): MobileRecoveryEvidenceFingerprintVerification {
+  const { fingerprint, ...manifestBody } = reviewManifest;
+
+  return buildFingerprintVerification({
+    actual: buildEvidenceFingerprint(
+      manifestBody,
+      'bundle_review_manifest_without_fingerprint',
+    ).value,
+    detail: 'Recomputes the bundle review-manifest checksum from manifest content without the fingerprint field.',
+    expected: fingerprint?.value ?? null,
+    label: 'Bundle review manifest fingerprint',
+  });
+}
+
+export function verifyMobileRecoveryEvidenceBundleArtifacts(
+  bundle: Omit<MobileRecoveryEvidenceBundle, 'verification'> | MobileRecoveryEvidenceBundle,
+): MobileRecoveryEvidenceBundleVerification {
+  const checks: MobileRecoveryEvidenceFingerprintVerification[] = [
+    verifyMobileRecoveryEvidenceLedgerReview(bundle.ledgerReview),
+    verifyMobileRecoveryEvidenceBundleReviewManifest(bundle.reviewManifest),
+    buildFingerprintVerification({
+      actual: bundle.ledgerReview.fingerprint.value,
+      detail: 'Checks that the bundle review manifest points at the included ledger review fingerprint.',
+      expected: bundle.reviewManifest.ledgerReviewFingerprint,
+      label: 'Manifest ledger-review link',
+    }),
+  ];
+  const reportChecks = mobileRecoveryEvidenceScenarios.flatMap((scenario) => {
+    const report = bundle.reportsByScenario[scenario];
+    const reportId = bundle.reportIdsByScenario[scenario];
+
+    if (!report || !reportId) {
+      return [];
+    }
+
+    return [
+      {
+        ...verifyMobileRecoveryEvidenceReportArtifact(report),
+        reportId,
+        scenario,
+      },
+    ];
+  });
+  const scenarioArtifactChecks = bundle.reviewManifest.scenarioArtifacts.map((artifact) => {
+    const report = bundle.reportsByScenario[artifact.scenario];
+    const reportId = bundle.reportIdsByScenario[artifact.scenario] ?? null;
+    const actual = report ? getReportFingerprint(report) : null;
+
+    return {
+      ...buildFingerprintVerification({
+        actual,
+        detail: 'Compares the review-manifest scenario artifact fingerprint with the included report artifact.',
+        expected: artifact.fingerprint,
+        label: 'Scenario artifact report link',
+      }),
+      reportId,
+      scenario: artifact.scenario,
+    };
+  });
+  const allChecks = [...checks, ...reportChecks, ...scenarioArtifactChecks];
+
+  return {
+    schema: 'escrow4337.mobileRecoveryEvidence.bundleVerification.v1',
+    checkedAt: new Date().toISOString(),
+    checks,
+    reportChecks,
+    reviewerChecklist: [
+      'Treat valid=false as a blocker before accepting the exported bundle.',
+      'Missing checks usually indicate a legacy report or incomplete partial bundle.',
+      'Invalid checks indicate the exported JSON sections no longer match their embedded fingerprints.',
+      'Verification checks are deterministic review checksums, not cryptographic signatures.',
+    ],
+    scenarioArtifactChecks,
+    valid:
+      allChecks.length > 0 &&
+      allChecks.every((check) => check.status === 'valid'),
+  };
 }
 
 function createEmptyScenarioReviewSummary() {
@@ -1206,6 +1372,17 @@ export async function buildMobileRecoveryEvidenceBundle(
     reportIdsByScenario,
     reportsByScenario,
     reviewManifest,
+    verification: verifyMobileRecoveryEvidenceBundleArtifacts({
+      version: 1,
+      capturePlan,
+      coverage,
+      generatedAt,
+      ledgerReview,
+      readiness,
+      reportIdsByScenario,
+      reportsByScenario,
+      reviewManifest,
+    }),
   };
 }
 
