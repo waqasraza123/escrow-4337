@@ -792,21 +792,13 @@ export function FreelancerConsole() {
           />
         ) : null}
 
-        {!loading && tokens && activeLane !== 'freelancer' ? (
-          <EmptyStateCard
-            className={styles.panel}
-              title={
-                freelancerWorkspace
-                  ? workspaceMessages.switchRequiredTitle
-                  : workspaceMessages.unavailableTitle
-              }
-              message={
-                freelancerWorkspace
-                  ? workspaceMessages.switchRequiredBody
-                  : workspaceMessages.unavailableBody
-              }
-            messageClassName={styles.stateText}
-          >
+          {!loading && tokens && activeLane !== 'freelancer' ? (
+            <EmptyStateCard
+              className={styles.panel}
+              title={workspaceMessages.messages.laneUnavailable('freelancer')}
+              message={workspaceMessages.messages.laneUnavailable('freelancer')}
+              messageClassName={styles.stateText}
+            >
             <div className={styles.inlineActions}>
               {freelancerWorkspace ? (
                 <button
