@@ -3,6 +3,25 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Context)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added controlled `scenario` and `outcome` context to `MobileRecoveryEvidenceReport`
+  - supported scenarios: offline start, API recovery, wallet return, project room
+  - supported outcomes: observed, passed, failed
+  - exposed scenario/outcome segmented controls in the Account recovery evidence card
+  - included latest report scenario/outcome in the Account ledger summary
+  - kept the report free of free-form reviewer notes to avoid accidental PII/secrets
+  - documented the controlled context contract in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real iOS/Android evidence reports for each controlled scenario and preserve pass/fail posture from the local ledger.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Ledger)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

@@ -8,6 +8,10 @@ import type { OfflineSnapshotSummary } from './offlineSnapshots';
 export type MobileRecoveryEvidenceReport = {
   version: 1;
   capturedAt: string;
+  evidenceContext: {
+    scenario: MobileRecoveryEvidenceScenario;
+    outcome: MobileRecoveryEvidenceOutcome;
+  };
   platform: {
     os: string;
     version: string;
@@ -77,9 +81,19 @@ export type MobileRecoveryEvidenceSummary = {
   capturedAt: string;
   apiStatus: string;
   offline: boolean;
+  outcome: MobileRecoveryEvidenceOutcome;
   restoredFromProfileSnapshot: boolean;
+  scenario: MobileRecoveryEvidenceScenario;
   snapshotCount: number | null;
 };
+
+export type MobileRecoveryEvidenceScenario =
+  | 'offline_start'
+  | 'api_recovery'
+  | 'wallet_return'
+  | 'project_room';
+
+export type MobileRecoveryEvidenceOutcome = 'observed' | 'passed' | 'failed';
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
 export const mobileRecoveryEvidenceMaxEntries = 12;
@@ -180,7 +194,9 @@ function summarizeEvidenceReport(
     capturedAt: report.capturedAt,
     apiStatus: report.api.reachability.status,
     offline: report.network.offline,
+    outcome: report.evidenceContext?.outcome ?? 'observed',
     restoredFromProfileSnapshot: report.session.restoredFromProfileSnapshot,
+    scenario: report.evidenceContext?.scenario ?? 'api_recovery',
     snapshotCount: report.offlineSnapshots?.totalCount ?? null,
   };
 }
@@ -194,8 +210,10 @@ export function buildMobileRecoveryEvidenceReport({
   isInternetReachable,
   lastChangedAt,
   offline,
+  outcome,
   profileSnapshotCachedAt,
   restoredFromProfileSnapshot,
+  scenario,
   snapshotSummary,
   user,
 }: {
@@ -212,14 +230,20 @@ export function buildMobileRecoveryEvidenceReport({
   isInternetReachable: boolean | null;
   lastChangedAt: number | null;
   offline: boolean;
+  outcome: MobileRecoveryEvidenceOutcome;
   profileSnapshotCachedAt: number | null;
   restoredFromProfileSnapshot: boolean;
+  scenario: MobileRecoveryEvidenceScenario;
   snapshotSummary: OfflineSnapshotSummary | null;
   user: UserProfile | null;
 }): MobileRecoveryEvidenceReport {
   return {
     version: 1,
     capturedAt: new Date().toISOString(),
+    evidenceContext: {
+      outcome,
+      scenario,
+    },
     platform: {
       os: Platform.OS,
       version: String(Platform.Version),

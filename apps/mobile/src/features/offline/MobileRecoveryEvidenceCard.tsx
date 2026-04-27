@@ -8,6 +8,7 @@ import {
   Heading,
   MetricRow,
   SecondaryButton,
+  SegmentedControl,
   StatusBadge,
   SurfaceCard,
 } from '@/ui/primitives';
@@ -17,9 +18,43 @@ import {
   listMobileRecoveryEvidence,
   mobileRecoveryEvidenceMaxEntries,
   saveMobileRecoveryEvidenceReport,
+  type MobileRecoveryEvidenceOutcome,
+  type MobileRecoveryEvidenceScenario,
   type MobileRecoveryEvidenceSummary,
 } from './mobileRecoveryEvidence';
 import type { OfflineSnapshotSummary } from './offlineSnapshots';
+
+const evidenceScenarioOptions: Array<{
+  label: string;
+  value: MobileRecoveryEvidenceScenario;
+}> = [
+  { label: 'Offline', value: 'offline_start' },
+  { label: 'API', value: 'api_recovery' },
+  { label: 'Wallet', value: 'wallet_return' },
+  { label: 'Room', value: 'project_room' },
+];
+
+const evidenceOutcomeOptions: Array<{
+  label: string;
+  value: MobileRecoveryEvidenceOutcome;
+}> = [
+  { label: 'Observed', value: 'observed' },
+  { label: 'Passed', value: 'passed' },
+  { label: 'Failed', value: 'failed' },
+];
+
+const evidenceScenarioLabels: Record<MobileRecoveryEvidenceScenario, string> = {
+  api_recovery: 'API recovery',
+  offline_start: 'Offline start',
+  project_room: 'Project room',
+  wallet_return: 'Wallet return',
+};
+
+const evidenceOutcomeLabels: Record<MobileRecoveryEvidenceOutcome, string> = {
+  failed: 'Failed',
+  observed: 'Observed',
+  passed: 'Passed',
+};
 
 export function MobileRecoveryEvidenceCard({
   delay = 60,
@@ -36,6 +71,9 @@ export function MobileRecoveryEvidenceCard({
   const [clearing, setClearing] = useState(false);
   const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [scenario, setScenario] =
+    useState<MobileRecoveryEvidenceScenario>('offline_start');
+  const [outcome, setOutcome] = useState<MobileRecoveryEvidenceOutcome>('observed');
 
   const signedIn = Boolean(session.user);
   const restoredFromSnapshot = session.restoredFromProfileSnapshot;
@@ -73,8 +111,10 @@ export function MobileRecoveryEvidenceCard({
         isInternetReachable: network.isInternetReachable,
         lastChangedAt: network.lastChangedAt,
         offline: network.offline,
+        outcome,
         profileSnapshotCachedAt: session.profileSnapshotCachedAt,
         restoredFromProfileSnapshot: restoredFromSnapshot,
+        scenario,
         snapshotSummary,
         user: session.user,
       });
@@ -134,6 +174,18 @@ export function MobileRecoveryEvidenceCard({
         cached-session, wallet-count, workspace-kind, capability, and offline snapshot posture
         without tokens, email addresses, user ids, wallet addresses, labels, or URL credentials.
       </BodyText>
+      <MetricRow label="Evidence scenario" value={evidenceScenarioLabels[scenario]} />
+      <SegmentedControl
+        value={scenario}
+        onChange={setScenario}
+        options={evidenceScenarioOptions}
+      />
+      <MetricRow label="Evidence outcome" value={evidenceOutcomeLabels[outcome]} />
+      <SegmentedControl
+        value={outcome}
+        onChange={setOutcome}
+        options={evidenceOutcomeOptions}
+      />
       <MetricRow label="Signed in" value={signedIn ? 'Yes' : 'No'} />
       <MetricRow
         label="Profile snapshot"
@@ -166,7 +218,13 @@ export function MobileRecoveryEvidenceCard({
       />
       <MetricRow
         label="Latest report"
-        value={latestReport ? formatTimestamp(Date.parse(latestReport.capturedAt)) : 'None'}
+        value={
+          latestReport
+            ? `${evidenceScenarioLabels[latestReport.scenario]} / ${
+                evidenceOutcomeLabels[latestReport.outcome]
+              } / ${formatTimestamp(Date.parse(latestReport.capturedAt))}`
+            : 'None'
+        }
       />
       <SecondaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
         {sharing ? 'Preparing evidence' : 'Save and share evidence'}

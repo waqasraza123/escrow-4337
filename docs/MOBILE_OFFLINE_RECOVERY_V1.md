@@ -42,9 +42,9 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/session/MobileSessionRecoveryBridge.tsx` mounts inside `SessionProvider`. When the app is running from a secure cached profile and API reachability recovers to `reachable`, it throttles and attempts a live session refresh, then invalidates query caches after a successful refresh. Refresh failures stay non-destructive; the cached-profile notice remains visible until a live session refresh succeeds or the user signs out.
 
-`apps/mobile/src/features/offline/mobileRecoveryEvidence.ts` owns the mobile recovery evidence report contract. It assembles sanitized JSON reports from network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, stores recent reports in AsyncStorage, and enforces bounded local retention. Reports intentionally exclude access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, and URL credentials or query strings.
+`apps/mobile/src/features/offline/mobileRecoveryEvidence.ts` owns the mobile recovery evidence report contract. It assembles sanitized JSON reports from controlled evidence context, network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, stores recent reports in AsyncStorage, and enforces bounded local retention. Reports intentionally exclude access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, free-form reviewer notes, and URL credentials or query strings.
 
-`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays the saved-report count and newest report timestamp, and exposes a clear control for the local evidence ledger.
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It captures controlled scenario and outcome values, creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays the saved-report count and newest report timestamp, and exposes a clear control for the local evidence ledger.
 
 ## UI Surface
 
@@ -70,7 +70,7 @@ Current placements:
 
 The card is intentionally diagnostic but user-facing. It separates device connectivity from backend reachability so a backend outage is not presented as a local airplane-mode problem.
 
-`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is shown on the Account tab for signed-in users. It lets a reviewer save and export a comparable recovery report during iOS or Android manual evidence runs after toggling airplane mode, restoring API reachability, returning from background, or exercising wallet deep-link recovery.
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is shown on the Account tab for signed-in users. It lets a reviewer pick a scenario and outcome, then save and export a comparable recovery report during iOS or Android manual evidence runs after toggling airplane mode, restoring API reachability, returning from background, or exercising wallet deep-link recovery.
 
 ## Mutation Guarding
 
@@ -188,13 +188,15 @@ The Account recovery evidence card uses a separate AsyncStorage namespace, `escr
 Evidence report retention rules:
 
 - each share action saves the report locally before opening the native share sheet
+- each report includes a controlled scenario: offline start, API recovery, wallet return, or project room
+- each report includes a controlled outcome: observed, passed, or failed
 - the app retains the newest 12 reports
 - reports expire after 30 days
 - malformed report envelopes are pruned by the same retention pass
-- Account displays saved-report count and newest report timestamp
+- Account displays saved-report count, newest report scenario, newest report outcome, and newest report timestamp
 - Account exposes a "Clear saved evidence" action that removes only the recovery evidence namespace
 
-Evidence reports may include platform, app version, sanitized API base URL, API probe status/error, NetInfo state, cached-profile session status, capability booleans, wallet counts, workspace kind/role posture, and offline snapshot summary counts. They must not include session tokens, OTPs, email addresses, user ids, wallet addresses, workspace labels, organization names, invite tokens, private keys, URL credentials, or URL query strings.
+Evidence reports may include scenario, outcome, platform, app version, sanitized API base URL, API probe status/error, NetInfo state, cached-profile session status, capability booleans, wallet counts, workspace kind/role posture, and offline snapshot summary counts. They must not include session tokens, OTPs, email addresses, user ids, wallet addresses, workspace labels, organization names, invite tokens, private keys, free-form reviewer notes, URL credentials, or URL query strings.
 
 ## Recovery Model
 
