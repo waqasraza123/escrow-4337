@@ -405,20 +405,20 @@ export const applicationDecisionNoteSchema = z
   })
   .strict();
 
+export const marketplaceInterviewMessageAttachmentSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    label: z.string().trim().max(180).nullable().optional(),
+    url: z.string().trim().url().max(2000),
+    mimeType: z.string().trim().max(120).nullable().optional(),
+    sizeBytes: z.number().int().min(0).nullable().optional(),
+  })
+  .strict();
+
 export const createMarketplaceInterviewMessageSchema = z
   .object({
     attachments: z
-      .array(
-        z
-          .object({
-            id: z.string().trim().min(1).optional(),
-            label: z.string().trim().max(180).nullable().optional(),
-            url: z.string().trim().url().max(2000),
-            mimeType: z.string().trim().max(120).nullable().optional(),
-            sizeBytes: z.number().int().min(0).nullable().optional(),
-          })
-          .strict(),
-      )
+      .array(marketplaceInterviewMessageAttachmentSchema)
       .max(12)
       .default([]),
     kind: z.enum(['clarification', 'interview']),
@@ -727,7 +727,7 @@ export type CreateMarketplaceInterviewMessageDto = z.infer<
   typeof createMarketplaceInterviewMessageSchema
 >;
 export type CreateMarketplaceInterviewMessageAttachmentDto = z.infer<
-  typeof createMarketplaceInterviewMessageSchema['shape']['attachments'][0]
+  typeof marketplaceInterviewMessageAttachmentSchema
 >;
 export type CreateMarketplaceOfferDto = z.infer<
   typeof createMarketplaceOfferSchema
