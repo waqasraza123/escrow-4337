@@ -382,9 +382,6 @@ export function FreelancerConsole() {
     setError('');
 
     try {
-      const jobsResponse = await webApi.listJobs();
-      setContracts(jobsResponse.jobs.map((entry) => entry.job));
-
       if (!nextTokens) {
         setUser(null);
         setMyApplications([]);
@@ -392,8 +389,12 @@ export function FreelancerConsole() {
         setOfferDrafts({});
         setContractDraftEdits({});
         setInterviewMessageDrafts({});
+        setContracts([]);
         return;
       }
+
+      const jobsResponse = await webApi.listJobs(nextTokens.accessToken);
+      setContracts(jobsResponse.jobs.map((entry) => entry.job));
 
       const me = await webApi.me(nextTokens.accessToken);
       setUser(me);
