@@ -35,6 +35,9 @@ export default function ContractsRoute() {
           <SecondaryButton onPress={() => router.push('/contracts/new')}>
             Create direct contract
           </SecondaryButton>
+          <SecondaryButton onPress={() => router.push('/contracts/join')}>
+            Join with invite
+          </SecondaryButton>
         </SurfaceCard>
       ) : null}
 

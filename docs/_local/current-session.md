@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Contractor Join)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile product slice without intentional verification:
+  - added shared contractor-join helpers for invite-token normalization, readiness copy, status tone, and join eligibility
+  - added `/contracts/join` for authenticated invite entry by job id and invite token
+  - added `/contracts/[id]/join` for job-specific invite links that can carry `invite` or `inviteToken` query params
+  - the join screen now calls the existing protected join-readiness API, shows email/wallet/seat readiness, linked wallet posture, and executes the existing contractor join mutation when ready
+  - updated the contracts tab and root stack to expose the join flow
+- Changed files:
+  `apps/mobile/src/app/_layout.tsx`
+  `apps/mobile/src/app/(tabs)/contracts.tsx`
+  `apps/mobile/src/app/contracts/{join.tsx,[id]/join.tsx}`
+  `apps/mobile/src/features/contracts/contractor-join.ts`
+  `docs/project-state.md`
+  `docs/_local/current-session.md`
+- Verification:
+  - not run by request
+
 ## Update (2026-04-27, Mobile Direct Contract Creation)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile product slice without intentional verification:
@@ -224,23 +242,21 @@
   - still noisy in this shell: `pnpm --filter admin test` and `pnpm --filter admin test -- src/app/page.spec.tsx` did not return a clean completion signal here even though targeted admin specs and typecheck passed
 
 ## Current Objective
-- Advance Mobile V1 from marketplace/apply into direct escrow execution:
-  - guided native contract creation
-  - participant-scoped contract detail
-  - milestone commit and funding controls
+- Advance Mobile V1 from direct escrow creation into contractor join execution:
+  - invite-token entry and deep-link route
+  - protected join-readiness posture
+  - contractor join mutation when email and wallet match
   - no test/build verification in this request
 
 ## Last Completed Step
 - Pushed the clean `dev` branch before implementation; `origin/dev` was already up to date.
 
 ## Current Step
-- Mobile direct contract creation/detail code is implemented and intentionally unverified:
-  - `apps/mobile/.env.example`
-  - `apps/mobile/app.json`
+- Mobile contractor join code is implemented and intentionally unverified:
   - `apps/mobile/src/app/_layout.tsx`
   - `apps/mobile/src/app/(tabs)/contracts.tsx`
-  - `apps/mobile/src/app/contracts/{new.tsx,[id].tsx}`
-  - `apps/mobile/src/features/contracts/contract-drafts.ts`
+  - `apps/mobile/src/app/contracts/{join.tsx,[id]/join.tsx}`
+  - `apps/mobile/src/features/contracts/contractor-join.ts`
   - `docs/project-state.md`
   - `docs/_local/current-session.md`
 - No tests or builds were run after implementation.
@@ -251,7 +267,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- Mobile had marketplace proposal submission but still lacked native direct escrow creation, contract drill-in, milestone commit posture, and funding controls.
+- Mobile could create and inspect direct contracts but still lacked the launch-candidate contractor invite recovery/join path.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -344,9 +360,9 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - add mobile contractor join readiness
   - add mobile delivery/dispute forms
   - add mobile project-room delivery review
+  - add device-level wallet hardening notes after real wallet exercise
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
