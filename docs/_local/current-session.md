@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Project Room)
+- Started from `dev`, confirmed `origin/dev` was up to date, and preserved the existing in-progress project-room DTO edit in `packages/product-core/src/api/types.ts`.
+- Implemented the next mobile product slice without intentional verification:
+  - added mobile-safe project-room DTOs and product-core API methods for room read, messages, submissions, revision requests, approvals, and approved-submission delivery
+  - added `/contracts/[id]/room` with participant-scoped room summary, milestone selector, worker submission flow, client revision/approval flow, worker approved-delivery action, recent messages, and room/audit activity
+  - linked contract detail into the native project room
+  - documented the Mobile Project Room V1 role model, API mapping, artifact input contract, UI behavior, and gaps
+- Changed files:
+  `packages/product-core/src/api/{client.ts,types.ts}`
+  `apps/mobile/src/app/{_layout.tsx,contracts/[id].tsx,contracts/[id]/room.tsx}`
+  `docs/{MOBILE_PROJECT_ROOM_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - device-test wallet-backed project-room delivery with real mobile wallets, then add native support-case and job-review capture.
+
 ## Update (2026-04-27, Mobile Delivery and Dispute Actions)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile product slice without intentional verification:

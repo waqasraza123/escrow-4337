@@ -83,6 +83,16 @@ function RootStack() {
             headerTintColor: theme.colors.foreground,
           }}
         />
+        <Stack.Screen
+          name="contracts/[id]/room"
+          options={{
+            headerShown: true,
+            headerTitle: '',
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.colors.background },
+            headerTintColor: theme.colors.foreground,
+          }}
+        />
       </Stack>
     </>
   );

@@ -18,6 +18,9 @@ import type {
   MarketplaceScreeningQuestion,
   MarketplaceTalentSearchResult,
   MarketplaceVerificationLevel,
+  ProjectMessage,
+  ProjectRoom,
+  ProjectSubmission,
   RuntimeProfile,
   SessionTokens,
   SmartAccountProvisionResponse,
@@ -334,6 +337,107 @@ export function createProductApiClient(options: ProductApiClientOptions = {}) {
       return requestJson<{ txHash: string }>(
         baseUrl,
         `/jobs/${encodeURIComponent(jobId)}/milestones/${milestoneIndex}/release`,
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+        },
+        accessToken,
+      );
+    },
+    getProjectRoom(jobId: string, accessToken: string) {
+      return requestJson<{ room: ProjectRoom }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room`,
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    postProjectRoomMessage(
+      jobId: string,
+      input: { body: string },
+      accessToken: string,
+    ) {
+      return requestJson<{ message: ProjectMessage }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    submitProjectMilestone(
+      jobId: string,
+      milestoneIndex: number,
+      input: {
+        note: string;
+        artifacts: Array<{
+          label: string;
+          url: string;
+          sha256: string;
+          mimeType?: string | null;
+          byteSize?: number | null;
+        }>;
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ submission: ProjectSubmission }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room/milestones/${milestoneIndex}/submissions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    requestProjectRevision(
+      jobId: string,
+      submissionId: string,
+      input: { note: string },
+      accessToken: string,
+    ) {
+      return requestJson<{ submission: ProjectSubmission }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room/submissions/${encodeURIComponent(
+          submissionId,
+        )}/revision-request`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    approveProjectSubmission(
+      jobId: string,
+      submissionId: string,
+      input: { note?: string | null },
+      accessToken: string,
+    ) {
+      return requestJson<{ submission: ProjectSubmission }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room/submissions/${encodeURIComponent(
+          submissionId,
+        )}/approve`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    deliverProjectSubmission(
+      jobId: string,
+      submissionId: string,
+      accessToken: string,
+    ) {
+      return requestJson<{ submission: ProjectSubmission; txHash: string }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/project-room/submissions/${encodeURIComponent(
+          submissionId,
+        )}/deliver`,
         {
           method: 'POST',
           body: JSON.stringify({}),

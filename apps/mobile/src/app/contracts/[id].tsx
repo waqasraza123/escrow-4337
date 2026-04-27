@@ -189,8 +189,26 @@ export default function ContractDetailRoute() {
 
       <ContractMilestonesCard job={job} participantRoles={participantRoles} />
 
+      <SurfaceCard animated delay={120}>
+        <Heading size="section">Project room</Heading>
+        <BodyText>
+          Review milestone submissions, revision requests, approvals, artifact metadata, and room
+          messages before onchain delivery.
+        </BodyText>
+        <PrimaryButton
+          onPress={() =>
+            router.push({
+              pathname: '/contracts/[id]/room',
+              params: { id: job.id },
+            })
+          }
+        >
+          Open project room
+        </PrimaryButton>
+      </SurfaceCard>
+
       {isClient ? (
-        <SurfaceCard animated delay={140}>
+        <SurfaceCard animated delay={160}>
           <Heading size="section">Funding</Heading>
           <BodyText>
             Fund the escrow after the contract and milestone plan are correct. The default value can

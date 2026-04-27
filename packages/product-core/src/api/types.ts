@@ -217,6 +217,137 @@ export type ContractorJoinReadiness = {
   };
 };
 
+export type ProjectArtifactStorageKind = 'external_url';
+
+export type ProjectArtifact = {
+  id: string;
+  label: string;
+  url: string;
+  sha256: string;
+  mimeType: string | null;
+  byteSize: number | null;
+  storageKind: ProjectArtifactStorageKind;
+  uploadedByUserId: string;
+  createdAt: number;
+};
+
+export type ProjectSubmissionStatus =
+  | 'submitted'
+  | 'revision_requested'
+  | 'approved'
+  | 'delivered';
+
+export type ProjectSubmission = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number;
+  note: string;
+  artifacts: ProjectArtifact[];
+  status: ProjectSubmissionStatus;
+  revisionRequest: {
+    note: string;
+    requestedByUserId: string;
+    requestedByEmail: string;
+    requestedAt: number;
+  } | null;
+  approval: {
+    note: string | null;
+    approvedByUserId: string;
+    approvedByEmail: string;
+    approvedAt: number;
+  } | null;
+  deliveredAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+  submittedBy: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type ProjectMessage = {
+  id: string;
+  jobId: string;
+  senderRole: 'client' | 'worker';
+  body: string;
+  createdAt: number;
+  sender: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type ProjectActivity =
+  | {
+      id: string;
+      source: 'room';
+      type:
+        | 'submission_posted'
+        | 'revision_requested'
+        | 'submission_approved'
+        | 'submission_delivered'
+        | 'message_posted'
+        | 'support_case_opened'
+        | 'support_case_message_posted'
+        | 'support_case_status_updated';
+      actorRole: 'client' | 'worker';
+      milestoneIndex: number | null;
+      relatedSubmissionId: string | null;
+      summary: string;
+      detail: string | null;
+      createdAt: number;
+      actor: {
+        userId: string;
+        email: string;
+      };
+    }
+  | {
+      id: string;
+      source: 'audit';
+      type: string;
+      actorRole: 'client' | 'worker' | 'system';
+      milestoneIndex: number | null;
+      summary: string;
+      detail: string | null;
+      createdAt: number;
+    };
+
+export type ProjectSupportCaseSummary = {
+  id: string;
+  jobId: string;
+  milestoneIndex: number | null;
+  reason:
+    | 'general_help'
+    | 'fee_question'
+    | 'fee_exception'
+    | 'stuck_funding'
+    | 'dispute_followup'
+    | 'release_delay';
+  status:
+    | 'open'
+    | 'investigating'
+    | 'waiting_on_client'
+    | 'waiting_on_worker'
+    | 'resolved';
+  severity: 'routine' | 'elevated' | 'critical';
+  subject: string;
+  description: string;
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  openedAt: number;
+  updatedAt: number;
+  resolvedAt: number | null;
+};
+
+export type ProjectRoom = {
+  job: JobView;
+  participantRoles: Array<'client' | 'worker'>;
+  submissions: ProjectSubmission[];
+  messages: ProjectMessage[];
+  activity: ProjectActivity[];
+  supportCases: ProjectSupportCaseSummary[];
+};
+
 export type MarketplaceAvailability = 'open' | 'limited' | 'unavailable';
 export type OpportunityVisibility = 'public' | 'private';
 export type OpportunityStatus =
