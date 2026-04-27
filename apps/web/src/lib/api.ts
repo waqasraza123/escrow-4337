@@ -1453,7 +1453,16 @@ export type MarketplaceInterviewMessage = {
   senderEmail: string;
   kind: MarketplaceInterviewMessageKind;
   body: string;
+  attachments: MarketplaceInterviewMessageAttachment[];
   createdAt: number;
+};
+
+export type MarketplaceInterviewMessageAttachment = {
+  id: string;
+  label: string | null;
+  url: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
 };
 
 export type MarketplaceInterviewThread = {
@@ -1466,6 +1475,8 @@ export type MarketplaceInterviewThread = {
   createdAt: number;
   updatedAt: number;
   messages: MarketplaceInterviewMessage[];
+  hasUnreadForClient: boolean;
+  hasUnreadForApplicant: boolean;
 };
 
 export type MarketplaceOfferMilestoneDraft = {
@@ -3276,6 +3287,7 @@ export const webApi = {
     input: {
       kind: 'clarification' | 'interview';
       body: string;
+      attachments?: MarketplaceInterviewMessageAttachment[];
     },
     accessToken: string,
   ) {
@@ -3286,6 +3298,14 @@ export const webApi = {
         method: 'POST',
         body: JSON.stringify(input),
       },
+      accessToken,
+    );
+  },
+  markMarketplaceApplicationInterviewThreadRead(id: string, accessToken: string) {
+    return requestJson<{ thread: MarketplaceInterviewThread }>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/interview/read`,
+      { method: 'POST' },
       accessToken,
     );
   },

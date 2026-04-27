@@ -218,6 +218,9 @@ async function loadApplicationData(
               application.id,
               accessToken,
             );
+            await webApi
+              .markMarketplaceApplicationInterviewThreadRead(application.id, accessToken)
+              .catch(() => {});
             timelinesByApplication[application.id] = timelineResponse.timeline;
           }),
         );
@@ -256,9 +259,12 @@ function getLatestInterviewSummary(timeline: MarketplaceApplicationTimeline) {
 
   const awaitingClientReply =
     latest.senderUserId === timeline.application.applicant.userId;
+  const hasUnreadForClient =
+    timeline.interviewThread?.hasUnreadForClient ?? false;
 
   return {
     latest,
+    hasUnreadForClient,
     awaitingClientReply,
   };
 }
@@ -417,7 +423,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
     }
 
     const pendingReplies = interviewRows.filter(
-      (entry) => entry.summary.awaitingClientReply,
+      (entry) => entry.summary.hasUnreadForClient,
     ).length;
     if (pendingReplies > 0) {
       items.push({
@@ -1643,11 +1649,30 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                           <strong>{timeline.application.applicant.displayName}</strong>
                           <p className={styles.stateText}>
                             {timeline.application.opportunity.title} •{' '}
-                            {summary.awaitingClientReply
+                            {summary.hasUnreadForClient
                               ? clientMessages.interviews.awaitingReply
                               : clientMessages.interviews.active}
                           </p>
                           <p className={styles.stateText}>{summary.latest.body}</p>
+                          {summary.latest.attachments.length > 0 ? (
+                            <div>
+                              {summary.latest.attachments.map((attachment, attachmentIndex) => (
+                                <p
+                                  key={`${attachment.id}-${attachmentIndex}`}
+                                  className={styles.stateText}
+                                  style={{ margin: '0.25rem 0' }}
+                                >
+                                  <a
+                                    href={attachment.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {attachment.label || attachment.url}
+                                  </a>
+                                </p>
+                              ))}
+                            </div>
+                          ) : null}
                           <p className={styles.stateText}>
                             {new Date(summary.latest.createdAt).toLocaleString()}
                           </p>

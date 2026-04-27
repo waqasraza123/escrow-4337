@@ -377,7 +377,10 @@ const webMessages = {
         topBarMeta:
           'Write decision-ready briefs, submit structured proposals, and review dossier-ranked applicants before escrow.',
         publicMarketplace: 'Public marketplace',
+        freelancerConsole: 'Open freelancer console',
+        workspaceSummary: 'Workspace summary',
         loadingTitle: 'Loading workspace…',
+        loadingBody: 'Restoring your freelancer workspace and active offers.',
         sessionRequiredTitle: 'Session required for hiring actions',
         sessionRequiredBody:
           'Public browse is open, but structured profiles, briefs, proposals, and hires still use the authenticated product session.',
@@ -684,6 +687,9 @@ const webMessages = {
         skillOverlap: 'Skill overlap',
         requirementGaps: 'Requirement gaps',
         myApplicationsTitle: 'My applications',
+        activeNegotiations: 'Active negotiations',
+        noActiveOffers: 'No active offers to respond to.',
+        noInterviewMessages: 'No messages yet.',
         noApplications: 'No applications yet.',
         withdraw: 'Withdraw',
         discoverEyebrow: 'Discover',
@@ -696,6 +702,7 @@ const webMessages = {
         submitStructuredApplication: 'Submit structured application',
         messages: {
           loadFailed: 'Failed to load workspace.',
+          signedOut: 'Marketplace session cleared.',
           sessionCleared: 'Marketplace session cleared.',
           workspaceSwitched: 'Workspace switched.',
           signInBeforeEdit:
@@ -2013,7 +2020,10 @@ const webMessages = {
         topBarMeta:
           'أنشئ عروضاً موجزة جاهزة للقرار، وقدّم عروضاً منظمة، وراجع المرشحين المصنفين بالدوسيه قبل الضمان.',
         publicMarketplace: 'السوق العام',
+        freelancerConsole: 'فتح لوحة المستقل',
+        workspaceSummary: 'ملخص مساحة العمل',
         loadingTitle: 'جارٍ تحميل مساحة العمل…',
+        loadingBody: 'جارٍ استعادة مساحة المستقل والعروض النشطة.',
         sessionRequiredTitle: 'الجلسة مطلوبة لإجراءات التوظيف',
         sessionRequiredBody:
           'التصفح العام متاح، لكن الملفات المنظمة والعروض والطلبات وعمليات التوظيف ما تزال تعتمد على جلسة المنتج الموثقة.',
@@ -2318,6 +2328,9 @@ const webMessages = {
         skillOverlap: 'تداخل المهارات',
         requirementGaps: 'فجوات المتطلبات',
         myApplicationsTitle: 'طلباتي',
+        activeNegotiations: 'المفاوضات النشطة',
+        noActiveOffers: 'لا توجد عروض نشطة للرد عليها حالياً.',
+        noInterviewMessages: 'لا توجد رسائل بعد.',
         noApplications: 'لا توجد طلبات بعد.',
         withdraw: 'سحب',
         discoverEyebrow: 'اكتشف',
@@ -2330,6 +2343,7 @@ const webMessages = {
         submitStructuredApplication: 'إرسال طلب منظم',
         messages: {
           loadFailed: 'تعذر تحميل مساحة العمل.',
+          signedOut: 'تم مسح جلسة السوق.',
           sessionCleared: 'تم مسح جلسة السوق.',
           workspaceSwitched: 'تم تبديل مساحة العمل.',
           signInBeforeEdit:

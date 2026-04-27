@@ -237,6 +237,18 @@ function normalizeProofArtifacts(
   }));
 }
 
+function normalizeInterviewMessageAttachments(
+  attachments: CreateMarketplaceInterviewMessageDto['attachments'],
+) {
+  return attachments.map((attachment) => ({
+    id: attachment.id ?? randomUUID(),
+    label: attachment.label?.trim() || null,
+    url: attachment.url.trim(),
+    mimeType: attachment.mimeType?.trim() || null,
+    sizeBytes: attachment.sizeBytes ?? null,
+  }));
+}
+
 function normalizeScreeningQuestions(values: MarketplaceScreeningQuestion[]) {
   return values.map((question) => ({
     ...question,
@@ -2676,8 +2688,10 @@ export class MarketplaceService {
   ): Promise<MarketplaceApplicationTimelineResponse> {
     const application = await this.requireApplication(applicationId);
     await this.assertApplicationTimelineAccess(userId, application);
+    const opportunity = await this.requireOpportunity(application.opportunityId);
+    const access = await this.getApplicationAccess(userId, application, opportunity);
     return {
-      timeline: await this.buildApplicationTimeline(application, userId),
+      timeline: await this.buildApplicationTimeline(application, userId, access),
     };
   }
 
@@ -2690,10 +2704,33 @@ export class MarketplaceService {
     const opportunity = await this.requireOpportunity(
       application.opportunityId,
     );
+    const access = await this.getApplicationAccess(userId, application, opportunity);
     const thread = await this.getOrCreateInterviewThread(
       application,
       opportunity,
     );
+    await this.markInterviewThreadRead(thread, access);
+    return {
+      thread: await this.toInterviewThreadView(thread),
+    };
+  }
+
+  async markApplicationInterviewThreadRead(
+    userId: string,
+    applicationId: string,
+  ): Promise<MarketplaceInterviewThreadResponse> {
+    const application = await this.requireApplication(applicationId);
+    const opportunity = await this.requireOpportunity(
+      application.opportunityId,
+    );
+    const access = await this.getApplicationAccess(userId, application, opportunity);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this marketplace interview thread',
+      );
+    }
+    const thread = await this.getOrCreateInterviewThread(application, opportunity);
+    await this.markInterviewThreadRead(thread, access);
     return {
       thread: await this.toInterviewThreadView(thread),
     };
@@ -2736,11 +2773,13 @@ export class MarketplaceService {
       senderWorkspaceId: senderWorkspaceId ?? null,
       kind: dto.kind,
       body: dto.body.trim(),
+      attachments: normalizeInterviewMessageAttachments(dto.attachments),
       createdAt: now,
     };
     await this.marketplaceRepository.saveInterviewMessage(message);
     thread.status = 'open';
     thread.updatedAt = now;
+    await this.markInterviewThreadRead(thread, access);
     await this.marketplaceRepository.saveInterviewThread(thread);
     if (
       application.status === 'submitted' ||
@@ -4409,12 +4448,34 @@ export class MarketplaceService {
       opportunityId: opportunity.id,
       clientUserId: opportunity.ownerUserId,
       applicantUserId: application.applicantUserId,
+      lastReadByClientAt: null,
+      lastReadByApplicantAt: null,
       status: 'open',
       createdAt: now,
       updatedAt: now,
     };
     await this.marketplaceRepository.saveInterviewThread(thread);
     return thread;
+  }
+
+  private async markInterviewThreadRead(
+    thread: MarketplaceInterviewThreadRecord,
+    access: Awaited<ReturnType<MarketplaceService['getApplicationAccess']>>,
+  ) {
+    const now = Date.now();
+    let changed = false;
+    if (access.asOwner && thread.lastReadByClientAt !== now) {
+      thread.lastReadByClientAt = now;
+      changed = true;
+    }
+    if (access.asApplicant && thread.lastReadByApplicantAt !== now) {
+      thread.lastReadByApplicantAt = now;
+      changed = true;
+    }
+    if (!changed) {
+      return;
+    }
+    await this.marketplaceRepository.saveInterviewThread(thread);
   }
 
   private async toInterviewThreadView(
@@ -4434,15 +4495,36 @@ export class MarketplaceService {
         } satisfies MarketplaceInterviewMessageView;
       }),
     );
+    const hasUnreadForClient =
+      messageViews.some((message) => {
+        if (message.senderUserId === thread.clientUserId) {
+          return false;
+        }
+        return thread.lastReadByClientAt === null
+          ? true
+          : message.createdAt > thread.lastReadByClientAt;
+      });
+    const hasUnreadForApplicant =
+      messageViews.some((message) => {
+        if (message.senderUserId === thread.applicantUserId) {
+          return false;
+        }
+        return thread.lastReadByApplicantAt === null
+          ? true
+          : message.createdAt > thread.lastReadByApplicantAt;
+      });
     return {
       ...thread,
       messages: messageViews,
+      hasUnreadForClient,
+      hasUnreadForApplicant,
     };
   }
 
   private async buildApplicationTimeline(
     application: MarketplaceApplicationRecord,
     viewerUserId?: string,
+    viewerAccess?: Awaited<ReturnType<MarketplaceService['getApplicationAccess']>>,
   ): Promise<MarketplaceApplicationTimelineView> {
     const revisions = (
       await this.marketplaceRepository.listApplicationRevisions()
@@ -4453,6 +4535,9 @@ export class MarketplaceService {
       (await this.marketplaceRepository.listInterviewThreads())
         .filter((entry) => entry.applicationId === application.id)
         .sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
+    if (thread && viewerAccess) {
+      await this.markInterviewThreadRead(thread, viewerAccess);
+    }
     const offers = (await this.marketplaceRepository.listOffers())
       .filter((offer) => offer.applicationId === application.id)
       .sort(

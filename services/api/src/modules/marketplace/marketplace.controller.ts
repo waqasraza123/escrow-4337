@@ -616,6 +616,15 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('applications/:id/interview/read')
+  markApplicationInterviewThreadRead(
+    @User() user: ReqUser,
+    @Param('id') id: string,
+  ) {
+    return this.marketplaceService.markApplicationInterviewThreadRead(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
   @Post('applications/:id/interview/messages')
   postApplicationInterviewMessage(
     @User() user: ReqUser,

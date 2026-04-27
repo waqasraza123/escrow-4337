@@ -171,6 +171,8 @@ type MarketplaceInterviewThreadRow = QueryResultRow & {
   opportunity_id: string;
   client_user_id: string;
   applicant_user_id: string;
+  last_read_by_client_at: string | null;
+  last_read_by_applicant_at: string | null;
   status: MarketplaceInterviewThreadStatus;
   created_at_ms: string;
   updated_at_ms: string;
@@ -185,6 +187,7 @@ type MarketplaceInterviewMessageRow = QueryResultRow & {
   sender_workspace_id: string | null;
   kind: MarketplaceInterviewMessageKind;
   body: string;
+  attachments_json: MarketplaceInterviewMessageRecord['attachments'];
   created_at_ms: string;
 };
 
@@ -627,6 +630,14 @@ function mapInterviewThread(
     opportunityId: row.opportunity_id,
     clientUserId: row.client_user_id,
     applicantUserId: row.applicant_user_id,
+    lastReadByClientAt:
+      row.last_read_by_client_at === null
+        ? null
+        : Number(row.last_read_by_client_at),
+    lastReadByApplicantAt:
+      row.last_read_by_applicant_at === null
+        ? null
+        : Number(row.last_read_by_applicant_at),
     status: row.status,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
@@ -642,10 +653,11 @@ function mapInterviewMessage(
     applicationId: row.application_id,
     opportunityId: row.opportunity_id,
     senderUserId: row.sender_user_id,
-    senderWorkspaceId: row.sender_workspace_id,
-    kind: row.kind,
-    body: row.body,
-    createdAt: Number(row.created_at_ms),
+  senderWorkspaceId: row.sender_workspace_id,
+  kind: row.kind,
+  body: row.body,
+  attachments: row.attachments_json ?? [],
+  createdAt: Number(row.created_at_ms),
   };
 }
 
@@ -1670,13 +1682,16 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       `
         INSERT INTO marketplace_interview_threads (
           id, application_id, opportunity_id, client_user_id, applicant_user_id,
-          status, created_at_ms, updated_at_ms
+          status, created_at_ms, updated_at_ms, last_read_by_client_at,
+          last_read_by_applicant_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (id)
         DO UPDATE SET
           status = EXCLUDED.status,
-          updated_at_ms = EXCLUDED.updated_at_ms
+          updated_at_ms = EXCLUDED.updated_at_ms,
+          last_read_by_client_at = EXCLUDED.last_read_by_client_at,
+          last_read_by_applicant_at = EXCLUDED.last_read_by_applicant_at
       `,
       [
         thread.id,
@@ -1687,6 +1702,12 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         thread.status,
         String(thread.createdAt),
         String(thread.updatedAt),
+        thread.lastReadByClientAt === null
+          ? null
+          : String(thread.lastReadByClientAt),
+        thread.lastReadByApplicantAt === null
+          ? null
+          : String(thread.lastReadByApplicantAt),
       ],
     );
   }
@@ -1722,12 +1743,13 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       `
         INSERT INTO marketplace_interview_messages (
           id, thread_id, application_id, opportunity_id, sender_user_id,
-          sender_workspace_id, kind, body, created_at_ms
+          sender_workspace_id, kind, body, attachments_json, created_at_ms
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (id)
         DO UPDATE SET
-          body = EXCLUDED.body
+          body = EXCLUDED.body,
+          attachments_json = EXCLUDED.attachments_json
       `,
       [
         message.id,
@@ -1738,6 +1760,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         message.senderWorkspaceId,
         message.kind,
         message.body,
+        JSON.stringify(message.attachments ?? []),
         String(message.createdAt),
       ],
     );

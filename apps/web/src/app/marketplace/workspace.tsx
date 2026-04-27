@@ -1609,6 +1609,9 @@ export function MarketplaceWorkspace() {
       applicationId,
       tokens.accessToken,
     );
+    await webApi
+      .markMarketplaceApplicationInterviewThreadRead(applicationId, tokens.accessToken)
+      .catch(() => {});
     setApplicationTimelines((current) => ({
       ...current,
       [applicationId]: response.timeline,
@@ -2411,6 +2414,15 @@ export function MarketplaceWorkspace() {
                     {clientConsoleMessages.actions.openClientConsole}
                   </Link>
                 ) : null}
+                {isFreelancerWorkspace ? (
+                  <Link
+                    className={`${styles.actionLink} ${styles.actionLinkPrimary}`}
+                    data-testid="workspace-freelancer-console-link"
+                    href="/app/marketplace/freelancer"
+                  >
+                    {workspaceMessages.freelancerConsole}
+                  </Link>
+                ) : null}
               </div>
             </div>
             <div className={styles.heroCard}>
@@ -2608,6 +2620,14 @@ export function MarketplaceWorkspace() {
                         href="/app/marketplace/client"
                       >
                         {clientConsoleMessages.actions.openClientConsole}
+                      </Link>
+                    ) : null}
+                    {isFreelancerWorkspace ? (
+                      <Link
+                        className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                        href="/app/marketplace/freelancer"
+                      >
+                        {workspaceMessages.freelancerConsole}
                       </Link>
                     ) : null}
                   </div>
@@ -4925,9 +4945,30 @@ export function MarketplaceWorkspace() {
                               </span>
                               {applicationTimelines[application.id].interviewThread?.messages.map(
                                 (message) => (
-                                  <p key={message.id} className={styles.stateText}>
-                                    <strong>{message.senderEmail}</strong>: {message.body}
-                                  </p>
+                                  <div key={message.id}>
+                                    <p className={styles.stateText}>
+                                      <strong>{message.senderEmail}</strong>: {message.body}
+                                    </p>
+                                    {message.attachments.length > 0 ? (
+                                      <div>
+                                      {message.attachments.map((attachment, attachmentIndex) => (
+                                        <p
+                                          key={`${attachment.id}-${attachmentIndex}`}
+                                          className={styles.stateText}
+                                          style={{ margin: '0.25rem 0 0' }}
+                                        >
+                                            <a
+                                              href={attachment.url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                            >
+                                              {attachment.label || attachment.url}
+                                            </a>
+                                          </p>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </div>
                                 ),
                               ) ?? null}
                               <label className={styles.field}>
@@ -5285,9 +5326,30 @@ export function MarketplaceWorkspace() {
                         </span>
                         {applicationTimelines[application.id].interviewThread?.messages.map(
                           (message) => (
-                            <p key={message.id} className={styles.stateText}>
-                              <strong>{message.senderEmail}</strong>: {message.body}
-                            </p>
+                            <div key={message.id}>
+                              <p className={styles.stateText}>
+                                <strong>{message.senderEmail}</strong>: {message.body}
+                              </p>
+                              {message.attachments.length > 0 ? (
+                                <div>
+                                  {message.attachments.map((attachment, attachmentIndex) => (
+                                    <p
+                                      key={`${attachment.id}-${attachmentIndex}`}
+                                      className={styles.stateText}
+                                      style={{ margin: '0.25rem 0 0' }}
+                                    >
+                                      <a
+                                        href={attachment.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        {attachment.label || attachment.url}
+                                      </a>
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
                           ),
                         ) ?? null}
                         <label className={styles.field}>

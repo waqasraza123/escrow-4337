@@ -134,7 +134,21 @@ function normalizeInterviewThread(
 ): MarketplaceInterviewThreadRecord {
   return {
     ...thread,
+    lastReadByClientAt: thread.lastReadByClientAt ?? null,
+    lastReadByApplicantAt: thread.lastReadByApplicantAt ?? null,
   };
+}
+
+function normalizeInterviewMessageAttachments(
+  attachments: MarketplaceInterviewMessageRecord['attachments'] | null | undefined,
+) {
+  return (attachments ?? []).map((attachment) => ({
+    id: attachment.id?.trim() || '',
+    label: attachment.label?.trim() || null,
+    url: attachment.url.trim(),
+    mimeType: attachment.mimeType?.trim() || null,
+    sizeBytes: attachment.sizeBytes ?? null,
+  }));
 }
 
 function normalizeInterviewMessage(
@@ -143,6 +157,7 @@ function normalizeInterviewMessage(
   return {
     ...message,
     body: message.body.trim(),
+    attachments: normalizeInterviewMessageAttachments(message.attachments),
   };
 }
 

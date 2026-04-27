@@ -623,9 +623,19 @@ export type MarketplaceInterviewThreadRecord = {
   opportunityId: string;
   clientUserId: string;
   applicantUserId: string;
+  lastReadByClientAt: number | null;
+  lastReadByApplicantAt: number | null;
   status: MarketplaceInterviewThreadStatus;
   createdAt: number;
   updatedAt: number;
+};
+
+export type MarketplaceInterviewMessageAttachment = {
+  id: string;
+  label: string | null;
+  url: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
 };
 
 export type MarketplaceInterviewMessageRecord = {
@@ -637,6 +647,7 @@ export type MarketplaceInterviewMessageRecord = {
   senderWorkspaceId: string | null;
   kind: MarketplaceInterviewMessageKind;
   body: string;
+  attachments: MarketplaceInterviewMessageAttachment[];
   createdAt: number;
 };
 
@@ -951,6 +962,8 @@ export type MarketplaceInterviewMessageView =
 export type MarketplaceInterviewThreadView =
   MarketplaceInterviewThreadRecord & {
     messages: MarketplaceInterviewMessageView[];
+    hasUnreadForClient: boolean;
+    hasUnreadForApplicant: boolean;
   };
 
 export type MarketplaceOfferView = MarketplaceOfferRecord;

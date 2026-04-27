@@ -3,6 +3,52 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Interview Attachment Render Stability)
+- Finished final robustness pass on attachment rendering for interview messages:
+  - changed attachment list keys in client and freelancer interview render paths to include element index fallback
+  - prevents React key collisions when legacy attachment records omit IDs
+- Verification:
+  - no tests/builds run by request
+
+## Update (2026-04-27, Marketplace Interview Read State and Attachments)
+- Completed marketplace interview read-state and attachment support:
+  - upgraded file persistence payload to `version: 32`
+  - added postgres migration for interview read timestamps and message attachments
+  - wired read-state + attachments through marketplace persistence repositories
+  - added `/marketplace/applications/:id/interview/read` client API method and thread/message typing updates
+- Updated marketplace UI flows to use unread signals and render attachment links:
+  - client/freelancer/workspace timeline views now call mark-as-read on load
+  - interviews list uses `hasUnreadForClient`
+  - message histories render attachment links
+- Verification:
+  - no tests/builds run by request
+
+## Update (2026-04-27, Freelancer Interview Messaging)
+- Added in-console interview messaging for the freelancer lane in `apps/web/src/app/marketplace/freelancer-console.tsx`.
+- Loaded and rendered interview-thread messages from application timelines so freelancers can review message history per active offer.
+- Added message draft compose + send flow using `POST /marketplace/applications/:id/interview/messages` via `webApi.postMarketplaceApplicationInterviewMessage`.
+- Added `workspace.noInterviewMessages` copy for EN and AR in `apps/web/src/lib/i18n.tsx`.
+- Session update includes the new feature state and localized messaging.
+- Verification:
+  - No tests/builds run by request.
+
+## Update (2026-04-27, Freelancer Marketplace Console Route)
+- Wired the existing `apps/web/src/app/marketplace/freelancer-console.tsx` into product navigation.
+- Added `/app/marketplace/freelancer` route at
+  `apps/web/src/app/app/marketplace/freelancer/page.tsx` to match the Upwork-like split
+  between hiring and freelancer negotiation workflows.
+- Added new workspace-console labels for freelancer route/sections in `apps/web/src/lib/i18n.tsx`.
+- Updated `apps/web/src/app/marketplace/workspace.tsx` to expose the freelancer console when
+  in freelancer mode from both the top hero quick actions and the onboarding freelancer card.
+- Changed files:
+  `apps/web/src/app/marketplace/workspace.tsx`
+  `apps/web/src/app/marketplace/freelancer-console.tsx` (existing)
+  `apps/web/src/app/app/marketplace/freelancer/page.tsx`
+  `apps/web/src/lib/i18n.tsx`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - changed with minimal localization-safe keys for EN and AR
+
 ## Update (2026-04-27, Client Console Offer Negotiation)
 - Started from a tree with no unrelated local edits beyond this feature branch.
 - Implemented the next production-grade Upwork-like client-side offer workflow in
