@@ -89,6 +89,24 @@ export type MobileRecoveryEvidenceSummary = {
   snapshotCount: number | null;
 };
 
+export type MobileRecoveryEvidenceScenarioCoverage = {
+  reportCount: number;
+  latestCapturedAt: string | null;
+  latestOutcome: MobileRecoveryEvidenceOutcome | null;
+  latestCheckCounts: Record<MobileRecoveryEvidenceCheckStatus, number>;
+  hasPassedReport: boolean;
+  hasFailedReport: boolean;
+};
+
+export type MobileRecoveryEvidenceCoverage = {
+  allScenariosObserved: boolean;
+  completeScenarioCount: number;
+  failingScenarioCount: number;
+  passingScenarioCount: number;
+  scenarios: Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceScenarioCoverage>;
+  totalScenarioCount: number;
+};
+
 export type MobileRecoveryEvidenceScenario =
   | 'offline_start'
   | 'api_recovery'
@@ -107,6 +125,18 @@ export type MobileRecoveryEvidenceCheck = {
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
 export const mobileRecoveryEvidenceMaxEntries = 12;
 export const mobileRecoveryEvidenceMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
+export const mobileRecoveryEvidenceScenarios: MobileRecoveryEvidenceScenario[] = [
+  'offline_start',
+  'api_recovery',
+  'wallet_return',
+  'project_room',
+];
+
+const emptyCheckCounts: Record<MobileRecoveryEvidenceCheckStatus, number> = {
+  fail: 0,
+  pass: 0,
+  warn: 0,
+};
 
 function buildAppVersionLabel() {
   return Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? 'unknown';
@@ -185,8 +215,19 @@ function countChecks(checks: MobileRecoveryEvidenceCheck[]) {
       counts[check.status] += 1;
       return counts;
     },
-    { fail: 0, pass: 0, warn: 0 },
+    { ...emptyCheckCounts },
   );
+}
+
+function createEmptyScenarioCoverage(): MobileRecoveryEvidenceScenarioCoverage {
+  return {
+    hasFailedReport: false,
+    hasPassedReport: false,
+    latestCapturedAt: null,
+    latestCheckCounts: { ...emptyCheckCounts },
+    latestOutcome: null,
+    reportCount: 0,
+  };
 }
 
 function getSnapshotResourceCount(
@@ -504,6 +545,51 @@ export async function listMobileRecoveryEvidence(): Promise<MobileRecoveryEviden
     })
     .filter((summary): summary is MobileRecoveryEvidenceSummary => Boolean(summary))
     .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
+}
+
+export function summarizeMobileRecoveryEvidenceCoverage(
+  history: MobileRecoveryEvidenceSummary[],
+): MobileRecoveryEvidenceCoverage {
+  const scenarios = mobileRecoveryEvidenceScenarios.reduce<
+    Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceScenarioCoverage>
+  >((coverage, scenario) => {
+    coverage[scenario] = createEmptyScenarioCoverage();
+    return coverage;
+  }, {} as Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceScenarioCoverage>);
+
+  for (const summary of history) {
+    const scenarioCoverage = scenarios[summary.scenario];
+    scenarioCoverage.reportCount += 1;
+    scenarioCoverage.hasPassedReport =
+      scenarioCoverage.hasPassedReport || summary.outcome === 'passed';
+    scenarioCoverage.hasFailedReport =
+      scenarioCoverage.hasFailedReport || summary.outcome === 'failed';
+
+    const latestMs = scenarioCoverage.latestCapturedAt
+      ? Date.parse(scenarioCoverage.latestCapturedAt)
+      : Number.NEGATIVE_INFINITY;
+    const summaryMs = Date.parse(summary.capturedAt);
+
+    if (Number.isFinite(summaryMs) && summaryMs >= latestMs) {
+      scenarioCoverage.latestCapturedAt = summary.capturedAt;
+      scenarioCoverage.latestCheckCounts = summary.checkCounts;
+      scenarioCoverage.latestOutcome = summary.outcome;
+    }
+  }
+
+  const scenarioValues = Object.values(scenarios);
+  const completeScenarioCount = scenarioValues.filter((coverage) => coverage.reportCount > 0).length;
+  const passingScenarioCount = scenarioValues.filter((coverage) => coverage.hasPassedReport).length;
+  const failingScenarioCount = scenarioValues.filter((coverage) => coverage.hasFailedReport).length;
+
+  return {
+    allScenariosObserved: completeScenarioCount === mobileRecoveryEvidenceScenarios.length,
+    completeScenarioCount,
+    failingScenarioCount,
+    passingScenarioCount,
+    scenarios,
+    totalScenarioCount: mobileRecoveryEvidenceScenarios.length,
+  };
 }
 
 export async function readMobileRecoveryEvidenceReport(id: string) {

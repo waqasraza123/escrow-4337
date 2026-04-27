@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Coverage)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added ledger-level scenario coverage summaries in `mobileRecoveryEvidence.ts`
+  - coverage tracks all four supported scenarios: offline start, API recovery, wallet return, project room
+  - coverage includes captured scenario count, passing scenario count, failing scenario count, per-scenario latest outcome, latest check counts, and report count
+  - Account now shows total scenario coverage plus per-scenario status for the local evidence ledger
+  - documented coverage semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture one real iOS/Android evidence report per supported scenario and use the coverage summary to confirm all four scenarios are represented before exporting evidence.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Checks)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

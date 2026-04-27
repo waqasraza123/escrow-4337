@@ -19,6 +19,7 @@ import {
   mobileRecoveryEvidenceMaxEntries,
   readMobileRecoveryEvidenceReport,
   saveMobileRecoveryEvidenceReport,
+  summarizeMobileRecoveryEvidenceCoverage,
   type MobileRecoveryEvidenceOutcome,
   type MobileRecoveryEvidenceScenario,
   type MobileRecoveryEvidenceSummary,
@@ -64,6 +65,25 @@ function formatCheckCounts(summary: MobileRecoveryEvidenceSummary | null) {
 
   const { fail, pass, warn } = summary.checkCounts;
   return `${pass} pass / ${warn} warn / ${fail} fail`;
+}
+
+function formatScenarioCoverage(
+  scenario: MobileRecoveryEvidenceScenario,
+  coverage: ReturnType<typeof summarizeMobileRecoveryEvidenceCoverage>,
+) {
+  const scenarioCoverage = coverage.scenarios[scenario];
+
+  if (!scenarioCoverage.reportCount) {
+    return 'Missing';
+  }
+
+  const latestOutcome = scenarioCoverage.latestOutcome
+    ? evidenceOutcomeLabels[scenarioCoverage.latestOutcome]
+    : 'Observed';
+
+  return `${latestOutcome} / ${scenarioCoverage.reportCount} report${
+    scenarioCoverage.reportCount === 1 ? '' : 's'
+  }`;
 }
 
 export function MobileRecoveryEvidenceCard({
@@ -204,6 +224,7 @@ export function MobileRecoveryEvidenceCard({
   }
 
   const latestReport = history[0] ?? null;
+  const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
 
   return (
     <SurfaceCard animated delay={delay}>
@@ -259,6 +280,34 @@ export function MobileRecoveryEvidenceCard({
         label="Saved reports"
         value={historyLoading ? 'Checking' : `${history.length}/${mobileRecoveryEvidenceMaxEntries}`}
       />
+      <MetricRow
+        label="Scenario coverage"
+        value={
+          historyLoading
+            ? 'Checking'
+            : `${coverage.completeScenarioCount}/${coverage.totalScenarioCount} captured`
+        }
+      />
+      <MetricRow
+        label="Passing scenarios"
+        value={
+          historyLoading
+            ? 'Checking'
+            : `${coverage.passingScenarioCount}/${coverage.totalScenarioCount}`
+        }
+      />
+      <MetricRow
+        label="Failing scenarios"
+        value={
+          historyLoading
+            ? 'Checking'
+            : `${coverage.failingScenarioCount}/${coverage.totalScenarioCount}`
+        }
+      />
+      <MetricRow label="Offline evidence" value={formatScenarioCoverage('offline_start', coverage)} />
+      <MetricRow label="API evidence" value={formatScenarioCoverage('api_recovery', coverage)} />
+      <MetricRow label="Wallet evidence" value={formatScenarioCoverage('wallet_return', coverage)} />
+      <MetricRow label="Room evidence" value={formatScenarioCoverage('project_room', coverage)} />
       <MetricRow
         label="Latest report"
         value={
