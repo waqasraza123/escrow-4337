@@ -37,6 +37,7 @@ import type {
   ApplyToOpportunityDto,
   CreateMarketplaceAutomationRuleDto,
   CreateMarketplaceInterviewMessageDto,
+  CreateMarketplaceInterviewMessageAttachmentDto,
   CreateMarketplaceOfferDto,
   CreateMarketplaceOpportunityInviteDto,
   CreateMarketplaceRehireOpportunityDto,
@@ -240,7 +241,7 @@ function normalizeProofArtifacts(
 function normalizeInterviewMessageAttachments(
   attachments: CreateMarketplaceInterviewMessageDto['attachments'],
 ) {
-  return attachments.map((attachment) => ({
+  return attachments.map((attachment: CreateMarketplaceInterviewMessageAttachmentDto) => ({
     id: attachment.id ?? randomUUID(),
     label: attachment.label?.trim() || null,
     url: attachment.url.trim(),

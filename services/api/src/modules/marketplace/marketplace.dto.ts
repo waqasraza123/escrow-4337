@@ -419,8 +419,8 @@ export const createMarketplaceInterviewMessageSchema = z
           })
           .strict(),
       )
-      .default([])
-      .max(12),
+      .max(12)
+      .default([]),
     kind: z.enum(['clarification', 'interview']),
     body: z.string().trim().min(1).max(4000),
   })
