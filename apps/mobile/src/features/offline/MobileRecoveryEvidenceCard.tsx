@@ -87,6 +87,25 @@ function formatScenarioCoverage(
   }`;
 }
 
+function formatBundleReadiness({
+  coverage,
+  historyLoading,
+}: {
+  coverage: ReturnType<typeof summarizeMobileRecoveryEvidenceCoverage>;
+  historyLoading: boolean;
+}) {
+  if (historyLoading) {
+    return 'Checking';
+  }
+
+  if (coverage.allScenariosObserved) {
+    return 'Ready';
+  }
+
+  const missingScenarioCount = coverage.totalScenarioCount - coverage.completeScenarioCount;
+  return `${missingScenarioCount} scenario${missingScenarioCount === 1 ? '' : 's'} missing`;
+}
+
 export function MobileRecoveryEvidenceCard({
   delay = 60,
   snapshotSummary,
@@ -209,9 +228,8 @@ export function MobileRecoveryEvidenceCard({
     setSharingBundle(true);
     try {
       const bundle = await buildMobileRecoveryEvidenceBundle(history);
-      const includedReportCount = Object.keys(bundle.reportsByScenario).length;
 
-      if (!includedReportCount) {
+      if (!bundle.readiness.includedScenarioCount) {
         await refreshHistory();
         Alert.alert(
           'Evidence bundle unavailable',
@@ -224,6 +242,10 @@ export function MobileRecoveryEvidenceCard({
         title: 'Escrow4337 mobile recovery evidence bundle',
         message: JSON.stringify(bundle, null, 2),
       });
+
+      if (bundle.readiness.unreadableScenarios.length) {
+        await refreshHistory();
+      }
     } catch (error) {
       Alert.alert(
         'Evidence bundle not shared',
@@ -323,6 +345,10 @@ export function MobileRecoveryEvidenceCard({
             ? 'Checking'
             : `${coverage.completeScenarioCount}/${coverage.totalScenarioCount} captured`
         }
+      />
+      <MetricRow
+        label="Bundle readiness"
+        value={formatBundleReadiness({ coverage, historyLoading })}
       />
       <MetricRow
         label="Passing scenarios"

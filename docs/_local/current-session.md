@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Bundle Readiness)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added explicit `MobileRecoveryEvidenceBundleReadiness` metadata to coverage bundles
+  - bundle readiness records generated report count, required scenario count, included readable scenario count, missing scenarios, unreadable scenarios, and final ready/partial posture
+  - bundle generation now falls back to the latest readable saved report for a scenario while recording unreadable skipped reports
+  - Account now displays bundle readiness before sharing
+  - sharing a bundle refreshes the ledger if stale unreadable report bodies are detected during bundle generation
+  - documented readiness semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture all four scenario reports on a real device, then preserve the shared bundle only when its `readiness.ready` value is `true`.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Bundle)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

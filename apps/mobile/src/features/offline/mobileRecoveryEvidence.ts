@@ -111,8 +111,18 @@ export type MobileRecoveryEvidenceBundle = {
   version: 1;
   generatedAt: string;
   coverage: MobileRecoveryEvidenceCoverage;
+  readiness: MobileRecoveryEvidenceBundleReadiness;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
   reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>>;
+};
+
+export type MobileRecoveryEvidenceBundleReadiness = {
+  ready: boolean;
+  generatedFromReportCount: number;
+  includedScenarioCount: number;
+  missingScenarios: MobileRecoveryEvidenceScenario[];
+  requiredScenarioCount: number;
+  unreadableScenarios: MobileRecoveryEvidenceScenario[];
 };
 
 export type MobileRecoveryEvidenceScenario =
@@ -608,33 +618,69 @@ export async function buildMobileRecoveryEvidenceBundle(
   history: MobileRecoveryEvidenceSummary[],
 ): Promise<MobileRecoveryEvidenceBundle> {
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const missingScenarios: MobileRecoveryEvidenceScenario[] = [];
   const reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>> = {};
   const reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>> =
     {};
+  const unreadableScenarios: MobileRecoveryEvidenceScenario[] = [];
 
   for (const scenario of mobileRecoveryEvidenceScenarios) {
-    const latest = history
+    const scenarioHistory = history
       .filter((summary) => summary.scenario === scenario)
-      .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))[0];
+      .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
 
-    if (!latest) {
+    if (!scenarioHistory.length) {
+      missingScenarios.push(scenario);
       continue;
     }
 
-    const report = await readMobileRecoveryEvidenceReport(latest.id);
+    let selectedReportId: string | null = null;
+    let selectedReport: MobileRecoveryEvidenceReport | null = null;
+    let skippedUnreadableReport = false;
 
-    if (!report) {
+    for (const summary of scenarioHistory) {
+      const report = await readMobileRecoveryEvidenceReport(summary.id);
+
+      if (report) {
+        selectedReportId = summary.id;
+        selectedReport = report;
+        break;
+      }
+
+      skippedUnreadableReport = true;
+    }
+
+    if (!selectedReportId || !selectedReport) {
+      unreadableScenarios.push(scenario);
       continue;
     }
 
-    reportIdsByScenario[scenario] = latest.id;
-    reportsByScenario[scenario] = report;
+    if (skippedUnreadableReport) {
+      unreadableScenarios.push(scenario);
+    }
+
+    reportIdsByScenario[scenario] = selectedReportId;
+    reportsByScenario[scenario] = selectedReport;
   }
+
+  const includedScenarioCount = Object.keys(reportsByScenario).length;
+  const requiredScenarioCount = mobileRecoveryEvidenceScenarios.length;
 
   return {
     version: 1,
     coverage,
     generatedAt: new Date().toISOString(),
+    readiness: {
+      generatedFromReportCount: history.length,
+      includedScenarioCount,
+      missingScenarios,
+      ready:
+        includedScenarioCount === requiredScenarioCount &&
+        missingScenarios.length === 0 &&
+        unreadableScenarios.length === 0,
+      requiredScenarioCount,
+      unreadableScenarios,
+    },
     reportIdsByScenario,
     reportsByScenario,
   };
