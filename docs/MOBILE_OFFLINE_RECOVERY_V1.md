@@ -22,7 +22,7 @@ The slice is intentionally native-client focused. It does not introduce a durabl
 
 `apps/mobile/src/providers/root.tsx` mounts `MobileNetworkProvider` above `QueryProvider`. This ordering lets the network provider update React Query online state before screens issue normal query traffic.
 
-`apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx` mounts inside `QueryProvider` and watches network/API recovery. After the device or API moves from offline, skipped, or unreachable into a reachable API probe state, it invalidates the mobile read-query families that should replace stale snapshots: runtime profile, jobs, contractor join readiness, project room, marketplace job reviews, and marketplace reads. A short throttle prevents duplicate invalidation bursts during NetInfo/probe races.
+`apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx` mounts inside `QueryProvider` and watches network/API recovery. After the device or API moves from offline, skipped, or unreachable into a reachable API probe state, it invalidates the mobile read-query families that should replace stale snapshots: runtime profile, jobs, contractor join readiness, project room, marketplace job reviews, and marketplace reads. A short throttle prevents duplicate invalidation bursts during NetInfo/probe races. The same bridge also listens for app foreground return and runs a bounded `network.refresh()` when API posture is unavailable or stale, so background-to-foreground recovery does not depend on NetInfo emitting a fresh event.
 
 `apps/mobile/src/features/network/useNetworkActionGate.ts` is the screen-level mutation gate. It wraps `useMobileNetwork()` and exposes:
 
@@ -150,6 +150,7 @@ Current recovery behavior is manual and explicit:
 - Manual refresh runs both NetInfo refresh and the API reachability probe.
 - Query caches are invalidated after manual refresh so visible surfaces can refetch.
 - Query caches for mobile read surfaces are also invalidated automatically after an offline/API-unreachable period recovers into a reachable API probe state.
+- Foreground resume triggers a bounded network/API refresh when the previous API probe is stale or unavailable.
 - Mutating actions produce direct reconnect-and-retry copy instead of generic API failures.
 - Selected contract and project-room read surfaces can still show the last saved participant-scoped snapshot after an offline start or backend outage.
 

@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Foreground Recovery Probe)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery hardening slice without intentional tests/builds:
+  - extended `apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx` with React Native `AppState` foreground detection
+  - when the app returns active from background/inactive state, it runs a bounded `network.refresh()` if API posture is stale, skipped, unreachable, unchecked, or the device was offline
+  - added foreground refresh throttling so rapid app switching cannot spam NetInfo/API probes
+  - kept existing read-query invalidation behavior after API recovery reaches a reachable probe state
+  - documented foreground recovery probes in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/network/MobileRecoveryRefreshBridge.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device evidence for background/foreground recovery, offline snapshot hydration/clearing, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Recovery Auto Refresh)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery slice without intentional tests/builds:
