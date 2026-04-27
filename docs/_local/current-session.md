@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Direct Contract Creation)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile product slice without intentional verification:
+  - added shared mobile contract draft helpers for initial drafts, milestone normalization, terms JSON generation, readiness checks, and job-to-milestone draft hydration
+  - added `/contracts/new` for guided direct escrow creation with scope, contractor identity, settlement token, milestone plan, terms, smart-account readiness, and automatic milestone commit after job creation
+  - added `/contracts/[id]` for participant-scoped contract detail with authority summary, milestone commit/review, and client funding action
+  - updated the contracts tab to deep-link into contract detail and direct contract creation
+  - added `EXPO_PUBLIC_DEFAULT_CURRENCY_ADDRESS` to the mobile environment contract
+- Changed files:
+  `apps/mobile/.env.example`
+  `apps/mobile/app.json`
+  `apps/mobile/src/app/_layout.tsx`
+  `apps/mobile/src/app/(tabs)/contracts.tsx`
+  `apps/mobile/src/app/contracts/{new.tsx,[id].tsx}`
+  `apps/mobile/src/features/contracts/contract-drafts.ts`
+  `docs/project-state.md`
+  `docs/_local/current-session.md`
+- Verification:
+  - not run by request
+
 ## Update (2026-04-27, Mobile Marketplace Workspace and Apply)
 - Started from a clean `dev` tree and pushed `origin/dev`; there was no pre-existing uncommitted work to commit.
 - Implemented the next mobile product slice without intentional verification:
@@ -204,19 +224,23 @@
   - still noisy in this shell: `pnpm --filter admin test` and `pnpm --filter admin test -- src/app/page.spec.tsx` did not return a clean completion signal here even though targeted admin specs and typecheck passed
 
 ## Current Objective
-- Advance Mobile V1 from browse/setup into authenticated marketplace execution:
-  - native workspace summaries and lane switching
-  - freelancer/agency opportunity application submission
-  - client opportunity and marketplace signal posture
+- Advance Mobile V1 from marketplace/apply into direct escrow execution:
+  - guided native contract creation
+  - participant-scoped contract detail
+  - milestone commit and funding controls
   - no test/build verification in this request
 
 ## Last Completed Step
-- Pushed the clean `dev` branch before implementation; there was no pre-existing dirty work to commit.
+- Pushed the clean `dev` branch before implementation; `origin/dev` was already up to date.
 
 ## Current Step
-- Mobile marketplace workspace/apply code is implemented and intentionally unverified:
-  - `apps/mobile/src/app/(tabs)/marketplace.tsx`
-  - `apps/mobile/src/app/marketplace/opportunity/[id].tsx`
+- Mobile direct contract creation/detail code is implemented and intentionally unverified:
+  - `apps/mobile/.env.example`
+  - `apps/mobile/app.json`
+  - `apps/mobile/src/app/_layout.tsx`
+  - `apps/mobile/src/app/(tabs)/contracts.tsx`
+  - `apps/mobile/src/app/contracts/{new.tsx,[id].tsx}`
+  - `apps/mobile/src/features/contracts/contract-drafts.ts`
   - `docs/project-state.md`
   - `docs/_local/current-session.md`
 - No tests or builds were run after implementation.
@@ -227,7 +251,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- Mobile had wallet setup and browse/detail views, but native users still had to leave mobile for proposal submission and workspace marketplace posture.
+- Mobile had marketplace proposal submission but still lacked native direct escrow creation, contract drill-in, milestone commit posture, and funding controls.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -320,9 +344,9 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - add guided mobile contract creation/detail
   - add mobile contractor join readiness
   - add mobile delivery/dispute forms
+  - add mobile project-room delivery review
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`

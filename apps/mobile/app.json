@@ -38,6 +38,7 @@
     },
     "extra": {
       "apiBaseUrl": "http://localhost:4100",
+      "defaultCurrencyAddress": "",
       "reownProjectId": "",
       "walletConnectMetadataUrl": "https://escrow4337.local",
       "walletConnectIconUrl": "https://escrow4337.local/icon.png",

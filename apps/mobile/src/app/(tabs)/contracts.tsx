@@ -1,18 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { formatAmount } from '@escrow4334/product-core';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
-  BodyText,
   EmptyState,
-  Heading,
-  MetricRow,
-  MilestoneTimeline,
+  ListCard,
   PrimaryButton,
   ScrollScreen,
   SectionHeader,
+  SecondaryButton,
   SkeletonCard,
-  StatusBadge,
   SurfaceCard,
 } from '@/ui/primitives';
 
@@ -32,6 +30,14 @@ export default function ContractsRoute() {
         body="Track funded work, milestone posture, delivery evidence, and dispute readiness from one mobile list."
       />
 
+      {accessToken ? (
+        <SurfaceCard animated variant="elevated">
+          <SecondaryButton onPress={() => router.push('/contracts/new')}>
+            Create direct contract
+          </SecondaryButton>
+        </SurfaceCard>
+      ) : null}
+
       {!accessToken ? (
         <EmptyState
           title="Sign in required"
@@ -48,19 +54,33 @@ export default function ContractsRoute() {
       ) : null}
 
       {jobs.data?.jobs.map(({ job }, index) => (
-        <SurfaceCard key={job.id} animated delay={index * 50} variant="elevated">
-          <StatusBadge label={job.status} tone={job.status === 'completed' ? 'success' : 'info'} />
-          <Heading size="section">{job.title}</Heading>
-          <BodyText>{job.description}</BodyText>
-          <MetricRow label="Funded" value={job.fundedAmount || 'Not funded'} />
-          <MilestoneTimeline milestones={job.milestones} />
-        </SurfaceCard>
+        <ListCard
+          key={job.id}
+          title={job.title}
+          body={job.description}
+          eyebrow={job.category}
+          chips={job.milestones.map((milestone) => milestone.status)}
+          meta={`${job.status} · ${formatAmount(job.fundedAmount)}`}
+          actionLabel="Open contract"
+          delay={index * 50}
+          onPress={() =>
+            router.push({
+              pathname: '/contracts/[id]',
+              params: { id: job.id },
+            })
+          }
+        />
       ))}
 
       {accessToken && jobs.data?.jobs.length === 0 ? (
         <EmptyState
           title="No contracts yet"
           body="Start from marketplace hiring or create a direct escrow contract."
+          action={
+            <PrimaryButton onPress={() => router.push('/contracts/new')}>
+              Create direct contract
+            </PrimaryButton>
+          }
         />
       ) : null}
 
