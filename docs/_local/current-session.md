@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Review Decision)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - coverage bundles now include `reviewDecision`
+  - review decisions classify exported bundles as `ready`, `ready_with_warnings`, `partial`, or `blocked`
+  - hard blockers cover missing scenarios, unreadable saved evidence, and invalid/missing self-verification checks
+  - advisory warnings cover latest reviewer outcomes of `observed` or `failed` plus latest computed check warnings/failures
+  - review decisions include deduped reviewer next actions and compact readiness/verification/outcome counts
+  - `validForExternalReview` now requires both `readiness.ready` and `verification.valid`; warnings stay advisory
+  - documented review-decision semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/mobileRecoveryEvidence.ts`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Self-Verification)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:

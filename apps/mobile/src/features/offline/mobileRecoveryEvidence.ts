@@ -163,6 +163,7 @@ export type MobileRecoveryEvidenceBundle = {
   capturePlan: MobileRecoveryEvidenceCapturePlan;
   ledgerReview: MobileRecoveryEvidenceLedgerReview;
   readiness: MobileRecoveryEvidenceBundleReadiness;
+  reviewDecision: MobileRecoveryEvidenceBundleReviewDecision;
   reviewManifest: MobileRecoveryEvidenceBundleReviewManifest;
   verification: MobileRecoveryEvidenceBundleVerification;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
@@ -310,6 +311,31 @@ export type MobileRecoveryEvidenceBundleVerification = {
     }
   >;
   valid: boolean;
+};
+
+export type MobileRecoveryEvidenceBundleReviewDecisionStatus =
+  | 'blocked'
+  | 'partial'
+  | 'ready'
+  | 'ready_with_warnings';
+
+export type MobileRecoveryEvidenceBundleReviewDecision = {
+  schema: 'escrow4337.mobileRecoveryEvidence.bundleReviewDecision.v1';
+  blockers: string[];
+  generatedAt: string;
+  nextActions: string[];
+  status: MobileRecoveryEvidenceBundleReviewDecisionStatus;
+  summary: {
+    failedScenarioCount: number;
+    includedScenarioCount: number;
+    missingScenarioCount: number;
+    observedScenarioCount: number;
+    passingScenarioCount: number;
+    unreadableScenarioCount: number;
+    verificationValid: boolean;
+  };
+  validForExternalReview: boolean;
+  warnings: string[];
 };
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
@@ -620,7 +646,9 @@ export function verifyMobileRecoveryEvidenceBundleReviewManifest(
 }
 
 export function verifyMobileRecoveryEvidenceBundleArtifacts(
-  bundle: Omit<MobileRecoveryEvidenceBundle, 'verification'> | MobileRecoveryEvidenceBundle,
+  bundle:
+    | Omit<MobileRecoveryEvidenceBundle, 'reviewDecision' | 'verification'>
+    | MobileRecoveryEvidenceBundle,
 ): MobileRecoveryEvidenceBundleVerification {
   const checks: MobileRecoveryEvidenceFingerprintVerification[] = [
     verifyMobileRecoveryEvidenceLedgerReview(bundle.ledgerReview),
@@ -681,6 +709,124 @@ export function verifyMobileRecoveryEvidenceBundleArtifacts(
     valid:
       allChecks.length > 0 &&
       allChecks.every((check) => check.status === 'valid'),
+  };
+}
+
+export function evaluateMobileRecoveryEvidenceBundleReviewDecision({
+  coverage,
+  generatedAt,
+  readiness,
+  verification,
+}: {
+  coverage: MobileRecoveryEvidenceCoverage;
+  generatedAt: string;
+  readiness: MobileRecoveryEvidenceBundleReadiness;
+  verification: MobileRecoveryEvidenceBundleVerification;
+}): MobileRecoveryEvidenceBundleReviewDecision {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const nextActions: string[] = [];
+  const missingScenarioCount = readiness.missingScenarios.length;
+  const unreadableScenarioCount = readiness.unreadableScenarios.length;
+  const observedScenarioCount = mobileRecoveryEvidenceScenarios.filter(
+    (scenario) => coverage.scenarios[scenario].latestOutcome === 'observed',
+  ).length;
+
+  if (!verification.valid) {
+    const failedChecks = [
+      ...verification.checks,
+      ...verification.reportChecks,
+      ...verification.scenarioArtifactChecks,
+    ].filter((check) => check.status !== 'valid');
+    blockers.push(
+      failedChecks.length
+        ? `Bundle self-verification has ${failedChecks.length} missing or invalid fingerprint check${
+            failedChecks.length === 1 ? '' : 's'
+          }.`
+        : 'Bundle self-verification is not valid.',
+    );
+    nextActions.push('Regenerate the coverage bundle from the device ledger before external review.');
+  }
+
+  if (missingScenarioCount) {
+    blockers.push(
+      `${missingScenarioCount} required scenario${
+        missingScenarioCount === 1 ? ' is' : 's are'
+      } missing from the bundle.`,
+    );
+    nextActions.push('Capture reports for every missing scenario before treating the bundle as complete.');
+  }
+
+  if (unreadableScenarioCount) {
+    blockers.push(
+      `${unreadableScenarioCount} scenario${
+        unreadableScenarioCount === 1 ? ' has' : 's have'
+      } unreadable saved evidence.`,
+    );
+    nextActions.push('Re-share or recapture unreadable scenario evidence from the device.');
+  }
+
+  for (const scenario of mobileRecoveryEvidenceScenarios) {
+    const scenarioCoverage = coverage.scenarios[scenario];
+
+    if (!scenarioCoverage.reportCount) {
+      continue;
+    }
+
+    if (scenarioCoverage.latestOutcome === 'failed') {
+      warnings.push(`${scenario} latest reviewer outcome is failed.`);
+      nextActions.push(`Review ${scenario} failure evidence before accepting the bundle.`);
+    } else if (scenarioCoverage.latestOutcome === 'observed') {
+      warnings.push(`${scenario} latest reviewer outcome is observed, not passed.`);
+    }
+
+    if (scenarioCoverage.latestCheckCounts.fail > 0) {
+      warnings.push(
+        `${scenario} latest computed checks include ${scenarioCoverage.latestCheckCounts.fail} fail result${
+          scenarioCoverage.latestCheckCounts.fail === 1 ? '' : 's'
+        }.`,
+      );
+    }
+
+    if (scenarioCoverage.latestCheckCounts.warn > 0) {
+      warnings.push(
+        `${scenario} latest computed checks include ${scenarioCoverage.latestCheckCounts.warn} warning result${
+          scenarioCoverage.latestCheckCounts.warn === 1 ? '' : 's'
+        }.`,
+      );
+    }
+  }
+
+  if (!blockers.length && warnings.length) {
+    nextActions.push('Review warning details before preserving the evidence bundle externally.');
+  }
+
+  const status: MobileRecoveryEvidenceBundleReviewDecisionStatus = blockers.length
+    ? readiness.ready
+      ? 'blocked'
+      : 'partial'
+    : warnings.length
+      ? 'ready_with_warnings'
+      : 'ready';
+  const validForExternalReview = readiness.ready && verification.valid;
+
+  return {
+    schema: 'escrow4337.mobileRecoveryEvidence.bundleReviewDecision.v1',
+    blockers,
+    generatedAt,
+    nextActions: [...new Set(nextActions)],
+    status,
+    summary: {
+      failedScenarioCount: coverage.failingScenarioCount,
+      includedScenarioCount: readiness.includedScenarioCount,
+      missingScenarioCount,
+      observedScenarioCount,
+      passingScenarioCount: coverage.passingScenarioCount,
+      unreadableScenarioCount,
+      verificationValid: verification.valid,
+    },
+    validForExternalReview,
+    warnings,
   };
 }
 
@@ -1361,8 +1507,7 @@ export async function buildMobileRecoveryEvidenceBundle(
       'bundle_review_manifest_without_fingerprint',
     ),
   };
-
-  return {
+  const verification = verifyMobileRecoveryEvidenceBundleArtifacts({
     version: 1,
     capturePlan,
     coverage,
@@ -1372,17 +1517,26 @@ export async function buildMobileRecoveryEvidenceBundle(
     reportIdsByScenario,
     reportsByScenario,
     reviewManifest,
-    verification: verifyMobileRecoveryEvidenceBundleArtifacts({
-      version: 1,
-      capturePlan,
-      coverage,
-      generatedAt,
-      ledgerReview,
-      readiness,
-      reportIdsByScenario,
-      reportsByScenario,
-      reviewManifest,
-    }),
+  });
+  const reviewDecision = evaluateMobileRecoveryEvidenceBundleReviewDecision({
+    coverage,
+    generatedAt,
+    readiness,
+    verification,
+  });
+
+  return {
+    version: 1,
+    capturePlan,
+    coverage,
+    generatedAt,
+    ledgerReview,
+    readiness,
+    reviewDecision,
+    reportIdsByScenario,
+    reportsByScenario,
+    reviewManifest,
+    verification,
   };
 }
 
