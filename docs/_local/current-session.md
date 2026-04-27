@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Capture Plan)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added a typed `MobileRecoveryEvidenceCapturePlan` derived from local ledger coverage
+  - capture plan tracks complete scenarios, missing scenarios, next missing scenario, required scenario count, generated report count, and recommended baseline outcome
+  - Account now shows a next-capture row inside the readiness panel
+  - selecting the next capture sets the missing scenario and resets outcome to `observed`
+  - ready ledgers show an explicit ready badge instead of a selection control
+  - documented capture-plan semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+
 ## Update (2026-04-27, Mobile Recovery Evidence UI Polish)
 - Implemented a focused Account recovery evidence UI/UX polish without intentional tests/builds:
   - promoted the primary save/share action to a true primary button

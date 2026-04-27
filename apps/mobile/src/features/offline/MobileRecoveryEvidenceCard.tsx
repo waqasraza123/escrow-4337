@@ -16,6 +16,7 @@ import {
   useAdaptiveMetrics,
 } from '@/ui/primitives';
 import {
+  buildMobileRecoveryEvidenceCapturePlan,
   buildMobileRecoveryEvidenceBundle,
   buildMobileRecoveryEvidenceReport,
   clearMobileRecoveryEvidence,
@@ -324,6 +325,7 @@ export function MobileRecoveryEvidenceCard({
 
   const latestReport = history[0] ?? null;
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
   const coveragePercent = historyLoading
     ? 0
     : Math.round((coverage.completeScenarioCount / coverage.totalScenarioCount) * 100);
@@ -336,6 +338,18 @@ export function MobileRecoveryEvidenceCard({
     network.apiReachability.status === 'reachable' && network.apiReachability.latencyMs !== null
       ? `${network.apiReachability.latencyMs}ms`
       : network.apiReachability.status;
+  const nextScenarioLabel = capturePlan.nextScenario
+    ? evidenceScenarioLabels[capturePlan.nextScenario]
+    : 'Complete';
+
+  function handleSelectNextScenario() {
+    if (!capturePlan.nextScenario) {
+      return;
+    }
+
+    setScenario(capturePlan.nextScenario);
+    setOutcome(capturePlan.recommendedOutcome);
+  }
 
   return (
     <SurfaceCard animated delay={delay} variant="elevated" style={styles.card}>
@@ -400,6 +414,38 @@ export function MobileRecoveryEvidenceCard({
           <EvidenceStat label="Saved" value={`${history.length}/${mobileRecoveryEvidenceMaxEntries}`} />
           <EvidenceStat label="Pass" value={`${coverage.passingScenarioCount}`} />
           <EvidenceStat label="Fail" value={`${coverage.failingScenarioCount}`} />
+        </View>
+        <View
+          style={[
+            styles.capturePlanPanel,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.md,
+            },
+          ]}
+        >
+          <View style={styles.capturePlanCopy}>
+            <Text style={[styles.capturePlanLabel, { color: theme.colors.foregroundMuted }]}>
+              Next capture
+            </Text>
+            <Text style={[styles.capturePlanValue, { color: theme.colors.foreground }]}>
+              {historyLoading ? 'Checking' : nextScenarioLabel}
+            </Text>
+          </View>
+          {historyLoading ? (
+            <StatusBadge label="Checking" tone="muted" />
+          ) : capturePlan.nextScenario ? (
+            <SecondaryButton
+              disabled={sharing || sharingBundle || sharingSaved || clearing}
+              onPress={handleSelectNextScenario}
+              style={styles.capturePlanButton}
+            >
+              Select
+            </SecondaryButton>
+          ) : (
+            <StatusBadge label="Ready" tone="success" />
+          )}
         </View>
       </View>
 
@@ -638,6 +684,35 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.7,
     textTransform: 'uppercase',
+  },
+  capturePlanPanel: {
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  capturePlanCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  capturePlanLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  capturePlanValue: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  capturePlanButton: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    width: 108,
   },
   captureStack: {
     gap: 9,

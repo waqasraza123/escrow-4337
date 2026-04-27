@@ -107,6 +107,16 @@ export type MobileRecoveryEvidenceCoverage = {
   totalScenarioCount: number;
 };
 
+export type MobileRecoveryEvidenceCapturePlan = {
+  completeScenarios: MobileRecoveryEvidenceScenario[];
+  generatedFromReportCount: number;
+  missingScenarios: MobileRecoveryEvidenceScenario[];
+  nextScenario: MobileRecoveryEvidenceScenario | null;
+  ready: boolean;
+  recommendedOutcome: MobileRecoveryEvidenceOutcome;
+  requiredScenarioCount: number;
+};
+
 export type MobileRecoveryEvidenceBundle = {
   version: 1;
   generatedAt: string;
@@ -607,6 +617,28 @@ export function summarizeMobileRecoveryEvidenceCoverage(
     passingScenarioCount,
     scenarios,
     totalScenarioCount: mobileRecoveryEvidenceScenarios.length,
+  };
+}
+
+export function buildMobileRecoveryEvidenceCapturePlan(
+  history: MobileRecoveryEvidenceSummary[],
+): MobileRecoveryEvidenceCapturePlan {
+  const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const missingScenarios = mobileRecoveryEvidenceScenarios.filter(
+    (scenario) => coverage.scenarios[scenario].reportCount === 0,
+  );
+  const completeScenarios = mobileRecoveryEvidenceScenarios.filter(
+    (scenario) => coverage.scenarios[scenario].reportCount > 0,
+  );
+
+  return {
+    completeScenarios,
+    generatedFromReportCount: history.length,
+    missingScenarios,
+    nextScenario: missingScenarios[0] ?? null,
+    ready: missingScenarios.length === 0,
+    recommendedOutcome: 'observed',
+    requiredScenarioCount: mobileRecoveryEvidenceScenarios.length,
   };
 }
 
