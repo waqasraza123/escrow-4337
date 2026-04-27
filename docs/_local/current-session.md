@@ -3,6 +3,25 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Offline Session Restore)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery session slice without intentional tests/builds:
+  - added a versioned SecureStore profile snapshot for the last successful `UserProfile`
+  - refreshed that profile snapshot after sign-in, refresh, direct profile restore, and explicit `setUser(...)` updates such as workspace switching
+  - changed cold restore to try the stored access token first, then rotate the refresh token when the access token is terminally invalid
+  - preserved stored tokens and hydrated `user` from the secure profile snapshot when restore fails for a non-terminal network/API outage
+  - kept destructive cleanup for terminal/no-snapshot restore failures, including token, profile snapshot, and offline snapshot clearing
+  - documented the secure profile fallback in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/providers/session.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for offline cold-start session restore, marketplace snapshot hydration, retention cleanup, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Snapshot Retention Bridge)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery storage lifecycle slice without intentional tests/builds:

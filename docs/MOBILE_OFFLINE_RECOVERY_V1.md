@@ -127,6 +127,22 @@ TanStack Query online state is derived from native connectivity, not backend rea
 
 The implementation does not persist the full React Query cache across app restarts. Secure session restore remains owned by the existing session provider; most server state remains a normal React Query cache.
 
+## Session Restore
+
+`apps/mobile/src/providers/session.tsx` stores access and refresh tokens in native SecureStore. It now also stores the last successful `UserProfile` response as a versioned SecureStore profile snapshot. The profile snapshot contains no access or refresh token, but it does include the identity/workspace/wallet summary needed to keep account-scoped offline reads coherent during an offline or API-unreachable app start.
+
+Restore behavior:
+
+- read stored access token, refresh token, and cached profile snapshot together
+- try `GET /auth/me` with the stored access token first
+- if the access token is terminally invalid and a refresh token exists, rotate the refresh token before clearing the session
+- after successful sign-in, refresh, or profile read, replace the cached profile snapshot
+- if profile/refresh calls fail for a non-terminal outage and a profile snapshot exists, keep the stored tokens and hydrate `user` from the secure profile snapshot
+- if restore fails without a usable profile snapshot, clear tokens, clear the cached profile snapshot, clear offline snapshots, and return to signed-out state
+- sign-out clears tokens, the profile snapshot, and account-scoped offline snapshots before best-effort logout
+
+This keeps offline contract/project-room/marketplace snapshots usable after a cold offline start without treating every backend outage as a revoked session.
+
 Selected high-value read surfaces now persist explicit offline snapshots:
 
 - contracts list and contract detail source data from `api.listJobs`
@@ -150,7 +166,7 @@ Snapshot retention rules:
 Snapshot lifecycle rules:
 
 - sign-out clears saved snapshots for the signed-out user
-- failed session restore clears the snapshot namespace before returning to signed-out state
+- failed session restore with no usable secure profile snapshot clears the snapshot namespace before returning to signed-out state
 - Account exposes a signed-in "Clear offline data" control that removes the full offline snapshot namespace, including public marketplace snapshots
 - snapshot clearing only targets keys under `escrow4337.offlineSnapshot.v1`, leaving locale, theme, WalletConnect, and secure token storage untouched
 

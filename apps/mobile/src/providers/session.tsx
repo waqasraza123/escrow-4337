@@ -14,6 +14,13 @@ import { api } from './api';
 
 const accessTokenKey = 'escrow4337.accessToken';
 const refreshTokenKey = 'escrow4337.refreshToken';
+const profileSnapshotKey = 'escrow4337.profileSnapshot.v1';
+
+type ProfileSnapshotEnvelope = {
+  version: 1;
+  cachedAt: number;
+  user: UserProfile;
+};
 
 type SessionContextValue = {
   accessToken: string | null;
@@ -39,6 +46,49 @@ async function clearTokens() {
   await SecureStore.deleteItemAsync(refreshTokenKey);
 }
 
+function isProfileSnapshotEnvelope(value: unknown): value is ProfileSnapshotEnvelope {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<ProfileSnapshotEnvelope>;
+  return candidate.version === 1 && typeof candidate.cachedAt === 'number' && Boolean(candidate.user);
+}
+
+async function saveProfileSnapshot(user: UserProfile) {
+  const envelope: ProfileSnapshotEnvelope = {
+    version: 1,
+    cachedAt: Date.now(),
+    user,
+  };
+
+  await SecureStore.setItemAsync(profileSnapshotKey, JSON.stringify(envelope));
+}
+
+async function readProfileSnapshot() {
+  const raw = await SecureStore.getItemAsync(profileSnapshotKey);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isProfileSnapshotEnvelope(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function clearProfileSnapshot() {
+  await SecureStore.deleteItemAsync(profileSnapshotKey);
+}
+
+function isTerminalSessionRestoreError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  return /invalid token|missing token|invalid session|not found/i.test(message);
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
@@ -54,6 +104,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const applyUser = useCallback((nextUser: UserProfile | null) => {
+    setUser(nextUser);
+
+    if (nextUser) {
+      void saveProfileSnapshot(nextUser).catch(() => undefined);
+    } else {
+      void clearProfileSnapshot().catch(() => undefined);
+    }
+  }, []);
+
   const refreshSession = useCallback(async () => {
     const storedRefreshToken =
       refreshToken || (await SecureStore.getItemAsync(refreshTokenKey));
@@ -64,18 +124,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const tokens = await api.refresh(storedRefreshToken);
     await applyTokens(tokens.accessToken, tokens.refreshToken);
     const profile = await api.me(tokens.accessToken);
-    setUser(profile);
+    applyUser(profile);
     return profile;
-  }, [applyTokens, refreshToken]);
+  }, [applyTokens, applyUser, refreshToken]);
 
   useEffect(() => {
     let mounted = true;
 
     async function restore() {
       try {
-        const [storedAccessToken, storedRefreshToken] = await Promise.all([
+        const [storedAccessToken, storedRefreshToken, profileSnapshot] = await Promise.all([
           SecureStore.getItemAsync(accessTokenKey),
           SecureStore.getItemAsync(refreshTokenKey),
+          readProfileSnapshot(),
         ]);
 
         if (!mounted) {
@@ -85,21 +146,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setAccessToken(storedAccessToken);
         setRefreshToken(storedRefreshToken);
 
-        if (storedAccessToken) {
-          const profile = await api.me(storedAccessToken);
-          if (mounted) {
-            setUser(profile);
+        try {
+          if (storedAccessToken) {
+            try {
+              const profile = await api.me(storedAccessToken);
+              if (mounted) {
+                applyUser(profile);
+              }
+              return;
+            } catch (error) {
+              if (!storedRefreshToken || !isTerminalSessionRestoreError(error)) {
+                throw error;
+              }
+            }
           }
-        } else if (storedRefreshToken) {
-          await refreshSession();
+
+          if (storedRefreshToken) {
+            const tokens = await api.refresh(storedRefreshToken);
+            await applyTokens(tokens.accessToken, tokens.refreshToken);
+            const profile = await api.me(tokens.accessToken);
+            if (mounted) {
+              applyUser(profile);
+            }
+          } else if (profileSnapshot) {
+            await clearProfileSnapshot();
+          }
+        } catch (error) {
+          if (profileSnapshot && !isTerminalSessionRestoreError(error)) {
+            if (mounted) {
+              applyUser(profileSnapshot.user);
+            }
+            return;
+          }
+
+          throw error;
         }
       } catch {
         if (mounted) {
           await clearTokens();
+          await clearProfileSnapshot();
           await clearOfflineSnapshots();
           setAccessToken(null);
           setRefreshToken(null);
-          setUser(null);
+          applyUser(null);
         }
       } finally {
         if (mounted) {
@@ -113,7 +202,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [refreshSession]);
+  }, [applyTokens, applyUser]);
 
   const requestCode = useCallback(async (email: string) => {
     await api.startAuth(email);
@@ -123,10 +212,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (email: string, code: string) => {
       const response = await api.verifyAuth(email, code);
       await applyTokens(response.accessToken, response.refreshToken);
-      setUser(response.user);
+      applyUser(response.user);
       return response.user;
     },
-    [applyTokens],
+    [applyTokens, applyUser],
   );
 
   const signOut = useCallback(async () => {
@@ -134,11 +223,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const userId = user?.id;
     setAccessToken(null);
     setRefreshToken(null);
-    setUser(null);
+    applyUser(null);
     await clearTokens();
+    await clearProfileSnapshot();
     await clearOfflineSnapshots(userId ? { userId } : undefined);
     await api.logout(tokenToRevoke).catch(() => undefined);
-  }, [refreshToken, user?.id]);
+  }, [applyUser, refreshToken, user?.id]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -150,7 +240,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       requestCode,
       refreshSession,
       signOut,
-      setUser,
+      setUser: applyUser,
     }),
     [
       accessToken,
@@ -160,6 +250,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       restoring,
       signIn,
       signOut,
+      applyUser,
       user,
     ],
   );
