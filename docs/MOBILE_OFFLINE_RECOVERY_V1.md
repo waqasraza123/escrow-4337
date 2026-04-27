@@ -185,6 +185,8 @@ Snapshot lifecycle rules:
 
 The Account recovery evidence card uses a separate AsyncStorage namespace, `escrow4337.mobileRecoveryEvidence.v1`, for sanitized manual-run reports. This namespace is intentionally separate from read-only offline snapshots because evidence reports are operational proof artifacts, not cached product data.
 
+The evidence export audit uses `escrow4337.mobileRecoveryEvidenceAudit.v1`. Audit entries are bounded local metadata records for export actions only. They include action type, timestamps, report id/scenario/outcome where applicable, and bundle readiness counts; they do not include report bodies, tokens, email addresses, wallet addresses, workspace labels, organization names, URL credentials, URL query strings, private keys, or free-form reviewer notes.
+
 Evidence report retention rules:
 
 - each share action saves the report locally before opening the native share sheet
@@ -192,15 +194,20 @@ Evidence report retention rules:
 - each report includes a controlled outcome: observed, passed, or failed
 - each report includes scenario-specific computed checks with `pass`, `warn`, or `fail` status
 - the app retains the newest 12 reports
+- the app retains the newest 24 export-audit events
 - reports expire after 30 days
+- export-audit events expire after 30 days
 - malformed report envelopes are pruned by the same retention pass
-- Account displays a readiness/progress panel, saved-report count, total scenario coverage, next missing scenario, expected posture for that capture, bundle readiness, passing/failing scenario counts, compact session/API/snapshot/profile posture pills, per-scenario latest outcome pills, newest report scenario, newest report outcome, newest report timestamp, and newest check counts
+- malformed audit envelopes are pruned by the audit retention pass
+- Account displays a readiness/progress panel, saved-report count, export-audit count, total scenario coverage, next missing scenario, expected posture for that capture, bundle readiness, passing/failing scenario counts, compact session/API/snapshot/profile posture pills, per-scenario latest outcome pills, newest report scenario, newest report outcome, newest report timestamp, newest check counts, and latest audit action
 - Account can share a coverage bundle containing the current coverage summary, explicit readiness metadata, and the latest readable exact saved report for each scenario that has one
 - Account requires explicit confirmation before sharing a partial coverage bundle and lists missing or unreadable scenarios in that confirmation
 - Account can re-share the latest saved report by id without generating a new report or mutating the existing evidence
-- Account exposes a "Clear saved evidence" action that removes only the recovery evidence namespace
+- Account exposes a "Clear saved evidence" action that removes the saved recovery reports and export-audit namespace
 
 Coverage semantics are ledger-local. A scenario is counted as captured once at least one saved report exists for that scenario. The capture plan uses that same local coverage summary to identify the first missing scenario in the supported order and lets Account select it with the recommended `observed` outcome. Scenario guides define each scenario title, expected posture, capture goal, and review focus so exported bundles preserve reviewer intent without free-form notes. Passing and failing scenario counts are based on reviewer-controlled outcomes, not computed checks. Computed checks remain attached to individual reports so reviewers can compare objective posture against the reviewer outcome before preserving the evidence externally. Coverage bundles add a `generatedAt` timestamp, the current capture plan, and a `readiness` block; they do not regenerate or mutate the included reports. A bundle is ready only when every supported scenario has a readable saved report at bundle-generation time. Partial bundles can still be shared, but Account requires a confirmation prompt before opening the native share sheet and that prompt lists `readiness.missingScenarios` plus `readiness.unreadableScenarios` so the gap is explicit before export.
+
+Export-audit semantics are local and bounded. Saving a new report, opening the native share sheet for a new report, opening the native share sheet for a saved report, opening the native share sheet for a bundle, and canceling a partial-bundle export each append one metadata event. These events are meant to help a reviewer reconstruct manual evidence handling on the device; they are not proof that the operating-system share target completed delivery.
 
 Computed checks are intentionally coarse and non-sensitive. Offline-start checks cover whether the device/API is actually unavailable, whether a secure profile snapshot is visible, and whether any read-only snapshot inventory exists. API-recovery checks cover device connectivity, runtime-profile reachability, and whether account context has recovered from cached-profile posture. Wallet-return checks cover signed-in state, linked-wallet presence, and default execution or smart-account posture. Project-room checks cover signed-in state, project-room snapshot availability, and whether recovery has either a live API or saved project-room snapshot source.
 

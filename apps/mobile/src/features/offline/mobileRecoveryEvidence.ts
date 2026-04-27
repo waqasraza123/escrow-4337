@@ -89,6 +89,31 @@ export type MobileRecoveryEvidenceSummary = {
   snapshotCount: number | null;
 };
 
+export type MobileRecoveryEvidenceAuditAction =
+  | 'bundle_share_opened'
+  | 'partial_bundle_share_cancelled'
+  | 'report_saved'
+  | 'report_share_opened'
+  | 'saved_report_share_opened';
+
+export type MobileRecoveryEvidenceAuditEvent = {
+  version: 1;
+  id: string;
+  recordedAt: string;
+  action: MobileRecoveryEvidenceAuditAction;
+  reportId?: string;
+  scenario?: MobileRecoveryEvidenceScenario;
+  outcome?: MobileRecoveryEvidenceOutcome;
+  historyReportCount?: number;
+  bundleReadiness?: {
+    ready: boolean;
+    includedScenarioCount: number;
+    missingScenarios: MobileRecoveryEvidenceScenario[];
+    requiredScenarioCount: number;
+    unreadableScenarios: MobileRecoveryEvidenceScenario[];
+  };
+};
+
 export type MobileRecoveryEvidenceScenarioCoverage = {
   reportCount: number;
   latestCapturedAt: string | null;
@@ -162,8 +187,10 @@ export type MobileRecoveryEvidenceCheck = {
 };
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
+const evidenceAuditPrefix = 'escrow4337.mobileRecoveryEvidenceAudit.v1';
 export const mobileRecoveryEvidenceMaxEntries = 12;
 export const mobileRecoveryEvidenceMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
+export const mobileRecoveryEvidenceAuditMaxEntries = 24;
 export const mobileRecoveryEvidenceScenarios: MobileRecoveryEvidenceScenario[] = [
   'offline_start',
   'api_recovery',
@@ -458,18 +485,51 @@ function parseEvidenceReport(raw: string | null): MobileRecoveryEvidenceReport |
   }
 }
 
+function parseEvidenceAuditEvent(raw: string | null): MobileRecoveryEvidenceAuditEvent | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<MobileRecoveryEvidenceAuditEvent>;
+    return parsed.version === 1 &&
+      typeof parsed.id === 'string' &&
+      typeof parsed.recordedAt === 'string' &&
+      typeof parsed.action === 'string'
+      ? (parsed as MobileRecoveryEvidenceAuditEvent)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function toEvidenceStorageKey(id: string) {
   return `${evidencePrefix}:${id}`;
+}
+
+function toEvidenceAuditStorageKey(id: string) {
+  return `${evidenceAuditPrefix}:${id}`;
 }
 
 function parseEvidenceStorageKey(key: string) {
   return key.startsWith(`${evidencePrefix}:`) ? key.slice(evidencePrefix.length + 1) : null;
 }
 
+function parseEvidenceAuditStorageKey(key: string) {
+  return key.startsWith(`${evidenceAuditPrefix}:`)
+    ? key.slice(evidenceAuditPrefix.length + 1)
+    : null;
+}
+
 function createEvidenceId(report: MobileRecoveryEvidenceReport) {
   const capturedAt = Date.parse(report.capturedAt);
   const suffix = Math.random().toString(36).slice(2, 8);
   return `${Number.isFinite(capturedAt) ? capturedAt : Date.now()}-${suffix}`;
+}
+
+function createEvidenceAuditId() {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${Date.now()}-${suffix}`;
 }
 
 function summarizeEvidenceReport(
@@ -618,6 +678,24 @@ export async function listMobileRecoveryEvidence(): Promise<MobileRecoveryEviden
     })
     .filter((summary): summary is MobileRecoveryEvidenceSummary => Boolean(summary))
     .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
+}
+
+export async function listMobileRecoveryEvidenceAudit(): Promise<
+  MobileRecoveryEvidenceAuditEvent[]
+> {
+  const keys = await AsyncStorage.getAllKeys();
+  const auditKeys = keys.filter((key) => parseEvidenceAuditStorageKey(key) !== null);
+
+  if (!auditKeys.length) {
+    return [];
+  }
+
+  const values = await AsyncStorage.multiGet(auditKeys);
+
+  return values
+    .map(([, raw]) => parseEvidenceAuditEvent(raw))
+    .filter((event): event is MobileRecoveryEvidenceAuditEvent => Boolean(event))
+    .sort((left, right) => Date.parse(right.recordedAt) - Date.parse(left.recordedAt));
 }
 
 export function summarizeMobileRecoveryEvidenceCoverage(
@@ -816,6 +894,69 @@ export async function enforceMobileRecoveryEvidenceRetention({
   return removalKeys.length;
 }
 
+export async function enforceMobileRecoveryEvidenceAuditRetention({
+  maxAgeMs = mobileRecoveryEvidenceMaxAgeMs,
+  maxEntries = mobileRecoveryEvidenceAuditMaxEntries,
+}: {
+  maxAgeMs?: number;
+  maxEntries?: number;
+} = {}) {
+  const keys = await AsyncStorage.getAllKeys();
+  const auditKeys = keys.filter((key) => parseEvidenceAuditStorageKey(key) !== null);
+
+  if (!auditKeys.length) {
+    return 0;
+  }
+
+  const now = Date.now();
+  const values = await AsyncStorage.multiGet(auditKeys);
+  const retained = values
+    .map(([key, raw]) => {
+      const event = parseEvidenceAuditEvent(raw);
+      const recordedAt = event ? Date.parse(event.recordedAt) : Number.NaN;
+      return {
+        key,
+        recordedAt,
+        valid: event !== null && Number.isFinite(recordedAt),
+      };
+    })
+    .filter((entry) => entry.valid)
+    .sort((left, right) => right.recordedAt - left.recordedAt);
+  const validKeySet = new Set(retained.map((entry) => entry.key));
+  const invalidKeys = auditKeys.filter((key) => !validKeySet.has(key));
+  const expiredKeys = retained
+    .filter((entry) => now - entry.recordedAt > Math.max(0, maxAgeMs))
+    .map((entry) => entry.key);
+  const expiredKeySet = new Set(expiredKeys);
+  const overflowKeys = retained
+    .filter((entry) => !expiredKeySet.has(entry.key))
+    .slice(Math.max(0, maxEntries))
+    .map((entry) => entry.key);
+  const removalKeys = [...new Set([...invalidKeys, ...expiredKeys, ...overflowKeys])];
+
+  if (removalKeys.length) {
+    await AsyncStorage.multiRemove(removalKeys);
+  }
+
+  return removalKeys.length;
+}
+
+export async function appendMobileRecoveryEvidenceAuditEvent(
+  event: Omit<MobileRecoveryEvidenceAuditEvent, 'id' | 'recordedAt' | 'version'>,
+) {
+  const id = createEvidenceAuditId();
+  const storedEvent: MobileRecoveryEvidenceAuditEvent = {
+    ...event,
+    id,
+    recordedAt: new Date().toISOString(),
+    version: 1,
+  };
+
+  await AsyncStorage.setItem(toEvidenceAuditStorageKey(id), JSON.stringify(storedEvent));
+  await enforceMobileRecoveryEvidenceAuditRetention();
+  return storedEvent;
+}
+
 export async function saveMobileRecoveryEvidenceReport(report: MobileRecoveryEvidenceReport) {
   const id = createEvidenceId(report);
   await AsyncStorage.setItem(toEvidenceStorageKey(id), JSON.stringify(report));
@@ -826,10 +967,12 @@ export async function saveMobileRecoveryEvidenceReport(report: MobileRecoveryEvi
 export async function clearMobileRecoveryEvidence() {
   const keys = await AsyncStorage.getAllKeys();
   const evidenceKeys = keys.filter((key) => parseEvidenceStorageKey(key) !== null);
+  const auditKeys = keys.filter((key) => parseEvidenceAuditStorageKey(key) !== null);
+  const removalKeys = [...evidenceKeys, ...auditKeys];
 
-  if (evidenceKeys.length) {
-    await AsyncStorage.multiRemove(evidenceKeys);
+  if (removalKeys.length) {
+    await AsyncStorage.multiRemove(removalKeys);
   }
 
-  return evidenceKeys.length;
+  return removalKeys.length;
 }

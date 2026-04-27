@@ -16,17 +16,21 @@ import {
   useAdaptiveMetrics,
 } from '@/ui/primitives';
 import {
+  appendMobileRecoveryEvidenceAuditEvent,
   buildMobileRecoveryEvidenceCapturePlan,
   buildMobileRecoveryEvidenceBundle,
   buildMobileRecoveryEvidenceReport,
   clearMobileRecoveryEvidence,
   listMobileRecoveryEvidence,
+  listMobileRecoveryEvidenceAudit,
+  mobileRecoveryEvidenceAuditMaxEntries,
   mobileRecoveryEvidenceMaxEntries,
   mobileRecoveryEvidenceScenarios,
   readMobileRecoveryEvidenceReport,
   saveMobileRecoveryEvidenceReport,
   summarizeMobileRecoveryEvidenceCoverage,
   type MobileRecoveryEvidenceOutcome,
+  type MobileRecoveryEvidenceAuditEvent,
   type MobileRecoveryEvidenceScenario,
   type MobileRecoveryEvidenceSummary,
 } from './mobileRecoveryEvidence';
@@ -71,6 +75,26 @@ function formatCheckCounts(summary: MobileRecoveryEvidenceSummary | null) {
 
   const { fail, pass, warn } = summary.checkCounts;
   return `${pass} pass / ${warn} warn / ${fail} fail`;
+}
+
+function formatAuditAction(action: MobileRecoveryEvidenceAuditEvent['action']) {
+  if (action === 'bundle_share_opened') {
+    return 'Bundle share opened';
+  }
+
+  if (action === 'partial_bundle_share_cancelled') {
+    return 'Partial bundle canceled';
+  }
+
+  if (action === 'report_saved') {
+    return 'Report saved';
+  }
+
+  if (action === 'report_share_opened') {
+    return 'Report share opened';
+  }
+
+  return 'Saved report share opened';
 }
 
 function formatCoverageSummary({
@@ -212,6 +236,7 @@ export function MobileRecoveryEvidenceCard({
   const [sharingBundle, setSharingBundle] = useState(false);
   const [sharingSaved, setSharingSaved] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [auditEvents, setAuditEvents] = useState<MobileRecoveryEvidenceAuditEvent[]>([]);
   const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [scenario, setScenario] =
@@ -226,8 +251,14 @@ export function MobileRecoveryEvidenceCard({
   async function refreshHistory() {
     setHistoryLoading(true);
     try {
-      setHistory(await listMobileRecoveryEvidence());
+      const [nextHistory, nextAuditEvents] = await Promise.all([
+        listMobileRecoveryEvidence(),
+        listMobileRecoveryEvidenceAudit(),
+      ]);
+      setAuditEvents(nextAuditEvents);
+      setHistory(nextHistory);
     } catch {
+      setAuditEvents([]);
       setHistory([]);
     } finally {
       setHistoryLoading(false);
@@ -262,13 +293,26 @@ export function MobileRecoveryEvidenceCard({
         snapshotSummary,
         user: session.user,
       });
-      await saveMobileRecoveryEvidenceReport(report);
+      const reportId = await saveMobileRecoveryEvidenceReport(report);
+      await appendMobileRecoveryEvidenceAuditEvent({
+        action: 'report_saved',
+        outcome,
+        reportId,
+        scenario,
+      });
       await refreshHistory();
 
       await Share.share({
         title: 'Escrow4337 mobile recovery evidence',
         message: JSON.stringify(report, null, 2),
       });
+      await appendMobileRecoveryEvidenceAuditEvent({
+        action: 'report_share_opened',
+        outcome,
+        reportId,
+        scenario,
+      });
+      await refreshHistory();
     } catch (error) {
       Alert.alert(
         'Evidence report not shared',
@@ -301,6 +345,13 @@ export function MobileRecoveryEvidenceCard({
         title: 'Escrow4337 mobile recovery evidence',
         message: JSON.stringify(report, null, 2),
       });
+      await appendMobileRecoveryEvidenceAuditEvent({
+        action: 'saved_report_share_opened',
+        outcome: latestReport.outcome,
+        reportId: latestReport.id,
+        scenario: latestReport.scenario,
+      });
+      await refreshHistory();
     } catch (error) {
       Alert.alert(
         'Saved evidence not shared',
@@ -336,8 +387,21 @@ export function MobileRecoveryEvidenceCard({
         });
 
         if (!shouldSharePartialBundle) {
+          await appendMobileRecoveryEvidenceAuditEvent({
+            action: 'partial_bundle_share_cancelled',
+            bundleReadiness: {
+              includedScenarioCount: bundle.readiness.includedScenarioCount,
+              missingScenarios: bundle.readiness.missingScenarios,
+              ready: bundle.readiness.ready,
+              requiredScenarioCount: bundle.readiness.requiredScenarioCount,
+              unreadableScenarios: bundle.readiness.unreadableScenarios,
+            },
+            historyReportCount: history.length,
+          });
           if (bundle.readiness.unreadableScenarios.length) {
             await refreshHistory();
+          } else {
+            setAuditEvents(await listMobileRecoveryEvidenceAudit());
           }
           return;
         }
@@ -347,9 +411,22 @@ export function MobileRecoveryEvidenceCard({
         title: 'Escrow4337 mobile recovery evidence bundle',
         message: JSON.stringify(bundle, null, 2),
       });
+      await appendMobileRecoveryEvidenceAuditEvent({
+        action: 'bundle_share_opened',
+        bundleReadiness: {
+          includedScenarioCount: bundle.readiness.includedScenarioCount,
+          missingScenarios: bundle.readiness.missingScenarios,
+          ready: bundle.readiness.ready,
+          requiredScenarioCount: bundle.readiness.requiredScenarioCount,
+          unreadableScenarios: bundle.readiness.unreadableScenarios,
+        },
+        historyReportCount: history.length,
+      });
 
       if (bundle.readiness.unreadableScenarios.length) {
         await refreshHistory();
+      } else {
+        setAuditEvents(await listMobileRecoveryEvidenceAudit());
       }
     } catch (error) {
       Alert.alert(
@@ -373,8 +450,8 @@ export function MobileRecoveryEvidenceCard({
       Alert.alert(
         'Recovery evidence cleared',
         removed
-          ? `Removed ${removed} saved recovery evidence report${removed === 1 ? '' : 's'}.`
-          : 'No saved recovery evidence reports were found on this device.',
+          ? `Removed ${removed} saved recovery evidence item${removed === 1 ? '' : 's'}.`
+          : 'No saved recovery evidence items were found on this device.',
       );
     } catch (error) {
       Alert.alert(
@@ -387,6 +464,7 @@ export function MobileRecoveryEvidenceCard({
   }
 
   const latestReport = history[0] ?? null;
+  const latestAuditEvent = auditEvents[0] ?? null;
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
   const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
   const coveragePercent = historyLoading
@@ -478,6 +556,10 @@ export function MobileRecoveryEvidenceCard({
           <EvidenceStat label="Saved" value={`${history.length}/${mobileRecoveryEvidenceMaxEntries}`} />
           <EvidenceStat label="Pass" value={`${coverage.passingScenarioCount}`} />
           <EvidenceStat label="Fail" value={`${coverage.failingScenarioCount}`} />
+          <EvidenceStat
+            label="Audit"
+            value={`${auditEvents.length}/${mobileRecoveryEvidenceAuditMaxEntries}`}
+          />
         </View>
         <View
           style={[
@@ -591,6 +673,16 @@ export function MobileRecoveryEvidenceCard({
           }
         />
         <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
+        <MetricRow
+          label="Latest audit"
+          value={
+            latestAuditEvent
+              ? `${formatAuditAction(latestAuditEvent.action)} / ${formatTimestamp(
+                  Date.parse(latestAuditEvent.recordedAt),
+                )}`
+              : 'None'
+          }
+        />
       </View>
 
       <PrimaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
