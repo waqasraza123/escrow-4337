@@ -1,8 +1,6 @@
-import * as Application from 'expo-application';
-import Constants from 'expo-constants';
-import { useState } from 'react';
-import { Alert, Platform, Share } from 'react-native';
-import { formatTimestamp, type UserProfile } from '@escrow4334/product-core';
+import { useEffect, useState } from 'react';
+import { Alert, Share } from 'react-native';
+import { formatTimestamp } from '@escrow4334/product-core';
 import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import {
@@ -13,71 +11,15 @@ import {
   StatusBadge,
   SurfaceCard,
 } from '@/ui/primitives';
+import {
+  buildMobileRecoveryEvidenceReport,
+  clearMobileRecoveryEvidence,
+  listMobileRecoveryEvidence,
+  mobileRecoveryEvidenceMaxEntries,
+  saveMobileRecoveryEvidenceReport,
+  type MobileRecoveryEvidenceSummary,
+} from './mobileRecoveryEvidence';
 import type { OfflineSnapshotSummary } from './offlineSnapshots';
-
-type SanitizedWorkspacePosture = {
-  activeKind: string | null;
-  activeOrganizationKind: string | null;
-  activeRoles: string[];
-  totalWorkspaces: number;
-};
-
-function buildWorkspacePosture(user: UserProfile | null): SanitizedWorkspacePosture {
-  return {
-    activeKind: user?.activeWorkspace?.kind ?? null,
-    activeOrganizationKind: user?.activeWorkspace?.organizationKind ?? null,
-    activeRoles: user?.activeWorkspace?.roles ?? [],
-    totalWorkspaces: user?.workspaces.length ?? 0,
-  };
-}
-
-function buildWalletPosture(user: UserProfile | null) {
-  const wallets = user?.wallets ?? [];
-
-  return {
-    total: wallets.length,
-    eoa: wallets.filter((wallet) => wallet.walletKind === 'eoa').length,
-    smartAccount: wallets.filter((wallet) => wallet.walletKind === 'smart_account').length,
-    hasDefaultExecutionWallet: Boolean(user?.defaultExecutionWalletAddress),
-  };
-}
-
-function buildCapabilityPosture(user: UserProfile | null) {
-  if (!user) {
-    return {
-      chainAuditSync: false,
-      escrowOperations: false,
-      escrowResolution: false,
-      jobHistoryImport: false,
-      marketplaceModeration: false,
-    };
-  }
-
-  return {
-    chainAuditSync: user.capabilities.chainAuditSync.allowed,
-    escrowOperations: user.capabilities.escrowOperations.allowed,
-    escrowResolution: user.capabilities.escrowResolution.allowed,
-    jobHistoryImport: user.capabilities.jobHistoryImport.allowed,
-    marketplaceModeration: user.capabilities.marketplaceModeration.allowed,
-  };
-}
-
-function buildAppVersionLabel() {
-  return Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? 'unknown';
-}
-
-function sanitizeUrlForEvidence(value: string) {
-  try {
-    const url = new URL(value);
-    url.username = '';
-    url.password = '';
-    url.search = '';
-    url.hash = '';
-    return url.toString().replace(/\/$/, '');
-  } catch {
-    return value.split('?')[0]?.split('#')[0] ?? 'unknown';
-  }
-}
 
 export function MobileRecoveryEvidenceCard({
   delay = 60,
@@ -91,10 +33,28 @@ export function MobileRecoveryEvidenceCard({
   const network = useMobileNetwork();
   const session = useSession();
   const [sharing, setSharing] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   const signedIn = Boolean(session.user);
   const restoredFromSnapshot = session.restoredFromProfileSnapshot;
-  const canShare = !snapshotSummaryLoading && !sharing;
+  const canShare = !snapshotSummaryLoading && !sharing && !clearing;
+
+  async function refreshHistory() {
+    setHistoryLoading(true);
+    try {
+      setHistory(await listMobileRecoveryEvidence());
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshHistory();
+  }, []);
 
   async function handleShareEvidence() {
     if (!canShare) {
@@ -104,66 +64,22 @@ export function MobileRecoveryEvidenceCard({
     setSharing(true);
 
     try {
-      const report = {
-        version: 1,
-        capturedAt: new Date().toISOString(),
-        platform: {
-          os: Platform.OS,
-          version: String(Platform.Version),
-        },
-        app: {
-          applicationId: Application.applicationId ?? Constants.expoConfig?.slug ?? 'unknown',
-          ownership: Constants.appOwnership ?? 'unknown',
-          version: buildAppVersionLabel(),
-        },
-        api: {
-          baseUrl: sanitizeUrlForEvidence(network.apiBaseUrl),
-          reachability: {
-            status: network.apiReachability.status,
-            checkedAt: network.apiReachability.checkedAt
-              ? new Date(network.apiReachability.checkedAt).toISOString()
-              : null,
-            latencyMs: network.apiReachability.latencyMs,
-            error: network.apiReachability.error,
-          },
-        },
-        network: {
-          initialized: network.initialized,
-          offline: network.offline,
-          connectionType: network.connectionType,
-          isConnected: network.isConnected,
-          isInternetReachable: network.isInternetReachable,
-          lastChangedAt: network.lastChangedAt
-            ? new Date(network.lastChangedAt).toISOString()
-            : null,
-        },
-        session: {
-          signedIn,
-          restoredFromProfileSnapshot: restoredFromSnapshot,
-          profileSnapshotCachedAt: session.profileSnapshotCachedAt
-            ? new Date(session.profileSnapshotCachedAt).toISOString()
-            : null,
-          shariahMode: Boolean(session.user?.shariahMode),
-          capabilities: buildCapabilityPosture(session.user),
-          walletPosture: buildWalletPosture(session.user),
-          workspacePosture: buildWorkspacePosture(session.user),
-        },
-        offlineSnapshots: snapshotSummary
-          ? {
-              accountScopedCount: snapshotSummary.accountScopedCount,
-              estimatedBytes: snapshotSummary.estimatedBytes,
-              expiredCount: snapshotSummary.expiredCount,
-              latestCachedAt: snapshotSummary.latestCachedAt
-                ? new Date(snapshotSummary.latestCachedAt).toISOString()
-                : null,
-              maxAgeMs: snapshotSummary.maxAgeMs,
-              maxEntriesPerScope: snapshotSummary.maxEntriesPerScope,
-              publicCount: snapshotSummary.publicCount,
-              resourceCounts: snapshotSummary.resourceCounts,
-              totalCount: snapshotSummary.totalCount,
-            }
-          : null,
-      };
+      const report = buildMobileRecoveryEvidenceReport({
+        apiBaseUrl: network.apiBaseUrl,
+        apiReachability: network.apiReachability,
+        connectionType: network.connectionType,
+        initialized: network.initialized,
+        isConnected: network.isConnected,
+        isInternetReachable: network.isInternetReachable,
+        lastChangedAt: network.lastChangedAt,
+        offline: network.offline,
+        profileSnapshotCachedAt: session.profileSnapshotCachedAt,
+        restoredFromProfileSnapshot: restoredFromSnapshot,
+        snapshotSummary,
+        user: session.user,
+      });
+      await saveMobileRecoveryEvidenceReport(report);
+      await refreshHistory();
 
       await Share.share({
         title: 'Escrow4337 mobile recovery evidence',
@@ -179,6 +95,33 @@ export function MobileRecoveryEvidenceCard({
     }
   }
 
+  async function handleClearEvidence() {
+    if (clearing || sharing) {
+      return;
+    }
+
+    setClearing(true);
+    try {
+      const removed = await clearMobileRecoveryEvidence();
+      await refreshHistory();
+      Alert.alert(
+        'Recovery evidence cleared',
+        removed
+          ? `Removed ${removed} saved recovery evidence report${removed === 1 ? '' : 's'}.`
+          : 'No saved recovery evidence reports were found on this device.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'Recovery evidence not cleared',
+        error instanceof Error ? error.message : 'Saved recovery evidence could not be removed.',
+      );
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  const latestReport = history[0] ?? null;
+
   return (
     <SurfaceCard animated delay={delay}>
       <Heading size="section">Recovery evidence</Heading>
@@ -189,7 +132,7 @@ export function MobileRecoveryEvidenceCard({
       <BodyText>
         Share a sanitized JSON report during real-device recovery checks. It captures network, API,
         cached-session, wallet-count, workspace-kind, capability, and offline snapshot posture
-        without tokens, email addresses, user ids, or wallet addresses.
+        without tokens, email addresses, user ids, wallet addresses, labels, or URL credentials.
       </BodyText>
       <MetricRow label="Signed in" value={signedIn ? 'Yes' : 'No'} />
       <MetricRow
@@ -217,9 +160,22 @@ export function MobileRecoveryEvidenceCard({
             : `${snapshotSummary?.totalCount ?? 0} saved`
         }
       />
+      <MetricRow
+        label="Saved reports"
+        value={historyLoading ? 'Checking' : `${history.length}/${mobileRecoveryEvidenceMaxEntries}`}
+      />
+      <MetricRow
+        label="Latest report"
+        value={latestReport ? formatTimestamp(Date.parse(latestReport.capturedAt)) : 'None'}
+      />
       <SecondaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
-        {sharing ? 'Preparing evidence' : 'Share recovery evidence'}
+        {sharing ? 'Preparing evidence' : 'Save and share evidence'}
       </SecondaryButton>
+      {history.length ? (
+        <SecondaryButton disabled={sharing || clearing} onPress={() => void handleClearEvidence()}>
+          {clearing ? 'Clearing evidence' : 'Clear saved evidence'}
+        </SecondaryButton>
+      ) : null}
     </SurfaceCard>
   );
 }

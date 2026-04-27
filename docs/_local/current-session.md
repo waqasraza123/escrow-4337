@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Ledger)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added `apps/mobile/src/features/offline/mobileRecoveryEvidence.ts`
+  - moved recovery evidence report construction and sanitization out of the Account card into a reusable storage helper
+  - saved every shared evidence report into a separate AsyncStorage namespace before opening the native share sheet
+  - added bounded evidence retention: newest 12 reports, 30-day max age, malformed envelope pruning
+  - surfaced saved-report count, newest report timestamp, and a clear-saved-evidence control in the Account recovery evidence card
+  - documented the local evidence ledger, retention, and sanitization contract in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real iOS/Android evidence reports from the new local ledger for offline cold-start restore, API recovery auto-refresh, marketplace snapshot hydration, retention cleanup, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Report)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push origin dev` completed with `Everything up-to-date`, but the repo safe-push hook ran `pnpm build` despite the no-build request.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
