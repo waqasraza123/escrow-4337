@@ -17,6 +17,7 @@ import {
   clearMobileRecoveryEvidence,
   listMobileRecoveryEvidence,
   mobileRecoveryEvidenceMaxEntries,
+  readMobileRecoveryEvidenceReport,
   saveMobileRecoveryEvidenceReport,
   type MobileRecoveryEvidenceOutcome,
   type MobileRecoveryEvidenceScenario,
@@ -68,6 +69,7 @@ export function MobileRecoveryEvidenceCard({
   const network = useMobileNetwork();
   const session = useSession();
   const [sharing, setSharing] = useState(false);
+  const [sharingSaved, setSharingSaved] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -77,7 +79,7 @@ export function MobileRecoveryEvidenceCard({
 
   const signedIn = Boolean(session.user);
   const restoredFromSnapshot = session.restoredFromProfileSnapshot;
-  const canShare = !snapshotSummaryLoading && !sharing && !clearing;
+  const canShare = !snapshotSummaryLoading && !sharing && !sharingSaved && !clearing;
 
   async function refreshHistory() {
     setHistoryLoading(true);
@@ -135,8 +137,40 @@ export function MobileRecoveryEvidenceCard({
     }
   }
 
+  async function handleShareLatestEvidence() {
+    if (!latestReport || sharing || sharingSaved || clearing) {
+      return;
+    }
+
+    setSharingSaved(true);
+    try {
+      const report = await readMobileRecoveryEvidenceReport(latestReport.id);
+
+      if (!report) {
+        await refreshHistory();
+        Alert.alert(
+          'Saved evidence unavailable',
+          'The latest saved recovery evidence report could not be read. It may have expired or been cleared.',
+        );
+        return;
+      }
+
+      await Share.share({
+        title: 'Escrow4337 mobile recovery evidence',
+        message: JSON.stringify(report, null, 2),
+      });
+    } catch (error) {
+      Alert.alert(
+        'Saved evidence not shared',
+        error instanceof Error ? error.message : 'The saved recovery evidence report could not be shared.',
+      );
+    } finally {
+      setSharingSaved(false);
+    }
+  }
+
   async function handleClearEvidence() {
-    if (clearing || sharing) {
+    if (clearing || sharing || sharingSaved) {
       return;
     }
 
@@ -230,9 +264,20 @@ export function MobileRecoveryEvidenceCard({
         {sharing ? 'Preparing evidence' : 'Save and share evidence'}
       </SecondaryButton>
       {history.length ? (
-        <SecondaryButton disabled={sharing || clearing} onPress={() => void handleClearEvidence()}>
-          {clearing ? 'Clearing evidence' : 'Clear saved evidence'}
-        </SecondaryButton>
+        <>
+          <SecondaryButton
+            disabled={sharing || sharingSaved || clearing}
+            onPress={() => void handleShareLatestEvidence()}
+          >
+            {sharingSaved ? 'Opening saved evidence' : 'Share latest saved evidence'}
+          </SecondaryButton>
+          <SecondaryButton
+            disabled={sharing || sharingSaved || clearing}
+            onPress={() => void handleClearEvidence()}
+          >
+            {clearing ? 'Clearing evidence' : 'Clear saved evidence'}
+          </SecondaryButton>
+        </>
       ) : null}
     </SurfaceCard>
   );

@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Re-share)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added saved report reads by id in `apps/mobile/src/features/offline/mobileRecoveryEvidence.ts`
+  - added a latest saved evidence re-share action to the Account recovery evidence card
+  - re-share reads the exact stored report by id and opens the native share sheet without regenerating or mutating evidence
+  - handled missing/pruned saved reports by refreshing the ledger and showing explicit copy
+  - documented exact latest-report re-share behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real iOS/Android evidence reports, then use the re-share path to preserve the exact saved artifacts for offline start, API recovery, wallet return, and project-room scenarios.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Context)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

@@ -321,6 +321,10 @@ export async function listMobileRecoveryEvidence(): Promise<MobileRecoveryEviden
     .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
 }
 
+export async function readMobileRecoveryEvidenceReport(id: string) {
+  return parseEvidenceReport(await AsyncStorage.getItem(toEvidenceStorageKey(id)));
+}
+
 export async function enforceMobileRecoveryEvidenceRetention({
   maxAgeMs = mobileRecoveryEvidenceMaxAgeMs,
   maxEntries = mobileRecoveryEvidenceMaxEntries,
