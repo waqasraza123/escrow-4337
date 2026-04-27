@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Review Manifests)
+- Committed and pushed prior motion polish to `origin/dev`:
+  - commit `fc6da5c` (`Polish mobile recovery evidence motion`)
+  - used `--no-verify` to avoid hooks/builds/tests per request
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - new report `artifact` manifest with schema, check counts, scenario/outcome summary, privacy boundary, reviewer checklist, and deterministic non-secret fingerprint
+  - new bundle `reviewManifest` with readiness, retention constants, partial reasons, privacy boundary, reviewer checklist, scenario artifact descriptors, and deterministic non-secret fingerprint
+  - latest report summaries now retain/display report fingerprints
+  - export-audit metadata can record report or bundle fingerprints without storing report bodies
+  - legacy saved reports without an artifact block still get a derived local display fingerprint
+  - documented review-manifest and fingerprint semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Professional Motion Polish)
 - Polished the Account recovery evidence card with professional motion and smoother state changes:
   - added animated bundle-readiness progress fill with a subtle sheen

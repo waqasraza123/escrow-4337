@@ -7,6 +7,7 @@ import type { OfflineSnapshotSummary } from './offlineSnapshots';
 
 export type MobileRecoveryEvidenceReport = {
   version: 1;
+  artifact?: MobileRecoveryEvidenceReportArtifact;
   capturedAt: string;
   evidenceContext: {
     checks: MobileRecoveryEvidenceCheck[];
@@ -82,6 +83,7 @@ export type MobileRecoveryEvidenceSummary = {
   capturedAt: string;
   apiStatus: string;
   checkCounts: Record<MobileRecoveryEvidenceCheckStatus, number>;
+  fingerprint: string;
   offline: boolean;
   outcome: MobileRecoveryEvidenceOutcome;
   restoredFromProfileSnapshot: boolean;
@@ -104,6 +106,8 @@ export type MobileRecoveryEvidenceAuditEvent = {
   reportId?: string;
   scenario?: MobileRecoveryEvidenceScenario;
   outcome?: MobileRecoveryEvidenceOutcome;
+  bundleFingerprint?: string;
+  reportFingerprint?: string;
   historyReportCount?: number;
   bundleReadiness?: {
     ready: boolean;
@@ -158,6 +162,7 @@ export type MobileRecoveryEvidenceBundle = {
   coverage: MobileRecoveryEvidenceCoverage;
   capturePlan: MobileRecoveryEvidenceCapturePlan;
   readiness: MobileRecoveryEvidenceBundleReadiness;
+  reviewManifest: MobileRecoveryEvidenceBundleReviewManifest;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
   reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>>;
 };
@@ -184,6 +189,54 @@ export type MobileRecoveryEvidenceCheck = {
   label: string;
   status: MobileRecoveryEvidenceCheckStatus;
   detail: string;
+};
+
+export type MobileRecoveryEvidenceArtifactFingerprint = {
+  algorithm: 'fnv1a32-canonical-json';
+  scope: string;
+  value: string;
+  warning: string;
+};
+
+export type MobileRecoveryEvidencePrivacyBoundary = {
+  excludes: string[];
+  notes: string[];
+};
+
+export type MobileRecoveryEvidenceReportArtifact = {
+  schema: 'escrow4337.mobileRecoveryEvidence.report.v1';
+  fingerprint: MobileRecoveryEvidenceArtifactFingerprint;
+  privacy: MobileRecoveryEvidencePrivacyBoundary;
+  reviewSummary: {
+    checkCounts: Record<MobileRecoveryEvidenceCheckStatus, number>;
+    generatedAt: string;
+    outcome: MobileRecoveryEvidenceOutcome;
+    scenario: MobileRecoveryEvidenceScenario;
+  };
+  reviewerChecklist: string[];
+};
+
+export type MobileRecoveryEvidenceBundleReviewManifest = {
+  schema: 'escrow4337.mobileRecoveryEvidence.bundle.v1';
+  fingerprint: MobileRecoveryEvidenceArtifactFingerprint;
+  generatedAt: string;
+  partialReasons: string[];
+  privacy: MobileRecoveryEvidencePrivacyBoundary;
+  readiness: MobileRecoveryEvidenceBundleReadiness;
+  retention: {
+    auditMaxEntries: number;
+    maxAgeMs: number;
+    reportMaxEntries: number;
+  };
+  scenarioArtifacts: Array<{
+    capturedAt: string;
+    checkCounts: Record<MobileRecoveryEvidenceCheckStatus, number>;
+    fingerprint: string;
+    outcome: MobileRecoveryEvidenceOutcome;
+    reportId: string;
+    scenario: MobileRecoveryEvidenceScenario;
+  }>;
+  reviewerChecklist: string[];
 };
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
@@ -236,6 +289,26 @@ const emptyCheckCounts: Record<MobileRecoveryEvidenceCheckStatus, number> = {
   fail: 0,
   pass: 0,
   warn: 0,
+};
+
+const evidencePrivacyBoundary: MobileRecoveryEvidencePrivacyBoundary = {
+  excludes: [
+    'access tokens',
+    'refresh tokens',
+    'email addresses',
+    'user ids',
+    'wallet addresses',
+    'workspace labels',
+    'organization names',
+    'URL credentials',
+    'URL query strings',
+    'private keys',
+    'free-form reviewer notes',
+  ],
+  notes: [
+    'Evidence is generated from sanitized runtime posture only.',
+    'Fingerprints are deterministic review checksums, not cryptographic signatures.',
+  ],
 };
 
 function buildAppVersionLabel() {
@@ -316,6 +389,90 @@ function countChecks(checks: MobileRecoveryEvidenceCheck[]) {
       return counts;
     },
     { ...emptyCheckCounts },
+  );
+}
+
+function canonicalizeEvidenceValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalizeEvidenceValue(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.keys(value as Record<string, unknown>)
+    .sort()
+    .reduce<Record<string, unknown>>((canonical, key) => {
+      const nextValue = (value as Record<string, unknown>)[key];
+
+      if (nextValue !== undefined) {
+        canonical[key] = canonicalizeEvidenceValue(nextValue);
+      }
+
+      return canonical;
+    }, {});
+}
+
+function stableStringifyEvidence(value: unknown) {
+  return JSON.stringify(canonicalizeEvidenceValue(value));
+}
+
+function fnv1a32(value: string) {
+  let hash = 0x811c9dc5;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+
+  return hash.toString(16).padStart(8, '0');
+}
+
+function buildEvidenceFingerprint(
+  value: unknown,
+  scope: string,
+): MobileRecoveryEvidenceArtifactFingerprint {
+  return {
+    algorithm: 'fnv1a32-canonical-json',
+    scope,
+    value: fnv1a32(stableStringifyEvidence(value)),
+    warning: 'Review checksum only; not a cryptographic signature or tamper-proof proof.',
+  };
+}
+
+function stripReportArtifact(report: MobileRecoveryEvidenceReport) {
+  const { artifact: _artifact, ...reportBody } = report;
+  return reportBody;
+}
+
+function buildReportArtifact(
+  report: Omit<MobileRecoveryEvidenceReport, 'artifact'>,
+): MobileRecoveryEvidenceReportArtifact {
+  const guide = mobileRecoveryEvidenceScenarioGuides[report.evidenceContext.scenario];
+
+  return {
+    schema: 'escrow4337.mobileRecoveryEvidence.report.v1',
+    fingerprint: buildEvidenceFingerprint(report, 'report_without_artifact'),
+    privacy: evidencePrivacyBoundary,
+    reviewSummary: {
+      checkCounts: countChecks(report.evidenceContext.checks),
+      generatedAt: report.capturedAt,
+      outcome: report.evidenceContext.outcome,
+      scenario: report.evidenceContext.scenario,
+    },
+    reviewerChecklist: [
+      guide.captureGoal,
+      ...guide.reviewFocus.map((focus) => `Review ${focus.toLowerCase()}.`),
+      'Confirm the controlled reviewer outcome matches the computed check posture.',
+    ],
+  };
+}
+
+function getReportFingerprint(report: MobileRecoveryEvidenceReport) {
+  return (
+    report.artifact?.fingerprint.value ??
+    buildEvidenceFingerprint(stripReportArtifact(report), 'legacy_report_without_artifact').value
   );
 }
 
@@ -541,6 +698,7 @@ function summarizeEvidenceReport(
     capturedAt: report.capturedAt,
     apiStatus: report.api.reachability.status,
     checkCounts: countChecks(report.evidenceContext?.checks ?? []),
+    fingerprint: getReportFingerprint(report),
     offline: report.network.offline,
     outcome: report.evidenceContext?.outcome ?? 'observed',
     restoredFromProfileSnapshot: report.session.restoredFromProfileSnapshot,
@@ -595,7 +753,7 @@ export function buildMobileRecoveryEvidenceReport({
     user,
   });
 
-  return {
+  const report: Omit<MobileRecoveryEvidenceReport, 'artifact'> = {
     version: 1,
     capturedAt: new Date().toISOString(),
     evidenceContext: {
@@ -657,6 +815,11 @@ export function buildMobileRecoveryEvidenceReport({
           totalCount: snapshotSummary.totalCount,
         }
       : null,
+  };
+
+  return {
+    ...report,
+    artifact: buildReportArtifact(report),
   };
 }
 
@@ -778,6 +941,7 @@ export async function buildMobileRecoveryEvidenceBundle(
 ): Promise<MobileRecoveryEvidenceBundle> {
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
   const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
+  const generatedAt = new Date().toISOString();
   const missingScenarios: MobileRecoveryEvidenceScenario[] = [];
   const reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>> = {};
   const reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>> =
@@ -825,25 +989,77 @@ export async function buildMobileRecoveryEvidenceBundle(
 
   const includedScenarioCount = Object.keys(reportsByScenario).length;
   const requiredScenarioCount = mobileRecoveryEvidenceScenarios.length;
+  const readiness: MobileRecoveryEvidenceBundleReadiness = {
+    generatedFromReportCount: history.length,
+    includedScenarioCount,
+    missingScenarios,
+    ready:
+      includedScenarioCount === requiredScenarioCount &&
+      missingScenarios.length === 0 &&
+      unreadableScenarios.length === 0,
+    requiredScenarioCount,
+    unreadableScenarios,
+  };
+  const scenarioArtifacts = mobileRecoveryEvidenceScenarios.flatMap((scenario) => {
+    const report = reportsByScenario[scenario];
+    const reportId = reportIdsByScenario[scenario];
+
+    if (!report || !reportId) {
+      return [];
+    }
+
+    return [
+      {
+        capturedAt: report.capturedAt,
+        checkCounts: countChecks(report.evidenceContext.checks),
+        fingerprint: getReportFingerprint(report),
+        outcome: report.evidenceContext.outcome,
+        reportId,
+        scenario,
+      },
+    ];
+  });
+  const partialReasons = [
+    ...missingScenarios.map((scenario) => `Missing ${scenario} report.`),
+    ...unreadableScenarios.map((scenario) => `Unreadable saved report for ${scenario}.`),
+  ];
+  const reviewerChecklist = [
+    'Confirm readiness.ready is true before treating the bundle as complete.',
+    'Compare each scenario artifact fingerprint with the included report artifact fingerprint.',
+    'Review missing or unreadable scenario reasons before accepting a partial bundle.',
+    'Confirm the bundle contains one latest readable report per supported scenario.',
+  ];
+  const manifestBody = {
+    schema: 'escrow4337.mobileRecoveryEvidence.bundle.v1' as const,
+    generatedAt,
+    partialReasons,
+    privacy: evidencePrivacyBoundary,
+    readiness,
+    retention: {
+      auditMaxEntries: mobileRecoveryEvidenceAuditMaxEntries,
+      maxAgeMs: mobileRecoveryEvidenceMaxAgeMs,
+      reportMaxEntries: mobileRecoveryEvidenceMaxEntries,
+    },
+    scenarioArtifacts,
+    reviewerChecklist,
+  };
+  const reviewManifest: MobileRecoveryEvidenceBundleReviewManifest = {
+    ...manifestBody,
+    fingerprint: buildEvidenceFingerprint(
+      manifestBody,
+      'bundle_review_manifest_without_fingerprint',
+    ),
+  };
 
   return {
     version: 1,
     capturePlan,
     coverage,
-    generatedAt: new Date().toISOString(),
-    readiness: {
-      generatedFromReportCount: history.length,
-      includedScenarioCount,
-      missingScenarios,
-      ready:
-        includedScenarioCount === requiredScenarioCount &&
-        missingScenarios.length === 0 &&
-        unreadableScenarios.length === 0,
-      requiredScenarioCount,
-      unreadableScenarios,
-    },
+    generatedAt,
+    readiness,
     reportIdsByScenario,
     reportsByScenario,
+    reviewManifest,
   };
 }
 

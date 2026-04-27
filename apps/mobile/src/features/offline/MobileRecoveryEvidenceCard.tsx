@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Easing, Share, StyleSheet, Text, View } from 'react-native';
-import { formatTimestamp, type ProductStatusTone } from '@escrow4334/product-core';
+import { formatTimestamp, previewHash, type ProductStatusTone } from '@escrow4334/product-core';
 import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import { useMobileTheme } from '@/providers/theme';
@@ -299,6 +299,7 @@ export function MobileRecoveryEvidenceCard({
       await appendMobileRecoveryEvidenceAuditEvent({
         action: 'report_saved',
         outcome,
+        reportFingerprint: report.artifact?.fingerprint.value,
         reportId,
         scenario,
       });
@@ -311,6 +312,7 @@ export function MobileRecoveryEvidenceCard({
       await appendMobileRecoveryEvidenceAuditEvent({
         action: 'report_share_opened',
         outcome,
+        reportFingerprint: report.artifact?.fingerprint.value,
         reportId,
         scenario,
       });
@@ -350,6 +352,7 @@ export function MobileRecoveryEvidenceCard({
       await appendMobileRecoveryEvidenceAuditEvent({
         action: 'saved_report_share_opened',
         outcome: latestReport.outcome,
+        reportFingerprint: latestReport.fingerprint,
         reportId: latestReport.id,
         scenario: latestReport.scenario,
       });
@@ -391,6 +394,7 @@ export function MobileRecoveryEvidenceCard({
         if (!shouldSharePartialBundle) {
           await appendMobileRecoveryEvidenceAuditEvent({
             action: 'partial_bundle_share_cancelled',
+            bundleFingerprint: bundle.reviewManifest.fingerprint.value,
             bundleReadiness: {
               includedScenarioCount: bundle.readiness.includedScenarioCount,
               missingScenarios: bundle.readiness.missingScenarios,
@@ -415,6 +419,7 @@ export function MobileRecoveryEvidenceCard({
       });
       await appendMobileRecoveryEvidenceAuditEvent({
         action: 'bundle_share_opened',
+        bundleFingerprint: bundle.reviewManifest.fingerprint.value,
         bundleReadiness: {
           includedScenarioCount: bundle.readiness.includedScenarioCount,
           missingScenarios: bundle.readiness.missingScenarios,
@@ -717,6 +722,10 @@ export function MobileRecoveryEvidenceCard({
             }
           />
           <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
+          <MetricRow
+            label="Latest fingerprint"
+            value={latestReport ? previewHash(latestReport.fingerprint, 'None', 6, 4) : 'None'}
+          />
           <MetricRow
             label="Latest audit"
             value={
