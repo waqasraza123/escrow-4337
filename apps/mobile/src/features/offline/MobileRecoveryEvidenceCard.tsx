@@ -341,6 +341,7 @@ export function MobileRecoveryEvidenceCard({
   const nextScenarioLabel = capturePlan.nextScenario
     ? evidenceScenarioLabels[capturePlan.nextScenario]
     : 'Complete';
+  const nextScenarioPosture = capturePlan.nextGuide?.expectedPosture ?? 'All scenarios captured';
 
   function handleSelectNextScenario() {
     if (!capturePlan.nextScenario) {
@@ -431,6 +432,12 @@ export function MobileRecoveryEvidenceCard({
             </Text>
             <Text style={[styles.capturePlanValue, { color: theme.colors.foreground }]}>
               {historyLoading ? 'Checking' : nextScenarioLabel}
+            </Text>
+            <Text
+              numberOfLines={2}
+              style={[styles.capturePlanPosture, { color: theme.colors.foregroundMuted }]}
+            >
+              {historyLoading ? 'Loading local evidence ledger' : nextScenarioPosture}
             </Text>
           </View>
           {historyLoading ? (
@@ -707,6 +714,11 @@ const styles = StyleSheet.create({
   capturePlanValue: {
     fontSize: 15,
     fontWeight: '900',
+  },
+  capturePlanPosture: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   capturePlanButton: {
     minHeight: 38,

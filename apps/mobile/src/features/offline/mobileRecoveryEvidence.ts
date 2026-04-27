@@ -109,18 +109,29 @@ export type MobileRecoveryEvidenceCoverage = {
 
 export type MobileRecoveryEvidenceCapturePlan = {
   completeScenarios: MobileRecoveryEvidenceScenario[];
+  guidesByScenario: Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceScenarioGuide>;
   generatedFromReportCount: number;
   missingScenarios: MobileRecoveryEvidenceScenario[];
+  nextGuide: MobileRecoveryEvidenceScenarioGuide | null;
   nextScenario: MobileRecoveryEvidenceScenario | null;
   ready: boolean;
   recommendedOutcome: MobileRecoveryEvidenceOutcome;
   requiredScenarioCount: number;
 };
 
+export type MobileRecoveryEvidenceScenarioGuide = {
+  scenario: MobileRecoveryEvidenceScenario;
+  title: string;
+  expectedPosture: string;
+  captureGoal: string;
+  reviewFocus: string[];
+};
+
 export type MobileRecoveryEvidenceBundle = {
   version: 1;
   generatedAt: string;
   coverage: MobileRecoveryEvidenceCoverage;
+  capturePlan: MobileRecoveryEvidenceCapturePlan;
   readiness: MobileRecoveryEvidenceBundleReadiness;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
   reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>>;
@@ -159,6 +170,40 @@ export const mobileRecoveryEvidenceScenarios: MobileRecoveryEvidenceScenario[] =
   'wallet_return',
   'project_room',
 ];
+
+export const mobileRecoveryEvidenceScenarioGuides: Record<
+  MobileRecoveryEvidenceScenario,
+  MobileRecoveryEvidenceScenarioGuide
+> = {
+  api_recovery: {
+    captureGoal: 'Prove the app converges back to live API/session posture after connectivity returns.',
+    expectedPosture: 'Device online, runtime-profile reachable',
+    reviewFocus: ['API reachability', 'Live session posture', 'Snapshot-to-live convergence'],
+    scenario: 'api_recovery',
+    title: 'API recovery',
+  },
+  offline_start: {
+    captureGoal: 'Prove account and read snapshots remain inspectable while offline or API-unreachable.',
+    expectedPosture: 'Device offline or API unreachable',
+    reviewFocus: ['Offline/API posture', 'Cached profile availability', 'Read snapshot inventory'],
+    scenario: 'offline_start',
+    title: 'Offline start',
+  },
+  project_room: {
+    captureGoal: 'Prove project-room recovery has either a live API source or saved project-room snapshot.',
+    expectedPosture: 'Project-room context visible',
+    reviewFocus: ['Signed-in state', 'Project-room snapshot presence', 'Live API or snapshot source'],
+    scenario: 'project_room',
+    title: 'Project room',
+  },
+  wallet_return: {
+    captureGoal: 'Prove wallet-linked account posture survives return to the mobile flow.',
+    expectedPosture: 'Signed in with wallet posture visible',
+    reviewFocus: ['Signed-in state', 'Linked wallet count', 'Execution or smart-account posture'],
+    scenario: 'wallet_return',
+    title: 'Wallet return',
+  },
+};
 
 const emptyCheckCounts: Record<MobileRecoveryEvidenceCheckStatus, number> = {
   fail: 0,
@@ -633,8 +678,12 @@ export function buildMobileRecoveryEvidenceCapturePlan(
 
   return {
     completeScenarios,
+    guidesByScenario: mobileRecoveryEvidenceScenarioGuides,
     generatedFromReportCount: history.length,
     missingScenarios,
+    nextGuide: missingScenarios[0]
+      ? mobileRecoveryEvidenceScenarioGuides[missingScenarios[0]]
+      : null,
     nextScenario: missingScenarios[0] ?? null,
     ready: missingScenarios.length === 0,
     recommendedOutcome: 'observed',
@@ -650,6 +699,7 @@ export async function buildMobileRecoveryEvidenceBundle(
   history: MobileRecoveryEvidenceSummary[],
 ): Promise<MobileRecoveryEvidenceBundle> {
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
   const missingScenarios: MobileRecoveryEvidenceScenario[] = [];
   const reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>> = {};
   const reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>> =
@@ -700,6 +750,7 @@ export async function buildMobileRecoveryEvidenceBundle(
 
   return {
     version: 1,
+    capturePlan,
     coverage,
     generatedAt: new Date().toISOString(),
     readiness: {

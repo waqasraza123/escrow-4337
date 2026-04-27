@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Scenario Guides)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added typed scenario-guide metadata for offline start, API recovery, wallet return, and project room
+  - each guide records title, expected posture, capture goal, and reviewer focus points
+  - capture plans now include all scenario guides plus the next scenario guide
+  - coverage bundles now include the current capture plan alongside coverage/readiness and exact saved reports
+  - Account now shows expected posture for the next missing capture inside the readiness panel
+  - documented scenario-guide and bundle capture-plan semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+
 ## Update (2026-04-27, Mobile Recovery Evidence Capture Plan)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
