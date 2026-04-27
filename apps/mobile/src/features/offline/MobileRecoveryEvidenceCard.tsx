@@ -57,6 +57,15 @@ const evidenceOutcomeLabels: Record<MobileRecoveryEvidenceOutcome, string> = {
   passed: 'Passed',
 };
 
+function formatCheckCounts(summary: MobileRecoveryEvidenceSummary | null) {
+  if (!summary) {
+    return 'None';
+  }
+
+  const { fail, pass, warn } = summary.checkCounts;
+  return `${pass} pass / ${warn} warn / ${fail} fail`;
+}
+
 export function MobileRecoveryEvidenceCard({
   delay = 60,
   snapshotSummary,
@@ -260,6 +269,7 @@ export function MobileRecoveryEvidenceCard({
             : 'None'
         }
       />
+      <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
       <SecondaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
         {sharing ? 'Preparing evidence' : 'Save and share evidence'}
       </SecondaryButton>

@@ -42,9 +42,9 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/session/MobileSessionRecoveryBridge.tsx` mounts inside `SessionProvider`. When the app is running from a secure cached profile and API reachability recovers to `reachable`, it throttles and attempts a live session refresh, then invalidates query caches after a successful refresh. Refresh failures stay non-destructive; the cached-profile notice remains visible until a live session refresh succeeds or the user signs out.
 
-`apps/mobile/src/features/offline/mobileRecoveryEvidence.ts` owns the mobile recovery evidence report contract. It assembles sanitized JSON reports from controlled evidence context, network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, stores recent reports in AsyncStorage, supports reading a saved report by id for exact re-share, and enforces bounded local retention. Reports intentionally exclude access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, free-form reviewer notes, and URL credentials or query strings.
+`apps/mobile/src/features/offline/mobileRecoveryEvidence.ts` owns the mobile recovery evidence report contract. It assembles sanitized JSON reports from controlled evidence context, scenario-specific posture checks, network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, stores recent reports in AsyncStorage, supports reading a saved report by id for exact re-share, and enforces bounded local retention. Reports intentionally exclude access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, free-form reviewer notes, and URL credentials or query strings.
 
-`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It captures controlled scenario and outcome values, creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays the saved-report count and newest report timestamp, supports re-sharing the latest saved report without regenerating it, and exposes a clear control for the local evidence ledger.
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It captures controlled scenario and outcome values, creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays the saved-report count, newest report timestamp, and newest pass/warn/fail check counts, supports re-sharing the latest saved report without regenerating it, and exposes a clear control for the local evidence ledger.
 
 ## UI Surface
 
@@ -190,14 +190,17 @@ Evidence report retention rules:
 - each share action saves the report locally before opening the native share sheet
 - each report includes a controlled scenario: offline start, API recovery, wallet return, or project room
 - each report includes a controlled outcome: observed, passed, or failed
+- each report includes scenario-specific computed checks with `pass`, `warn`, or `fail` status
 - the app retains the newest 12 reports
 - reports expire after 30 days
 - malformed report envelopes are pruned by the same retention pass
-- Account displays saved-report count, newest report scenario, newest report outcome, and newest report timestamp
+- Account displays saved-report count, newest report scenario, newest report outcome, newest report timestamp, and newest check counts
 - Account can re-share the latest saved report by id without generating a new report or mutating the existing evidence
 - Account exposes a "Clear saved evidence" action that removes only the recovery evidence namespace
 
-Evidence reports may include scenario, outcome, platform, app version, sanitized API base URL, API probe status/error, NetInfo state, cached-profile session status, capability booleans, wallet counts, workspace kind/role posture, and offline snapshot summary counts. They must not include session tokens, OTPs, email addresses, user ids, wallet addresses, workspace labels, organization names, invite tokens, private keys, free-form reviewer notes, URL credentials, or URL query strings.
+Computed checks are intentionally coarse and non-sensitive. Offline-start checks cover whether the device/API is actually unavailable, whether a secure profile snapshot is visible, and whether any read-only snapshot inventory exists. API-recovery checks cover device connectivity, runtime-profile reachability, and whether account context has recovered from cached-profile posture. Wallet-return checks cover signed-in state, linked-wallet presence, and default execution or smart-account posture. Project-room checks cover signed-in state, project-room snapshot availability, and whether recovery has either a live API or saved project-room snapshot source.
+
+Evidence reports may include scenario, outcome, computed checks, platform, app version, sanitized API base URL, API probe status/error, NetInfo state, cached-profile session status, capability booleans, wallet counts, workspace kind/role posture, and offline snapshot summary counts. They must not include session tokens, OTPs, email addresses, user ids, wallet addresses, workspace labels, organization names, invite tokens, private keys, free-form reviewer notes, URL credentials, or URL query strings.
 
 ## Recovery Model
 

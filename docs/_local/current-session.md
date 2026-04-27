@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Checks)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added scenario-specific computed checks to `MobileRecoveryEvidenceReport`
+  - check statuses are `pass`, `warn`, or `fail` and stay coarse/non-sensitive
+  - offline-start checks cover offline/API posture, cached profile availability, and read snapshot inventory
+  - API-recovery checks cover device connectivity, runtime-profile reachability, and live-versus-cached session posture
+  - wallet-return checks cover signed-in state, linked-wallet presence, and execution/smart-account posture
+  - project-room checks cover signed-in state, project-room snapshot presence, and live API or snapshot recovery source
+  - Account now shows latest saved report check counts
+  - documented computed-check semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real iOS/Android evidence reports and compare reviewer outcomes with computed pass/warn/fail checks for the four supported scenarios.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Re-share)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

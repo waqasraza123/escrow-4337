@@ -9,6 +9,7 @@ export type MobileRecoveryEvidenceReport = {
   version: 1;
   capturedAt: string;
   evidenceContext: {
+    checks: MobileRecoveryEvidenceCheck[];
     scenario: MobileRecoveryEvidenceScenario;
     outcome: MobileRecoveryEvidenceOutcome;
   };
@@ -80,6 +81,7 @@ export type MobileRecoveryEvidenceSummary = {
   id: string;
   capturedAt: string;
   apiStatus: string;
+  checkCounts: Record<MobileRecoveryEvidenceCheckStatus, number>;
   offline: boolean;
   outcome: MobileRecoveryEvidenceOutcome;
   restoredFromProfileSnapshot: boolean;
@@ -94,6 +96,13 @@ export type MobileRecoveryEvidenceScenario =
   | 'project_room';
 
 export type MobileRecoveryEvidenceOutcome = 'observed' | 'passed' | 'failed';
+export type MobileRecoveryEvidenceCheckStatus = 'pass' | 'warn' | 'fail';
+export type MobileRecoveryEvidenceCheck = {
+  id: string;
+  label: string;
+  status: MobileRecoveryEvidenceCheckStatus;
+  detail: string;
+};
 
 const evidencePrefix = 'escrow4337.mobileRecoveryEvidence.v1';
 export const mobileRecoveryEvidenceMaxEntries = 12;
@@ -156,6 +165,170 @@ function buildCapabilityPosture(user: UserProfile | null) {
   };
 }
 
+function buildCheck(
+  id: string,
+  label: string,
+  status: MobileRecoveryEvidenceCheckStatus,
+  detail: string,
+): MobileRecoveryEvidenceCheck {
+  return {
+    detail,
+    id,
+    label,
+    status,
+  };
+}
+
+function countChecks(checks: MobileRecoveryEvidenceCheck[]) {
+  return checks.reduce<Record<MobileRecoveryEvidenceCheckStatus, number>>(
+    (counts, check) => {
+      counts[check.status] += 1;
+      return counts;
+    },
+    { fail: 0, pass: 0, warn: 0 },
+  );
+}
+
+function getSnapshotResourceCount(
+  snapshotSummary: OfflineSnapshotSummary | null,
+  resource: string,
+) {
+  return snapshotSummary?.resourceCounts[resource] ?? 0;
+}
+
+function buildScenarioChecks({
+  apiReachability,
+  offline,
+  profileSnapshotCachedAt,
+  restoredFromProfileSnapshot,
+  scenario,
+  snapshotSummary,
+  user,
+}: {
+  apiReachability: { status: string };
+  offline: boolean;
+  profileSnapshotCachedAt: number | null;
+  restoredFromProfileSnapshot: boolean;
+  scenario: MobileRecoveryEvidenceScenario;
+  snapshotSummary: OfflineSnapshotSummary | null;
+  user: UserProfile | null;
+}) {
+  const walletCount = user?.wallets.length ?? 0;
+  const smartAccountCount =
+    user?.wallets.filter((wallet) => wallet.walletKind === 'smart_account').length ?? 0;
+  const projectRoomSnapshotCount = getSnapshotResourceCount(snapshotSummary, 'project-room');
+
+  if (scenario === 'offline_start') {
+    return [
+      buildCheck(
+        'offline-posture',
+        'Offline posture',
+        offline || apiReachability.status === 'skipped' || apiReachability.status === 'unreachable'
+          ? 'pass'
+          : 'warn',
+        offline || apiReachability.status === 'skipped' || apiReachability.status === 'unreachable'
+          ? 'Device or API posture reflects an offline/outage capture.'
+          : 'Device and API both appear reachable during an offline-start capture.',
+      ),
+      buildCheck(
+        'cached-profile',
+        'Cached profile available',
+        profileSnapshotCachedAt || restoredFromProfileSnapshot ? 'pass' : 'warn',
+        profileSnapshotCachedAt || restoredFromProfileSnapshot
+          ? 'A secure profile snapshot is available for account-scoped recovery.'
+          : 'No secure profile snapshot was visible for this capture.',
+      ),
+      buildCheck(
+        'snapshot-inventory',
+        'Read snapshot inventory',
+        (snapshotSummary?.totalCount ?? 0) > 0 ? 'pass' : 'warn',
+        (snapshotSummary?.totalCount ?? 0) > 0
+          ? 'Read-only snapshot inventory exists on this device.'
+          : 'No read-only snapshots were visible on this device.',
+      ),
+    ];
+  }
+
+  if (scenario === 'api_recovery') {
+    return [
+      buildCheck(
+        'device-online',
+        'Device online',
+        offline ? 'fail' : 'pass',
+        offline ? 'Device is still reporting offline.' : 'Device connectivity is available.',
+      ),
+      buildCheck(
+        'api-reachable',
+        'API reachable',
+        apiReachability.status === 'reachable' ? 'pass' : 'fail',
+        apiReachability.status === 'reachable'
+          ? 'Runtime-profile probe is reachable.'
+          : `Runtime-profile probe status is ${apiReachability.status}.`,
+      ),
+      buildCheck(
+        'session-refresh',
+        'Session recovery posture',
+        user ? (restoredFromProfileSnapshot ? 'warn' : 'pass') : 'warn',
+        user
+          ? restoredFromProfileSnapshot
+            ? 'Account is still using cached profile context.'
+            : 'Account context is live.'
+          : 'No signed-in account context is available.',
+      ),
+    ];
+  }
+
+  if (scenario === 'wallet_return') {
+    return [
+      buildCheck(
+        'signed-in',
+        'Signed in',
+        user ? 'pass' : 'fail',
+        user ? 'Account context is available.' : 'No signed-in account context is available.',
+      ),
+      buildCheck(
+        'linked-wallet',
+        'Linked wallet',
+        walletCount > 0 ? 'pass' : 'fail',
+        walletCount > 0 ? 'At least one wallet is linked.' : 'No linked wallet is visible.',
+      ),
+      buildCheck(
+        'execution-wallet',
+        'Execution wallet',
+        user?.defaultExecutionWalletAddress || smartAccountCount > 0 ? 'pass' : 'warn',
+        user?.defaultExecutionWalletAddress || smartAccountCount > 0
+          ? 'Default execution or smart-account posture is available.'
+          : 'No default execution wallet or smart-account posture is visible.',
+      ),
+    ];
+  }
+
+  return [
+    buildCheck(
+      'signed-in',
+      'Signed in',
+      user ? 'pass' : 'fail',
+      user ? 'Account context is available.' : 'No signed-in account context is available.',
+    ),
+    buildCheck(
+      'project-room-snapshot',
+      'Project-room snapshot',
+      projectRoomSnapshotCount > 0 ? 'pass' : 'warn',
+      projectRoomSnapshotCount > 0
+        ? 'At least one project-room snapshot is available.'
+        : 'No project-room snapshot is visible on this device.',
+    ),
+    buildCheck(
+      'project-room-recovery-source',
+      'Recovery source',
+      apiReachability.status === 'reachable' || projectRoomSnapshotCount > 0 ? 'pass' : 'fail',
+      apiReachability.status === 'reachable' || projectRoomSnapshotCount > 0
+        ? 'Project-room recovery has a live API or saved snapshot source.'
+        : 'No live API or project-room snapshot source is available.',
+    ),
+  ];
+}
+
 function parseEvidenceReport(raw: string | null): MobileRecoveryEvidenceReport | null {
   if (!raw) {
     return null;
@@ -193,6 +366,7 @@ function summarizeEvidenceReport(
     id,
     capturedAt: report.capturedAt,
     apiStatus: report.api.reachability.status,
+    checkCounts: countChecks(report.evidenceContext?.checks ?? []),
     offline: report.network.offline,
     outcome: report.evidenceContext?.outcome ?? 'observed',
     restoredFromProfileSnapshot: report.session.restoredFromProfileSnapshot,
@@ -237,10 +411,21 @@ export function buildMobileRecoveryEvidenceReport({
   snapshotSummary: OfflineSnapshotSummary | null;
   user: UserProfile | null;
 }): MobileRecoveryEvidenceReport {
+  const checks = buildScenarioChecks({
+    apiReachability,
+    offline,
+    profileSnapshotCachedAt,
+    restoredFromProfileSnapshot,
+    scenario,
+    snapshotSummary,
+    user,
+  });
+
   return {
     version: 1,
     capturedAt: new Date().toISOString(),
     evidenceContext: {
+      checks,
       outcome,
       scenario,
     },
