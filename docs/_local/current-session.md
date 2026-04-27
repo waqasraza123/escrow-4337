@@ -16,7 +16,7 @@
 - Verification:
   - real tests/builds intentionally not run by request
   - `git diff --check` passed
-  - `git push --no-verify` pending
+  - `git push --no-verify origin dev` completed (`b9f1026`)
 - Changed files:
   `apps/web/src/app/marketplace/client-console.tsx`
 
