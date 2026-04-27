@@ -21,10 +21,8 @@ import {
 } from '@escrow4334/product-core';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
-import {
-  OfflineSnapshotNotice,
-  useOfflineSnapshot,
-} from '@/features/offline/useOfflineSnapshot';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -406,7 +404,7 @@ export default function ContractProjectRoomRoute() {
     queryFn: () => api.getProjectRoom(id as string, accessToken as string),
   });
   const roomSnapshot = useOfflineSnapshot<{ room: ProjectRoom }>({
-    cacheKey: user && id ? `project-room:${user.id}:${id}` : null,
+    cacheKey: user && id ? createOfflineSnapshotCacheKey('project-room', user.id, id) : null,
     data: roomQuery.data,
     enabled: Boolean(user && id),
   });
@@ -417,7 +415,8 @@ export default function ContractProjectRoomRoute() {
     queryFn: () => api.getMarketplaceJobReviews(id as string, accessToken as string),
   });
   const reviewsSnapshot = useOfflineSnapshot<{ reviews: MarketplaceReview[] }>({
-    cacheKey: user && id ? `marketplace-job-reviews:${user.id}:${id}` : null,
+    cacheKey:
+      user && id ? createOfflineSnapshotCacheKey('marketplace-job-reviews', user.id, id) : null,
     data: reviewsQuery.data,
     enabled: Boolean(user && id),
   });

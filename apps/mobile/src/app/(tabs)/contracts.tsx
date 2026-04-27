@@ -1,10 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { formatAmount, type JobsListResponse } from '@escrow4334/product-core';
-import {
-  OfflineSnapshotNotice,
-  useOfflineSnapshot,
-} from '@/features/offline/useOfflineSnapshot';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
@@ -28,7 +26,7 @@ export default function ContractsRoute() {
     queryFn: () => api.listJobs(accessToken as string),
   });
   const jobsSnapshot = useOfflineSnapshot<JobsListResponse>({
-    cacheKey: user ? `jobs:${user.id}` : null,
+    cacheKey: user ? createOfflineSnapshotCacheKey('jobs', user.id) : null,
     data: jobs.data,
     enabled: Boolean(user),
   });

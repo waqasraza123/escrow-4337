@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Offline Snapshot Lifecycle)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery hardening slice without intentional tests/builds:
+  - split snapshot storage into `apps/mobile/src/features/offline/offlineSnapshots.ts` so session cleanup can clear cached reads without importing UI/hook code
+  - centralized snapshot cache-key creation for contracts, project-room, and marketplace-review snapshots
+  - cleared saved snapshots for the current user on sign-out, and cleared the snapshot namespace after failed session restore
+  - added an Account "Clear offline data" control with user-facing success/failure copy
+  - documented snapshot lifecycle, account control behavior, and namespace isolation in Mobile Offline Recovery V1 plus durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{offlineSnapshots.ts,useOfflineSnapshot.tsx}`
+  `apps/mobile/src/providers/session.tsx`
+  `apps/mobile/src/app/{(tabs)/account.tsx,(tabs)/contracts.tsx,contracts/[id].tsx,contracts/[id]/room.tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device evidence for offline snapshot hydration/clearing, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Read-Only Offline Snapshots)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery slice without intentional tests/builds:

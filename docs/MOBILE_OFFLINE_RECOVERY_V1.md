@@ -32,7 +32,9 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/network/NetworkActionNotice.tsx` is the shared blocked-action notice. It renders only when `useNetworkActionGate().actionBlocked` is true and gives users action-specific recovery copy next to disabled mutation controls.
 
-`apps/mobile/src/features/offline/useOfflineSnapshot.tsx` is the shared read-only snapshot boundary. It persists selected authenticated read responses in AsyncStorage under user-scoped, non-token cache keys, hydrates them on later app opens, and exposes `OfflineSnapshotNotice` for clear stale-data copy.
+`apps/mobile/src/features/offline/offlineSnapshots.ts` owns the AsyncStorage storage contract for read-only snapshots: resource/user-scoped cache-key construction, envelope reads/writes, and snapshot clearing by user id or whole namespace.
+
+`apps/mobile/src/features/offline/useOfflineSnapshot.tsx` is the shared React boundary. It persists selected authenticated read responses through the storage helper, hydrates them on later app opens, and exposes `OfflineSnapshotNotice` for clear stale-data copy.
 
 ## UI Surface
 
@@ -128,6 +130,13 @@ Selected high-value read surfaces now persist explicit offline snapshots:
 - marketplace review state from `api.getMarketplaceJobReviews`
 
 Snapshots are intentionally read-only. When a screen is rendered from snapshot data rather than live query data, it shows an `Offline snapshot` notice with the saved timestamp and disables write actions that depend on that stale state. Fresh successful query responses replace the previous snapshot. Snapshot keys use the authenticated user id and resource id, never access or refresh tokens.
+
+Snapshot lifecycle rules:
+
+- sign-out clears saved snapshots for the signed-out user
+- failed session restore clears the snapshot namespace before returning to signed-out state
+- Account exposes a signed-in "Clear offline data" control for explicit local data removal
+- snapshot clearing only targets keys under `escrow4337.offlineSnapshot.v1`, leaving locale, theme, WalletConnect, and secure token storage untouched
 
 ## Recovery Model
 

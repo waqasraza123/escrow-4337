@@ -19,10 +19,8 @@ import {
 } from '@/features/contracts/contract-drafts';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
-import {
-  OfflineSnapshotNotice,
-  useOfflineSnapshot,
-} from '@/features/offline/useOfflineSnapshot';
+import { createOfflineSnapshotCacheKey } from '@/features/offline/offlineSnapshots';
+import { OfflineSnapshotNotice, useOfflineSnapshot } from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -57,7 +55,7 @@ export default function ContractDetailRoute() {
     queryFn: () => api.listJobs(accessToken as string),
   });
   const jobsSnapshot = useOfflineSnapshot<JobsListResponse>({
-    cacheKey: user ? `jobs:${user.id}` : null,
+    cacheKey: user ? createOfflineSnapshotCacheKey('jobs', user.id) : null,
     data: jobs.data,
     enabled: Boolean(user),
   });

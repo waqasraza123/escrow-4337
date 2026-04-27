@@ -1,15 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatTimestamp } from '@escrow4334/product-core';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMobileTheme } from '@/providers/theme';
 import { BodyText, StatusBadge } from '@/ui/primitives';
-
-type OfflineSnapshotEnvelope<TData> = {
-  version: 1;
-  cachedAt: number;
-  data: TData;
-};
+import {
+  readOfflineSnapshot,
+  writeOfflineSnapshot,
+  type OfflineSnapshotEnvelope,
+} from './offlineSnapshots';
 
 type OfflineSnapshotState<TData> = {
   cachedAt: number | null;
@@ -17,34 +15,7 @@ type OfflineSnapshotState<TData> = {
   hydrating: boolean;
 };
 
-const snapshotPrefix = 'escrow4337.offlineSnapshot.v1';
 const defaultMaxAgeMs = 1000 * 60 * 60 * 24 * 7;
-
-function buildStorageKey(cacheKey: string) {
-  return `${snapshotPrefix}:${cacheKey}`;
-}
-
-function isSnapshotEnvelope<TData>(value: unknown): value is OfflineSnapshotEnvelope<TData> {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Partial<OfflineSnapshotEnvelope<TData>>;
-  return candidate.version === 1 && typeof candidate.cachedAt === 'number' && 'data' in candidate;
-}
-
-function parseSnapshot<TData>(raw: string | null): OfflineSnapshotEnvelope<TData> | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return isSnapshotEnvelope<TData>(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
 export function useOfflineSnapshot<TData>({
   cacheKey,
@@ -57,20 +28,17 @@ export function useOfflineSnapshot<TData>({
   enabled?: boolean;
   maxAgeMs?: number;
 }) {
-  const storageKey = useMemo(
-    () => (enabled && cacheKey ? buildStorageKey(cacheKey) : null),
-    [cacheKey, enabled],
-  );
+  const snapshotKey = useMemo(() => (enabled && cacheKey ? cacheKey : null), [cacheKey, enabled]);
   const [state, setState] = useState<OfflineSnapshotState<TData>>({
     cachedAt: null,
     data: null,
-    hydrating: Boolean(storageKey),
+    hydrating: Boolean(snapshotKey),
   });
 
   useEffect(() => {
     let active = true;
 
-    if (!storageKey) {
+    if (!snapshotKey) {
       setState({ cachedAt: null, data: null, hydrating: false });
       return () => {
         active = false;
@@ -78,13 +46,12 @@ export function useOfflineSnapshot<TData>({
     }
 
     setState((current) => ({ ...current, hydrating: true }));
-    void AsyncStorage.getItem(storageKey)
-      .then((raw) => {
+    void readOfflineSnapshot<TData>(snapshotKey)
+      .then((snapshot) => {
         if (!active) {
           return;
         }
 
-        const snapshot = parseSnapshot<TData>(raw);
         const expired =
           snapshot !== null && Date.now() - snapshot.cachedAt > Math.max(0, maxAgeMs);
 
@@ -103,10 +70,10 @@ export function useOfflineSnapshot<TData>({
     return () => {
       active = false;
     };
-  }, [maxAgeMs, storageKey]);
+  }, [maxAgeMs, snapshotKey]);
 
   useEffect(() => {
-    if (!storageKey || data === null || data === undefined) {
+    if (!snapshotKey || data === null || data === undefined) {
       return;
     }
 
@@ -122,8 +89,8 @@ export function useOfflineSnapshot<TData>({
       hydrating: false,
     });
 
-    void AsyncStorage.setItem(storageKey, JSON.stringify(envelope)).catch(() => undefined);
-  }, [data, storageKey]);
+    void writeOfflineSnapshot(snapshotKey, envelope).catch(() => undefined);
+  }, [data, snapshotKey]);
 
   return state;
 }

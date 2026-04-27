@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { UserProfile } from '@escrow4334/product-core';
+import { clearOfflineSnapshots } from '@/features/offline/offlineSnapshots';
 import { api } from './api';
 
 const accessTokenKey = 'escrow4337.accessToken';
@@ -95,6 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch {
         if (mounted) {
           await clearTokens();
+          await clearOfflineSnapshots();
           setAccessToken(null);
           setRefreshToken(null);
           setUser(null);
@@ -129,12 +131,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const tokenToRevoke = refreshToken;
+    const userId = user?.id;
     setAccessToken(null);
     setRefreshToken(null);
     setUser(null);
     await clearTokens();
+    await clearOfflineSnapshots(userId ? { userId } : undefined);
     await api.logout(tokenToRevoke).catch(() => undefined);
-  }, [refreshToken]);
+  }, [refreshToken, user?.id]);
 
   const value = useMemo<SessionContextValue>(
     () => ({

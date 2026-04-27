@@ -1,5 +1,8 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
+import { Alert } from 'react-native';
 import { supportedLocales } from '@escrow4334/product-core';
+import { clearOfflineSnapshots } from '@/features/offline/offlineSnapshots';
 import {
   WalletDiagnosticsCard,
   WalletListCard,
@@ -10,12 +13,14 @@ import { useLocale } from '@/providers/locale';
 import { useSession } from '@/providers/session';
 import { useMobileTheme, type ThemePreference } from '@/providers/theme';
 import {
+  BodyText,
   BottomActionBar,
   Heading,
   MetricRow,
   PrimaryButton,
   ScrollScreen,
   SectionHeader,
+  SecondaryButton,
   SegmentedControl,
   StatusBadge,
   SurfaceCard,
@@ -27,6 +32,31 @@ export default function AccountRoute() {
   const { user, signOut } = useSession();
   const locale = useLocale();
   const theme = useMobileTheme();
+  const [clearingSnapshots, setClearingSnapshots] = useState(false);
+
+  async function handleClearOfflineSnapshots() {
+    if (!user || clearingSnapshots) {
+      return;
+    }
+
+    setClearingSnapshots(true);
+    try {
+      const removed = await clearOfflineSnapshots({ userId: user.id });
+      Alert.alert(
+        'Offline data cleared',
+        removed
+          ? `Removed ${removed} saved offline snapshot${removed === 1 ? '' : 's'}.`
+          : 'No saved offline snapshots were found for this account.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'Offline data not cleared',
+        error instanceof Error ? error.message : 'Saved offline snapshots could not be removed.',
+      );
+    } finally {
+      setClearingSnapshots(false);
+    }
+  }
 
   return (
     <ScrollScreen
@@ -62,6 +92,22 @@ export default function AccountRoute() {
       {user ? (
         <>
           <NetworkStatusCard />
+          <SurfaceCard animated delay={40}>
+            <Heading size="section" style={styles.cardHeading}>
+              Offline data
+            </Heading>
+            <BodyText>
+              Contract and project-room snapshots are saved on this device for read-only access
+              during outages. They never include session tokens and are cleared automatically on
+              sign-out.
+            </BodyText>
+            <SecondaryButton
+              disabled={clearingSnapshots}
+              onPress={() => void handleClearOfflineSnapshots()}
+            >
+              {clearingSnapshots ? 'Clearing offline data' : 'Clear offline data'}
+            </SecondaryButton>
+          </SurfaceCard>
           <WalletSetupCard user={user} />
           <WalletDiagnosticsCard />
           <WalletListCard user={user} />
