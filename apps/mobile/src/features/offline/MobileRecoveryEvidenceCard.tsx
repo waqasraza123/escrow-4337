@@ -13,6 +13,7 @@ import {
   SurfaceCard,
 } from '@/ui/primitives';
 import {
+  buildMobileRecoveryEvidenceBundle,
   buildMobileRecoveryEvidenceReport,
   clearMobileRecoveryEvidence,
   listMobileRecoveryEvidence,
@@ -98,6 +99,7 @@ export function MobileRecoveryEvidenceCard({
   const network = useMobileNetwork();
   const session = useSession();
   const [sharing, setSharing] = useState(false);
+  const [sharingBundle, setSharingBundle] = useState(false);
   const [sharingSaved, setSharingSaved] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
@@ -108,7 +110,8 @@ export function MobileRecoveryEvidenceCard({
 
   const signedIn = Boolean(session.user);
   const restoredFromSnapshot = session.restoredFromProfileSnapshot;
-  const canShare = !snapshotSummaryLoading && !sharing && !sharingSaved && !clearing;
+  const canShare =
+    !snapshotSummaryLoading && !sharing && !sharingBundle && !sharingSaved && !clearing;
 
   async function refreshHistory() {
     setHistoryLoading(true);
@@ -167,7 +170,7 @@ export function MobileRecoveryEvidenceCard({
   }
 
   async function handleShareLatestEvidence() {
-    if (!latestReport || sharing || sharingSaved || clearing) {
+    if (!latestReport || sharing || sharingBundle || sharingSaved || clearing) {
       return;
     }
 
@@ -198,8 +201,41 @@ export function MobileRecoveryEvidenceCard({
     }
   }
 
+  async function handleShareCoverageBundle() {
+    if (!history.length || sharing || sharingBundle || sharingSaved || clearing) {
+      return;
+    }
+
+    setSharingBundle(true);
+    try {
+      const bundle = await buildMobileRecoveryEvidenceBundle(history);
+      const includedReportCount = Object.keys(bundle.reportsByScenario).length;
+
+      if (!includedReportCount) {
+        await refreshHistory();
+        Alert.alert(
+          'Evidence bundle unavailable',
+          'Saved recovery evidence reports could not be read. They may have expired or been cleared.',
+        );
+        return;
+      }
+
+      await Share.share({
+        title: 'Escrow4337 mobile recovery evidence bundle',
+        message: JSON.stringify(bundle, null, 2),
+      });
+    } catch (error) {
+      Alert.alert(
+        'Evidence bundle not shared',
+        error instanceof Error ? error.message : 'The recovery evidence bundle could not be shared.',
+      );
+    } finally {
+      setSharingBundle(false);
+    }
+  }
+
   async function handleClearEvidence() {
-    if (clearing || sharing || sharingSaved) {
+    if (clearing || sharing || sharingBundle || sharingSaved) {
       return;
     }
 
@@ -325,13 +361,19 @@ export function MobileRecoveryEvidenceCard({
       {history.length ? (
         <>
           <SecondaryButton
-            disabled={sharing || sharingSaved || clearing}
+            disabled={sharing || sharingBundle || sharingSaved || clearing}
+            onPress={() => void handleShareCoverageBundle()}
+          >
+            {sharingBundle ? 'Opening evidence bundle' : 'Share coverage bundle'}
+          </SecondaryButton>
+          <SecondaryButton
+            disabled={sharing || sharingBundle || sharingSaved || clearing}
             onPress={() => void handleShareLatestEvidence()}
           >
             {sharingSaved ? 'Opening saved evidence' : 'Share latest saved evidence'}
           </SecondaryButton>
           <SecondaryButton
-            disabled={sharing || sharingSaved || clearing}
+            disabled={sharing || sharingBundle || sharingSaved || clearing}
             onPress={() => void handleClearEvidence()}
           >
             {clearing ? 'Clearing evidence' : 'Clear saved evidence'}

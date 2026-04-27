@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Bundle)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added a `MobileRecoveryEvidenceBundle` contract in `mobileRecoveryEvidence.ts`
+  - bundle generation includes `generatedAt`, ledger coverage summary, saved report ids by scenario, and the latest exact saved report for each readable scenario
+  - added `Share coverage bundle` to the Account recovery evidence card
+  - bundle sharing does not regenerate or mutate the included reports
+  - missing/pruned reports refresh the ledger and show explicit user copy
+  - documented coverage-bundle behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - after capturing all four scenario reports, share the coverage bundle as the compact manual evidence artifact.
+
 ## Update (2026-04-27, Mobile Recovery Evidence Coverage)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

@@ -107,6 +107,14 @@ export type MobileRecoveryEvidenceCoverage = {
   totalScenarioCount: number;
 };
 
+export type MobileRecoveryEvidenceBundle = {
+  version: 1;
+  generatedAt: string;
+  coverage: MobileRecoveryEvidenceCoverage;
+  reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
+  reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>>;
+};
+
 export type MobileRecoveryEvidenceScenario =
   | 'offline_start'
   | 'api_recovery'
@@ -594,6 +602,42 @@ export function summarizeMobileRecoveryEvidenceCoverage(
 
 export async function readMobileRecoveryEvidenceReport(id: string) {
   return parseEvidenceReport(await AsyncStorage.getItem(toEvidenceStorageKey(id)));
+}
+
+export async function buildMobileRecoveryEvidenceBundle(
+  history: MobileRecoveryEvidenceSummary[],
+): Promise<MobileRecoveryEvidenceBundle> {
+  const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>> = {};
+  const reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>> =
+    {};
+
+  for (const scenario of mobileRecoveryEvidenceScenarios) {
+    const latest = history
+      .filter((summary) => summary.scenario === scenario)
+      .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))[0];
+
+    if (!latest) {
+      continue;
+    }
+
+    const report = await readMobileRecoveryEvidenceReport(latest.id);
+
+    if (!report) {
+      continue;
+    }
+
+    reportIdsByScenario[scenario] = latest.id;
+    reportsByScenario[scenario] = report;
+  }
+
+  return {
+    version: 1,
+    coverage,
+    generatedAt: new Date().toISOString(),
+    reportIdsByScenario,
+    reportsByScenario,
+  };
 }
 
 export async function enforceMobileRecoveryEvidenceRetention({
