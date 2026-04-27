@@ -179,7 +179,7 @@ export function FreelancerConsole() {
         hasActiveNegotiation: isActiveOfferStatus(latestOffer.status),
       } satisfies FreelancerOfferRow;
     })
-    .filter(Boolean);
+    .filter((entry): entry is FreelancerOfferRow => entry !== null);
 
   function syncContractDraftIntoTimeline(applicationId: string, draft: MarketplaceContractDraft) {
     setApplicationTimelines((current) => {
