@@ -42,6 +42,8 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/session/MobileSessionRecoveryBridge.tsx` mounts inside `SessionProvider`. When the app is running from a secure cached profile and API reachability recovers to `reachable`, it throttles and attempts a live session refresh, then invalidates query caches after a successful refresh. Refresh failures stay non-destructive; the cached-profile notice remains visible until a live session refresh succeeds or the user signs out.
 
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It assembles a sanitized JSON report from network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, then uses the native share sheet. The report intentionally excludes access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, and URL credentials or query strings.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -65,6 +67,8 @@ Current placements:
 - Sign-in screen, compact mode before OTP entry
 
 The card is intentionally diagnostic but user-facing. It separates device connectivity from backend reachability so a backend outage is not presented as a local airplane-mode problem.
+
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is shown on the Account tab for signed-in users. It lets a reviewer export a comparable recovery report during iOS or Android manual evidence runs after toggling airplane mode, restoring API reachability, returning from background, or exercising wallet deep-link recovery.
 
 ## Mutation Guarding
 
@@ -188,6 +192,7 @@ Current recovery behavior is manual and explicit:
 - Foreground resume triggers a bounded network/API refresh when the previous API probe is stale or unavailable.
 - Mutating actions produce direct reconnect-and-retry copy instead of generic API failures.
 - Selected contract, project-room, and marketplace read surfaces can still show the last saved snapshot after an offline start or backend outage.
+- Account can share a sanitized recovery evidence report so manual device checks can preserve the runtime posture without copying secrets or personally identifying account data.
 
 This is appropriate for the current app because escrow, wallet, and identity mutations should not be silently queued without a stronger idempotency and replay contract.
 
@@ -195,7 +200,7 @@ This is appropriate for the current app because escrow, wallet, and identity mut
 
 - Durable offline mutation queue for low-risk writes only.
 - Per-mutation retry envelopes with idempotency keys, conflict copy, and user-visible pending state.
-- Device-level evidence on iOS and Android across airplane mode, captive portal, flaky LTE, and wallet deep-link return paths.
+- Real iOS and Android evidence runs using the Account recovery evidence report across airplane mode, captive portal, flaky LTE, and wallet deep-link return paths.
 
 ## Operational Notes
 

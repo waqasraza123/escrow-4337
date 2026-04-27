@@ -7,6 +7,7 @@ import {
   getOfflineSnapshotSummary,
   type OfflineSnapshotSummary,
 } from '@/features/offline/offlineSnapshots';
+import { MobileRecoveryEvidenceCard } from '@/features/offline/MobileRecoveryEvidenceCard';
 import {
   WalletDiagnosticsCard,
   WalletListCard,
@@ -149,7 +150,12 @@ export default function AccountRoute() {
         <>
           <NetworkStatusCard />
           <SessionRestoreNotice delay={30} />
-          <SurfaceCard animated delay={40}>
+          <MobileRecoveryEvidenceCard
+            delay={50}
+            snapshotSummary={snapshotSummary}
+            snapshotSummaryLoading={snapshotSummaryLoading}
+          />
+          <SurfaceCard animated delay={70}>
             <Heading size="section" style={styles.cardHeading}>
               Offline data
             </Heading>

@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Report)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push origin dev` completed with `Everything up-to-date`, but the repo safe-push hook ran `pnpm build` despite the no-build request.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  - surfaced a signed-in Account recovery evidence card that uses the native share sheet
+  - generated a sanitized JSON report from platform/app version, API reachability, NetInfo posture, cached-profile session posture, capability booleans, wallet counts, workspace kind/roles, and offline snapshot summary
+  - deliberately excluded tokens, email addresses, user ids, wallet addresses, workspace labels, organization names, and URL credentials/query strings from the report
+  - documented the report contract in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `apps/mobile/src/app/(tabs)/account.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - pending lightweight source checks
+  - real tests/builds intentionally not run after implementation by request
+- Next useful step:
+  - capture real iOS/Android evidence reports for offline cold-start restore, API recovery auto-refresh, marketplace snapshot hydration, retention cleanup, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Cached Session Auto Refresh)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery session lifecycle slice without intentional tests/builds:
