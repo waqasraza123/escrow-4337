@@ -1,7 +1,21 @@
 # Current Session
 
 ## Date
-- 2026-04-26
+- 2026-04-27
+
+## Update (2026-04-27, Mobile Marketplace Workspace and Apply)
+- Started from a clean `dev` tree and pushed `origin/dev`; there was no pre-existing uncommitted work to commit.
+- Implemented the next mobile product slice without intentional verification:
+  - `apps/mobile/src/app/(tabs)/marketplace.tsx` now shows authenticated workspace summaries, workspace switching, analytics counts, notification posture, freelancer application posture, and client opportunity posture
+  - `apps/mobile/src/app/marketplace/opportunity/[id].tsx` now supports native wallet-bound structured opportunity applications from freelancer/agency-capable workspaces
+  - application submission captures cover note, delivery approach, milestone plan, screening answers, proposed rate, selected wallet, estimated start, and portfolio URLs through the existing product API client
+- Docs updated:
+  - `docs/project-state.md`
+  - `docs/_local/current-session.md`
+- Verification:
+  - not run by request
+- Note:
+  - the repo pre-push hook automatically replayed cached `pnpm build` during the initial no-op push before implementation; no additional tests or builds were run after code changes.
 
 ## Update (2026-04-26, Mobile Wallet Commit/Push)
 - Prepared the native mobile wallet/setup work for branch publication.
@@ -190,26 +204,22 @@
   - still noisy in this shell: `pnpm --filter admin test` and `pnpm --filter admin test -- src/app/page.spec.tsx` did not return a clean completion signal here even though targeted admin specs and typecheck passed
 
 ## Current Objective
-- Land the repo-side Phase 8 marketplace intelligence pass in one code step:
-  - interaction telemetry for public search and core marketplace conversions
-  - refreshed search read models with stronger ranking signals
-  - workspace analytics for search/conversion/liquidity/no-hire posture
-  - operator moderation intelligence for funnel, liquidity, and ranking QA
+- Advance Mobile V1 from browse/setup into authenticated marketplace execution:
+  - native workspace summaries and lane switching
+  - freelancer/agency opportunity application submission
+  - client opportunity and marketplace signal posture
+  - no test/build verification in this request
 
 ## Last Completed Step
-- Committed the Phase 7 handoff locally as `c3b8c93` (`Implement Phase 7 fee treasury and support operations`).
+- Pushed the clean `dev` branch before implementation; there was no pre-existing dirty work to commit.
 
 ## Current Step
-- Phase 8 marketplace intelligence code is now implemented and intentionally unverified:
-  - `marketplace` now persists interaction telemetry plus a new Postgres migration `025_marketplace_intelligence_phase.sql`
-  - marketplace search read models are now refreshed from richer profile/opportunity ranking helpers instead of only the earlier shallow document state
-  - new API reads now expose authenticated workspace analytics and operator moderation intelligence
-  - `apps/web` now records public marketplace search/click/detail telemetry, exposes a workspace conversion-intelligence panel, and adds SEO metadata to public marketplace routes
-  - `apps/admin` now exposes funnel/liquidity/no-hire/ranking QA reads inside the marketplace moderation console
-- This pass is intentionally code-only:
-  - no real tests were run
-  - no builds were run
-  - no release-path work was attempted
+- Mobile marketplace workspace/apply code is implemented and intentionally unverified:
+  - `apps/mobile/src/app/(tabs)/marketplace.tsx`
+  - `apps/mobile/src/app/marketplace/opportunity/[id].tsx`
+  - `docs/project-state.md`
+  - `docs/_local/current-session.md`
+- No tests or builds were run after implementation.
 - Remaining external work is still the separate staged proof path:
   - deploy the candidate with real staging secrets
   - run `Deployed Smoke`
@@ -217,7 +227,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- The roadmap requires completed marketplace contracts to accumulate reusable trust/reputation signals before fees/support/scale phases make the product operationally real.
+- Mobile had wallet setup and browse/detail views, but native users still had to leave mobile for proposal submission and workspace marketplace posture.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -310,8 +320,9 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - start Phase 8 ranking/scale/conversion work
-  - or tighten the new Phase 7 fee/support UX and operator ergonomics
+  - add guided mobile contract creation/detail
+  - add mobile contractor join readiness
+  - add mobile delivery/dispute forms
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
