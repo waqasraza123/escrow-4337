@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Wallet Diagnostics)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile hardening slice without intentional verification:
+  - exported WalletConnect metadata, native redirect, supported Base chain ids, network labels, configured-chain normalization, and supported-chain helpers from mobile wallet config
+  - expanded the mobile wallet context with target/connected chain diagnostics, metadata/redirect diagnostics, supported-chain state, and a `wrong_chain` phase
+  - blocked SIWE wallet linking when a connected wallet reports an unsupported chain and surfaced recovery copy that points users back to the configured Base target
+  - added wallet readiness diagnostics to setup and account surfaces, including target chain, connected chain, Reown project posture, metadata URL, native redirect, and supported chains
+  - documented Mobile Wallet Hardening V1 and updated durable project state
+- Changed files:
+  `apps/mobile/src/providers/{wallet-config.ts,wallet.tsx}`
+  `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
+  `apps/mobile/src/app/(tabs)/account.tsx`
+  `docs/{MOBILE_WALLET_HARDENING_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device wallet-linking and project-room delivery evidence with MetaMask/Coinbase/Rainbow-class wallets.
+
 ## Update (2026-04-27, Mobile Support and Reviews)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile product slice without intentional verification:

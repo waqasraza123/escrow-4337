@@ -11,6 +11,9 @@ import {
 import { EthersAdapter } from '@reown/appkit-ethers-react-native';
 
 const appkitStoragePrefix = 'escrow4337.appkit.';
+const baseSepoliaChainId = 84532;
+const baseMainnetChainId = 8453;
+const supportedBaseChainIds = [baseSepoliaChainId, baseMainnetChainId] as const;
 
 function readExtraString(key: string) {
   const value = Constants.expoConfig?.extra?.[key];
@@ -30,9 +33,9 @@ function readPositiveInteger(value: string | undefined, fallback: number) {
 export const mobileWalletProjectId =
   process.env.EXPO_PUBLIC_REOWN_PROJECT_ID?.trim() || readExtraString('reownProjectId');
 
-export const mobileWalletDefaultChainId = readPositiveInteger(
+export const mobileWalletConfiguredChainId = readPositiveInteger(
   process.env.EXPO_PUBLIC_WALLET_CHAIN_ID,
-  readExtraNumber('walletChainId') ?? 84532,
+  readExtraNumber('walletChainId') ?? baseSepoliaChainId,
 );
 
 const metadataUrl =
@@ -45,11 +48,13 @@ const metadataIcon =
   readExtraString('walletConnectIconUrl') ||
   `${metadataUrl.replace(/\/+$/, '')}/icon.png`;
 
+export const mobileWalletRedirectNative = 'escrow4337://';
+
 const baseSepolia: AppKitNetwork = {
-  id: 84532,
+  id: baseSepoliaChainId,
   name: 'Base Sepolia',
   chainNamespace: 'eip155',
-  caipNetworkId: 'eip155:84532',
+  caipNetworkId: `eip155:${baseSepoliaChainId}`,
   nativeCurrency: {
     name: 'Sepolia Ether',
     symbol: 'ETH',
@@ -70,10 +75,10 @@ const baseSepolia: AppKitNetwork = {
 };
 
 const baseMainnet: AppKitNetwork = {
-  id: 8453,
+  id: baseMainnetChainId,
   name: 'Base',
   chainNamespace: 'eip155',
-  caipNetworkId: 'eip155:8453',
+  caipNetworkId: `eip155:${baseMainnetChainId}`,
   nativeCurrency: {
     name: 'Ether',
     symbol: 'ETH',
@@ -94,9 +99,32 @@ const baseMainnet: AppKitNetwork = {
 
 export const mobileWalletNetworks = [baseSepolia, baseMainnet] as const;
 
+export const mobileWalletSupportedChainIds: number[] = [...supportedBaseChainIds];
+
+export const mobileWalletDefaultChainId = mobileWalletSupportedChainIds.includes(
+  mobileWalletConfiguredChainId,
+)
+  ? mobileWalletConfiguredChainId
+  : baseSepoliaChainId;
+
 export const mobileWalletDefaultNetwork =
   mobileWalletNetworks.find((network) => Number(network.id) === mobileWalletDefaultChainId) ??
   baseSepolia;
+
+export const mobileWalletMetadata = {
+  url: metadataUrl,
+  icon: metadataIcon,
+  redirectNative: mobileWalletRedirectNative,
+};
+
+export function isMobileWalletSupportedChain(chainId: number | null | undefined) {
+  return typeof chainId === 'number' && mobileWalletSupportedChainIds.includes(chainId);
+}
+
+export function getMobileWalletNetworkName(chainId: number | null | undefined) {
+  const network = mobileWalletNetworks.find((candidate) => Number(candidate.id) === chainId);
+  return network?.name ?? (chainId ? `Chain ${chainId}` : 'Unknown network');
+}
 
 export const appKitStorage: Storage = {
   async getKeys() {
@@ -140,7 +168,7 @@ export const mobileAppKit = mobileWalletProjectId
         url: metadataUrl,
         icons: [metadataIcon],
         redirect: {
-          native: 'escrow4337://',
+          native: mobileWalletRedirectNative,
         },
       },
       adapters: [new EthersAdapter()],

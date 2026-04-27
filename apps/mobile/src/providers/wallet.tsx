@@ -13,9 +13,13 @@ import { View } from 'react-native';
 import { api } from './api';
 import { useSession } from './session';
 import {
+  getMobileWalletNetworkName,
+  isMobileWalletSupportedChain,
   mobileAppKit,
   mobileWalletDefaultChainId,
+  mobileWalletMetadata,
   mobileWalletProjectId,
+  mobileWalletSupportedChainIds,
 } from './wallet-config';
 
 export type MobileWalletPhase =
@@ -23,6 +27,7 @@ export type MobileWalletPhase =
   | 'idle'
   | 'connecting'
   | 'connected'
+  | 'wrong_chain'
   | 'signing'
   | 'verifying'
   | 'provisioning'
@@ -35,6 +40,13 @@ type MobileWalletContextValue = {
   projectId: string | null;
   address: string | null;
   chainId: number | null;
+  defaultChainId: number;
+  supportedChainIds: number[];
+  chainSupported: boolean;
+  connectedNetworkName: string;
+  defaultNetworkName: string;
+  metadataUrl: string;
+  redirectNative: string;
   isConnected: boolean;
   phase: MobileWalletPhase;
   message: string;
@@ -95,6 +107,13 @@ function StaticMobileWalletProvider({ children }: { children: ReactNode }) {
       projectId: null,
       address: null,
       chainId: null,
+      defaultChainId: mobileWalletDefaultChainId,
+      supportedChainIds: mobileWalletSupportedChainIds,
+      chainSupported: false,
+      connectedNetworkName: 'Not connected',
+      defaultNetworkName: getMobileWalletNetworkName(mobileWalletDefaultChainId),
+      metadataUrl: mobileWalletMetadata.url,
+      redirectNative: mobileWalletMetadata.redirectNative,
       isConnected: false,
       phase: 'unconfigured',
       message: unconfiguredMessage,
@@ -121,6 +140,11 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
 
   const chainId = parseChainId(account.chainId);
   const address = account.address ?? null;
+  const chainSupported = !account.isConnected || isMobileWalletSupportedChain(chainId);
+  const connectedNetworkName = account.isConnected
+    ? getMobileWalletNetworkName(chainId)
+    : 'Not connected';
+  const defaultNetworkName = getMobileWalletNetworkName(mobileWalletDefaultChainId);
   const evmProvider =
     providerType === 'eip155' ? (provider as WalletRequestProvider | undefined) : undefined;
 
@@ -159,6 +183,13 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       if (!address || !evmProvider) {
         setPhase('error');
         setMessage('Connect an EVM wallet before requesting a SIWE signature.');
+        return;
+      }
+      if (!chainSupported) {
+        setPhase('wrong_chain');
+        setMessage(
+          `Switch the connected wallet to ${defaultNetworkName} before linking. Connected network: ${connectedNetworkName}.`,
+        );
         return;
       }
 
@@ -201,7 +232,16 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
         setMessage(normalizeError(error, 'Failed to link wallet.'));
       }
     },
-    [accessToken, address, chainId, evmProvider, refreshUser],
+    [
+      accessToken,
+      address,
+      chainId,
+      chainSupported,
+      connectedNetworkName,
+      defaultNetworkName,
+      evmProvider,
+      refreshUser,
+    ],
   );
 
   const provisionSmartAccount = useCallback(
@@ -277,12 +317,26 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       projectId: mobileWalletProjectId,
       address,
       chainId,
+      defaultChainId: mobileWalletDefaultChainId,
+      supportedChainIds: mobileWalletSupportedChainIds,
+      chainSupported,
+      connectedNetworkName,
+      defaultNetworkName,
+      metadataUrl: mobileWalletMetadata.url,
+      redirectNative: mobileWalletMetadata.redirectNative,
       isConnected: account.isConnected,
-      phase: account.isConnected && phase === 'connecting' ? 'connected' : phase,
+      phase:
+        account.isConnected && !chainSupported
+          ? 'wrong_chain'
+          : account.isConnected && phase === 'connecting'
+            ? 'connected'
+            : phase,
       message:
-        account.isConnected && phase === 'connecting'
-          ? 'Wallet connected. Sign once to link it to this account.'
-          : message,
+        account.isConnected && !chainSupported
+          ? `Switch to ${defaultNetworkName} before signing. Connected network: ${connectedNetworkName}.`
+          : account.isConnected && phase === 'connecting'
+            ? 'Wallet connected. Sign once to link it to this account.'
+            : message,
       openConnector,
       disconnectWallet,
       linkConnectedWallet,
@@ -294,7 +348,10 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       account.isConnected,
       address,
       chainId,
+      chainSupported,
       clearStatus,
+      connectedNetworkName,
+      defaultNetworkName,
       disconnectWallet,
       linkConnectedWallet,
       message,

@@ -1,6 +1,10 @@
 import { router } from 'expo-router';
 import { supportedLocales } from '@escrow4334/product-core';
-import { WalletListCard, WalletSetupCard } from '@/features/wallet/MobileWalletSetupCard';
+import {
+  WalletDiagnosticsCard,
+  WalletListCard,
+  WalletSetupCard,
+} from '@/features/wallet/MobileWalletSetupCard';
 import { useLocale } from '@/providers/locale';
 import { useSession } from '@/providers/session';
 import { useMobileTheme, type ThemePreference } from '@/providers/theme';
@@ -57,6 +61,7 @@ export default function AccountRoute() {
       {user ? (
         <>
           <WalletSetupCard user={user} />
+          <WalletDiagnosticsCard />
           <WalletListCard user={user} />
         </>
       ) : null}

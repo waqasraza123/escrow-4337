@@ -50,11 +50,17 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
     'setting_default',
   ].includes(wallet.phase);
   const connectedAddress = wallet.address || linkedEoa?.address || null;
+  const connectedOnUnsupportedChain = wallet.isConnected && !wallet.chainSupported;
 
   const primaryAction = !user
     ? null
     : !wallet.configured
       ? null
+      : connectedOnUnsupportedChain
+        ? {
+            label: 'Open wallet connector',
+            onPress: wallet.openConnector,
+          }
       : !wallet.isConnected && !linkedEoa
         ? {
             label: 'Connect wallet',
@@ -97,6 +103,10 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
         items={[
           { label: 'Email session active', ready: Boolean(user) },
           { label: 'Mobile wallet connected', ready: wallet.isConnected || Boolean(linkedEoa) },
+          {
+            label: `Wallet network is ${wallet.defaultNetworkName}`,
+            ready: !wallet.isConnected || wallet.chainSupported,
+          },
           { label: 'SIWE wallet linked', ready: Boolean(linkedEoa) },
           { label: 'Default execution wallet ready', ready: hasDefaultSmartAccount },
         ]}
@@ -113,6 +123,26 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
           label="Default execution"
           value={previewHash(user?.defaultExecutionWalletAddress)}
         />
+      </AnimatedReveal>
+      <MetricRow
+        label="Target network"
+        value={`${wallet.defaultNetworkName} (${wallet.defaultChainId})`}
+      />
+      <MetricRow label="WalletConnect redirect" value={wallet.redirectNative} />
+      <AnimatedReveal visible={wallet.isConnected}>
+        <MetricRow
+          label="Connected network"
+          value={`${wallet.connectedNetworkName}${wallet.chainId ? ` (${wallet.chainId})` : ''}`}
+        />
+      </AnimatedReveal>
+      <AnimatedReveal visible={!wallet.configured}>
+        <BodyText style={styles.stateText}>
+          Configure `EXPO_PUBLIC_REOWN_PROJECT_ID` before testing native wallet connection on a
+          device.
+        </BodyText>
+      </AnimatedReveal>
+      <AnimatedReveal visible={connectedOnUnsupportedChain}>
+        <StatusBadge label="Switch to Base before signing" tone="warning" />
       </AnimatedReveal>
 
       {wallet.message ? (
@@ -141,6 +171,47 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
           Disconnect wallet
         </SecondaryButton>
       </AnimatedReveal>
+    </SurfaceCard>
+  );
+}
+
+export function WalletDiagnosticsCard() {
+  const wallet = useMobileWallet();
+
+  return (
+    <SurfaceCard animated delay={220}>
+      <Heading size="section">Wallet diagnostics</Heading>
+      <BodyText>
+        Device wallet readiness is derived from the configured WalletConnect project, deep-link
+        redirect, target Base network, and the currently connected EVM account.
+      </BodyText>
+      <MetricRow
+        label="Connector"
+        value={wallet.configured ? 'WalletConnect configured' : 'Project ID missing'}
+      />
+      <MetricRow
+        label="Project"
+        value={wallet.projectId ? previewHash(wallet.projectId) : 'Missing'}
+      />
+      <MetricRow label="Metadata URL" value={wallet.metadataUrl} />
+      <MetricRow label="Native redirect" value={wallet.redirectNative} />
+      <MetricRow
+        label="Target chain"
+        value={`${wallet.defaultNetworkName} (${wallet.defaultChainId})`}
+      />
+      <MetricRow label="Supported chains" value={wallet.supportedChainIds.join(', ')} />
+      <MetricRow
+        label="Connected chain"
+        value={
+          wallet.isConnected
+            ? `${wallet.connectedNetworkName}${wallet.chainId ? ` (${wallet.chainId})` : ''}`
+            : 'Not connected'
+        }
+      />
+      <StatusBadge
+        label={wallet.chainSupported ? 'Chain accepted' : 'Wrong or missing chain'}
+        tone={wallet.chainSupported ? 'success' : 'warning'}
+      />
     </SurfaceCard>
   );
 }
