@@ -827,9 +827,9 @@ export function FreelancerConsole() {
             <RevealSection className={styles.grid} delay={0.04}>
               <SectionCard
                 className={styles.panel}
-                eyebrow={workspaceMessages.workspace.workspaceSummary}
+                eyebrow={workspaceMessages.workspaceSummary}
                 title={activeWorkspaceSummary}
-                description={workspaceMessages.workspace.switchWorkspace(
+                description={workspaceMessages.activeWorkspace.switchWorkspace(
                   workspaceMessages.emptyStates.freelancerApplicationsReady,
                   'freelancer',
                 )}
