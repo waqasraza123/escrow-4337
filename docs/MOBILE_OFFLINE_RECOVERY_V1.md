@@ -136,6 +136,14 @@ Selected high-value read surfaces now persist explicit offline snapshots:
 
 Snapshots are intentionally read-only. When a screen is rendered from snapshot data rather than live query data, it shows an `Offline snapshot` notice with the saved timestamp and disables write actions that depend on that stale state. Fresh successful query responses replace the previous snapshot. Snapshot keys use the authenticated user id and resource id, never access or refresh tokens.
 
+Snapshot retention rules:
+
+- snapshots expire after 7 days
+- each account or public snapshot scope retains at most 80 newest entries
+- each successful snapshot write triggers best-effort retention pruning for that scope
+- invalid or unreadable snapshot envelopes are removed by the same retention pass
+- Account displays the current snapshot inventory, approximate namespace size, public snapshot count, account-scoped snapshot count, newest saved timestamp, and expired-waiting-cleanup count
+
 Snapshot lifecycle rules:
 
 - sign-out clears saved snapshots for the signed-out user

@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Snapshot Retention Inventory)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery storage hardening slice without intentional tests/builds:
+  - added offline snapshot metadata and summary APIs for cache key, resource, scope, cached timestamp, and approximate storage size
+  - added bounded retention constants: 7-day max age and 80 newest snapshots per account/public scope
+  - made successful snapshot writes trigger best-effort scope-local retention pruning, including invalid envelope cleanup
+  - moved `useOfflineSnapshot` onto the shared retention max-age constant
+  - expanded Account offline data with snapshot inventory, approximate namespace size, account/public counts, newest timestamp, expired-waiting-cleanup count, and retention copy
+  - documented retention and inventory behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{offlineSnapshots.ts,useOfflineSnapshot.tsx}`
+  `apps/mobile/src/app/(tabs)/account.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for marketplace snapshot hydration, retention cleanup, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Marketplace Offline Snapshots)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery product slice without intentional tests/builds:

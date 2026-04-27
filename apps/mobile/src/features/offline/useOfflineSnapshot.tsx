@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useMobileTheme } from '@/providers/theme';
 import { BodyText, StatusBadge } from '@/ui/primitives';
 import {
+  offlineSnapshotMaxAgeMs,
   readOfflineSnapshot,
   writeOfflineSnapshot,
   type OfflineSnapshotEnvelope,
@@ -15,13 +16,11 @@ type OfflineSnapshotState<TData> = {
   hydrating: boolean;
 };
 
-const defaultMaxAgeMs = 1000 * 60 * 60 * 24 * 7;
-
 export function useOfflineSnapshot<TData>({
   cacheKey,
   data,
   enabled = true,
-  maxAgeMs = defaultMaxAgeMs,
+  maxAgeMs = offlineSnapshotMaxAgeMs,
 }: {
   cacheKey: string | null;
   data: TData | null | undefined;
