@@ -3,6 +3,21 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Pre-share Review)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - Account now builds an async pre-share coverage bundle preview from retained evidence reports plus export-audit events
+  - the preview uses the same bundle builder as export but does not save or share by itself
+  - Account displays bundle review decision status, external-review posture, verification posture, bundle fingerprint, top blockers, and top warnings before native share
+  - preview status uses existing product status tones: blocked as danger, partial/warnings as warning, ready as success
+  - documented pre-share review behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Review Decision)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:

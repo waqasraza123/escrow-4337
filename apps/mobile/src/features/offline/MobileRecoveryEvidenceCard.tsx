@@ -33,6 +33,7 @@ import {
   summarizeMobileRecoveryEvidenceCoverage,
   type MobileRecoveryEvidenceOutcome,
   type MobileRecoveryEvidenceAuditEvent,
+  type MobileRecoveryEvidenceBundle,
   type MobileRecoveryEvidenceScenario,
   type MobileRecoveryEvidenceSummary,
 } from './mobileRecoveryEvidence';
@@ -97,6 +98,47 @@ function formatAuditAction(action: MobileRecoveryEvidenceAuditEvent['action']) {
   }
 
   return 'Saved report share opened';
+}
+
+function formatReviewDecisionStatus(
+  status: MobileRecoveryEvidenceBundle['reviewDecision']['status'],
+) {
+  if (status === 'blocked') {
+    return 'Blocked';
+  }
+
+  if (status === 'partial') {
+    return 'Partial';
+  }
+
+  if (status === 'ready_with_warnings') {
+    return 'Ready / warnings';
+  }
+
+  return 'Ready';
+}
+
+function getReviewDecisionTone(
+  status: MobileRecoveryEvidenceBundle['reviewDecision']['status'],
+): ProductStatusTone {
+  if (status === 'blocked') {
+    return 'danger';
+  }
+
+  if (status === 'partial' || status === 'ready_with_warnings') {
+    return 'warning';
+  }
+
+  return 'success';
+}
+
+function formatReviewDecisionList(values: string[], fallback: string) {
+  if (!values.length) {
+    return fallback;
+  }
+
+  const visible = values.slice(0, 2).join(' / ');
+  return values.length > 2 ? `${visible} / +${values.length - 2} more` : visible;
 }
 
 function formatCoverageSummary({
@@ -239,6 +281,8 @@ export function MobileRecoveryEvidenceCard({
   const [sharingSaved, setSharingSaved] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [auditEvents, setAuditEvents] = useState<MobileRecoveryEvidenceAuditEvent[]>([]);
+  const [bundlePreview, setBundlePreview] = useState<MobileRecoveryEvidenceBundle | null>(null);
+  const [bundlePreviewLoading, setBundlePreviewLoading] = useState(false);
   const [history, setHistory] = useState<MobileRecoveryEvidenceSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [scenario, setScenario] =
@@ -270,6 +314,40 @@ export function MobileRecoveryEvidenceCard({
   useEffect(() => {
     void refreshHistory();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (historyLoading || !history.length) {
+      setBundlePreview(null);
+      setBundlePreviewLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setBundlePreviewLoading(true);
+    buildMobileRecoveryEvidenceBundle(history, auditEvents)
+      .then((bundle) => {
+        if (!cancelled) {
+          setBundlePreview(bundle);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBundlePreview(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBundlePreviewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auditEvents, history, historyLoading]);
 
   async function handleShareEvidence() {
     if (!canShare) {
@@ -474,6 +552,10 @@ export function MobileRecoveryEvidenceCard({
   const latestAuditEvent = auditEvents[0] ?? null;
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
   const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
+  const reviewDecision = bundlePreview?.reviewDecision ?? null;
+  const reviewDecisionTone: ProductStatusTone = reviewDecision
+    ? getReviewDecisionTone(reviewDecision.status)
+    : 'muted';
   const coveragePercent = historyLoading
     ? 0
     : Math.round((coverage.completeScenarioCount / coverage.totalScenarioCount) * 100);
@@ -699,6 +781,72 @@ export function MobileRecoveryEvidenceCard({
           ))}
         </View>
       </AnimatedEntrance>
+
+      {history.length ? (
+        <AnimatedEntrance delay={delay + 280} distance={6}>
+          <View
+            style={[
+              styles.reviewDecisionPanel,
+              {
+                backgroundColor: theme.status[reviewDecisionTone].background,
+                borderColor: theme.status[reviewDecisionTone].border,
+                borderRadius: theme.radii.md,
+              },
+            ]}
+          >
+            <View style={styles.reviewDecisionHeader}>
+              <View style={styles.reviewDecisionCopy}>
+                <Text style={[styles.sectionLabel, { color: theme.colors.foregroundMuted }]}>
+                  Bundle review
+                </Text>
+                <Text style={[styles.reviewDecisionTitle, { color: theme.colors.foreground }]}>
+                  {bundlePreviewLoading
+                    ? 'Checking evidence bundle'
+                    : reviewDecision
+                      ? formatReviewDecisionStatus(reviewDecision.status)
+                      : 'Unavailable'}
+                </Text>
+              </View>
+              <StatusBadge
+                label={
+                  bundlePreviewLoading
+                    ? 'Checking'
+                    : reviewDecision?.validForExternalReview
+                      ? 'External'
+                      : 'Review'
+                }
+                tone={reviewDecisionTone}
+              />
+            </View>
+            <MetricRow
+              label="Verification"
+              value={
+                bundlePreviewLoading
+                  ? 'Checking'
+                  : bundlePreview?.verification.valid
+                    ? 'Valid'
+                    : 'Needs review'
+              }
+            />
+            <MetricRow
+              label="Bundle fingerprint"
+              value={
+                bundlePreview
+                  ? previewHash(bundlePreview.reviewManifest.fingerprint.value, 'None', 6, 4)
+                  : 'None'
+              }
+            />
+            <MetricRow
+              label="Blockers"
+              value={formatReviewDecisionList(reviewDecision?.blockers ?? [], 'None')}
+            />
+            <MetricRow
+              label="Warnings"
+              value={formatReviewDecisionList(reviewDecision?.warnings ?? [], 'None')}
+            />
+          </View>
+        </AnimatedEntrance>
+      ) : null}
 
       <AnimatedEntrance delay={delay + 320} distance={6}>
         <View
@@ -1170,6 +1318,25 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     gap: 10,
     padding: 12,
+  },
+  reviewDecisionPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    padding: 12,
+  },
+  reviewDecisionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  reviewDecisionCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  reviewDecisionTitle: {
+    fontSize: 16,
+    fontWeight: '900',
   },
   secondaryActions: {
     width: '100%',
