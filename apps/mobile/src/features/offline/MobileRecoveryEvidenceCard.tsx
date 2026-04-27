@@ -81,6 +81,10 @@ function formatCheckCounts(summary: MobileRecoveryEvidenceSummary | null) {
 }
 
 function formatAuditAction(action: MobileRecoveryEvidenceAuditEvent['action']) {
+  if (action === 'bundle_share_cancelled') {
+    return 'Bundle share canceled';
+  }
+
   if (action === 'bundle_share_opened') {
     return 'Bundle share opened';
   }
@@ -220,13 +224,17 @@ function formatScenarioNames(scenarios: MobileRecoveryEvidenceScenario[]) {
     : 'None';
 }
 
-function confirmPartialEvidenceBundleShare({
-  missingScenarios,
-  unreadableScenarios,
+function confirmReviewDecisionBundleShare({
+  readiness,
+  reviewDecision,
 }: {
-  missingScenarios: MobileRecoveryEvidenceScenario[];
-  unreadableScenarios: MobileRecoveryEvidenceScenario[];
+  readiness: MobileRecoveryEvidenceBundle['readiness'];
+  reviewDecision: MobileRecoveryEvidenceBundle['reviewDecision'];
 }) {
+  if (reviewDecision.status === 'ready') {
+    return Promise.resolve(true);
+  }
+
   return new Promise<boolean>((resolve) => {
     let settled = false;
     const settle = (value: boolean) => {
@@ -235,14 +243,22 @@ function confirmPartialEvidenceBundleShare({
         resolve(value);
       }
     };
+    const title =
+      reviewDecision.status === 'blocked'
+        ? 'Share blocked evidence bundle?'
+        : reviewDecision.status === 'partial'
+          ? 'Share partial evidence bundle?'
+          : 'Share evidence bundle with warnings?';
 
     Alert.alert(
-      'Share partial evidence bundle?',
+      title,
       [
-        'This bundle is not ready yet.',
-        `Missing: ${formatScenarioNames(missingScenarios)}`,
-        `Unreadable: ${formatScenarioNames(unreadableScenarios)}`,
-        'Share only if you intentionally want a partial manual evidence artifact.',
+        `Decision: ${formatReviewDecisionStatus(reviewDecision.status)}`,
+        `Missing: ${formatScenarioNames(readiness.missingScenarios)}`,
+        `Unreadable: ${formatScenarioNames(readiness.unreadableScenarios)}`,
+        `Blockers: ${formatReviewDecisionList(reviewDecision.blockers, 'None')}`,
+        `Warnings: ${formatReviewDecisionList(reviewDecision.warnings, 'None')}`,
+        `Next: ${formatReviewDecisionList(reviewDecision.nextActions, 'Review manually before sharing.')}`,
       ].join('\n\n'),
       [
         {
@@ -252,7 +268,7 @@ function confirmPartialEvidenceBundleShare({
         },
         {
           onPress: () => settle(true),
-          text: 'Share partial',
+          text: 'Share anyway',
         },
       ],
       {
@@ -463,15 +479,15 @@ export function MobileRecoveryEvidenceCard({
         return;
       }
 
-      if (!bundle.readiness.ready) {
-        const shouldSharePartialBundle = await confirmPartialEvidenceBundleShare({
-          missingScenarios: bundle.readiness.missingScenarios,
-          unreadableScenarios: bundle.readiness.unreadableScenarios,
+      if (bundle.reviewDecision.status !== 'ready') {
+        const shouldShareReviewDecisionBundle = await confirmReviewDecisionBundleShare({
+          readiness: bundle.readiness,
+          reviewDecision: bundle.reviewDecision,
         });
 
-        if (!shouldSharePartialBundle) {
+        if (!shouldShareReviewDecisionBundle) {
           await appendMobileRecoveryEvidenceAuditEvent({
-            action: 'partial_bundle_share_cancelled',
+            action: 'bundle_share_cancelled',
             bundleFingerprint: bundle.reviewManifest.fingerprint.value,
             bundleReadiness: {
               includedScenarioCount: bundle.readiness.includedScenarioCount,
@@ -482,11 +498,7 @@ export function MobileRecoveryEvidenceCard({
             },
             historyReportCount: history.length,
           });
-          if (bundle.readiness.unreadableScenarios.length) {
-            await refreshHistory();
-          } else {
-            setAuditEvents(await listMobileRecoveryEvidenceAudit());
-          }
+          setAuditEvents(await listMobileRecoveryEvidenceAudit());
           return;
         }
       }

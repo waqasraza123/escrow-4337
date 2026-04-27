@@ -92,6 +92,7 @@ export type MobileRecoveryEvidenceSummary = {
 };
 
 export type MobileRecoveryEvidenceAuditAction =
+  | 'bundle_share_cancelled'
   | 'bundle_share_opened'
   | 'partial_bundle_share_cancelled'
   | 'report_saved'

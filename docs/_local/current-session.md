@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Decision-Gated Export)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - coverage-bundle sharing now uses one decision-aware confirmation whenever `reviewDecision.status !== "ready"`
+  - confirmation lists decision status, missing scenarios, unreadable scenarios, blockers, warnings, and next actions before the native share sheet opens
+  - partial bundles, blocked bundles, and ready-with-warning bundles are all explicitly gated by the same review-decision prompt
+  - canceling a decision-gated export appends `bundle_share_cancelled` audit metadata without storing report bodies
+  - legacy `partial_bundle_share_cancelled` audit entries remain readable for older local ledgers
+  - documented decision-gated export behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Pre-share Review)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
