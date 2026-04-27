@@ -374,7 +374,7 @@ export function MobileRecoveryEvidenceCard({
 
     setSharingBundle(true);
     try {
-      const bundle = await buildMobileRecoveryEvidenceBundle(history);
+      const bundle = await buildMobileRecoveryEvidenceBundle(history, auditEvents);
 
       if (!bundle.readiness.includedScenarioCount) {
         await refreshHistory();

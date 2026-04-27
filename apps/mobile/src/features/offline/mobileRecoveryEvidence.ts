@@ -161,6 +161,7 @@ export type MobileRecoveryEvidenceBundle = {
   generatedAt: string;
   coverage: MobileRecoveryEvidenceCoverage;
   capturePlan: MobileRecoveryEvidenceCapturePlan;
+  ledgerReview: MobileRecoveryEvidenceLedgerReview;
   readiness: MobileRecoveryEvidenceBundleReadiness;
   reviewManifest: MobileRecoveryEvidenceBundleReviewManifest;
   reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>>;
@@ -216,10 +217,51 @@ export type MobileRecoveryEvidenceReportArtifact = {
   reviewerChecklist: string[];
 };
 
+export type MobileRecoveryEvidenceAuditTrailEntry = {
+  action: MobileRecoveryEvidenceAuditAction;
+  bundleFingerprint?: string;
+  bundleReady?: boolean;
+  id: string;
+  outcome?: MobileRecoveryEvidenceOutcome;
+  recordedAt: string;
+  reportFingerprint?: string;
+  reportId?: string;
+  scenario?: MobileRecoveryEvidenceScenario;
+};
+
+export type MobileRecoveryEvidenceLedgerReview = {
+  schema: 'escrow4337.mobileRecoveryEvidence.ledgerReview.v1';
+  auditEventCount: number;
+  auditTrail: MobileRecoveryEvidenceAuditTrailEntry[];
+  fingerprint: MobileRecoveryEvidenceArtifactFingerprint;
+  generatedAt: string;
+  latestAuditAction: MobileRecoveryEvidenceAuditAction | null;
+  latestReportFingerprint: string | null;
+  privacy: MobileRecoveryEvidencePrivacyBoundary;
+  reportCount: number;
+  retention: {
+    auditMaxEntries: number;
+    maxAgeMs: number;
+    reportMaxEntries: number;
+  };
+  reviewerChecklist: string[];
+  scenarioSummaries: Record<
+    MobileRecoveryEvidenceScenario,
+    {
+      latestCapturedAt: string | null;
+      latestFingerprint: string | null;
+      latestOutcome: MobileRecoveryEvidenceOutcome | null;
+      latestReportId: string | null;
+      reportCount: number;
+    }
+  >;
+};
+
 export type MobileRecoveryEvidenceBundleReviewManifest = {
   schema: 'escrow4337.mobileRecoveryEvidence.bundle.v1';
   fingerprint: MobileRecoveryEvidenceArtifactFingerprint;
   generatedAt: string;
+  ledgerReviewFingerprint: string;
   partialReasons: string[];
   privacy: MobileRecoveryEvidencePrivacyBoundary;
   readiness: MobileRecoveryEvidenceBundleReadiness;
@@ -474,6 +516,102 @@ function getReportFingerprint(report: MobileRecoveryEvidenceReport) {
     report.artifact?.fingerprint.value ??
     buildEvidenceFingerprint(stripReportArtifact(report), 'legacy_report_without_artifact').value
   );
+}
+
+function createEmptyScenarioReviewSummary() {
+  return {
+    latestCapturedAt: null,
+    latestFingerprint: null,
+    latestOutcome: null,
+    latestReportId: null,
+    reportCount: 0,
+  };
+}
+
+function buildAuditTrailEntry(
+  event: MobileRecoveryEvidenceAuditEvent,
+): MobileRecoveryEvidenceAuditTrailEntry {
+  return {
+    action: event.action,
+    bundleFingerprint: event.bundleFingerprint,
+    bundleReady: event.bundleReadiness?.ready,
+    id: event.id,
+    outcome: event.outcome,
+    recordedAt: event.recordedAt,
+    reportFingerprint: event.reportFingerprint,
+    reportId: event.reportId,
+    scenario: event.scenario,
+  };
+}
+
+function buildMobileRecoveryEvidenceLedgerReview({
+  auditEvents,
+  generatedAt,
+  history,
+}: {
+  auditEvents: MobileRecoveryEvidenceAuditEvent[];
+  generatedAt: string;
+  history: MobileRecoveryEvidenceSummary[];
+}): MobileRecoveryEvidenceLedgerReview {
+  const scenarioSummaries = mobileRecoveryEvidenceScenarios.reduce<
+    MobileRecoveryEvidenceLedgerReview['scenarioSummaries']
+  >((summaries, scenario) => {
+    summaries[scenario] = createEmptyScenarioReviewSummary();
+    return summaries;
+  }, {} as MobileRecoveryEvidenceLedgerReview['scenarioSummaries']);
+
+  for (const summary of history) {
+    const scenarioSummary = scenarioSummaries[summary.scenario];
+    scenarioSummary.reportCount += 1;
+
+    const currentLatestMs = scenarioSummary.latestCapturedAt
+      ? Date.parse(scenarioSummary.latestCapturedAt)
+      : Number.NEGATIVE_INFINITY;
+    const summaryMs = Date.parse(summary.capturedAt);
+
+    if (Number.isFinite(summaryMs) && summaryMs >= currentLatestMs) {
+      scenarioSummary.latestCapturedAt = summary.capturedAt;
+      scenarioSummary.latestFingerprint = summary.fingerprint;
+      scenarioSummary.latestOutcome = summary.outcome;
+      scenarioSummary.latestReportId = summary.id;
+    }
+  }
+
+  const auditTrail = auditEvents
+    .slice()
+    .sort((left, right) => Date.parse(right.recordedAt) - Date.parse(left.recordedAt))
+    .slice(0, mobileRecoveryEvidenceAuditMaxEntries)
+    .map(buildAuditTrailEntry);
+  const latestReport = history
+    .slice()
+    .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))[0];
+  const ledgerBody = {
+    schema: 'escrow4337.mobileRecoveryEvidence.ledgerReview.v1' as const,
+    auditEventCount: auditEvents.length,
+    auditTrail,
+    generatedAt,
+    latestAuditAction: auditTrail[0]?.action ?? null,
+    latestReportFingerprint: latestReport?.fingerprint ?? null,
+    privacy: evidencePrivacyBoundary,
+    reportCount: history.length,
+    retention: {
+      auditMaxEntries: mobileRecoveryEvidenceAuditMaxEntries,
+      maxAgeMs: mobileRecoveryEvidenceMaxAgeMs,
+      reportMaxEntries: mobileRecoveryEvidenceMaxEntries,
+    },
+    reviewerChecklist: [
+      'Confirm the audit trail contains only metadata and no report body.',
+      'Compare latestReportFingerprint with the newest retained report artifact.',
+      'Review scenario summaries for missing or stale capture coverage.',
+      'Confirm auditEventCount does not exceed retained local audit expectations.',
+    ],
+    scenarioSummaries,
+  };
+
+  return {
+    ...ledgerBody,
+    fingerprint: buildEvidenceFingerprint(ledgerBody, 'ledger_review_without_fingerprint'),
+  };
 }
 
 function createEmptyScenarioCoverage(): MobileRecoveryEvidenceScenarioCoverage {
@@ -938,10 +1076,16 @@ export async function readMobileRecoveryEvidenceReport(id: string) {
 
 export async function buildMobileRecoveryEvidenceBundle(
   history: MobileRecoveryEvidenceSummary[],
+  auditEvents: MobileRecoveryEvidenceAuditEvent[] = [],
 ): Promise<MobileRecoveryEvidenceBundle> {
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
   const capturePlan = buildMobileRecoveryEvidenceCapturePlan(history);
   const generatedAt = new Date().toISOString();
+  const ledgerReview = buildMobileRecoveryEvidenceLedgerReview({
+    auditEvents,
+    generatedAt,
+    history,
+  });
   const missingScenarios: MobileRecoveryEvidenceScenario[] = [];
   const reportIdsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, string>> = {};
   const reportsByScenario: Partial<Record<MobileRecoveryEvidenceScenario, MobileRecoveryEvidenceReport>> =
@@ -1032,6 +1176,7 @@ export async function buildMobileRecoveryEvidenceBundle(
   const manifestBody = {
     schema: 'escrow4337.mobileRecoveryEvidence.bundle.v1' as const,
     generatedAt,
+    ledgerReviewFingerprint: ledgerReview.fingerprint.value,
     partialReasons,
     privacy: evidencePrivacyBoundary,
     readiness,
@@ -1056,6 +1201,7 @@ export async function buildMobileRecoveryEvidenceBundle(
     capturePlan,
     coverage,
     generatedAt,
+    ledgerReview,
     readiness,
     reportIdsByScenario,
     reportsByScenario,

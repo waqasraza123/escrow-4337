@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Ledger Review)
+- Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
+  - coverage bundle generation now accepts retained export-audit events from Account
+  - bundles now include a sanitized `ledgerReview` with report count, latest report fingerprint, latest audit action, per-scenario latest report/fingerprint/outcome summaries, retention constants, privacy boundary, reviewer checklist, and bounded audit-trail metadata
+  - ledger reviews carry deterministic non-secret fingerprints computed over canonical ledger-review content without the fingerprint field
+  - bundle `reviewManifest` now includes `ledgerReviewFingerprint` so reviewers can compare bundle sections
+  - audit trail entries include only action, timestamp, report id, scenario/outcome, report fingerprint, bundle fingerprint, and bundle ready/partial posture when available
+  - documented ledger-review and audit-trail bundle semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{MobileRecoveryEvidenceCard.tsx,mobileRecoveryEvidence.ts}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Review Manifests)
 - Committed and pushed prior motion polish to `origin/dev`:
   - commit `fc6da5c` (`Polish mobile recovery evidence motion`)
