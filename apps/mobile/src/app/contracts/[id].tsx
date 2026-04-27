@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import {
   formatAmount,
   formatTimestamp,
   previewHash,
+  splitList,
+  type JobMilestone,
   type JobView,
 } from '@escrow4334/product-core';
 import {
@@ -28,6 +30,7 @@ import {
   PrimaryButton,
   ScrollScreen,
   SecondaryButton,
+  SegmentedControl,
   SectionHeader,
   StatusBadge,
   SurfaceCard,
@@ -184,7 +187,7 @@ export default function ContractDetailRoute() {
         <HashText value={job.onchain.currencyAddress} />
       </SurfaceCard>
 
-      <ContractMilestonesCard job={job} />
+      <ContractMilestonesCard job={job} participantRoles={participantRoles} />
 
       {isClient ? (
         <SurfaceCard animated delay={140}>
@@ -211,14 +214,119 @@ export default function ContractDetailRoute() {
   );
 }
 
-function ContractMilestonesCard({ job }: { job: JobView }) {
+type MobileMilestoneActionKind = 'deliver' | 'release' | 'dispute';
+
+type MobileMilestoneAction = {
+  key: string;
+  kind: MobileMilestoneActionKind;
+  milestoneIndex: number;
+  milestone: JobMilestone;
+  label: string;
+};
+
+function buildMobileMilestoneActions(
+  job: JobView,
+  participantRoles: Array<'client' | 'worker'>,
+): MobileMilestoneAction[] {
+  return job.milestones.flatMap((milestone, milestoneIndex) => {
+    const actions: MobileMilestoneAction[] = [];
+
+    if (participantRoles.includes('worker') && milestone.status === 'pending') {
+      actions.push({
+        key: `${milestoneIndex}:deliver`,
+        kind: 'deliver',
+        milestoneIndex,
+        milestone,
+        label: `Deliver ${milestoneIndex + 1}`,
+      });
+    }
+
+    if (participantRoles.includes('client') && milestone.status === 'delivered') {
+      actions.push(
+        {
+          key: `${milestoneIndex}:release`,
+          kind: 'release',
+          milestoneIndex,
+          milestone,
+          label: `Release ${milestoneIndex + 1}`,
+        },
+        {
+          key: `${milestoneIndex}:dispute`,
+          kind: 'dispute',
+          milestoneIndex,
+          milestone,
+          label: `Dispute ${milestoneIndex + 1}`,
+        },
+      );
+    }
+
+    return actions;
+  });
+}
+
+function getMilestoneActionCopy(kind: MobileMilestoneActionKind) {
+  switch (kind) {
+    case 'deliver':
+      return {
+        title: 'Submit delivery',
+        body: 'Send the delivery note and evidence URLs for client review. The backend derives worker authority from this authenticated account.',
+        button: 'Submit delivery',
+      };
+    case 'release':
+      return {
+        title: 'Release milestone',
+        body: 'Release is final for this milestone once the escrow transaction is accepted.',
+        button: 'Release milestone',
+      };
+    case 'dispute':
+      return {
+        title: 'Open dispute',
+        body: 'Disputes are client-initiated in this launch flow and should include a concrete reason plus supporting evidence URLs.',
+        button: 'Open dispute',
+      };
+  }
+}
+
+function ContractMilestonesCard({
+  job,
+  participantRoles,
+}: {
+  job: JobView;
+  participantRoles: Array<'client' | 'worker'>;
+}) {
   const { accessToken } = useSession();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<MobileMilestoneDraft[]>(() =>
     createMilestoneDraftsFromJob(job),
   );
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [deliveryEvidenceUrls, setDeliveryEvidenceUrls] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeEvidenceUrls, setDisputeEvidenceUrls] = useState('');
   const normalized = useMemo(() => normalizeMilestones(drafts), [drafts]);
   const hasCommittedMilestones = job.milestones.length > 0;
+  const milestoneActions = useMemo(
+    () => buildMobileMilestoneActions(job, participantRoles),
+    [job, participantRoles],
+  );
+  const [selectedActionKey, setSelectedActionKey] = useState(
+    () => milestoneActions[0]?.key ?? '',
+  );
+  const selectedAction =
+    milestoneActions.find((action) => action.key === selectedActionKey) ??
+    milestoneActions[0] ??
+    null;
+
+  useEffect(() => {
+    if (!milestoneActions.length) {
+      setSelectedActionKey('');
+      return;
+    }
+
+    if (!milestoneActions.some((action) => action.key === selectedActionKey)) {
+      setSelectedActionKey(milestoneActions[0].key);
+    }
+  }, [milestoneActions, selectedActionKey]);
 
   const commit = useMutation({
     mutationFn: async () => {
@@ -243,6 +351,65 @@ function ContractMilestonesCard({ job }: { job: JobView }) {
     },
   });
 
+  const executeAction = useMutation({
+    mutationFn: async () => {
+      if (!accessToken) {
+        throw new Error('Sign in before updating a milestone.');
+      }
+      if (!selectedAction) {
+        throw new Error('Select a milestone action.');
+      }
+
+      if (selectedAction.kind === 'deliver') {
+        if (!deliveryNote.trim()) {
+          throw new Error('Add a delivery note before submitting.');
+        }
+
+        return api.deliverMilestone(
+          job.id,
+          selectedAction.milestoneIndex,
+          {
+            note: deliveryNote.trim(),
+            evidenceUrls: splitList(deliveryEvidenceUrls),
+          },
+          accessToken,
+        );
+      }
+
+      if (selectedAction.kind === 'dispute') {
+        if (!disputeReason.trim()) {
+          throw new Error('Add a dispute reason before opening a dispute.');
+        }
+
+        return api.disputeMilestone(
+          job.id,
+          selectedAction.milestoneIndex,
+          {
+            reason: disputeReason.trim(),
+            evidenceUrls: splitList(disputeEvidenceUrls),
+          },
+          accessToken,
+        );
+      }
+
+      return api.releaseMilestone(job.id, selectedAction.milestoneIndex, accessToken);
+    },
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      setDeliveryNote('');
+      setDeliveryEvidenceUrls('');
+      setDisputeReason('');
+      setDisputeEvidenceUrls('');
+      Alert.alert('Milestone updated', `Transaction ${previewHash(response.txHash)} was recorded.`);
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Milestone action failed',
+        error instanceof Error ? error.message : 'The milestone action could not be completed.',
+      );
+    },
+  });
+
   function updateDraft(index: number, field: keyof MobileMilestoneDraft, value: string) {
     setDrafts((current) =>
       current.map((milestone, currentIndex) =>
@@ -262,7 +429,81 @@ function ContractMilestonesCard({ job }: { job: JobView }) {
       </View>
 
       {hasCommittedMilestones ? (
-        <MilestoneTimeline milestones={job.milestones} />
+        <>
+          <MilestoneTimeline milestones={job.milestones} />
+          {selectedAction ? (
+            <View style={styles.actionBlock}>
+              <Heading size="section">
+                {getMilestoneActionCopy(selectedAction.kind).title}
+              </Heading>
+              <BodyText>{getMilestoneActionCopy(selectedAction.kind).body}</BodyText>
+              {milestoneActions.length > 1 ? (
+                <SegmentedControl
+                  value={selectedAction.key}
+                  onChange={setSelectedActionKey}
+                  options={milestoneActions.map((action) => ({
+                    label: action.label,
+                    value: action.key,
+                  }))}
+                />
+              ) : null}
+              <MetricRow label="Milestone" value={selectedAction.milestone.title} />
+              <MetricRow
+                label="Amount"
+                value={formatAmount(selectedAction.milestone.amount)}
+              />
+
+              {selectedAction.kind === 'deliver' ? (
+                <>
+                  <Textarea
+                    label="Delivery note"
+                    onChangeText={setDeliveryNote}
+                    placeholder="What changed, where to review it, and any acceptance notes"
+                    value={deliveryNote}
+                  />
+                  <Textarea
+                    autoCapitalize="none"
+                    label="Evidence URLs"
+                    onChangeText={setDeliveryEvidenceUrls}
+                    placeholder="Optional, comma-separated"
+                    value={deliveryEvidenceUrls}
+                  />
+                </>
+              ) : null}
+
+              {selectedAction.kind === 'dispute' ? (
+                <>
+                  <Textarea
+                    label="Dispute reason"
+                    onChangeText={setDisputeReason}
+                    placeholder="What failed acceptance and what outcome you need"
+                    value={disputeReason}
+                  />
+                  <Textarea
+                    autoCapitalize="none"
+                    label="Evidence URLs"
+                    onChangeText={setDisputeEvidenceUrls}
+                    placeholder="Optional, comma-separated"
+                    value={disputeEvidenceUrls}
+                  />
+                </>
+              ) : null}
+
+              <PrimaryButton
+                disabled={executeAction.isPending}
+                loading={executeAction.isPending}
+                onPress={() => executeAction.mutate()}
+              >
+                {getMilestoneActionCopy(selectedAction.kind).button}
+              </PrimaryButton>
+            </View>
+          ) : (
+            <BodyText>
+              No milestone actions are available for your current participant role and milestone
+              states.
+            </BodyText>
+          )}
+        </>
       ) : (
         <>
           <BodyText>
@@ -328,6 +569,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   milestoneBlock: {
+    gap: 10,
+  },
+  actionBlock: {
     gap: 10,
   },
 });

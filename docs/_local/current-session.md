@@ -3,6 +3,21 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Delivery and Dispute Actions)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile product slice without intentional verification:
+  - added role-aware milestone action derivation on `/contracts/[id]`
+  - workers can submit delivery notes plus comma-separated evidence URLs for pending milestones
+  - clients can release delivered milestones or open disputes with reason plus evidence URLs
+  - action mutations reuse the existing authenticated escrow APIs: `deliverMilestone`, `releaseMilestone`, and `disputeMilestone`
+  - the contract detail view now clears submitted form state after successful milestone actions and refreshes the participant job list cache
+- Changed files:
+  `apps/mobile/src/app/contracts/[id].tsx`
+  `docs/project-state.md`
+  `docs/_local/current-session.md`
+- Verification:
+  - not run by request
+
 ## Update (2026-04-27, Mobile Contractor Join)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile product slice without intentional verification:
@@ -242,21 +257,18 @@
   - still noisy in this shell: `pnpm --filter admin test` and `pnpm --filter admin test -- src/app/page.spec.tsx` did not return a clean completion signal here even though targeted admin specs and typecheck passed
 
 ## Current Objective
-- Advance Mobile V1 from direct escrow creation into contractor join execution:
-  - invite-token entry and deep-link route
-  - protected join-readiness posture
-  - contractor join mutation when email and wallet match
+- Advance Mobile V1 from contractor join into milestone execution:
+  - worker delivery submission
+  - client release action
+  - client dispute initiation with evidence
   - no test/build verification in this request
 
 ## Last Completed Step
 - Pushed the clean `dev` branch before implementation; `origin/dev` was already up to date.
 
 ## Current Step
-- Mobile contractor join code is implemented and intentionally unverified:
-  - `apps/mobile/src/app/_layout.tsx`
-  - `apps/mobile/src/app/(tabs)/contracts.tsx`
-  - `apps/mobile/src/app/contracts/{join.tsx,[id]/join.tsx}`
-  - `apps/mobile/src/features/contracts/contractor-join.ts`
+- Mobile delivery/release/dispute code is implemented and intentionally unverified:
+  - `apps/mobile/src/app/contracts/[id].tsx`
   - `docs/project-state.md`
   - `docs/_local/current-session.md`
 - No tests or builds were run after implementation.
@@ -267,7 +279,7 @@
   - run `Promotion Review`
 
 ## Why This Step Exists
-- Mobile could create and inspect direct contracts but still lacked the launch-candidate contractor invite recovery/join path.
+- Mobile could create, join, fund, and inspect contracts but still lacked milestone execution actions for worker delivery, client release, and client disputes.
 
 ## Changed Files
 - Phase 0 repo-closeout:
@@ -360,9 +372,9 @@
 
 ## Next Likely Step
 - If staying in product code:
-  - add mobile delivery/dispute forms
   - add mobile project-room delivery review
   - add device-level wallet hardening notes after real wallet exercise
+  - add mobile support/review capture for closed contracts
 - If switching back to release work:
   - deploy the target candidate to staging
   - run `Deployed Smoke`
