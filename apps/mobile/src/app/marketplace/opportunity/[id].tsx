@@ -9,6 +9,7 @@ import {
   splitList,
   type MarketplaceOpportunityDetail,
 } from '@escrow4334/product-core';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -32,6 +33,7 @@ import {
 export default function OpportunityDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken, user } = useSession();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [applyOpen, setApplyOpen] = useState(false);
   const opportunity = useQuery({
@@ -51,6 +53,7 @@ export default function OpportunityDetailRoute() {
       if (!accessToken || !id) {
         throw new Error('Sign in before applying.');
       }
+      networkGate.requireOnline('Submitting a marketplace application');
 
       return api.applyToMarketplaceOpportunity(id, input, accessToken);
     },
@@ -94,6 +97,15 @@ export default function OpportunityDetailRoute() {
                   Alert.alert(
                     'Wallet required',
                     'Link or provision a wallet before submitting a wallet-bound proposal.',
+                  );
+                  return;
+                }
+                try {
+                  networkGate.requireOnline('Opening marketplace application');
+                } catch (error) {
+                  Alert.alert(
+                    'Application unavailable',
+                    error instanceof Error ? error.message : 'Network state is unavailable.',
                   );
                   return;
                 }
@@ -147,7 +159,7 @@ export default function OpportunityDetailRoute() {
           {applyOpen && canApply ? (
             <NativeApplicationForm
               defaultWallet={defaultWallet}
-              disabled={apply.isPending}
+              disabled={networkGate.actionBlocked || apply.isPending}
               onCancel={() => setApplyOpen(false)}
               onSubmit={(input) => apply.mutate(input)}
               opportunity={opportunity.data.opportunity}

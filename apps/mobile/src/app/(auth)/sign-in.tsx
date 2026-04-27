@@ -13,22 +13,21 @@ import {
   SurfaceCard,
 } from '@/ui/primitives';
 import { useSession } from '@/providers/session';
-import { useMobileNetwork } from '@/providers/network';
 import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 
 export default function SignInRoute() {
   const { requestCode, signIn } = useSession();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const apiUnavailable = network.apiReachability.status === 'unreachable';
 
   const handleRequestCode = async () => {
     setSubmitting(true);
     try {
-      network.requireOnline('Requesting a sign-in code');
+      networkGate.requireOnline('Requesting a sign-in code');
       await requestCode(email.trim());
       setCodeSent(true);
     } catch (error) {
@@ -44,7 +43,7 @@ export default function SignInRoute() {
   const handleVerify = async () => {
     setSubmitting(true);
     try {
-      network.requireOnline('Verifying a sign-in code');
+      networkGate.requireOnline('Verifying a sign-in code');
       await signIn(email.trim(), code.trim());
       router.replace('/home');
     } catch (error) {
@@ -67,7 +66,7 @@ export default function SignInRoute() {
           <BottomActionBar>
             <PrimaryButton
               disabled={
-                network.offline || apiUnavailable || !email.trim() || (codeSent && !code.trim())
+                networkGate.actionBlocked || !email.trim() || (codeSent && !code.trim())
               }
               loading={submitting}
               onPress={codeSent ? handleVerify : handleRequestCode}

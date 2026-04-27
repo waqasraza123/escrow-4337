@@ -22,6 +22,14 @@ The slice is intentionally native-client focused. It does not introduce a durabl
 
 `apps/mobile/src/providers/root.tsx` mounts `MobileNetworkProvider` above `QueryProvider`. This ordering lets the network provider update React Query online state before screens issue normal query traffic.
 
+`apps/mobile/src/features/network/useNetworkActionGate.ts` is the screen-level mutation gate. It wraps `useMobileNetwork()` and exposes:
+
+- `actionBlocked`: `true` when the device is known offline or the escrow API is known unreachable
+- `requireOnline(action)`: the authoritative guard used inside mutation functions
+- `blockedReason`, `offline`, and `apiUnavailable`: UI-friendly status values for buttons and copy
+
+Screens should use this hook for authenticated writes instead of duplicating `network.offline || apiReachability.status === 'unreachable'`.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -58,6 +66,8 @@ The helper throws a user-safe error when the device is known offline or when the
 
 - OTP code request
 - OTP verification
+- workspace switching
+- marketplace opportunity application submission
 - direct contract creation and initial milestone commit
 - contract funding
 - contractor readiness re-check and join execution
@@ -80,6 +90,18 @@ The helper throws a user-safe error when the device is known offline or when the
 This keeps offline and API-outage failures close to the initiating action and avoids sending users into wallet approval or OTP flows that cannot complete.
 
 Mutation surfaces also disable their primary action buttons while the device is known offline or the API is known unreachable. The provider guard remains the authoritative protection because programmatic mutation calls, stale buttons, and fast network changes can still happen between render and press.
+
+Current guarded mobile write surfaces:
+
+- `apps/mobile/src/app/(auth)/sign-in.tsx`
+- `apps/mobile/src/app/(tabs)/marketplace.tsx`
+- `apps/mobile/src/app/marketplace/opportunity/[id].tsx`
+- `apps/mobile/src/app/contracts/new.tsx`
+- `apps/mobile/src/app/contracts/join.tsx`
+- `apps/mobile/src/app/contracts/[id].tsx`
+- `apps/mobile/src/app/contracts/[id]/room.tsx`
+- `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
+- `apps/mobile/src/providers/wallet.tsx`
 
 ## Query Behavior
 

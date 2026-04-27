@@ -9,6 +9,7 @@ import {
   getMarketplaceLaneLabel,
   resolveMarketplaceLane,
 } from '@escrow4334/product-core';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -31,6 +32,7 @@ type MarketplaceTab = 'talent' | 'opportunities';
 
 export default function MarketplaceRoute() {
   const { accessToken, user, setUser } = useSession();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<MarketplaceTab>('talent');
   const [query, setQuery] = useState('');
@@ -78,6 +80,7 @@ export default function MarketplaceRoute() {
       if (!accessToken) {
         throw new Error('Sign in before switching workspaces.');
       }
+      networkGate.requireOnline('Switching workspaces');
 
       return api.selectWorkspace(workspaceId, accessToken);
     },
@@ -118,7 +121,17 @@ export default function MarketplaceRoute() {
         notifications={notifications.data?.notifications ?? []}
         opportunities={myOpportunities.data?.opportunities ?? []}
         opportunitiesLoading={myOpportunities.isLoading}
-        onSelectWorkspace={(workspaceId) => selectWorkspace.mutate(workspaceId)}
+        onSelectWorkspace={(workspaceId) => {
+          try {
+            networkGate.requireOnline('Switching workspaces');
+            selectWorkspace.mutate(workspaceId);
+          } catch (error) {
+            Alert.alert(
+              'Workspace switch unavailable',
+              error instanceof Error ? error.message : 'Network state is unavailable.',
+            );
+          }
+        }}
         selectWorkspacePending={selectWorkspace.isPending}
         user={user}
       />

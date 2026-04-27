@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Network Action Gate)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile recovery/code-quality slice without intentional tests/builds:
+  - added `apps/mobile/src/features/network/useNetworkActionGate.ts` as the shared screen-level guard for offline/API-unreachable writes
+  - rewired sign-in, wallet setup UI, contract creation/join/detail/project-room screens, marketplace workspace switching, and marketplace opportunity applications to use the shared gate
+  - added network guards to the previously uncovered workspace selection and marketplace proposal submission mutations
+  - documented the shared action-gate contract and current guarded screen list in Mobile Offline Recovery V1, plus updated durable project state
+- Changed files:
+  `apps/mobile/src/features/network/useNetworkActionGate.ts`
+  `apps/mobile/src/app/{(auth)/sign-in.tsx,(tabs)/marketplace.tsx,contracts/new.tsx,contracts/join.tsx,contracts/[id].tsx,contracts/[id]/room.tsx,marketplace/opportunity/[id].tsx}`
+  `apps/mobile/src/features/wallet/MobileWalletSetupCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - keep future authenticated mobile writes on `useNetworkActionGate()` and capture real-device evidence for wallet/project-room flows.
+
 ## Update (2026-04-27, Mobile Mutation Network Guards)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile recovery slice without intentional tests/builds:

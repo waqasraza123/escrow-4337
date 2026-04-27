@@ -7,8 +7,8 @@ import {
   getJoinReadinessCopy,
   normalizeInviteToken,
 } from '@/features/contracts/contractor-join';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
-import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import {
   BodyText,
@@ -33,7 +33,7 @@ export default function ContractorJoinRoute() {
     inviteToken?: string;
   }>();
   const { accessToken } = useSession();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [jobId, setJobId] = useState(() => normalizeInviteToken(params.jobId ?? params.id));
   const [inviteToken, setInviteToken] = useState(() =>
@@ -54,7 +54,6 @@ export default function ContractorJoinRoute() {
   });
   const copy = getJoinReadinessCopy(readiness.data?.status ?? 'invite_required');
   const status = readiness.data?.status;
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   const join = useMutation({
     mutationFn: async () => {
@@ -64,7 +63,7 @@ export default function ContractorJoinRoute() {
       if (!normalizedJobId || !normalizedInviteToken) {
         throw new Error('Job id and invite token are required.');
       }
-      network.requireOnline('Joining a contract');
+      networkGate.requireOnline('Joining a contract');
 
       return api.joinContractor(normalizedJobId, normalizedInviteToken, accessToken);
     },
@@ -132,11 +131,11 @@ export default function ContractorJoinRoute() {
           value={inviteToken}
         />
         <PrimaryButton
-          disabled={!normalizedJobId || actionBlocked || readiness.isFetching}
+          disabled={!normalizedJobId || networkGate.actionBlocked || readiness.isFetching}
           loading={readiness.isFetching}
           onPress={() => {
             try {
-              network.requireOnline('Checking contractor readiness');
+              networkGate.requireOnline('Checking contractor readiness');
               void readiness.refetch();
             } catch (error) {
               Alert.alert(
@@ -202,7 +201,7 @@ export default function ContractorJoinRoute() {
           ) : null}
           {canJoinContract(status) ? (
             <PrimaryButton
-              disabled={actionBlocked || join.isPending}
+              disabled={networkGate.actionBlocked || join.isPending}
               loading={join.isPending}
               onPress={() => join.mutate()}
             >

@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { previewHash, type UserProfile, type UserWallet } from '@escrow4334/product-core';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { useMobileWallet } from '@/providers/wallet';
-import { useMobileNetwork } from '@/providers/network';
 import { useMobileTheme } from '@/providers/theme';
 import {
   AnimatedReveal,
@@ -32,7 +32,7 @@ function getSmartAccount(user: UserProfile | null, ownerAddress?: string) {
 export function WalletSetupCard({ user }: { user: UserProfile | null }) {
   const theme = useMobileTheme();
   const wallet = useMobileWallet();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const linkedEoa = getLinkedEoa(user);
   const smartAccount = getSmartAccount(user, linkedEoa?.address);
   const hasDefaultSmartAccount = Boolean(
@@ -51,7 +51,6 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
     'provisioning',
     'setting_default',
   ].includes(wallet.phase);
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
   const connectedAddress = wallet.address || linkedEoa?.address || null;
   const connectedOnUnsupportedChain = wallet.isConnected && !wallet.chainSupported;
 
@@ -161,7 +160,7 @@ export function WalletSetupCard({ user }: { user: UserProfile | null }) {
 
       {primaryAction ? (
         <PrimaryButton
-          disabled={busy || actionBlocked}
+          disabled={busy || networkGate.actionBlocked}
           loading={busy}
           onPress={primaryAction.onPress}
         >
@@ -232,10 +231,9 @@ export function WalletListCard({
 }) {
   const theme = useMobileTheme();
   const wallet = useMobileWallet();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const wallets = user?.wallets ?? [];
   const busy = wallet.phase === 'setting_default';
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   return (
     <SurfaceCard animated delay={160}>
@@ -248,7 +246,7 @@ export function WalletListCard({
             <WalletListItem
               key={`${item.walletKind}-${item.address}`}
               defaultAddress={user?.defaultExecutionWalletAddress ?? null}
-              disabled={busy || actionBlocked}
+              disabled={busy || networkGate.actionBlocked}
               onSetDefault={wallet.setDefaultWallet}
               themeForeground={theme.colors.foreground}
               themePrimary={theme.colors.primary}

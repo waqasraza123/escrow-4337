@@ -16,8 +16,8 @@ import {
   sumMilestoneAmounts,
   type MobileMilestoneDraft,
 } from '@/features/contracts/contract-drafts';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
-import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import {
   BodyText,
@@ -41,10 +41,9 @@ import {
 export default function ContractDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken } = useSession();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [fundAmount, setFundAmount] = useState('');
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   const jobs = useQuery({
     enabled: Boolean(accessToken),
@@ -67,7 +66,7 @@ export default function ContractDetailRoute() {
       if (!fundAmount.trim()) {
         throw new Error('Enter a funding amount.');
       }
-      network.requireOnline('Funding a contract');
+      networkGate.requireOnline('Funding a contract');
 
       return api.fundJob(job.id, fundAmount.trim(), accessToken);
     },
@@ -154,7 +153,7 @@ export default function ContractDetailRoute() {
         isClient ? (
           <BottomActionBar>
             <PrimaryButton
-              disabled={actionBlocked || fund.isPending || !fundAmount.trim()}
+              disabled={networkGate.actionBlocked || fund.isPending || !fundAmount.trim()}
               loading={fund.isPending}
               onPress={() => fund.mutate()}
             >
@@ -317,7 +316,7 @@ function ContractMilestonesCard({
   participantRoles: Array<'client' | 'worker'>;
 }) {
   const { accessToken } = useSession();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<MobileMilestoneDraft[]>(() =>
     createMilestoneDraftsFromJob(job),
@@ -339,7 +338,6 @@ function ContractMilestonesCard({
     milestoneActions.find((action) => action.key === selectedActionKey) ??
     milestoneActions[0] ??
     null;
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   useEffect(() => {
     if (!milestoneActions.length) {
@@ -360,7 +358,7 @@ function ContractMilestonesCard({
       if (!normalized.length) {
         throw new Error('Add at least one ready milestone.');
       }
-      network.requireOnline('Committing milestones');
+      networkGate.requireOnline('Committing milestones');
 
       return api.setMilestones(job.id, normalized, accessToken);
     },
@@ -384,7 +382,7 @@ function ContractMilestonesCard({
       if (!selectedAction) {
         throw new Error('Select a milestone action.');
       }
-      network.requireOnline(getMilestoneActionCopy(selectedAction.kind).title);
+      networkGate.requireOnline(getMilestoneActionCopy(selectedAction.kind).title);
 
       if (selectedAction.kind === 'deliver') {
         if (!deliveryNote.trim()) {
@@ -516,7 +514,7 @@ function ContractMilestonesCard({
               ) : null}
 
               <PrimaryButton
-                disabled={actionBlocked || executeAction.isPending}
+                disabled={networkGate.actionBlocked || executeAction.isPending}
                 loading={executeAction.isPending}
                 onPress={() => executeAction.mutate()}
               >
@@ -574,7 +572,7 @@ function ContractMilestonesCard({
             Add milestone
           </SecondaryButton>
           <PrimaryButton
-            disabled={actionBlocked || commit.isPending || !normalized.length}
+            disabled={networkGate.actionBlocked || commit.isPending || !normalized.length}
             loading={commit.isPending}
             onPress={() => commit.mutate()}
           >

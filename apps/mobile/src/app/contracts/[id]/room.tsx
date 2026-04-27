@@ -18,8 +18,8 @@ import {
   type SupportCaseReason,
   type SupportCaseSeverity,
 } from '@escrow4334/product-core';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
-import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import {
   BodyText,
@@ -370,7 +370,7 @@ function ScoreControl({
 export default function ContractProjectRoomRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken, user } = useSession();
-  const network = useMobileNetwork();
+  const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [selectedMilestoneValue, setSelectedMilestoneValue] = useState('0');
   const [submissionNote, setSubmissionNote] = useState('');
@@ -450,7 +450,6 @@ export default function ContractProjectRoomRoute() {
     room?.supportCases.find((supportCase) => supportCase.status !== 'resolved') ??
     room?.supportCases[0] ??
     null;
-  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   useEffect(() => {
     if (!job?.milestones.length) {
@@ -489,7 +488,7 @@ export default function ContractProjectRoomRoute() {
       if (!submissionNote.trim()) {
         throw new Error('Add a submission note before posting work.');
       }
-      network.requireOnline('Posting a milestone submission');
+      networkGate.requireOnline('Posting a milestone submission');
 
       return api.submitProjectMilestone(
         job.id,
@@ -523,7 +522,7 @@ export default function ContractProjectRoomRoute() {
       if (!revisionNote.trim()) {
         throw new Error('Add a revision request note.');
       }
-      network.requireOnline('Requesting a project-room revision');
+      networkGate.requireOnline('Requesting a project-room revision');
 
       return api.requestProjectRevision(
         job.id,
@@ -550,7 +549,7 @@ export default function ContractProjectRoomRoute() {
       if (!accessToken || !job || !latestSubmission) {
         throw new Error('Select a submitted milestone before approving it.');
       }
-      network.requireOnline('Approving a project-room submission');
+      networkGate.requireOnline('Approving a project-room submission');
 
       return api.approveProjectSubmission(
         job.id,
@@ -577,7 +576,7 @@ export default function ContractProjectRoomRoute() {
       if (!accessToken || !job || !latestSubmission) {
         throw new Error('Select an approved milestone submission before delivery.');
       }
-      network.requireOnline('Delivering an approved submission');
+      networkGate.requireOnline('Delivering an approved submission');
 
       return api.deliverProjectSubmission(job.id, latestSubmission.id, accessToken);
     },
@@ -601,7 +600,7 @@ export default function ContractProjectRoomRoute() {
       if (!messageBody.trim()) {
         throw new Error('Write a message before posting.');
       }
-      network.requireOnline('Posting a project-room message');
+      networkGate.requireOnline('Posting a project-room message');
 
       return api.postProjectRoomMessage(job.id, { body: messageBody.trim() }, accessToken);
     },
@@ -629,7 +628,7 @@ export default function ContractProjectRoomRoute() {
       if (!supportDescription.trim()) {
         throw new Error('Describe the support request.');
       }
-      network.requireOnline('Opening a support case');
+      networkGate.requireOnline('Opening a support case');
 
       return api.createSupportCase(
         job.id,
@@ -666,7 +665,7 @@ export default function ContractProjectRoomRoute() {
       if (!supportReply.trim()) {
         throw new Error('Write a support reply before posting.');
       }
-      network.requireOnline('Posting a support reply');
+      networkGate.requireOnline('Posting a support reply');
 
       return api.postSupportCaseMessage(
         job.id,
@@ -696,7 +695,7 @@ export default function ContractProjectRoomRoute() {
       if (!reviewBody.trim()) {
         throw new Error('Add review body copy before submitting.');
       }
-      network.requireOnline('Submitting a marketplace review');
+      networkGate.requireOnline('Submitting a marketplace review');
 
       return api.createMarketplaceJobReview(
         job.id,
@@ -868,7 +867,9 @@ export default function ContractProjectRoomRoute() {
             value={artifactLines}
           />
           <PrimaryButton
-            disabled={actionBlocked || submitMilestone.isPending || !submissionNote.trim()}
+            disabled={
+              networkGate.actionBlocked || submitMilestone.isPending || !submissionNote.trim()
+            }
             loading={submitMilestone.isPending}
             onPress={() => submitMilestone.mutate()}
           >
@@ -898,7 +899,9 @@ export default function ContractProjectRoomRoute() {
             value={revisionNote}
           />
           <SecondaryButton
-            disabled={actionBlocked || requestRevision.isPending || !revisionNote.trim()}
+            disabled={
+              networkGate.actionBlocked || requestRevision.isPending || !revisionNote.trim()
+            }
             onPress={() => requestRevision.mutate()}
           >
             Request revision
@@ -910,7 +913,7 @@ export default function ContractProjectRoomRoute() {
             value={approvalNote}
           />
           <PrimaryButton
-            disabled={actionBlocked || approveSubmission.isPending}
+            disabled={networkGate.actionBlocked || approveSubmission.isPending}
             loading={approveSubmission.isPending}
             onPress={() => approveSubmission.mutate()}
           >
@@ -927,7 +930,7 @@ export default function ContractProjectRoomRoute() {
             artifact URLs as milestone delivery evidence.
           </BodyText>
           <PrimaryButton
-            disabled={actionBlocked || deliverApproved.isPending}
+            disabled={networkGate.actionBlocked || deliverApproved.isPending}
             loading={deliverApproved.isPending}
             onPress={() => deliverApproved.mutate()}
           >
@@ -945,7 +948,7 @@ export default function ContractProjectRoomRoute() {
           value={messageBody}
         />
         <PrimaryButton
-          disabled={actionBlocked || postMessage.isPending || !messageBody.trim()}
+          disabled={networkGate.actionBlocked || postMessage.isPending || !messageBody.trim()}
           loading={postMessage.isPending}
           onPress={() => postMessage.mutate()}
         >
@@ -994,7 +997,7 @@ export default function ContractProjectRoomRoute() {
         />
         <PrimaryButton
           disabled={
-            actionBlocked ||
+            networkGate.actionBlocked ||
             createSupportCase.isPending ||
             !supportSubject.trim() ||
             !supportDescription.trim()
@@ -1019,7 +1022,9 @@ export default function ContractProjectRoomRoute() {
               value={supportReply}
             />
             <SecondaryButton
-              disabled={actionBlocked || postSupportReply.isPending || !supportReply.trim()}
+              disabled={
+                networkGate.actionBlocked || postSupportReply.isPending || !supportReply.trim()
+              }
               onPress={() => postSupportReply.mutate()}
             >
               Post support reply
@@ -1073,7 +1078,7 @@ export default function ContractProjectRoomRoute() {
               value={reviewBody}
             />
             <PrimaryButton
-              disabled={actionBlocked || createReview.isPending || !reviewBody.trim()}
+              disabled={networkGate.actionBlocked || createReview.isPending || !reviewBody.trim()}
               loading={createReview.isPending}
               onPress={() => createReview.mutate()}
             >
