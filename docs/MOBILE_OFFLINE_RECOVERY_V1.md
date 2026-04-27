@@ -38,6 +38,8 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/offline/useOfflineSnapshot.tsx` is the shared React boundary. It persists selected authenticated read responses through the storage helper, hydrates them on later app opens, and exposes `OfflineSnapshotNotice` for clear stale-data copy.
 
+`apps/mobile/src/features/offline/OfflineSnapshotRetentionBridge.tsx` mounts at the root provider layer. It runs best-effort namespace retention once on app startup and again after foreground return when the last retention run is older than six hours. It does not block screen rendering, query execution, or session restore.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -141,6 +143,7 @@ Snapshot retention rules:
 - snapshots expire after 7 days
 - each account or public snapshot scope retains at most 80 newest entries
 - each successful snapshot write triggers best-effort retention pruning for that scope
+- app startup and throttled foreground return trigger best-effort retention pruning across the snapshot namespace
 - invalid or unreadable snapshot envelopes are removed by the same retention pass
 - Account displays the current snapshot inventory, approximate namespace size, public snapshot count, account-scoped snapshot count, newest saved timestamp, and expired-waiting-cleanup count
 

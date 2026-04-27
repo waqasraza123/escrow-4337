@@ -241,10 +241,11 @@ export async function enforceOfflineSnapshotRetention({
       return {
         cachedAt: snapshot?.cachedAt ?? null,
         storageKey,
+        userId: parsed.userId,
       };
     })
     .filter(
-      (snapshot): snapshot is { cachedAt: number | null; storageKey: string } =>
+      (snapshot): snapshot is { cachedAt: number | null; storageKey: string; userId: string } =>
         Boolean(snapshot),
     );
   const expiredKeys = snapshots
@@ -257,9 +258,19 @@ export async function enforceOfflineSnapshotRetention({
   const retained = snapshots
     .filter((snapshot) => snapshot.cachedAt !== null && !expiredKeySet.has(snapshot.storageKey))
     .sort((left, right) => (right.cachedAt ?? 0) - (left.cachedAt ?? 0));
-  const overflowKeys = retained
-    .slice(Math.max(0, maxEntriesPerScope))
-    .map((snapshot) => snapshot.storageKey);
+  const retainedByScope = retained.reduce<
+    Record<string, Array<{ cachedAt: number | null; storageKey: string; userId: string }>>
+  >((scopes, snapshot) => {
+    scopes[snapshot.userId] = scopes[snapshot.userId] ?? [];
+    scopes[snapshot.userId].push(snapshot);
+    return scopes;
+  }, {});
+  const overflowKeys = Object.values(retainedByScope).flatMap((scopeSnapshots) =>
+    scopeSnapshots
+      .sort((left, right) => (right.cachedAt ?? 0) - (left.cachedAt ?? 0))
+      .slice(Math.max(0, maxEntriesPerScope))
+      .map((snapshot) => snapshot.storageKey),
+  );
   const removalKeys = [...new Set([...expiredKeys, ...overflowKeys])];
 
   if (removalKeys.length) {

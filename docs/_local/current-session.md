@@ -3,6 +3,25 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Snapshot Retention Bridge)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery storage lifecycle slice without intentional tests/builds:
+  - added `apps/mobile/src/features/offline/OfflineSnapshotRetentionBridge.tsx`
+  - mounted the bridge in `RootProviders` so retention runs once on app startup
+  - added throttled foreground-return retention so stale/invalid snapshots are pruned after long background periods without blocking screen rendering
+  - corrected namespace-wide retention so the 80-entry cap is enforced per account/public scope instead of across all scopes together
+  - documented startup/foreground retention behavior in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/{OfflineSnapshotRetentionBridge.tsx,offlineSnapshots.ts}`
+  `apps/mobile/src/providers/root.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for marketplace snapshot hydration, retention cleanup, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Snapshot Retention Inventory)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery storage hardening slice without intentional tests/builds:

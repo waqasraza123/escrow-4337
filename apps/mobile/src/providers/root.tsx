@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { OfflineSnapshotRetentionBridge } from '@/features/offline/OfflineSnapshotRetentionBridge';
 import { MobileRecoveryRefreshBridge } from '@/features/network/MobileRecoveryRefreshBridge';
 import { LocaleProvider } from './locale';
 import { MobileNetworkProvider } from './network';
@@ -11,6 +12,7 @@ export function RootProviders({ children }: { children: ReactNode }) {
   return (
     <MobileNetworkProvider>
       <QueryProvider>
+        <OfflineSnapshotRetentionBridge />
         <MobileRecoveryRefreshBridge />
         <MobileThemeProvider>
           <LocaleProvider>
