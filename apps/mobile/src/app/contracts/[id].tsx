@@ -7,6 +7,7 @@ import {
   formatTimestamp,
   previewHash,
   splitList,
+  type JobsListResponse,
   type JobMilestone,
   type JobView,
 } from '@escrow4334/product-core';
@@ -18,6 +19,10 @@ import {
 } from '@/features/contracts/contract-drafts';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
+import {
+  OfflineSnapshotNotice,
+  useOfflineSnapshot,
+} from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -41,7 +46,7 @@ import {
 
 export default function ContractDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { accessToken } = useSession();
+  const { accessToken, user } = useSession();
   const networkGate = useNetworkActionGate();
   const queryClient = useQueryClient();
   const [fundAmount, setFundAmount] = useState('');
@@ -51,13 +56,25 @@ export default function ContractDetailRoute() {
     queryKey: ['jobs'],
     queryFn: () => api.listJobs(accessToken as string),
   });
+  const jobsSnapshot = useOfflineSnapshot<JobsListResponse>({
+    cacheKey: user ? `jobs:${user.id}` : null,
+    data: jobs.data,
+    enabled: Boolean(user),
+  });
+  const snapshotAvailable = Boolean(jobsSnapshot.data);
+  const useJobsSnapshot =
+    !jobs.data &&
+    snapshotAvailable &&
+    (networkGate.actionBlocked || jobs.isError || jobs.isLoading);
+  const jobsData = jobs.data ?? (useJobsSnapshot ? jobsSnapshot.data : null);
 
   const selected = useMemo(
-    () => jobs.data?.jobs.find(({ job }) => job.id === id) ?? null,
-    [id, jobs.data?.jobs],
+    () => jobsData?.jobs.find(({ job }) => job.id === id) ?? null,
+    [id, jobsData?.jobs],
   );
   const job = selected?.job ?? null;
   const participantRoles = selected?.participantRoles ?? [];
+  const snapshotReadOnly = useJobsSnapshot;
 
   const fund = useMutation({
     mutationFn: async () => {
@@ -66,6 +83,9 @@ export default function ContractDetailRoute() {
       }
       if (!fundAmount.trim()) {
         throw new Error('Enter a funding amount.');
+      }
+      if (snapshotReadOnly) {
+        throw new Error('Refresh live contract state before funding from cached data.');
       }
       networkGate.requireOnline('Funding a contract');
 
@@ -100,7 +120,7 @@ export default function ContractDetailRoute() {
     );
   }
 
-  if (jobs.isLoading) {
+  if (jobs.isLoading && !jobsData) {
     return (
       <ScrollScreen>
         <SectionHeader eyebrow="Contract" title="Loading contract" />
@@ -111,7 +131,7 @@ export default function ContractDetailRoute() {
     );
   }
 
-  if (jobs.isError) {
+  if (jobs.isError && !jobsData) {
     return (
       <ScrollScreen>
         <SectionHeader
@@ -154,7 +174,12 @@ export default function ContractDetailRoute() {
         isClient ? (
           <BottomActionBar>
             <PrimaryButton
-              disabled={networkGate.actionBlocked || fund.isPending || !fundAmount.trim()}
+              disabled={
+                snapshotReadOnly ||
+                networkGate.actionBlocked ||
+                fund.isPending ||
+                !fundAmount.trim()
+              }
               loading={fund.isPending}
               onPress={() => fund.mutate()}
             >
@@ -165,6 +190,9 @@ export default function ContractDetailRoute() {
       }
     >
       <SectionHeader eyebrow="Contract" title={job.title} body={job.description} />
+      {snapshotReadOnly ? (
+        <OfflineSnapshotNotice cachedAt={jobsSnapshot.cachedAt} subject="contract state" />
+      ) : null}
 
       <SurfaceCard animated variant="elevated">
         <View style={styles.headerRow}>
@@ -191,7 +219,11 @@ export default function ContractDetailRoute() {
         <HashText value={job.onchain.currencyAddress} />
       </SurfaceCard>
 
-      <ContractMilestonesCard job={job} participantRoles={participantRoles} />
+      <ContractMilestonesCard
+        job={job}
+        participantRoles={participantRoles}
+        snapshotReadOnly={snapshotReadOnly}
+      />
 
       <SurfaceCard animated delay={120}>
         <Heading size="section">Project room</Heading>
@@ -313,9 +345,11 @@ function getMilestoneActionCopy(kind: MobileMilestoneActionKind) {
 function ContractMilestonesCard({
   job,
   participantRoles,
+  snapshotReadOnly,
 }: {
   job: JobView;
   participantRoles: Array<'client' | 'worker'>;
+  snapshotReadOnly: boolean;
 }) {
   const { accessToken } = useSession();
   const networkGate = useNetworkActionGate();
@@ -360,6 +394,9 @@ function ContractMilestonesCard({
       if (!normalized.length) {
         throw new Error('Add at least one ready milestone.');
       }
+      if (snapshotReadOnly) {
+        throw new Error('Refresh live contract state before committing milestones.');
+      }
       networkGate.requireOnline('Committing milestones');
 
       return api.setMilestones(job.id, normalized, accessToken);
@@ -383,6 +420,9 @@ function ContractMilestonesCard({
       }
       if (!selectedAction) {
         throw new Error('Select a milestone action.');
+      }
+      if (snapshotReadOnly) {
+        throw new Error('Refresh live contract state before updating a milestone.');
       }
       networkGate.requireOnline(getMilestoneActionCopy(selectedAction.kind).title);
 
@@ -517,7 +557,7 @@ function ContractMilestonesCard({
 
               <NetworkActionNotice action={getMilestoneActionCopy(selectedAction.kind).title} />
               <PrimaryButton
-                disabled={networkGate.actionBlocked || executeAction.isPending}
+                disabled={snapshotReadOnly || networkGate.actionBlocked || executeAction.isPending}
                 loading={executeAction.isPending}
                 onPress={() => executeAction.mutate()}
               >
@@ -575,7 +615,12 @@ function ContractMilestonesCard({
             Add milestone
           </SecondaryButton>
           <PrimaryButton
-            disabled={networkGate.actionBlocked || commit.isPending || !normalized.length}
+            disabled={
+              snapshotReadOnly ||
+              networkGate.actionBlocked ||
+              commit.isPending ||
+              !normalized.length
+            }
             loading={commit.isPending}
             onPress={() => commit.mutate()}
           >

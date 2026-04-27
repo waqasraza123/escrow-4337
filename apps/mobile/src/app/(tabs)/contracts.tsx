@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { formatAmount } from '@escrow4334/product-core';
+import { formatAmount, type JobsListResponse } from '@escrow4334/product-core';
+import {
+  OfflineSnapshotNotice,
+  useOfflineSnapshot,
+} from '@/features/offline/useOfflineSnapshot';
+import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -15,12 +20,25 @@ import {
 } from '@/ui/primitives';
 
 export default function ContractsRoute() {
-  const { accessToken } = useSession();
+  const { accessToken, user } = useSession();
+  const networkGate = useNetworkActionGate();
   const jobs = useQuery({
     enabled: Boolean(accessToken),
     queryKey: ['jobs'],
     queryFn: () => api.listJobs(accessToken as string),
   });
+  const jobsSnapshot = useOfflineSnapshot<JobsListResponse>({
+    cacheKey: user ? `jobs:${user.id}` : null,
+    data: jobs.data,
+    enabled: Boolean(user),
+  });
+  const snapshotAvailable = Boolean(jobsSnapshot.data);
+  const useJobsSnapshot =
+    !jobs.data &&
+    snapshotAvailable &&
+    (networkGate.actionBlocked || jobs.isError || jobs.isLoading);
+  const jobsData = jobs.data ?? (useJobsSnapshot ? jobsSnapshot.data : null);
+  const jobRows = jobsData?.jobs ?? [];
 
   return (
     <ScrollScreen>
@@ -49,14 +67,18 @@ export default function ContractsRoute() {
         />
       ) : null}
 
-      {jobs.isLoading ? (
+      {useJobsSnapshot ? (
+        <OfflineSnapshotNotice cachedAt={jobsSnapshot.cachedAt} subject="contracts" />
+      ) : null}
+
+      {jobs.isLoading && !jobsData ? (
         <>
           <SkeletonCard />
           <SkeletonCard />
         </>
       ) : null}
 
-      {jobs.data?.jobs.map(({ job }, index) => (
+      {jobRows.map(({ job }, index) => (
         <ListCard
           key={job.id}
           title={job.title}
@@ -75,7 +97,7 @@ export default function ContractsRoute() {
         />
       ))}
 
-      {accessToken && jobs.data?.jobs.length === 0 ? (
+      {accessToken && jobsData?.jobs.length === 0 ? (
         <EmptyState
           title="No contracts yet"
           body="Start from marketplace hiring or create a direct escrow contract."
@@ -87,7 +109,7 @@ export default function ContractsRoute() {
         />
       ) : null}
 
-      {accessToken && jobs.isError ? (
+      {accessToken && jobs.isError && !jobsData ? (
         <EmptyState
           title="Contracts unavailable"
           body="The contracts API could not be reached. Check the backend target and try again."

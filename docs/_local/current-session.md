@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Read-Only Offline Snapshots)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery slice without intentional tests/builds:
+  - added `apps/mobile/src/features/offline/useOfflineSnapshot.tsx` for AsyncStorage-backed, user-scoped read snapshots plus `OfflineSnapshotNotice`
+  - cached contracts list/detail source data, project-room state, and marketplace job-review reads after successful live queries
+  - allowed contracts, selected contract detail, and project-room/review screens to render saved snapshots during known offline/API-unreachable/error/loading states
+  - kept snapshots read-only by disabling stale-state writes and adding live-state guards before funding, milestone, project-room, support, and review mutations
+  - documented the snapshot contract, cache-key posture, and remaining deferred work in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/useOfflineSnapshot.tsx`
+  `apps/mobile/src/app/{(tabs)/contracts.tsx,contracts/[id].tsx,contracts/[id]/room.tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device evidence for offline snapshot hydration, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Blocked Action Notices)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile recovery UX slice without intentional tests/builds:

@@ -13,6 +13,7 @@ import {
   type ProjectActivity,
   type ProjectArtifact,
   type ProjectMessage,
+  type ProjectRoom,
   type ProjectSubmission,
   type SupportCase,
   type SupportCaseReason,
@@ -20,6 +21,10 @@ import {
 } from '@escrow4334/product-core';
 import { NetworkActionNotice } from '@/features/network/NetworkActionNotice';
 import { useNetworkActionGate } from '@/features/network/useNetworkActionGate';
+import {
+  OfflineSnapshotNotice,
+  useOfflineSnapshot,
+} from '@/features/offline/useOfflineSnapshot';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import {
@@ -400,17 +405,40 @@ export default function ContractProjectRoomRoute() {
     queryKey: ['project-room', id],
     queryFn: () => api.getProjectRoom(id as string, accessToken as string),
   });
+  const roomSnapshot = useOfflineSnapshot<{ room: ProjectRoom }>({
+    cacheKey: user && id ? `project-room:${user.id}:${id}` : null,
+    data: roomQuery.data,
+    enabled: Boolean(user && id),
+  });
 
   const reviewsQuery = useQuery({
     enabled: Boolean(accessToken && id),
     queryKey: ['marketplace-job-reviews', id],
     queryFn: () => api.getMarketplaceJobReviews(id as string, accessToken as string),
   });
+  const reviewsSnapshot = useOfflineSnapshot<{ reviews: MarketplaceReview[] }>({
+    cacheKey: user && id ? `marketplace-job-reviews:${user.id}:${id}` : null,
+    data: reviewsQuery.data,
+    enabled: Boolean(user && id),
+  });
 
-  const room = roomQuery.data?.room ?? null;
+  const useRoomSnapshot =
+    !roomQuery.data &&
+    Boolean(roomSnapshot.data) &&
+    (networkGate.actionBlocked || roomQuery.isError || roomQuery.isLoading);
+  const useReviewsSnapshot =
+    !reviewsQuery.data &&
+    Boolean(reviewsSnapshot.data) &&
+    (networkGate.actionBlocked || reviewsQuery.isError || reviewsQuery.isLoading);
+  const roomData = roomQuery.data ?? (useRoomSnapshot ? roomSnapshot.data : null);
+  const reviewsData = reviewsQuery.data ?? (useReviewsSnapshot ? reviewsSnapshot.data : null);
+  const snapshotReadOnly = useRoomSnapshot;
+  const reviewSnapshotReadOnly = useReviewsSnapshot;
+
+  const room = roomData?.room ?? null;
   const job = room?.job ?? null;
   const participantRoles = room?.participantRoles ?? [];
-  const reviews = reviewsQuery.data?.reviews ?? [];
+  const reviews = reviewsData?.reviews ?? [];
   const selectedMilestoneIndex = Number(selectedMilestoneValue);
   const selectedMilestone = job?.milestones[selectedMilestoneIndex] ?? null;
   const selectedSubmissions = useMemo(
@@ -481,6 +509,12 @@ export default function ContractProjectRoomRoute() {
     }));
   }
 
+  function requireLiveRoomState(action: string) {
+    if (snapshotReadOnly) {
+      throw new Error(`${action} needs live project-room state. Refresh before posting updates.`);
+    }
+  }
+
   const submitMilestone = useMutation({
     mutationFn: async () => {
       if (!accessToken || !job || !selectedMilestone) {
@@ -489,6 +523,7 @@ export default function ContractProjectRoomRoute() {
       if (!submissionNote.trim()) {
         throw new Error('Add a submission note before posting work.');
       }
+      requireLiveRoomState('Posting a milestone submission');
       networkGate.requireOnline('Posting a milestone submission');
 
       return api.submitProjectMilestone(
@@ -523,6 +558,7 @@ export default function ContractProjectRoomRoute() {
       if (!revisionNote.trim()) {
         throw new Error('Add a revision request note.');
       }
+      requireLiveRoomState('Requesting a project-room revision');
       networkGate.requireOnline('Requesting a project-room revision');
 
       return api.requestProjectRevision(
@@ -550,6 +586,7 @@ export default function ContractProjectRoomRoute() {
       if (!accessToken || !job || !latestSubmission) {
         throw new Error('Select a submitted milestone before approving it.');
       }
+      requireLiveRoomState('Approving a project-room submission');
       networkGate.requireOnline('Approving a project-room submission');
 
       return api.approveProjectSubmission(
@@ -577,6 +614,7 @@ export default function ContractProjectRoomRoute() {
       if (!accessToken || !job || !latestSubmission) {
         throw new Error('Select an approved milestone submission before delivery.');
       }
+      requireLiveRoomState('Delivering an approved submission');
       networkGate.requireOnline('Delivering an approved submission');
 
       return api.deliverProjectSubmission(job.id, latestSubmission.id, accessToken);
@@ -601,6 +639,7 @@ export default function ContractProjectRoomRoute() {
       if (!messageBody.trim()) {
         throw new Error('Write a message before posting.');
       }
+      requireLiveRoomState('Posting a project-room message');
       networkGate.requireOnline('Posting a project-room message');
 
       return api.postProjectRoomMessage(job.id, { body: messageBody.trim() }, accessToken);
@@ -629,6 +668,7 @@ export default function ContractProjectRoomRoute() {
       if (!supportDescription.trim()) {
         throw new Error('Describe the support request.');
       }
+      requireLiveRoomState('Opening a support case');
       networkGate.requireOnline('Opening a support case');
 
       return api.createSupportCase(
@@ -666,6 +706,7 @@ export default function ContractProjectRoomRoute() {
       if (!supportReply.trim()) {
         throw new Error('Write a support reply before posting.');
       }
+      requireLiveRoomState('Posting a support reply');
       networkGate.requireOnline('Posting a support reply');
 
       return api.postSupportCaseMessage(
@@ -696,6 +737,10 @@ export default function ContractProjectRoomRoute() {
       if (!reviewBody.trim()) {
         throw new Error('Add review body copy before submitting.');
       }
+      if (reviewSnapshotReadOnly) {
+        throw new Error('Refresh live marketplace review state before submitting a review.');
+      }
+      requireLiveRoomState('Submitting a marketplace review');
       networkGate.requireOnline('Submitting a marketplace review');
 
       return api.createMarketplaceJobReview(
@@ -747,7 +792,7 @@ export default function ContractProjectRoomRoute() {
     );
   }
 
-  if (roomQuery.isLoading) {
+  if (roomQuery.isLoading && !roomData) {
     return (
       <ScrollScreen>
         <SectionHeader eyebrow="Project room" title="Loading room" />
@@ -758,7 +803,7 @@ export default function ContractProjectRoomRoute() {
     );
   }
 
-  if (roomQuery.isError) {
+  if (roomQuery.isError && !roomData) {
     return (
       <ScrollScreen>
         <SectionHeader
@@ -799,6 +844,12 @@ export default function ContractProjectRoomRoute() {
         title={job.title}
         body="Review milestone submissions before onchain delivery, then continue through release or dispute from contract detail."
       />
+      {snapshotReadOnly ? (
+        <OfflineSnapshotNotice cachedAt={roomSnapshot.cachedAt} subject="project-room state" />
+      ) : null}
+      {useReviewsSnapshot ? (
+        <OfflineSnapshotNotice cachedAt={reviewsSnapshot.cachedAt} subject="marketplace reviews" />
+      ) : null}
 
       <SurfaceCard animated variant="elevated">
         <View style={styles.headerRow}>
@@ -869,7 +920,10 @@ export default function ContractProjectRoomRoute() {
           />
           <PrimaryButton
             disabled={
-              networkGate.actionBlocked || submitMilestone.isPending || !submissionNote.trim()
+              snapshotReadOnly ||
+              networkGate.actionBlocked ||
+              submitMilestone.isPending ||
+              !submissionNote.trim()
             }
             loading={submitMilestone.isPending}
             onPress={() => submitMilestone.mutate()}
@@ -902,7 +956,10 @@ export default function ContractProjectRoomRoute() {
           />
           <SecondaryButton
             disabled={
-              networkGate.actionBlocked || requestRevision.isPending || !revisionNote.trim()
+              snapshotReadOnly ||
+              networkGate.actionBlocked ||
+              requestRevision.isPending ||
+              !revisionNote.trim()
             }
             onPress={() => requestRevision.mutate()}
           >
@@ -915,7 +972,7 @@ export default function ContractProjectRoomRoute() {
             value={approvalNote}
           />
           <PrimaryButton
-            disabled={networkGate.actionBlocked || approveSubmission.isPending}
+            disabled={snapshotReadOnly || networkGate.actionBlocked || approveSubmission.isPending}
             loading={approveSubmission.isPending}
             onPress={() => approveSubmission.mutate()}
           >
@@ -933,7 +990,7 @@ export default function ContractProjectRoomRoute() {
             artifact URLs as milestone delivery evidence.
           </BodyText>
           <PrimaryButton
-            disabled={networkGate.actionBlocked || deliverApproved.isPending}
+            disabled={snapshotReadOnly || networkGate.actionBlocked || deliverApproved.isPending}
             loading={deliverApproved.isPending}
             onPress={() => deliverApproved.mutate()}
           >
@@ -952,7 +1009,12 @@ export default function ContractProjectRoomRoute() {
           value={messageBody}
         />
         <PrimaryButton
-          disabled={networkGate.actionBlocked || postMessage.isPending || !messageBody.trim()}
+          disabled={
+            snapshotReadOnly ||
+            networkGate.actionBlocked ||
+            postMessage.isPending ||
+            !messageBody.trim()
+          }
           loading={postMessage.isPending}
           onPress={() => postMessage.mutate()}
         >
@@ -1002,6 +1064,7 @@ export default function ContractProjectRoomRoute() {
         />
         <PrimaryButton
           disabled={
+            snapshotReadOnly ||
             networkGate.actionBlocked ||
             createSupportCase.isPending ||
             !supportSubject.trim() ||
@@ -1029,7 +1092,10 @@ export default function ContractProjectRoomRoute() {
             />
             <SecondaryButton
               disabled={
-                networkGate.actionBlocked || postSupportReply.isPending || !supportReply.trim()
+                snapshotReadOnly ||
+                networkGate.actionBlocked ||
+                postSupportReply.isPending ||
+                !supportReply.trim()
               }
               onPress={() => postSupportReply.mutate()}
             >
@@ -1041,7 +1107,7 @@ export default function ContractProjectRoomRoute() {
 
       <SurfaceCard animated delay={270}>
         <Heading size="section">Marketplace reviews</Heading>
-        {reviewsQuery.isLoading ? <BodyText>Loading reviews...</BodyText> : null}
+        {reviewsQuery.isLoading && !reviewsData ? <BodyText>Loading reviews...</BodyText> : null}
         <ReviewList reviews={reviews} />
         {canLeaveReview ? (
           <View style={styles.stack}>
@@ -1084,7 +1150,13 @@ export default function ContractProjectRoomRoute() {
               value={reviewBody}
             />
             <PrimaryButton
-              disabled={networkGate.actionBlocked || createReview.isPending || !reviewBody.trim()}
+              disabled={
+                snapshotReadOnly ||
+                reviewSnapshotReadOnly ||
+                networkGate.actionBlocked ||
+                createReview.isPending ||
+                !reviewBody.trim()
+              }
               loading={createReview.isPending}
               onPress={() => createReview.mutate()}
             >

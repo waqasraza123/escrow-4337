@@ -32,6 +32,8 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/network/NetworkActionNotice.tsx` is the shared blocked-action notice. It renders only when `useNetworkActionGate().actionBlocked` is true and gives users action-specific recovery copy next to disabled mutation controls.
 
+`apps/mobile/src/features/offline/useOfflineSnapshot.tsx` is the shared read-only snapshot boundary. It persists selected authenticated read responses in AsyncStorage under user-scoped, non-token cache keys, hydrates them on later app opens, and exposes `OfflineSnapshotNotice` for clear stale-data copy.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -117,7 +119,15 @@ Current blocked-action notice placements:
 
 TanStack Query online state is derived from native connectivity, not backend reachability. When NetInfo reports the device as offline or internet unreachable, query refetches pause through React Query's built-in online manager behavior. If the device is online but the API probe fails, normal queries remain unpaused and can surface endpoint-specific errors while high-risk guarded actions stop early with clearer recovery copy.
 
-The implementation does not persist query caches across app restarts. Secure session restore remains owned by the existing session provider; server state remains a normal React Query cache.
+The implementation does not persist the full React Query cache across app restarts. Secure session restore remains owned by the existing session provider; most server state remains a normal React Query cache.
+
+Selected high-value read surfaces now persist explicit offline snapshots:
+
+- contracts list and contract detail source data from `api.listJobs`
+- project-room state from `api.getProjectRoom`
+- marketplace review state from `api.getMarketplaceJobReviews`
+
+Snapshots are intentionally read-only. When a screen is rendered from snapshot data rather than live query data, it shows an `Offline snapshot` notice with the saved timestamp and disables write actions that depend on that stale state. Fresh successful query responses replace the previous snapshot. Snapshot keys use the authenticated user id and resource id, never access or refresh tokens.
 
 ## Recovery Model
 
@@ -129,6 +139,7 @@ Current recovery behavior is manual and explicit:
 - Manual refresh runs both NetInfo refresh and the API reachability probe.
 - Query caches are invalidated after manual refresh so visible surfaces can refetch.
 - Mutating actions produce direct reconnect-and-retry copy instead of generic API failures.
+- Selected contract and project-room read surfaces can still show the last saved participant-scoped snapshot after an offline start or backend outage.
 
 This is appropriate for the current app because escrow, wallet, and identity mutations should not be silently queued without a stronger idempotency and replay contract.
 
@@ -137,7 +148,6 @@ This is appropriate for the current app because escrow, wallet, and identity mut
 - Durable offline mutation queue for low-risk writes only.
 - Per-mutation retry envelopes with idempotency keys, conflict copy, and user-visible pending state.
 - Background refresh after reconnect.
-- Offline read persistence for selected contract/project-room snapshots.
 - Device-level evidence on iOS and Android across airplane mode, captive portal, flaky LTE, and wallet deep-link return paths.
 
 ## Operational Notes
