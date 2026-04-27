@@ -3,6 +3,21 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Mutation Network Guards)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile recovery slice without intentional tests/builds:
+  - added `useMobileNetwork()` action guards to direct contract creation, contractor join, contract funding, direct milestone commit, worker delivery, client release, and client dispute mutations
+  - added the same guard pattern to project-room submission, revision request, approval, approved-delivery, room message, support case, support reply, and marketplace review mutations
+  - disabled primary mutation buttons while the device is known offline or the API is known unreachable, while keeping provider-level guards as the authoritative protection at mutation execution time
+  - updated Mobile Offline Recovery V1 and durable project state with the expanded guarded mutation contract
+- Changed files:
+  `apps/mobile/src/app/contracts/{new.tsx,join.tsx,[id].tsx,[id]/room.tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - add a small shared mobile mutation-guard helper if more write paths are introduced, then capture real-device evidence for wallet/project-room flows.
+
 ## Update (2026-04-27, Mobile API Reachability)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile recovery slice without intentional tests/builds:

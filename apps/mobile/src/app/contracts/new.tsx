@@ -15,6 +15,7 @@ import {
   type MobileMilestoneDraft,
 } from '@/features/contracts/contract-drafts';
 import { api } from '@/providers/api';
+import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import {
   BottomActionBar,
@@ -39,6 +40,7 @@ const configuredCurrencyAddress =
 
 export default function NewContractRoute() {
   const { accessToken, user } = useSession();
+  const network = useMobileNetwork();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<MobileContractDraft>(() =>
     createInitialContractDraft(configuredCurrencyAddress),
@@ -64,12 +66,14 @@ export default function NewContractRoute() {
     [draft, hasSmartAccountDefault, milestones],
   );
   const ready = readiness.every((item) => item.ready);
+  const actionBlocked = network.offline || network.apiReachability.status === 'unreachable';
 
   const createContract = useMutation({
     mutationFn: async () => {
       if (!accessToken) {
         throw new Error('Sign in before creating a contract.');
       }
+      network.requireOnline('Creating a contract');
 
       const response = await api.createJob(
         {
@@ -157,7 +161,7 @@ export default function NewContractRoute() {
       footer={
         <BottomActionBar>
           <PrimaryButton
-            disabled={!ready || createContract.isPending}
+            disabled={!ready || actionBlocked || createContract.isPending}
             loading={createContract.isPending}
             onPress={() => createContract.mutate()}
           >

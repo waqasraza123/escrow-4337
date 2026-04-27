@@ -58,12 +58,28 @@ The helper throws a user-safe error when the device is known offline or when the
 
 - OTP code request
 - OTP verification
+- direct contract creation and initial milestone commit
+- contract funding
+- contractor readiness re-check and join execution
+- direct milestone commit
+- worker milestone delivery
+- client milestone release
+- client milestone dispute
+- project-room milestone submission
+- project-room revision request
+- project-room submission approval
+- approved-submission onchain delivery
+- project-room message posting
+- participant-visible support case opening and reply posting
+- post-contract marketplace review submission
 - wallet connector opening
 - wallet SIWE challenge creation and signature verification
 - smart-account provisioning
 - default wallet update
 
 This keeps offline and API-outage failures close to the initiating action and avoids sending users into wallet approval or OTP flows that cannot complete.
+
+Mutation surfaces also disable their primary action buttons while the device is known offline or the API is known unreachable. The provider guard remains the authoritative protection because programmatic mutation calls, stale buttons, and fast network changes can still happen between render and press.
 
 ## Query Behavior
 
@@ -97,3 +113,4 @@ This is appropriate for the current app because escrow, wallet, and identity mut
 - Do not queue escrow execution, wallet verification, OTP, funding, release, dispute, or join mutations until the API and contract gateway expose an explicit mobile-safe replay contract.
 - Treat NetInfo reachability as a device signal; use the API probe only as a lightweight reachability check, not as deep backend health proof.
 - Keep offline copy action-specific; generic "network failed" messages are not enough for wallet and escrow flows.
+- Keep guarded mutation lists in this document aligned with mobile screens when new authenticated write paths are added.
