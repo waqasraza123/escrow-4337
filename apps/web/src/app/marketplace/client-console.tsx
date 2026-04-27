@@ -19,9 +19,12 @@ import {
   webApi,
   type JobView,
   type MarketplaceAnalyticsOverview,
+  type MarketplaceContractDraft,
   type MarketplaceApplication,
   type MarketplaceApplicationComparison,
   type MarketplaceApplicationTimeline,
+  type MarketplaceOffer,
+  type MarketplaceOfferMilestoneDraft,
   type MarketplaceCryptoReadiness,
   type MarketplaceDigest,
   type MarketplaceDigestDispatchRun,
@@ -90,6 +93,20 @@ type ClientContractRow = {
   releasedCount: number;
 };
 
+type OfferDraft = {
+  message: string;
+  proposedRate: string;
+  milestones: string;
+  declineReason: string;
+};
+
+type ClientOfferRow = {
+  timeline: MarketplaceApplicationTimeline;
+  latestOffer: MarketplaceOffer;
+  draft: MarketplaceContractDraft | null;
+  hasActiveNegotiation: boolean;
+};
+
 const navSections: ClientConsoleSection[] = [
   'dashboard',
   'opportunities',
@@ -122,6 +139,46 @@ function createEmptyOpportunityDraft(): OpportunityDraft {
     engagementType: 'fixed_scope',
     cryptoReadinessRequired: 'wallet_only',
   };
+}
+
+function serializeOfferMilestones(milestones: MarketplaceOfferMilestoneDraft[]) {
+  return milestones
+    .map((milestone) =>
+      [
+        milestone.title,
+        milestone.deliverable,
+        milestone.amount,
+        milestone.dueAt ? new Date(milestone.dueAt).toISOString().slice(0, 10) : '',
+      ].join(' | '),
+    )
+    .join('\n');
+}
+
+function parseOfferMilestones(input: string) {
+  return splitList(input).map((line) => {
+    const [title = '', deliverable = '', amount = '', dueAtRaw = ''] = line
+      .split('|')
+      .map((value) => value.trim());
+    return {
+      title,
+      deliverable,
+      amount,
+      dueAt: dueAtRaw ? Date.parse(dueAtRaw) || null : null,
+    } satisfies MarketplaceOfferMilestoneDraft;
+  });
+}
+
+function createEmptyOfferDraft(): OfferDraft {
+  return {
+    message: '',
+    proposedRate: '',
+    milestones: '',
+    declineReason: '',
+  };
+}
+
+function formatOfferMessage(offer: MarketplaceOffer) {
+  return offer.message ?? offer.counterMessage ?? '';
 }
 
 async function loadApplicationData(
@@ -265,6 +322,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
   const [analyticsOverview, setAnalyticsOverview] =
     useState<MarketplaceAnalyticsOverview | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
   const [opportunityDraft, setOpportunityDraft] = useState<OpportunityDraft>(
     createEmptyOpportunityDraft(),
   );
@@ -312,7 +370,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
       return summary ? { timeline, summary } : null;
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-  const offerRows = Object.values(applicationTimelines)
+  const offerRows: ClientOfferRow[] = Object.values(applicationTimelines)
     .map((timeline) => {
       const latestOffer = timeline.offers[timeline.offers.length - 1] ?? null;
       return latestOffer
@@ -320,10 +378,12 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
             timeline,
             latestOffer,
             draft: timeline.contractDraft,
+            hasActiveNegotiation: ['sent', 'countered'].includes(latestOffer.status),
           }
         : null;
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  const activeOfferRows = offerRows.filter((entry) => entry.hasActiveNegotiation);
   const dashboardActions = useMemo<ClientDashboardActionItem[]>(() => {
     const items: ClientDashboardActionItem[] = [];
 
@@ -372,11 +432,11 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
       });
     }
 
-    if (offerRows.length > 0) {
+    if (activeOfferRows.length > 0) {
       items.push({
         id: 'offers',
         title: clientMessages.dashboard.actions.trackOffers,
-        detail: clientMessages.dashboard.actions.trackOffersDetail(offerRows.length),
+        detail: clientMessages.dashboard.actions.trackOffersDetail(activeOfferRows.length),
         href: '/app/marketplace/client/offers',
         cta: clientMessages.dashboard.actions.openOffers,
         tone: 'info',
@@ -430,7 +490,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
     fundingRows.length,
     interviewRows,
     myOpportunities,
-    offerRows.length,
+    activeOfferRows.length,
     reviewRows.length,
   ]);
 
@@ -450,6 +510,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
         setDigests([]);
         setDigestRuns([]);
         setAnalyticsOverview(null);
+        setOfferDrafts({});
         return;
       }
 
@@ -469,6 +530,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
         setDigests([]);
         setDigestRuns([]);
         setAnalyticsOverview(null);
+        setOfferDrafts({});
         return;
       }
 
@@ -677,6 +739,67 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
     );
     setReplyDrafts((current) => ({ ...current, [applicationId]: '' }));
     setMessage(clientMessages.messages.replySent);
+    await loadConsole(tokens);
+  }
+
+  function getOfferDraft(applicationId: string, offer: MarketplaceOffer) {
+    const draft = offerDrafts[applicationId];
+    if (draft) {
+      return draft;
+    }
+    return {
+      ...createEmptyOfferDraft(),
+      message: formatOfferMessage(offer),
+      proposedRate: offer.proposedRate ?? '',
+      milestones: serializeOfferMilestones(offer.milestones),
+      declineReason: offer.declineReason ?? '',
+    };
+  }
+
+  function updateOfferDraft(
+    applicationId: string,
+    updater: (draft: OfferDraft) => OfferDraft,
+  ) {
+    setOfferDrafts((current) => ({
+      ...current,
+      [applicationId]: updater(current[applicationId] ?? createEmptyOfferDraft()),
+    }));
+  }
+
+  async function handleRespondToOffer(
+    applicationId: string,
+    offerId: string,
+    action: 'accept' | 'counter' | 'decline',
+  ) {
+    if (!tokens) {
+      return;
+    }
+    const draft = offerDrafts[applicationId] ?? createEmptyOfferDraft();
+    await webApi.respondToMarketplaceOffer(
+      offerId,
+      {
+        action,
+        message: draft.message || null,
+        proposedRate: draft.proposedRate || null,
+        milestones:
+          action === 'counter' && draft.milestones.trim()
+            ? parseOfferMilestones(draft.milestones)
+            : undefined,
+        declineReason: draft.declineReason || null,
+      },
+      tokens.accessToken,
+    );
+    setOfferDrafts((current) => ({
+      ...current,
+      [applicationId]: createEmptyOfferDraft(),
+    }));
+    setMessage(
+      action === 'accept'
+        ? workspaceMessages.messages.offerAccepted
+        : action === 'counter'
+          ? workspaceMessages.messages.offerCountered
+          : workspaceMessages.messages.offerDeclined,
+    );
     await loadConsole(tokens);
   }
 
@@ -917,7 +1040,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                       />
                       <FactItem
                         label={clientMessages.summary.offers}
-                        value={offerRows.length}
+                        value={activeOfferRows.length}
                       />
                       <FactItem
                         label={workspaceMessages.pipelineStats.activeContracts}
@@ -1577,44 +1700,192 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                   {offerRows.length === 0 ? (
                     <p className={styles.stateText}>{clientMessages.offers.empty}</p>
                   ) : (
-                    offerRows.map(({ timeline, latestOffer, draft }) => (
-                      <SharedCard
-                        key={latestOffer.id}
-                        className={styles.actionPanel}
-                        interactive
-                      >
-                        <div className={styles.stack}>
-                          <strong>{timeline.application.applicant.displayName}</strong>
-                          <p className={styles.stateText}>
-                            {timeline.application.opportunity.title} •{' '}
-                            {latestOffer.status}
-                          </p>
-                          <p className={styles.stateText}>
-                            {clientMessages.offers.milestones(latestOffer.milestones.length)}
-                          </p>
-                          <p className={styles.stateText}>
-                            {clientMessages.offers.contractDraftStatus}:{' '}
-                            {draft ? draft.status : clientMessages.offers.noDraft}
-                          </p>
-                          <div className={styles.inlineActions}>
-                            <Link
-                              className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                              href="/app/marketplace/client/applicants"
-                            >
-                              {clientMessages.actions.openApplicants}
-                            </Link>
-                            {draft?.convertedJobId ? (
+                    offerRows.map(({ timeline, latestOffer, draft, hasActiveNegotiation }) => {
+                      const offerDraft = getOfferDraft(timeline.application.id, latestOffer);
+                      return (
+                        <SharedCard
+                          key={latestOffer.id}
+                          className={styles.actionPanel}
+                          interactive
+                        >
+                          <div className={styles.stack}>
+                            <strong>{timeline.application.applicant.displayName}</strong>
+                            <p className={styles.stateText}>
+                              {timeline.application.opportunity.title} •{' '}
+                              {latestOffer.status}
+                            </p>
+                            <p className={styles.stateText}>
+                              {clientMessages.offers.milestones(latestOffer.milestones.length)}
+                            </p>
+                            <p className={styles.stateText}>
+                              {workspaceMessages.proposalTimeline}:{' '}
+                              {timeline.offers.length}
+                            </p>
+                            <p className={styles.stateText}>
+                              {clientMessages.offers.contractDraftStatus}:{' '}
+                              {draft ? draft.status : clientMessages.offers.noDraft}
+                            </p>
+                            <div className={styles.stack}>
+                              <span className={styles.metaLabel}>
+                                {workspaceMessages.latestOffer}
+                              </span>
+                              {timeline.offers.map((offer) => {
+                                const offerIsActive = hasActiveNegotiation
+                                  && offer.id === latestOffer.id;
+                                return (
+                                  <div key={offer.id} className={styles.walletCard}>
+                                    <p className={styles.stateText}>
+                                      #{offer.revisionNumber} • {offer.status} •{' '}
+                                      {new Date(offer.updatedAt).toLocaleString()}
+                                    </p>
+                                    <p className={styles.stateText}>
+                                      {offer.message ?? offer.counterMessage ?? workspaceMessages.none}
+                                    </p>
+                                    <p className={styles.stateText}>
+                                      {workspaceMessages.offerRate}:{' '}
+                                      {offer.proposedRate || workspaceMessages.none}
+                                    </p>
+                                    <p className={styles.stateText}>
+                                      {workspaceMessages.offerMilestones}:{' '}
+                                      {offer.milestones
+                                        .map((entry) => entry.title || 'Untitled milestone')
+                                        .join(' • ') || workspaceMessages.none}
+                                    </p>
+                                    {offer.declineReason ? (
+                                      <p className={styles.stateText}>
+                                        {workspaceMessages.declineReason}:{' '}
+                                        {offer.declineReason}
+                                      </p>
+                                    ) : null}
+                                    {offerIsActive ? (
+                                      <div className={styles.stack}>
+                                        <label className={styles.field}>
+                                          <span>{workspaceMessages.offerMessage}</span>
+                                          <textarea
+                                            rows={2}
+                                            value={offerDraft.message}
+                                            onChange={(event) =>
+                                              updateOfferDraft(timeline.application.id, (current) => ({
+                                                ...current,
+                                                message: event.target.value,
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                        <label className={styles.field}>
+                                          <span>{workspaceMessages.offerRate}</span>
+                                          <input
+                                            value={offerDraft.proposedRate}
+                                            onChange={(event) =>
+                                              updateOfferDraft(
+                                                timeline.application.id,
+                                                (current) => ({
+                                                  ...current,
+                                                  proposedRate: event.target.value,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <label className={styles.field}>
+                                          <span>{workspaceMessages.offerMilestones}</span>
+                                          <textarea
+                                            rows={3}
+                                            placeholder={workspaceMessages.offerMilestonePlaceholder}
+                                            value={offerDraft.milestones}
+                                            onChange={(event) =>
+                                              updateOfferDraft(
+                                                timeline.application.id,
+                                                (current) => ({
+                                                  ...current,
+                                                  milestones: event.target.value,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <label className={styles.field}>
+                                          <span>{workspaceMessages.declineReason}</span>
+                                          <input
+                                            value={offerDraft.declineReason}
+                                            onChange={(event) =>
+                                              updateOfferDraft(
+                                                timeline.application.id,
+                                                (current) => ({
+                                                  ...current,
+                                                  declineReason: event.target.value,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <div className={styles.inlineActions}>
+                                          <button
+                                            type="button"
+                                            disabled={!canReviewApplications}
+                                            onClick={() =>
+                                              void handleRespondToOffer(
+                                                timeline.application.id,
+                                                offer.id,
+                                                'accept',
+                                              )
+                                            }
+                                          >
+                                            {workspaceMessages.respondAccept}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={!canReviewApplications}
+                                            onClick={() =>
+                                              void handleRespondToOffer(
+                                                timeline.application.id,
+                                                offer.id,
+                                                'counter',
+                                              )
+                                            }
+                                          >
+                                            {workspaceMessages.respondCounter}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={!canReviewApplications}
+                                            onClick={() =>
+                                              void handleRespondToOffer(
+                                                timeline.application.id,
+                                                offer.id,
+                                                'decline',
+                                              )
+                                            }
+                                          >
+                                            {workspaceMessages.respondDecline}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className={styles.inlineActions}>
                               <Link
                                 className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                                href={`/app/contracts/${draft.convertedJobId}`}
+                                href="/app/marketplace/client/applicants"
                               >
-                                {clientMessages.actions.openContract}
+                                {clientMessages.actions.openApplicants}
                               </Link>
-                            ) : null}
+                              {draft?.convertedJobId ? (
+                                <Link
+                                  className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                                  href={`/app/contracts/${draft.convertedJobId}`}
+                                >
+                                  {clientMessages.actions.openContract}
+                                </Link>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </SharedCard>
-                    ))
+                        </SharedCard>
+                      );
+                    })
                   )}
                 </SectionCard>
               </RevealSection>

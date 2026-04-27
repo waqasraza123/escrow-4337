@@ -3,6 +3,23 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Client Console Offer Negotiation)
+- Started from a tree with no unrelated local edits beyond this feature branch.
+- Implemented the next production-grade Upwork-like client-side offer workflow in
+  `apps/web/src/app/marketplace/client-console.tsx`:
+  - loaded offer timelines now expose negotiation history for each active application
+  - clients can accept, counter, or decline offer revisions directly from the offers console
+  - offers section now includes per-offer message, rate, milestones, and decline reason panels
+  - counter/decline responses use draft-backed controls and serialize milestone drafts to
+    the API response contract
+  - dashboard offer counts now focus on active negotiations (`sent` / `countered`)
+- Verification:
+  - real tests/builds intentionally not run by request
+  - `git diff --check` passed
+  - `git push --no-verify` pending
+- Changed files:
+  `apps/web/src/app/marketplace/client-console.tsx`
+
 ## Update (2026-04-27, Mobile Recovery Evidence Audit Decision Summary)
 - Started from a clean `dev` tree aligned with `origin/dev`; `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next production-grade mobile recovery evidence slice without intentional tests/builds:
