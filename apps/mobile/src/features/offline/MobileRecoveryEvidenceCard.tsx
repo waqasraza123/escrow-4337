@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Alert, Share } from 'react-native';
-import { formatTimestamp } from '@escrow4334/product-core';
+import { Alert, Share, StyleSheet, Text, View } from 'react-native';
+import { formatTimestamp, type ProductStatusTone } from '@escrow4334/product-core';
 import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
+import { useMobileTheme } from '@/providers/theme';
 import {
   BodyText,
   Heading,
   MetricRow,
+  PrimaryButton,
   SecondaryButton,
   SegmentedControl,
   StatusBadge,
   SurfaceCard,
+  useAdaptiveMetrics,
 } from '@/ui/primitives';
 import {
   buildMobileRecoveryEvidenceBundle,
@@ -18,6 +21,7 @@ import {
   clearMobileRecoveryEvidence,
   listMobileRecoveryEvidence,
   mobileRecoveryEvidenceMaxEntries,
+  mobileRecoveryEvidenceScenarios,
   readMobileRecoveryEvidenceReport,
   saveMobileRecoveryEvidenceReport,
   summarizeMobileRecoveryEvidenceCoverage,
@@ -68,6 +72,20 @@ function formatCheckCounts(summary: MobileRecoveryEvidenceSummary | null) {
   return `${pass} pass / ${warn} warn / ${fail} fail`;
 }
 
+function formatCoverageSummary({
+  coverage,
+  historyLoading,
+}: {
+  coverage: ReturnType<typeof summarizeMobileRecoveryEvidenceCoverage>;
+  historyLoading: boolean;
+}) {
+  if (historyLoading) {
+    return 'Checking';
+  }
+
+  return `${coverage.completeScenarioCount}/${coverage.totalScenarioCount}`;
+}
+
 function formatScenarioCoverage(
   scenario: MobileRecoveryEvidenceScenario,
   coverage: ReturnType<typeof summarizeMobileRecoveryEvidenceCoverage>,
@@ -106,6 +124,27 @@ function formatBundleReadiness({
   return `${missingScenarioCount} scenario${missingScenarioCount === 1 ? '' : 's'} missing`;
 }
 
+function getScenarioTone(
+  scenario: MobileRecoveryEvidenceScenario,
+  coverage: ReturnType<typeof summarizeMobileRecoveryEvidenceCoverage>,
+): ProductStatusTone {
+  const scenarioCoverage = coverage.scenarios[scenario];
+
+  if (!scenarioCoverage.reportCount) {
+    return 'muted';
+  }
+
+  if (scenarioCoverage.latestOutcome === 'failed') {
+    return 'danger';
+  }
+
+  if (scenarioCoverage.hasPassedReport || scenarioCoverage.latestOutcome === 'passed') {
+    return 'success';
+  }
+
+  return 'info';
+}
+
 export function MobileRecoveryEvidenceCard({
   delay = 60,
   snapshotSummary,
@@ -115,6 +154,8 @@ export function MobileRecoveryEvidenceCard({
   snapshotSummary: OfflineSnapshotSummary | null;
   snapshotSummaryLoading: boolean;
 }) {
+  const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
   const network = useMobileNetwork();
   const session = useSession();
   const [sharing, setSharing] = useState(false);
@@ -283,109 +324,164 @@ export function MobileRecoveryEvidenceCard({
 
   const latestReport = history[0] ?? null;
   const coverage = summarizeMobileRecoveryEvidenceCoverage(history);
+  const coveragePercent = historyLoading
+    ? 0
+    : Math.round((coverage.completeScenarioCount / coverage.totalScenarioCount) * 100);
+  const coverageWidth = `${coveragePercent}%` as `${number}%`;
+  const readinessTone: ProductStatusTone = coverage.allScenariosObserved ? 'success' : 'warning';
+  const snapshotValue = snapshotSummaryLoading
+    ? 'Checking'
+    : `${snapshotSummary?.totalCount ?? 0} saved`;
+  const apiPosture =
+    network.apiReachability.status === 'reachable' && network.apiReachability.latencyMs !== null
+      ? `${network.apiReachability.latencyMs}ms`
+      : network.apiReachability.status;
 
   return (
-    <SurfaceCard animated delay={delay}>
-      <Heading size="section">Recovery evidence</Heading>
-      <StatusBadge
-        label={restoredFromSnapshot ? 'Cached session active' : 'Live session posture'}
-        tone={restoredFromSnapshot ? 'warning' : 'success'}
-      />
-      <BodyText>
-        Share a sanitized JSON report during real-device recovery checks. It captures network, API,
-        cached-session, wallet-count, workspace-kind, capability, and offline snapshot posture
-        without tokens, email addresses, user ids, wallet addresses, labels, or URL credentials.
-      </BodyText>
-      <MetricRow label="Evidence scenario" value={evidenceScenarioLabels[scenario]} />
-      <SegmentedControl
-        value={scenario}
-        onChange={setScenario}
-        options={evidenceScenarioOptions}
-      />
-      <MetricRow label="Evidence outcome" value={evidenceOutcomeLabels[outcome]} />
-      <SegmentedControl
-        value={outcome}
-        onChange={setOutcome}
-        options={evidenceOutcomeOptions}
-      />
-      <MetricRow label="Signed in" value={signedIn ? 'Yes' : 'No'} />
-      <MetricRow
-        label="Profile snapshot"
-        value={
-          session.profileSnapshotCachedAt
-            ? formatTimestamp(session.profileSnapshotCachedAt)
-            : 'None loaded'
-        }
-      />
-      <MetricRow
-        label="API posture"
-        value={
-          network.apiReachability.status === 'reachable' &&
-          network.apiReachability.latencyMs !== null
-            ? `Reachable in ${network.apiReachability.latencyMs}ms`
-            : network.apiReachability.status
-        }
-      />
-      <MetricRow
-        label="Snapshot inventory"
-        value={
-          snapshotSummaryLoading
-            ? 'Checking'
-            : `${snapshotSummary?.totalCount ?? 0} saved`
-        }
-      />
-      <MetricRow
-        label="Saved reports"
-        value={historyLoading ? 'Checking' : `${history.length}/${mobileRecoveryEvidenceMaxEntries}`}
-      />
-      <MetricRow
-        label="Scenario coverage"
-        value={
-          historyLoading
-            ? 'Checking'
-            : `${coverage.completeScenarioCount}/${coverage.totalScenarioCount} captured`
-        }
-      />
-      <MetricRow
-        label="Bundle readiness"
-        value={formatBundleReadiness({ coverage, historyLoading })}
-      />
-      <MetricRow
-        label="Passing scenarios"
-        value={
-          historyLoading
-            ? 'Checking'
-            : `${coverage.passingScenarioCount}/${coverage.totalScenarioCount}`
-        }
-      />
-      <MetricRow
-        label="Failing scenarios"
-        value={
-          historyLoading
-            ? 'Checking'
-            : `${coverage.failingScenarioCount}/${coverage.totalScenarioCount}`
-        }
-      />
-      <MetricRow label="Offline evidence" value={formatScenarioCoverage('offline_start', coverage)} />
-      <MetricRow label="API evidence" value={formatScenarioCoverage('api_recovery', coverage)} />
-      <MetricRow label="Wallet evidence" value={formatScenarioCoverage('wallet_return', coverage)} />
-      <MetricRow label="Room evidence" value={formatScenarioCoverage('project_room', coverage)} />
-      <MetricRow
-        label="Latest report"
-        value={
-          latestReport
-            ? `${evidenceScenarioLabels[latestReport.scenario]} / ${
-                evidenceOutcomeLabels[latestReport.outcome]
-              } / ${formatTimestamp(Date.parse(latestReport.capturedAt))}`
-            : 'None'
-        }
-      />
-      <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
-      <SecondaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
+    <SurfaceCard animated delay={delay} variant="elevated" style={styles.card}>
+      <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Heading size="section">Recovery evidence</Heading>
+          <BodyText style={styles.headerBody}>
+            Manual recovery proof stays local, sanitized, and ready for external review.
+          </BodyText>
+        </View>
+        <StatusBadge
+          label={restoredFromSnapshot ? 'Cached' : 'Live'}
+          tone={restoredFromSnapshot ? 'warning' : 'success'}
+        />
+      </View>
+
+      <View
+        style={[
+          styles.readinessPanel,
+          {
+            backgroundColor: theme.status[readinessTone].background,
+            borderColor: theme.status[readinessTone].border,
+            borderRadius: theme.radii.md,
+          },
+        ]}
+      >
+        <View style={styles.readinessHeader}>
+          <View style={styles.readinessCopy}>
+            <Text style={[styles.readinessLabel, { color: theme.status[readinessTone].foreground }]}>
+              Bundle readiness
+            </Text>
+            <Text style={[styles.readinessValue, { color: theme.colors.foreground }]}>
+              {formatBundleReadiness({ coverage, historyLoading })}
+            </Text>
+          </View>
+          <Text style={[styles.coverageCounter, { color: theme.colors.foreground }]}>
+            {formatCoverageSummary({ coverage, historyLoading })}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.progressTrack,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.pill,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: theme.status[readinessTone].foreground,
+                borderRadius: theme.radii.pill,
+                width: coverageWidth,
+              },
+            ]}
+          />
+        </View>
+        <View style={styles.statGrid}>
+          <EvidenceStat label="Saved" value={`${history.length}/${mobileRecoveryEvidenceMaxEntries}`} />
+          <EvidenceStat label="Pass" value={`${coverage.passingScenarioCount}`} />
+          <EvidenceStat label="Fail" value={`${coverage.failingScenarioCount}`} />
+        </View>
+      </View>
+
+      <View style={styles.captureStack}>
+        <View style={styles.captureHeader}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.foregroundMuted }]}>
+            Capture context
+          </Text>
+          <Text style={[styles.selectedContext, { color: theme.colors.foreground }]}>
+            {evidenceScenarioLabels[scenario]} / {evidenceOutcomeLabels[outcome]}
+          </Text>
+        </View>
+        <SegmentedControl
+          value={scenario}
+          onChange={setScenario}
+          options={evidenceScenarioOptions}
+        />
+        <SegmentedControl
+          value={outcome}
+          onChange={setOutcome}
+          options={evidenceOutcomeOptions}
+        />
+      </View>
+
+      <View style={styles.pillWrap}>
+        <EvidenceStatusPill label="Session" value={signedIn ? 'Signed in' : 'Signed out'} />
+        <EvidenceStatusPill label="API" value={apiPosture} />
+        <EvidenceStatusPill label="Snapshots" value={snapshotValue} />
+        <EvidenceStatusPill
+          label="Profile"
+          value={
+            session.profileSnapshotCachedAt
+              ? formatTimestamp(session.profileSnapshotCachedAt)
+              : 'None'
+          }
+        />
+      </View>
+
+      <View style={styles.scenarioStack}>
+        <Text style={[styles.sectionLabel, { color: theme.colors.foregroundMuted }]}>
+          Scenario evidence
+        </Text>
+        <View style={styles.scenarioGrid}>
+          {mobileRecoveryEvidenceScenarios.map((scenarioKey) => (
+            <ScenarioPill
+              key={scenarioKey}
+              label={evidenceScenarioLabels[scenarioKey]}
+              tone={getScenarioTone(scenarioKey, coverage)}
+              value={formatScenarioCoverage(scenarioKey, coverage)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.latestPanel,
+          {
+            backgroundColor: theme.colors.surfaceSoft,
+            borderColor: theme.colors.border,
+            borderRadius: theme.radii.md,
+          },
+        ]}
+      >
+        <MetricRow
+          label="Latest report"
+          value={
+            latestReport
+              ? `${evidenceScenarioLabels[latestReport.scenario]} / ${
+                  evidenceOutcomeLabels[latestReport.outcome]
+                } / ${formatTimestamp(Date.parse(latestReport.capturedAt))}`
+              : 'None'
+          }
+        />
+        <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
+      </View>
+
+      <PrimaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
         {sharing ? 'Preparing evidence' : 'Save and share evidence'}
-      </SecondaryButton>
+      </PrimaryButton>
       {history.length ? (
-        <>
+        <View style={[styles.secondaryActions, { gap: metrics.compact ? 8 : 10 }]}>
           <SecondaryButton
             disabled={sharing || sharingBundle || sharingSaved || clearing}
             onPress={() => void handleShareCoverageBundle()}
@@ -404,8 +500,221 @@ export function MobileRecoveryEvidenceCard({
           >
             {clearing ? 'Clearing evidence' : 'Clear saved evidence'}
           </SecondaryButton>
-        </>
+        </View>
       ) : null}
     </SurfaceCard>
   );
 }
+
+function EvidenceStat({ label, value }: { label: string; value: string }) {
+  const theme = useMobileTheme();
+
+  return (
+    <View style={styles.statItem}>
+      <Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
+    </View>
+  );
+}
+
+function EvidenceStatusPill({ label, value }: { label: string; value: string }) {
+  const theme = useMobileTheme();
+
+  return (
+    <View
+      style={[
+        styles.statusPill,
+        {
+          backgroundColor: theme.colors.surfaceSoft,
+          borderColor: theme.colors.border,
+          borderRadius: theme.radii.md,
+        },
+      ]}
+    >
+      <Text style={[styles.statusPillLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
+      <Text style={[styles.statusPillValue, { color: theme.colors.foreground }]}>{value}</Text>
+    </View>
+  );
+}
+
+function ScenarioPill({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: ProductStatusTone;
+  value: string;
+}) {
+  const theme = useMobileTheme();
+  const status = theme.status[tone];
+
+  return (
+    <View
+      style={[
+        styles.scenarioPill,
+        {
+          backgroundColor: status.background,
+          borderColor: status.border,
+          borderRadius: theme.radii.md,
+        },
+      ]}
+    >
+      <Text style={[styles.scenarioLabel, { color: status.foreground }]}>{label}</Text>
+      <Text style={[styles.scenarioValue, { color: theme.colors.foreground }]}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    gap: 14,
+  },
+  header: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  headerCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  headerBody: {
+    maxWidth: 440,
+  },
+  readinessPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    padding: 14,
+  },
+  readinessHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  readinessCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  readinessLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  readinessValue: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  coverageCounter: {
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  progressTrack: {
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 10,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+  },
+  statGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statItem: {
+    flex: 1,
+    gap: 2,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  captureStack: {
+    gap: 9,
+  },
+  captureHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+  },
+  selectedContext: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  pillWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusPill: {
+    borderWidth: StyleSheet.hairlineWidth,
+    flexBasis: '48%',
+    flexGrow: 1,
+    gap: 3,
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  statusPillLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  statusPillValue: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  scenarioStack: {
+    gap: 9,
+  },
+  scenarioGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  scenarioPill: {
+    borderWidth: StyleSheet.hairlineWidth,
+    flexBasis: '48%',
+    flexGrow: 1,
+    gap: 3,
+    minHeight: 62,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  scenarioLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  scenarioValue: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  latestPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    padding: 12,
+  },
+  secondaryActions: {
+    width: '100%',
+  },
+});

@@ -44,7 +44,7 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/offline/mobileRecoveryEvidence.ts` owns the mobile recovery evidence report contract. It assembles sanitized JSON reports from controlled evidence context, scenario-specific posture checks, network/API posture, cached-session state, wallet and workspace counts, capability booleans, and offline snapshot inventory, stores recent reports in AsyncStorage, summarizes scenario coverage across the local ledger, builds a coverage bundle from the latest readable exact saved report for each scenario, includes explicit bundle readiness metadata, supports reading a saved report by id for exact re-share, and enforces bounded local retention. Reports intentionally exclude access tokens, refresh tokens, email addresses, user ids, workspace labels, organization names, wallet addresses, free-form reviewer notes, and URL credentials or query strings.
 
-`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It captures controlled scenario and outcome values, creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays saved-report count, scenario coverage, bundle readiness, per-scenario latest status, newest report timestamp, and newest pass/warn/fail check counts, supports sharing a scenario coverage bundle, supports re-sharing the latest saved report without regenerating it, and exposes a clear control for the local evidence ledger.
+`apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx` is the manual evidence boundary for real-device checks. It captures controlled scenario and outcome values, creates one sanitized report per share action, saves it locally before invoking the native share sheet, displays a compact readiness/progress panel, saved-report count, scenario coverage, bundle readiness, per-scenario latest status pills, newest report timestamp, and newest pass/warn/fail check counts, supports sharing a scenario coverage bundle, supports re-sharing the latest saved report without regenerating it, and exposes a clear control for the local evidence ledger.
 
 ## UI Surface
 
@@ -194,7 +194,7 @@ Evidence report retention rules:
 - the app retains the newest 12 reports
 - reports expire after 30 days
 - malformed report envelopes are pruned by the same retention pass
-- Account displays saved-report count, total scenario coverage, bundle readiness, passing/failing scenario counts, per-scenario latest outcome, newest report scenario, newest report outcome, newest report timestamp, and newest check counts
+- Account displays a readiness/progress panel, saved-report count, total scenario coverage, bundle readiness, passing/failing scenario counts, compact session/API/snapshot/profile posture pills, per-scenario latest outcome pills, newest report scenario, newest report outcome, newest report timestamp, and newest check counts
 - Account can share a coverage bundle containing the current coverage summary, explicit readiness metadata, and the latest readable exact saved report for each scenario that has one
 - Account can re-share the latest saved report by id without generating a new report or mutating the existing evidence
 - Account exposes a "Clear saved evidence" action that removes only the recovery evidence namespace

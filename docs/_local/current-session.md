@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence UI Polish)
+- Implemented a focused Account recovery evidence UI/UX polish without intentional tests/builds:
+  - promoted the primary save/share action to a true primary button
+  - replaced the dense metric stack with a compact readiness/progress panel
+  - added saved/pass/fail counters beside the bundle readiness progress bar
+  - grouped scenario/outcome selection under one capture-context header
+  - replaced operational posture rows with compact session/API/snapshot/profile pills
+  - replaced per-scenario rows with status-colored scenario evidence pills
+  - kept exact report/bundle behavior unchanged
+  - documented the updated evidence-card interaction shape in Mobile Offline Recovery V1
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+
 ## Update (2026-04-27, Mobile Recovery Evidence Bundle Readiness)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
