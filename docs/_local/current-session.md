@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Partial Bundle Guard)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
+- Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:
+  - added an explicit partial-bundle confirmation before the native share sheet opens
+  - confirmation lists missing scenarios and unreadable scenarios by reviewer-facing name
+  - canceling a partial bundle keeps the evidence local and refreshes history when unreadable reports were detected
+  - ready bundles still share directly
+  - documented partial-export confirmation semantics in Mobile Offline Recovery V1 and durable project state
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+
 ## Update (2026-04-27, Mobile Recovery Evidence Scenario Guides)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

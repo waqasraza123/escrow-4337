@@ -146,6 +146,55 @@ function getScenarioTone(
   return 'info';
 }
 
+function formatScenarioNames(scenarios: MobileRecoveryEvidenceScenario[]) {
+  return scenarios.length
+    ? scenarios.map((scenario) => evidenceScenarioLabels[scenario]).join(', ')
+    : 'None';
+}
+
+function confirmPartialEvidenceBundleShare({
+  missingScenarios,
+  unreadableScenarios,
+}: {
+  missingScenarios: MobileRecoveryEvidenceScenario[];
+  unreadableScenarios: MobileRecoveryEvidenceScenario[];
+}) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    Alert.alert(
+      'Share partial evidence bundle?',
+      [
+        'This bundle is not ready yet.',
+        `Missing: ${formatScenarioNames(missingScenarios)}`,
+        `Unreadable: ${formatScenarioNames(unreadableScenarios)}`,
+        'Share only if you intentionally want a partial manual evidence artifact.',
+      ].join('\n\n'),
+      [
+        {
+          onPress: () => settle(false),
+          style: 'cancel',
+          text: 'Cancel',
+        },
+        {
+          onPress: () => settle(true),
+          text: 'Share partial',
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => settle(false),
+      },
+    );
+  });
+}
+
 export function MobileRecoveryEvidenceCard({
   delay = 60,
   snapshotSummary,
@@ -278,6 +327,20 @@ export function MobileRecoveryEvidenceCard({
           'Saved recovery evidence reports could not be read. They may have expired or been cleared.',
         );
         return;
+      }
+
+      if (!bundle.readiness.ready) {
+        const shouldSharePartialBundle = await confirmPartialEvidenceBundleShare({
+          missingScenarios: bundle.readiness.missingScenarios,
+          unreadableScenarios: bundle.readiness.unreadableScenarios,
+        });
+
+        if (!shouldSharePartialBundle) {
+          if (bundle.readiness.unreadableScenarios.length) {
+            await refreshHistory();
+          }
+          return;
+        }
       }
 
       await Share.share({
