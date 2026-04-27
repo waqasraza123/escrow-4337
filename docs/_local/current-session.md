@@ -3,6 +3,20 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Recovery Evidence Professional Motion Polish)
+- Polished the Account recovery evidence card with professional motion and smoother state changes:
+  - added animated bundle-readiness progress fill with a subtle sheen
+  - staged capture context, posture pills, scenario pills, and latest-evidence panel entrance motion
+  - added tone-aware stat dots, posture accents, scenario status signals, and a readiness stripe for clearer scanning
+  - kept evidence generation, storage, bundle sharing, latest-report re-share, and clearing behavior unchanged
+  - documented the animated evidence-card presentation in Mobile Offline Recovery V1
+- Changed files:
+  `apps/mobile/src/features/offline/MobileRecoveryEvidenceCard.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,_local/current-session.md}`
+- Verification:
+  - `pnpm --filter mobile typecheck` passed
+  - `git diff --check` passed
+
 ## Update (2026-04-27, Mobile Recovery Evidence Export Audit)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no uncommitted work to commit. `git push --no-verify origin dev` completed with `Everything up-to-date`.
 - Implemented the next mobile offline-recovery evidence slice without intentional tests/builds:

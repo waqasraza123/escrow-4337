@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Alert, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Easing, Share, StyleSheet, Text, View } from 'react-native';
 import { formatTimestamp, type ProductStatusTone } from '@escrow4334/product-core';
 import { useMobileNetwork } from '@/providers/network';
 import { useSession } from '@/providers/session';
 import { useMobileTheme } from '@/providers/theme';
 import {
+  AnimatedEntrance,
   BodyText,
   Heading,
   MetricRow,
@@ -15,6 +16,7 @@ import {
   SurfaceCard,
   useAdaptiveMetrics,
 } from '@/ui/primitives';
+import { mobileMotion, useReducedMotion } from '@/ui/motion';
 import {
   appendMobileRecoveryEvidenceAuditEvent,
   buildMobileRecoveryEvidenceCapturePlan,
@@ -470,7 +472,6 @@ export function MobileRecoveryEvidenceCard({
   const coveragePercent = historyLoading
     ? 0
     : Math.round((coverage.completeScenarioCount / coverage.totalScenarioCount) * 100);
-  const coverageWidth = `${coveragePercent}%` as `${number}%`;
   const readinessTone: ProductStatusTone = coverage.allScenariosObserved ? 'success' : 'warning';
   const snapshotValue = snapshotSummaryLoading
     ? 'Checking'
@@ -515,6 +516,7 @@ export function MobileRecoveryEvidenceCard({
             backgroundColor: theme.status[readinessTone].background,
             borderColor: theme.status[readinessTone].border,
             borderRadius: theme.radii.md,
+            shadowColor: theme.status[readinessTone].foreground,
           },
         ]}
       >
@@ -531,6 +533,14 @@ export function MobileRecoveryEvidenceCard({
             {formatCoverageSummary({ coverage, historyLoading })}
           </Text>
         </View>
+        <View style={styles.readinessRail}>
+          <Text style={[styles.readinessRailLabel, { color: theme.colors.foregroundMuted }]}>
+            Captured
+          </Text>
+          <Text style={[styles.readinessRailLabel, { color: theme.colors.foregroundMuted }]}>
+            Required
+          </Text>
+        </View>
         <View
           style={[
             styles.progressTrack,
@@ -541,23 +551,34 @@ export function MobileRecoveryEvidenceCard({
             },
           ]}
         >
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: theme.status[readinessTone].foreground,
-                borderRadius: theme.radii.pill,
-                width: coverageWidth,
-              },
-            ]}
+          <AnimatedProgressFill
+            color={theme.status[readinessTone].foreground}
+            percent={coveragePercent}
+            radius={theme.radii.pill}
           />
         </View>
         <View style={styles.statGrid}>
-          <EvidenceStat label="Saved" value={`${history.length}/${mobileRecoveryEvidenceMaxEntries}`} />
-          <EvidenceStat label="Pass" value={`${coverage.passingScenarioCount}`} />
-          <EvidenceStat label="Fail" value={`${coverage.failingScenarioCount}`} />
           <EvidenceStat
+            delay={delay + 90}
+            label="Saved"
+            value={`${history.length}/${mobileRecoveryEvidenceMaxEntries}`}
+          />
+          <EvidenceStat
+            delay={delay + 130}
+            label="Pass"
+            tone="success"
+            value={`${coverage.passingScenarioCount}`}
+          />
+          <EvidenceStat
+            delay={delay + 170}
+            label="Fail"
+            tone={coverage.failingScenarioCount ? 'danger' : 'muted'}
+            value={`${coverage.failingScenarioCount}`}
+          />
+          <EvidenceStat
+            delay={delay + 210}
             label="Audit"
+            tone="info"
             value={`${auditEvents.length}/${mobileRecoveryEvidenceAuditMaxEntries}`}
           />
         </View>
@@ -571,6 +592,15 @@ export function MobileRecoveryEvidenceCard({
             },
           ]}
         >
+          <View
+            style={[
+              styles.capturePlanStripe,
+              {
+                backgroundColor: theme.status[readinessTone].foreground,
+                borderRadius: theme.radii.pill,
+              },
+            ]}
+          />
           <View style={styles.capturePlanCopy}>
             <Text style={[styles.capturePlanLabel, { color: theme.colors.foregroundMuted }]}>
               Next capture
@@ -601,7 +631,7 @@ export function MobileRecoveryEvidenceCard({
         </View>
       </View>
 
-      <View style={styles.captureStack}>
+      <AnimatedEntrance delay={delay + 110} distance={6} style={styles.captureStack}>
         <View style={styles.captureHeader}>
           <Text style={[styles.sectionLabel, { color: theme.colors.foregroundMuted }]}>
             Capture context
@@ -620,14 +650,26 @@ export function MobileRecoveryEvidenceCard({
           onChange={setOutcome}
           options={evidenceOutcomeOptions}
         />
-      </View>
+      </AnimatedEntrance>
 
       <View style={styles.pillWrap}>
-        <EvidenceStatusPill label="Session" value={signedIn ? 'Signed in' : 'Signed out'} />
-        <EvidenceStatusPill label="API" value={apiPosture} />
-        <EvidenceStatusPill label="Snapshots" value={snapshotValue} />
         <EvidenceStatusPill
+          delay={delay + 160}
+          label="Session"
+          tone={signedIn ? 'success' : 'warning'}
+          value={signedIn ? 'Signed in' : 'Signed out'}
+        />
+        <EvidenceStatusPill delay={delay + 190} label="API" tone="info" value={apiPosture} />
+        <EvidenceStatusPill
+          delay={delay + 220}
+          label="Snapshots"
+          tone={(snapshotSummary?.totalCount ?? 0) > 0 ? 'success' : 'muted'}
+          value={snapshotValue}
+        />
+        <EvidenceStatusPill
+          delay={delay + 250}
           label="Profile"
+          tone={session.profileSnapshotCachedAt ? 'success' : 'muted'}
           value={
             session.profileSnapshotCachedAt
               ? formatTimestamp(session.profileSnapshotCachedAt)
@@ -636,54 +678,57 @@ export function MobileRecoveryEvidenceCard({
         />
       </View>
 
-      <View style={styles.scenarioStack}>
+      <AnimatedEntrance delay={delay + 210} distance={6} style={styles.scenarioStack}>
         <Text style={[styles.sectionLabel, { color: theme.colors.foregroundMuted }]}>
           Scenario evidence
         </Text>
         <View style={styles.scenarioGrid}>
-          {mobileRecoveryEvidenceScenarios.map((scenarioKey) => (
+          {mobileRecoveryEvidenceScenarios.map((scenarioKey, index) => (
             <ScenarioPill
               key={scenarioKey}
+              delay={delay + 260 + index * 38}
               label={evidenceScenarioLabels[scenarioKey]}
               tone={getScenarioTone(scenarioKey, coverage)}
               value={formatScenarioCoverage(scenarioKey, coverage)}
             />
           ))}
         </View>
-      </View>
+      </AnimatedEntrance>
 
-      <View
-        style={[
-          styles.latestPanel,
-          {
-            backgroundColor: theme.colors.surfaceSoft,
-            borderColor: theme.colors.border,
-            borderRadius: theme.radii.md,
-          },
-        ]}
-      >
-        <MetricRow
-          label="Latest report"
-          value={
-            latestReport
-              ? `${evidenceScenarioLabels[latestReport.scenario]} / ${
-                  evidenceOutcomeLabels[latestReport.outcome]
-                } / ${formatTimestamp(Date.parse(latestReport.capturedAt))}`
-              : 'None'
-          }
-        />
-        <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
-        <MetricRow
-          label="Latest audit"
-          value={
-            latestAuditEvent
-              ? `${formatAuditAction(latestAuditEvent.action)} / ${formatTimestamp(
-                  Date.parse(latestAuditEvent.recordedAt),
-                )}`
-              : 'None'
-          }
-        />
-      </View>
+      <AnimatedEntrance delay={delay + 320} distance={6}>
+        <View
+          style={[
+            styles.latestPanel,
+            {
+              backgroundColor: theme.colors.surfaceSoft,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.md,
+            },
+          ]}
+        >
+          <MetricRow
+            label="Latest report"
+            value={
+              latestReport
+                ? `${evidenceScenarioLabels[latestReport.scenario]} / ${
+                    evidenceOutcomeLabels[latestReport.outcome]
+                  } / ${formatTimestamp(Date.parse(latestReport.capturedAt))}`
+                : 'None'
+            }
+          />
+          <MetricRow label="Latest checks" value={formatCheckCounts(latestReport)} />
+          <MetricRow
+            label="Latest audit"
+            value={
+              latestAuditEvent
+                ? `${formatAuditAction(latestAuditEvent.action)} / ${formatTimestamp(
+                    Date.parse(latestAuditEvent.recordedAt),
+                  )}`
+                : 'None'
+            }
+          />
+        </View>
+      </AnimatedEntrance>
 
       <PrimaryButton disabled={!canShare} onPress={() => void handleShareEvidence()}>
         {sharing ? 'Preparing evidence' : 'Save and share evidence'}
@@ -714,42 +759,140 @@ export function MobileRecoveryEvidenceCard({
   );
 }
 
-function EvidenceStat({ label, value }: { label: string; value: string }) {
-  const theme = useMobileTheme();
+function AnimatedProgressFill({
+  color,
+  percent,
+  radius,
+}: {
+  color: string;
+  percent: number;
+  radius: number;
+}) {
+  const reducedMotion = useReducedMotion();
+  const progress = useRef(new Animated.Value(percent)).current;
 
-  return (
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
-    </View>
+  useEffect(() => {
+    if (reducedMotion) {
+      progress.setValue(percent);
+      return;
+    }
+
+    Animated.timing(progress, {
+      toValue: percent,
+      duration: mobileMotion.content + 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [percent, progress, reducedMotion]);
+
+  const animatedStyle = useMemo(
+    () => ({
+      width: progress.interpolate({
+        inputRange: [0, 100],
+        outputRange: ['0%', '100%'],
+      }),
+    }),
+    [progress],
   );
-}
-
-function EvidenceStatusPill({ label, value }: { label: string; value: string }) {
-  const theme = useMobileTheme();
 
   return (
-    <View
+    <Animated.View
       style={[
-        styles.statusPill,
+        styles.progressFill,
+        animatedStyle,
         {
-          backgroundColor: theme.colors.surfaceSoft,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radii.md,
+          backgroundColor: color,
+          borderRadius: radius,
         },
       ]}
     >
-      <Text style={[styles.statusPillLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
-      <Text style={[styles.statusPillValue, { color: theme.colors.foreground }]}>{value}</Text>
-    </View>
+      <View style={[styles.progressShine, { backgroundColor: 'rgba(255,255,255,0.32)' }]} />
+    </Animated.View>
+  );
+}
+
+function EvidenceStat({
+  delay = 0,
+  label,
+  tone = 'muted',
+  value,
+}: {
+  delay?: number;
+  label: string;
+  tone?: ProductStatusTone;
+  value: string;
+}) {
+  const theme = useMobileTheme();
+  const status = theme.status[tone];
+
+  return (
+    <AnimatedEntrance delay={delay} distance={5} style={styles.statItem}>
+      <View
+        style={[
+          styles.statDot,
+          {
+            backgroundColor: status.foreground,
+            borderRadius: theme.radii.pill,
+          },
+        ]}
+      />
+      <Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.colors.foregroundMuted }]}>{label}</Text>
+    </AnimatedEntrance>
+  );
+}
+
+function EvidenceStatusPill({
+  delay = 0,
+  label,
+  tone = 'muted',
+  value,
+}: {
+  delay?: number;
+  label: string;
+  tone?: ProductStatusTone;
+  value: string;
+}) {
+  const theme = useMobileTheme();
+  const status = theme.status[tone];
+
+  return (
+    <AnimatedEntrance delay={delay} distance={6} style={styles.statusPillMotion}>
+      <View
+        style={[
+          styles.statusPill,
+          {
+            backgroundColor: theme.colors.surfaceSoft,
+            borderColor: status.border,
+            borderRadius: theme.radii.md,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.pillAccent,
+            {
+              backgroundColor: status.foreground,
+              borderRadius: theme.radii.pill,
+            },
+          ]}
+        />
+        <Text style={[styles.statusPillLabel, { color: theme.colors.foregroundMuted }]}>
+          {label}
+        </Text>
+        <Text style={[styles.statusPillValue, { color: theme.colors.foreground }]}>{value}</Text>
+      </View>
+    </AnimatedEntrance>
   );
 }
 
 function ScenarioPill({
+  delay = 0,
   label,
   tone,
   value,
 }: {
+  delay?: number;
   label: string;
   tone: ProductStatusTone;
   value: string;
@@ -758,19 +901,32 @@ function ScenarioPill({
   const status = theme.status[tone];
 
   return (
-    <View
-      style={[
-        styles.scenarioPill,
-        {
-          backgroundColor: status.background,
-          borderColor: status.border,
-          borderRadius: theme.radii.md,
-        },
-      ]}
-    >
-      <Text style={[styles.scenarioLabel, { color: status.foreground }]}>{label}</Text>
-      <Text style={[styles.scenarioValue, { color: theme.colors.foreground }]}>{value}</Text>
-    </View>
+    <AnimatedEntrance delay={delay} distance={6} style={styles.scenarioPillMotion}>
+      <View
+        style={[
+          styles.scenarioPill,
+          {
+            backgroundColor: status.background,
+            borderColor: status.border,
+            borderRadius: theme.radii.md,
+          },
+        ]}
+      >
+        <View style={styles.scenarioPillHeader}>
+          <Text style={[styles.scenarioLabel, { color: status.foreground }]}>{label}</Text>
+          <View
+            style={[
+              styles.scenarioSignal,
+              {
+                backgroundColor: status.foreground,
+                borderRadius: theme.radii.pill,
+              },
+            ]}
+          />
+        </View>
+        <Text style={[styles.scenarioValue, { color: theme.colors.foreground }]}>{value}</Text>
+      </View>
+    </AnimatedEntrance>
   );
 }
 
@@ -795,6 +951,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
     padding: 14,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
   },
   readinessHeader: {
     alignItems: 'center',
@@ -820,14 +979,32 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
   },
+  readinessRail: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: -6,
+  },
+  readinessRailLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   progressTrack: {
     borderWidth: StyleSheet.hairlineWidth,
-    height: 10,
+    height: 12,
     overflow: 'hidden',
     width: '100%',
   },
   progressFill: {
     height: '100%',
+    minWidth: 4,
+    overflow: 'hidden',
+  },
+  progressShine: {
+    height: '100%',
+    marginLeft: '64%',
+    opacity: 0.7,
+    width: 24,
   },
   statGrid: {
     flexDirection: 'row',
@@ -836,6 +1013,12 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     gap: 2,
+    minHeight: 52,
+  },
+  statDot: {
+    height: 4,
+    marginBottom: 3,
+    width: 20,
   },
   statValue: {
     fontSize: 18,
@@ -855,6 +1038,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  capturePlanStripe: {
+    alignSelf: 'stretch',
+    width: 4,
   },
   capturePlanCopy: {
     flex: 1,
@@ -907,14 +1094,21 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  statusPill: {
-    borderWidth: StyleSheet.hairlineWidth,
+  statusPillMotion: {
     flexBasis: '48%',
     flexGrow: 1,
+  },
+  statusPill: {
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 3,
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  pillAccent: {
+    height: 3,
+    marginBottom: 3,
+    width: 28,
   },
   statusPillLabel: {
     fontSize: 10,
@@ -934,14 +1128,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  scenarioPill: {
-    borderWidth: StyleSheet.hairlineWidth,
+  scenarioPillMotion: {
     flexBasis: '48%',
     flexGrow: 1,
+  },
+  scenarioPill: {
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 3,
     minHeight: 62,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  scenarioPillHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  scenarioSignal: {
+    height: 8,
+    width: 8,
   },
   scenarioLabel: {
     fontSize: 11,
