@@ -122,7 +122,7 @@ function createContractDraftEdit(draft: MarketplaceContractDraft): ContractDraft
 }
 
 function isActiveOfferStatus(status: MarketplaceOffer['status']) {
-  return status === 'offer_sent' || status === 'countered';
+  return status === 'sent' || status === 'countered';
 }
 
 function formatContractDraftStatus(
