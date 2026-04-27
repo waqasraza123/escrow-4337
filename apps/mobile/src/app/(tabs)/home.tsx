@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { api } from '@/providers/api';
 import { useSession } from '@/providers/session';
 import { SetupReadinessCard } from '@/features/setup/SetupReadinessCard';
+import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
 import {
   BodyText,
   EmptyState,
@@ -29,6 +30,8 @@ export default function HomeRoute() {
         title={user?.activeWorkspace?.label || 'Milestone Escrow'}
         body="Mobile starts from the escrow tasks that matter most: setup, browse, contracts, delivery, and disputes."
       />
+
+      <NetworkStatusCard compact />
 
       {runtime.isLoading ? (
         <SkeletonCard />

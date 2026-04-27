@@ -13,9 +13,12 @@ import {
   SurfaceCard,
 } from '@/ui/primitives';
 import { useSession } from '@/providers/session';
+import { useMobileNetwork } from '@/providers/network';
+import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
 
 export default function SignInRoute() {
   const { requestCode, signIn } = useSession();
+  const network = useMobileNetwork();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -24,6 +27,7 @@ export default function SignInRoute() {
   const handleRequestCode = async () => {
     setSubmitting(true);
     try {
+      network.requireOnline('Requesting a sign-in code');
       await requestCode(email.trim());
       setCodeSent(true);
     } catch (error) {
@@ -39,6 +43,7 @@ export default function SignInRoute() {
   const handleVerify = async () => {
     setSubmitting(true);
     try {
+      network.requireOnline('Verifying a sign-in code');
       await signIn(email.trim(), code.trim());
       router.replace('/home');
     } catch (error) {
@@ -60,7 +65,7 @@ export default function SignInRoute() {
         footer={
           <BottomActionBar>
             <PrimaryButton
-              disabled={!email.trim() || (codeSent && !code.trim())}
+              disabled={network.offline || !email.trim() || (codeSent && !code.trim())}
               loading={submitting}
               onPress={codeSent ? handleVerify : handleRequestCode}
             >
@@ -74,6 +79,8 @@ export default function SignInRoute() {
           title="Sign in with a one-time code"
           body="Use the same OTP session API as the web console. Tokens are kept in native secure storage after verification."
         />
+
+        <NetworkStatusCard compact />
 
         <SurfaceCard animated>
           <Field

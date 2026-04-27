@@ -3,6 +3,24 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Offline Recovery)
+- Started from a clean `dev` tree, confirmed `origin/dev` was up to date, and kept working without intentional tests/builds by request.
+- Implemented the next mobile hardening slice:
+  - added a NetInfo-backed mobile network provider that exposes connectivity posture, API target, refresh, and action-level `requireOnline(...)` guards
+  - wired native connectivity into TanStack Query's online manager so known-offline devices pause query refetch behavior
+  - added a reusable Network status/recovery card on Home, Account, and Sign-in
+  - blocked OTP request/verify, wallet connector opening, and wallet setup mutations before they enter API or wallet flows when the device is known offline
+  - documented the Mobile Offline Recovery V1 contract, limitations, and deferred durable queue work
+- Changed files:
+  `apps/mobile/src/providers/{network.tsx,root.tsx,wallet.tsx}`
+  `apps/mobile/src/features/network/NetworkStatusCard.tsx`
+  `apps/mobile/src/app/{(auth)/sign-in.tsx,(tabs)/home.tsx,(tabs)/account.tsx}`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - capture real-device wallet-linking and project-room delivery evidence; only add durable offline mutation replay after the API exposes an explicit mobile-safe idempotency contract.
+
 ## Update (2026-04-27, Mobile Wallet Diagnostics)
 - Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
 - Implemented the next mobile hardening slice without intentional verification:

@@ -5,6 +5,7 @@ import {
   WalletListCard,
   WalletSetupCard,
 } from '@/features/wallet/MobileWalletSetupCard';
+import { NetworkStatusCard } from '@/features/network/NetworkStatusCard';
 import { useLocale } from '@/providers/locale';
 import { useSession } from '@/providers/session';
 import { useMobileTheme, type ThemePreference } from '@/providers/theme';
@@ -60,6 +61,7 @@ export default function AccountRoute() {
 
       {user ? (
         <>
+          <NetworkStatusCard />
           <WalletSetupCard user={user} />
           <WalletDiagnosticsCard />
           <WalletListCard user={user} />

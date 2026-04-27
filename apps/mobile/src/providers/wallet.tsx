@@ -11,6 +11,7 @@ import {
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { api } from './api';
+import { useMobileNetwork } from './network';
 import { useSession } from './session';
 import {
   getMobileWalletNetworkName,
@@ -132,6 +133,7 @@ function StaticMobileWalletProvider({ children }: { children: ReactNode }) {
 
 function MobileWalletRuntime({ children }: { children: ReactNode }) {
   const { accessToken, setUser } = useSession();
+  const network = useMobileNetwork();
   const { open, disconnect } = useAppKit();
   const account = useAccount();
   const { provider, providerType } = useProvider();
@@ -158,6 +160,14 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
 
   const openConnector = useCallback(async () => {
     try {
+      network.requireOnline('Opening the wallet connector');
+    } catch (error) {
+      setPhase('error');
+      setMessage(error instanceof Error ? error.message : 'Reconnect before opening a wallet.');
+      return;
+    }
+
+    try {
       setPhase('connecting');
       setMessage('Choose your wallet and approve the connection request.');
       await open({ view: 'Connect' });
@@ -165,7 +175,7 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       setPhase('error');
       setMessage(normalizeError(error, 'Could not open the wallet connector.'));
     }
-  }, [open]);
+  }, [network, open]);
 
   const disconnectWallet = useCallback(async () => {
     await disconnect('eip155');
@@ -178,6 +188,13 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       if (!accessToken) {
         setPhase('error');
         setMessage('Sign in before linking a wallet.');
+        return;
+      }
+      try {
+        network.requireOnline('Linking a wallet');
+      } catch (error) {
+        setPhase('error');
+        setMessage(error instanceof Error ? error.message : 'Reconnect before linking a wallet.');
         return;
       }
       if (!address || !evmProvider) {
@@ -240,6 +257,7 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       connectedNetworkName,
       defaultNetworkName,
       evmProvider,
+      network,
       refreshUser,
     ],
   );
@@ -249,6 +267,15 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       if (!accessToken) {
         setPhase('error');
         setMessage('Sign in before provisioning a smart account.');
+        return;
+      }
+      try {
+        network.requireOnline('Provisioning a smart account');
+      } catch (error) {
+        setPhase('error');
+        setMessage(
+          error instanceof Error ? error.message : 'Reconnect before provisioning a smart account.',
+        );
         return;
       }
       const resolvedOwnerAddress = ownerAddress || address;
@@ -277,7 +304,7 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
         setMessage(normalizeError(error, 'Failed to provision smart account.'));
       }
     },
-    [accessToken, address, refreshUser],
+    [accessToken, address, network, refreshUser],
   );
 
   const setDefaultWallet = useCallback(
@@ -285,6 +312,15 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
       if (!accessToken) {
         setPhase('error');
         setMessage('Sign in before changing the default wallet.');
+        return;
+      }
+      try {
+        network.requireOnline('Changing the default wallet');
+      } catch (error) {
+        setPhase('error');
+        setMessage(
+          error instanceof Error ? error.message : 'Reconnect before changing the default wallet.',
+        );
         return;
       }
       try {
@@ -299,7 +335,7 @@ function MobileWalletRuntime({ children }: { children: ReactNode }) {
         setMessage(normalizeError(error, 'Failed to update default wallet.'));
       }
     },
-    [accessToken, refreshUser],
+    [accessToken, network, refreshUser],
   );
 
   const clearStatus = useCallback(() => {
