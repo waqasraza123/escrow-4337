@@ -14,6 +14,8 @@ import type {
   MarketplaceOpportunitySearchResult,
   MarketplaceProfile,
   MarketplaceProofArtifact,
+  MarketplaceReview,
+  MarketplaceReviewScores,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
   MarketplaceTalentSearchResult,
@@ -24,6 +26,7 @@ import type {
   RuntimeProfile,
   SessionTokens,
   SmartAccountProvisionResponse,
+  SupportCase,
   UserProfile,
   VerifyResponse,
   WalletLinkChallenge,
@@ -352,6 +355,46 @@ export function createProductApiClient(options: ProductApiClientOptions = {}) {
         accessToken,
       );
     },
+    createSupportCase(
+      jobId: string,
+      input: {
+        reason: SupportCase['reason'];
+        severity?: SupportCase['severity'];
+        milestoneIndex?: number | null;
+        subject: string;
+        description: string;
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ supportCase: SupportCase }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/support-cases`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    postSupportCaseMessage(
+      jobId: string,
+      caseId: string,
+      input: {
+        body: string;
+        visibility?: 'external' | 'internal';
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ supportCase: SupportCase }>(
+        baseUrl,
+        `/jobs/${encodeURIComponent(jobId)}/support-cases/${encodeURIComponent(caseId)}/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
     postProjectRoomMessage(
       jobId: string,
       input: { body: string },
@@ -608,6 +651,34 @@ export function createProductApiClient(options: ProductApiClientOptions = {}) {
         baseUrl,
         '/marketplace/applications/mine',
         { method: 'GET' },
+        accessToken,
+      );
+    },
+    getMarketplaceJobReviews(jobId: string, accessToken: string) {
+      return requestJson<{ reviews: MarketplaceReview[] }>(
+        baseUrl,
+        `/marketplace/jobs/${encodeURIComponent(jobId)}/reviews`,
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    createMarketplaceJobReview(
+      jobId: string,
+      input: {
+        rating: number;
+        scores: MarketplaceReviewScores;
+        headline?: string | null;
+        body: string;
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ review: MarketplaceReview }>(
+        baseUrl,
+        `/marketplace/jobs/${encodeURIComponent(jobId)}/reviews`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
         accessToken,
       );
     },

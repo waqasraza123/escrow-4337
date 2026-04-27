@@ -312,32 +312,65 @@ export type ProjectActivity =
       createdAt: number;
     };
 
-export type ProjectSupportCaseSummary = {
+export type SupportCaseReason =
+  | 'general_help'
+  | 'fee_question'
+  | 'fee_exception'
+  | 'stuck_funding'
+  | 'dispute_followup'
+  | 'release_delay';
+
+export type SupportCaseStatus =
+  | 'open'
+  | 'investigating'
+  | 'waiting_on_client'
+  | 'waiting_on_worker'
+  | 'resolved';
+
+export type SupportCaseSeverity = 'routine' | 'elevated' | 'critical';
+
+export type SupportCaseMessage = {
+  id: string;
+  authorRole: 'client' | 'worker' | 'operator';
+  visibility: 'external' | 'internal';
+  body: string;
+  createdAt: number;
+  author: {
+    userId: string;
+    email: string;
+  };
+};
+
+export type SupportCase = {
   id: string;
   jobId: string;
   milestoneIndex: number | null;
-  reason:
-    | 'general_help'
-    | 'fee_question'
-    | 'fee_exception'
-    | 'stuck_funding'
-    | 'dispute_followup'
-    | 'release_delay';
-  status:
-    | 'open'
-    | 'investigating'
-    | 'waiting_on_client'
-    | 'waiting_on_worker'
-    | 'resolved';
-  severity: 'routine' | 'elevated' | 'critical';
+  reason: SupportCaseReason;
+  status: SupportCaseStatus;
+  severity: SupportCaseSeverity;
   subject: string;
   description: string;
   ownerUserId: string | null;
   ownerEmail: string | null;
+  feeDecision:
+    | 'default'
+    | 'waive_open_and_future'
+    | 'refund_realized_and_waive'
+    | 'manual_review'
+    | null;
+  feeDecisionNote: string | null;
+  feeImpactAmount: string | null;
   openedAt: number;
   updatedAt: number;
   resolvedAt: number | null;
+  createdBy: {
+    userId: string;
+    email: string;
+  };
+  messages: SupportCaseMessage[];
 };
+
+export type ProjectSupportCaseSummary = SupportCase;
 
 export type ProjectRoom = {
   job: JobView;
@@ -345,7 +378,38 @@ export type ProjectRoom = {
   submissions: ProjectSubmission[];
   messages: ProjectMessage[];
   activity: ProjectActivity[];
-  supportCases: ProjectSupportCaseSummary[];
+  supportCases: SupportCase[];
+};
+
+export type MarketplaceReviewVisibilityStatus = 'visible' | 'hidden';
+
+export type MarketplaceReview = {
+  id: string;
+  jobId: string;
+  reviewerRole: 'client' | 'worker';
+  revieweeRole: 'client' | 'worker';
+  rating: number;
+  scores: MarketplaceReviewScores;
+  headline: string | null;
+  body: string | null;
+  visibilityStatus: MarketplaceReviewVisibilityStatus;
+  moderationNote: string | null;
+  moderatedBy: {
+    userId: string;
+    email: string;
+  } | null;
+  moderatedAt: number | null;
+  reviewer: {
+    userId: string;
+    displayName: string;
+    role: 'client' | 'worker';
+  };
+  reviewee: {
+    userId: string;
+    role: 'client' | 'worker';
+  };
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type MarketplaceAvailability = 'open' | 'limited' | 'unavailable';

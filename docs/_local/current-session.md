@@ -3,6 +3,22 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Support and Reviews)
+- Started from a clean `dev` tree and confirmed `origin/dev` was up to date with `git push origin dev --no-verify`.
+- Implemented the next mobile product slice without intentional verification:
+  - added mobile-safe support-case and marketplace-review DTOs plus product-core API methods for support case create/reply and job review read/create
+  - expanded `/contracts/[id]/room` with participant-visible support intake, support case selection, external support replies, marketplace review history, and gated post-contract review capture
+  - review capture records overall rating plus scope clarity, communication, timeliness, and outcome quality scores through the existing marketplace review API
+  - updated Mobile Project Room V1 docs to cover support/review API mapping, UI behavior, and remaining admin-led gaps
+- Changed files:
+  `packages/product-core/src/api/{client.ts,types.ts}`
+  `apps/mobile/src/app/contracts/[id]/room.tsx`
+  `docs/{MOBILE_PROJECT_ROOM_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - not run by request
+- Next useful step:
+  - device-test wallet-backed project-room delivery and wallet-linking flows against real mobile wallets.
+
 ## Update (2026-04-27, Mobile Project Room)
 - Started from `dev`, confirmed `origin/dev` was up to date, and preserved the existing in-progress project-room DTO edit in `packages/product-core/src/api/types.ts`.
 - Implemented the next mobile product slice without intentional verification:
