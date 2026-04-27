@@ -278,7 +278,7 @@ export function FreelancerConsole() {
       ...current,
       [applicationId]: '',
     }));
-    setMessage(workspaceMessages.interviewMessageSent);
+    setMessage(workspaceMessages.messages.interviewMessageSent);
     await handleLoadApplicationTimeline(applicationId);
   }
 
