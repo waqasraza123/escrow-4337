@@ -3,6 +3,26 @@
 ## Date
 - 2026-04-27
 
+## Update (2026-04-27, Mobile Cached Session Auto Refresh)
+- Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
+- Implemented the next mobile offline-recovery session lifecycle slice without intentional tests/builds:
+  - added `apps/mobile/src/features/session/MobileSessionRecoveryBridge.tsx`
+  - mounted it inside `SessionProvider` so it can consume session, network, and query-client state
+  - when a cached-profile session sees API reachability recover to `reachable`, it throttles and attempts a live session refresh
+  - successful automatic refresh invalidates query caches so cached/profile-restored reads can converge to live state
+  - refresh failures remain non-destructive and keep the cached-profile notice visible
+  - updated cached-session notice copy and documented automatic refresh behavior
+- Changed files:
+  `apps/mobile/src/features/session/{MobileSessionRecoveryBridge.tsx,SessionRestoreNotice.tsx}`
+  `apps/mobile/src/providers/root.tsx`
+  `docs/{MOBILE_OFFLINE_RECOVERY_V1.md,project-state.md,_local/current-session.md}`
+- Verification:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - real tests/builds intentionally not run by request
+- Next useful step:
+  - capture real-device evidence for cached-profile automatic refresh, offline cold-start restore, marketplace snapshot hydration, retention cleanup, foreground recovery, wallet-linking, and project-room delivery paths.
+
 ## Update (2026-04-27, Mobile Cached Session Notice)
 - Started from a clean `dev` tree aligned with `origin/dev`; there was no current uncommitted work to publish before this slice.
 - Implemented the next mobile offline-recovery session visibility slice without intentional tests/builds:

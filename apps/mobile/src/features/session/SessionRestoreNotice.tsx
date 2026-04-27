@@ -48,7 +48,8 @@ export function SessionRestoreNotice({ delay = 50 }: { delay?: number }) {
       <StatusBadge label="Cached profile" tone="warning" />
       <BodyText>
         Showing account context from the last secure profile snapshot because the live session could
-        not be reached during app start. Write actions still require a reachable API.
+        not be reached during app start. The app will refresh automatically after API recovery, and
+        write actions still require a reachable API.
       </BodyText>
       <MetricRow
         label="Profile saved"

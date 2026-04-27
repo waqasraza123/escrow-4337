@@ -40,6 +40,8 @@ Screens should use this hook for authenticated writes instead of duplicating `ne
 
 `apps/mobile/src/features/offline/OfflineSnapshotRetentionBridge.tsx` mounts at the root provider layer. It runs best-effort namespace retention once on app startup and again after foreground return when the last retention run is older than six hours. It does not block screen rendering, query execution, or session restore.
 
+`apps/mobile/src/features/session/MobileSessionRecoveryBridge.tsx` mounts inside `SessionProvider`. When the app is running from a secure cached profile and API reachability recovers to `reachable`, it throttles and attempts a live session refresh, then invalidates query caches after a successful refresh. Refresh failures stay non-destructive; the cached-profile notice remains visible until a live session refresh succeeds or the user signs out.
+
 ## UI Surface
 
 `apps/mobile/src/features/network/NetworkStatusCard.tsx` is the shared status and recovery surface.
@@ -140,6 +142,7 @@ Restore behavior:
 - if profile/refresh calls fail for a non-terminal outage and a profile snapshot exists, keep the stored tokens and hydrate `user` from the secure profile snapshot
 - expose `restoredFromProfileSnapshot` and `profileSnapshotCachedAt` through `useSession()`
 - Home and Account surface a cached-profile session notice with the saved timestamp and a manual session refresh action
+- once API reachability recovers, the session recovery bridge attempts the same live refresh automatically and invalidates queries after success
 - if restore fails without a usable profile snapshot, clear tokens, clear the cached profile snapshot, clear offline snapshots, and return to signed-out state
 - sign-out clears tokens, the profile snapshot, and account-scoped offline snapshots before best-effort logout
 
