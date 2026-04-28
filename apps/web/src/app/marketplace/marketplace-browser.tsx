@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { SectionHeading } from '@escrow4334/frontend-core';
+import {
+  ScreenSectionHeader,
+  SectionHeading,
+  TrustSignalStrip,
+} from '@escrow4334/frontend-core';
 import { RevealSection } from '@escrow4334/frontend-core/spatial';
 import styles from '../marketing.styles';
 import { LanguageSwitcher } from '../language-switcher';
@@ -590,6 +594,43 @@ export function MarketplaceBrowser() {
             </aside>
 
             <div className={styles.directoryMain}>
+              <ScreenSectionHeader
+                eyebrow={activeTab === 'talent' ? 'Trusted talent' : 'Scoped briefs'}
+                title={
+                  activeTab === 'talent'
+                    ? marketplaceMessages.directory.talentTab
+                    : marketplaceMessages.directory.opportunityTab
+                }
+                description={
+                  activeTab === 'talent'
+                    ? 'Scan credibility, escrow fit, and proof signals before opening a profile.'
+                    : 'Review budget, readiness, and acceptance shape before applying.'
+                }
+              />
+              <TrustSignalStrip
+                className="xl:grid-cols-3"
+                items={[
+                  {
+                    label: 'Visible results',
+                    value:
+                      activeTab === 'talent'
+                        ? talentResults.length
+                        : opportunityResults.length,
+                    detail: 'Loaded from the public marketplace index.',
+                    tone: 'success',
+                  },
+                  {
+                    label: 'Escrow posture',
+                    value: 'Milestone first',
+                    detail: 'Discovery leads into fixed-scope escrow workflows.',
+                  },
+                  {
+                    label: 'Proof density',
+                    value: activeTab === 'talent' ? 'Profile signals' : 'Brief criteria',
+                    detail: 'Cards prioritize trust signals over long text blocks.',
+                  },
+                ]}
+              />
               <div className={styles.directoryTopBar}>
                 <div className={styles.sectionBody}>
                   <strong className={styles.resultTitle}>

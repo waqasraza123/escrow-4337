@@ -206,6 +206,297 @@ export function SurfaceCard(
   );
 }
 
+export function VisualSceneCard(
+  props: HTMLAttributes<HTMLDivElement> & {
+    eyebrow?: ReactNode;
+    title?: ReactNode;
+    description?: ReactNode;
+    visual?: ReactNode;
+    footer?: ReactNode;
+    tone?: 'market' | 'trust' | 'operator';
+  },
+) {
+  const {
+    children,
+    className,
+    description,
+    eyebrow,
+    footer,
+    title,
+    tone = 'trust',
+    visual,
+    ...rest
+  } = props;
+
+  return (
+    <SurfaceCard
+      elevated
+      className={cn(
+        'relative isolate grid gap-4 overflow-hidden p-5 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px',
+        tone === 'market'
+          ? 'before:bg-[linear-gradient(90deg,transparent,rgba(46,161,91,0.58),transparent)]'
+          : tone === 'operator'
+            ? 'before:bg-[linear-gradient(90deg,transparent,rgba(208,145,58,0.5),transparent)]'
+            : 'before:bg-[linear-gradient(90deg,transparent,rgba(14,96,51,0.52),transparent)]',
+        className,
+      )}
+      {...rest}
+    >
+      <div
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute right-[-4rem] top-[-5rem] h-44 w-44 rounded-full blur-3xl',
+          tone === 'operator'
+            ? 'bg-[radial-gradient(circle,rgba(208,145,58,0.18),transparent_70%)]'
+            : 'bg-[var(--spotlight-glow)]',
+        )}
+      />
+      {visual ? (
+        <div className="relative z-10 overflow-hidden rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--surface-soft)]">
+          {visual}
+        </div>
+      ) : null}
+      {eyebrow || title || description ? (
+        <div className="relative z-10 grid gap-2">
+          {eyebrow ? (
+            <span className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[var(--accent-eyebrow-soft)]">
+              {eyebrow}
+            </span>
+          ) : null}
+          {title ? (
+            <strong className="text-[1.05rem] leading-6 text-[var(--foreground)]">
+              {title}
+            </strong>
+          ) : null}
+          {description ? (
+            <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {children ? <div className="relative z-10 grid gap-3">{children}</div> : null}
+      {footer ? <div className="relative z-10">{footer}</div> : null}
+    </SurfaceCard>
+  );
+}
+
+export function TrustSignalStrip(
+  props: HTMLAttributes<HTMLDivElement> & {
+    items: Array<{
+      label: ReactNode;
+      value: ReactNode;
+      detail?: ReactNode;
+      tone?: 'neutral' | 'success' | 'warning' | 'danger';
+    }>;
+  },
+) {
+  const { className, items, ...rest } = props;
+
+  return (
+    <div
+      className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-4', className)}
+      {...rest}
+    >
+      {items.map((item, index) => (
+        <div
+          key={`${String(item.label)}-${index}`}
+          className={cn(
+            'relative overflow-hidden rounded-[1.2rem] border bg-[var(--surface-soft)] px-4 py-3.5 shadow-[var(--interactive-shadow)]',
+            item.tone === 'success'
+              ? 'border-[var(--status-success-border)]'
+              : item.tone === 'warning'
+                ? 'border-[var(--status-warning-border)]'
+                : item.tone === 'danger'
+                  ? 'border-[var(--status-danger-border)]'
+                  : 'border-[var(--surface-border)]',
+          )}
+        >
+          <span className="block text-[0.66rem] font-bold uppercase tracking-[0.15em] text-[var(--foreground-muted)]">
+            {item.label}
+          </span>
+          <strong className="mt-1.5 block text-[1rem] leading-6 text-[var(--foreground)]">
+            {item.value}
+          </strong>
+          {item.detail ? (
+            <span className="mt-1 block text-xs leading-5 text-[var(--foreground-soft)]">
+              {item.detail}
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ActionTimeline(
+  props: HTMLAttributes<HTMLOListElement> & {
+    items: Array<{
+      label: ReactNode;
+      body?: ReactNode;
+      status?: ReactNode;
+      tone?: 'neutral' | 'success' | 'warning' | 'danger';
+    }>;
+  },
+) {
+  const { className, items, ...rest } = props;
+
+  return (
+    <ol className={cn('grid gap-3', className)} {...rest}>
+      {items.map((item, index) => (
+        <li
+          key={`${String(item.label)}-${index}`}
+          className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-[1.15rem] border border-[var(--surface-border)] bg-[var(--surface-soft)] p-3.5"
+        >
+          <span
+            className={cn(
+              'mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold',
+              item.tone === 'success'
+                ? 'border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--status-success-fg)]'
+                : item.tone === 'warning'
+                  ? 'border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]'
+                  : item.tone === 'danger'
+                    ? 'border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]'
+                    : 'border-[var(--status-info-border)] bg-[var(--status-info-bg)] text-[var(--status-info-fg)]',
+            )}
+          >
+            {index + 1}
+          </span>
+          <span className="grid gap-1">
+            <strong className="text-sm leading-5 text-[var(--foreground)]">
+              {item.label}
+            </strong>
+            {item.body ? (
+              <span className="text-xs leading-5 text-[var(--foreground-soft)]">
+                {item.body}
+              </span>
+            ) : null}
+            {item.status ? (
+              <span className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--foreground-muted)]">
+                {item.status}
+              </span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function ProofMetricCard(
+  props: HTMLAttributes<HTMLDivElement> & {
+    label: ReactNode;
+    value: ReactNode;
+    detail?: ReactNode;
+    tone?: 'neutral' | 'success' | 'warning' | 'danger';
+  },
+) {
+  const { className, detail, label, tone = 'neutral', value, ...rest } = props;
+
+  return (
+    <SurfaceCard
+      className={cn(
+        'grid gap-2 p-4',
+        tone === 'success'
+          ? 'border-[var(--status-success-border)]'
+          : tone === 'warning'
+            ? 'border-[var(--status-warning-border)]'
+            : tone === 'danger'
+              ? 'border-[var(--status-danger-border)]'
+              : '',
+        className,
+      )}
+      {...rest}
+    >
+      <span className="text-[0.68rem] font-bold uppercase tracking-[0.15em] text-[var(--foreground-muted)]">
+        {label}
+      </span>
+      <strong className="text-[1.2rem] leading-7 tracking-[-0.03em] text-[var(--foreground)]">
+        {value}
+      </strong>
+      {detail ? (
+        <span className="text-sm leading-6 text-[var(--foreground-soft)]">{detail}</span>
+      ) : null}
+    </SurfaceCard>
+  );
+}
+
+export function ScreenSectionHeader(
+  props: HTMLAttributes<HTMLDivElement> & {
+    eyebrow?: ReactNode;
+    title: ReactNode;
+    description?: ReactNode;
+    actions?: ReactNode;
+  },
+) {
+  const { actions, className, description, eyebrow, title, ...rest } = props;
+
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap items-end justify-between gap-4 rounded-[1.45rem] border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 shadow-[var(--surface-shadow)] backdrop-blur-xl',
+        className,
+      )}
+      {...rest}
+    >
+      <div className="grid max-w-3xl gap-1.5">
+        {eyebrow ? (
+          <span className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[var(--accent-eyebrow-soft)]">
+            {eyebrow}
+          </span>
+        ) : null}
+        <strong className="text-[clamp(1.25rem,2.2vw,1.8rem)] leading-tight text-[var(--foreground)]">
+          {title}
+        </strong>
+        {description ? (
+          <p className="text-sm leading-6 text-[var(--foreground-soft)]">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex flex-wrap items-center gap-2.5">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function EmptyStateVisual(
+  props: HTMLAttributes<HTMLDivElement> & {
+    title: ReactNode;
+    message?: ReactNode;
+    action?: ReactNode;
+  },
+) {
+  const { action, className, message, title, ...rest } = props;
+
+  return (
+    <VisualSceneCard
+      className={cn('items-center text-center', className)}
+      tone="trust"
+      visual={
+        <svg aria-hidden="true" viewBox="0 0 360 180" className="h-44 w-full">
+          <rect width="360" height="180" rx="28" fill="url(#empty-bg)" />
+          <rect x="52" y="52" width="120" height="76" rx="22" fill="var(--background-strong)" />
+          <rect x="188" y="38" width="120" height="104" rx="24" fill="var(--background-strong)" />
+          <rect x="76" y="74" width="72" height="12" rx="6" fill="var(--accent-eyebrow)" opacity="0.28" />
+          <rect x="76" y="98" width="52" height="12" rx="6" fill="var(--accent-eyebrow)" opacity="0.6" />
+          <circle cx="224" cy="80" r="18" fill="var(--accent-eyebrow)" opacity="0.18" />
+          <path d="M212 108L225 121L252 88" stroke="var(--accent-eyebrow)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+          <defs>
+            <linearGradient id="empty-bg" x1="24" y1="12" x2="336" y2="168" gradientUnits="userSpaceOnUse">
+              <stop stopColor="var(--surface-soft)" />
+              <stop offset="1" stopColor="var(--background-strong)" />
+            </linearGradient>
+          </defs>
+        </svg>
+      }
+      title={title}
+      description={message}
+      footer={action}
+      {...rest}
+    />
+  );
+}
+
 export function PageContainer(props: HTMLAttributes<HTMLDivElement>) {
   const { children, className, ...rest } = props;
 

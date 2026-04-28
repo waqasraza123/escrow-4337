@@ -12,6 +12,7 @@ import {
   SectionCard,
   StatusNotice,
   SurfaceCard,
+  TrustSignalStrip,
 } from '@escrow4334/frontend-core';
 import {
   MotionEmptyState,
@@ -164,6 +165,7 @@ type TalentDiscoveryDraft = {
   selectedOpportunityId: string;
   inviteMessage: string;
   savedSearchLabel: string;
+  alertFrequency: 'manual' | 'daily' | 'weekly';
 };
 
 type OpportunityDiscoveryDraft = {
@@ -172,6 +174,7 @@ type OpportunityDiscoveryDraft = {
   skills: string;
   category: string;
   savedSearchLabel: string;
+  alertFrequency: 'manual' | 'daily' | 'weekly';
 };
 
 type TalentPoolDraft = {
@@ -335,6 +338,7 @@ function createEmptyTalentDiscoveryDraft(): TalentDiscoveryDraft {
     selectedOpportunityId: '',
     inviteMessage: '',
     savedSearchLabel: '',
+    alertFrequency: 'manual',
   };
 }
 
@@ -345,6 +349,7 @@ function createEmptyOpportunityDiscoveryDraft(): OpportunityDiscoveryDraft {
     skills: '',
     category: '',
     savedSearchLabel: '',
+    alertFrequency: 'manual',
   };
 }
 
@@ -696,6 +701,71 @@ export function MarketplaceWorkspace() {
       </button>
     );
   };
+
+  function summarizeSavedSearchLabel(
+    kind: 'talent' | 'opportunity',
+    query: {
+      q?: string;
+      skill?: string;
+      skills?: string;
+      category?: string;
+    },
+  ) {
+    const label = query.q || query.skill || query.skills || query.category;
+    return label ? `${kind}: ${label}` : `${kind}: search`;
+  }
+
+  function summarizeSavedSearchTags(
+    kind: 'talent' | 'opportunity',
+    query: {
+      skill?: string;
+      skills?: string;
+      category?: string;
+      timezone?: string;
+    },
+  ) {
+    const merged = [
+      query.skill,
+      query.skills,
+      kind === 'opportunity' ? query.category : null,
+    ]
+      .filter((value): value is string => Boolean(value && value.trim().length > 0))
+      .flatMap((value) =>
+        value
+          .split(',')
+          .map((entry) => entry.trim().toLowerCase())
+          .filter(Boolean),
+      );
+    const timezone = (query.timezone ?? '').trim();
+    return {
+      queryLabel: `${kind}:${summarizeSavedSearchLabel(kind, query).replace(`${kind}: `, '')}`,
+      category: query.category?.trim() || null,
+      timezone: timezone || null,
+      skillTags: Array.from(new Set(merged)),
+    };
+  }
+
+  function recordSearchImpressionEvent(
+    kind: 'talent' | 'opportunity',
+    query: {
+      q?: string;
+      skill?: string;
+      skills?: string;
+      category?: string;
+      timezone?: string;
+    },
+    resultCount: number,
+  ) {
+    void webApi.recordMarketplaceInteraction({
+      surface: 'workspace',
+      entityType: 'search',
+      entityId: null,
+      eventType: 'search_impression',
+      searchKind: kind,
+      ...summarizeSavedSearchTags(kind, query),
+      resultCount,
+    });
+  }
 
   async function loadWorkspace(nextTokens: SessionTokens | null = tokens) {
     setLoading(true);
@@ -1101,6 +1171,15 @@ export function MarketplaceWorkspace() {
       limit: 8,
     });
     setTalentSearchResults(response.results);
+    recordSearchImpressionEvent(
+      'talent',
+      {
+        q: talentDiscoveryDraft.q || undefined,
+        skill: talentDiscoveryDraft.skill || undefined,
+        skills: talentDiscoveryDraft.skills || undefined,
+      },
+      response.results.length,
+    );
   }
 
   async function handleLoadTalentRecommendations() {
@@ -1117,6 +1196,15 @@ export function MarketplaceWorkspace() {
       tokens.accessToken,
     );
     setTalentSearchResults(response.results);
+    recordSearchImpressionEvent(
+      'talent',
+      {
+        q: talentDiscoveryDraft.q || undefined,
+        skill: talentDiscoveryDraft.skill || undefined,
+        skills: talentDiscoveryDraft.skills || undefined,
+      },
+      response.results.length,
+    );
   }
 
   async function handleSearchOpportunityDirectory() {
@@ -1128,6 +1216,16 @@ export function MarketplaceWorkspace() {
       limit: 8,
     });
     setOpportunitySearchResults(response.results);
+    recordSearchImpressionEvent(
+      'opportunity',
+      {
+        q: opportunityDiscoveryDraft.q || undefined,
+        skill: opportunityDiscoveryDraft.skill || undefined,
+        skills: opportunityDiscoveryDraft.skills || undefined,
+        category: opportunityDiscoveryDraft.category || undefined,
+      },
+      response.results.length,
+    );
   }
 
   async function handleLoadOpportunityRecommendations() {
@@ -1144,6 +1242,16 @@ export function MarketplaceWorkspace() {
       tokens.accessToken,
     );
     setOpportunitySearchResults(response.results);
+    recordSearchImpressionEvent(
+      'opportunity',
+      {
+        q: opportunityDiscoveryDraft.q || undefined,
+        skill: opportunityDiscoveryDraft.skill || undefined,
+        skills: opportunityDiscoveryDraft.skills || undefined,
+        category: opportunityDiscoveryDraft.category || undefined,
+      },
+      response.results.length,
+    );
   }
 
   async function handleSaveSearch(kind: 'talent' | 'opportunity') {
@@ -1174,12 +1282,16 @@ export function MarketplaceWorkspace() {
             skills: opportunityDiscoveryDraft.skills || null,
             category: opportunityDiscoveryDraft.category || null,
           };
+    const alertFrequency =
+      kind === 'talent'
+        ? talentDiscoveryDraft.alertFrequency
+        : opportunityDiscoveryDraft.alertFrequency;
     await webApi.createMarketplaceSavedSearch(
       {
         kind,
         label,
         query,
-        alertFrequency: 'manual',
+        alertFrequency,
       },
       tokens.accessToken,
     );
@@ -1198,6 +1310,25 @@ export function MarketplaceWorkspace() {
     await webApi.deleteMarketplaceSavedSearch(id, tokens.accessToken);
     setMessage(workspaceMessages.messages.savedSearchDeleted);
     await loadWorkspace(tokens);
+  }
+
+  async function handleRerunSavedSearch(searchId: string) {
+    if (!tokens) {
+      return;
+    }
+    const response = await webApi.rerunMarketplaceSavedSearch(searchId, tokens.accessToken);
+    setSavedSearches((currentSearches) =>
+      currentSearches.map((search) =>
+        search.id === response.search.id ? response.search : search,
+      ),
+    );
+    if (response.kind === 'talent') {
+      setTalentSearchResults(response.results);
+      setMessage(workspaceMessages.messages.savedSearchRerunTalent);
+    } else {
+      setOpportunitySearchResults(response.results);
+      setMessage(workspaceMessages.messages.savedSearchRerunOpportunity);
+    }
   }
 
   async function handleCreateTalentPool() {
@@ -2458,6 +2589,25 @@ export function MarketplaceWorkspace() {
                   value={activeApplications.length}
                 />
               </FactGrid>
+              <TrustSignalStrip
+                className="xl:grid-cols-2"
+                items={[
+                  {
+                    label: 'Workspace trust',
+                    value:
+                      activeLane === 'agency'
+                        ? 'Agency lane'
+                        : 'Role gated',
+                    detail: 'Actions stay scoped to the active workspace and capability contract.',
+                    tone: 'success',
+                  },
+                  {
+                    label: 'Presentation',
+                    value: 'Pipeline first',
+                    detail: 'Counts, next actions, and proof states stay visible without text-heavy panels.',
+                  },
+                ]}
+              />
               {availableWorkspaces.length > 1 ? (
                 <div className={styles.stack}>
                   <span className={styles.metaLabel}>
@@ -2740,18 +2890,31 @@ export function MarketplaceWorkspace() {
                 </p>
               ) : (
                 notifications.slice(0, 8).map((notification) => (
-                  <SharedCard
-                    key={notification.id}
-                    className={styles.actionPanel}
-                    interactive
-                  >
+                      <SharedCard
+                        key={notification.id}
+                        className={styles.actionPanel}
+                        interactive
+                      >
                     <div className={styles.stack}>
                       <strong>{notification.title}</strong>
                       <p className={styles.stateText}>
                         {notification.status} • {new Date(notification.updatedAt).toLocaleString()}
                       </p>
                       <p className={styles.stateText}>{notification.detail}</p>
+                      {notification.messageActionPrompt ? (
+                        <p className={styles.stateText}>
+                          {notification.messageActionPrompt}
+                        </p>
+                      ) : null}
                       <div className={styles.inlineActions}>
+                        {notification.messageThreadHref ? (
+                          <Link
+                            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                            href={notification.messageThreadHref}
+                          >
+                            {notification.messageActionLabel ?? 'Open message thread'}
+                          </Link>
+                        ) : null}
                         {notification.status === 'unread' ? (
                           <button
                             type="button"
@@ -3674,6 +3837,28 @@ export function MarketplaceWorkspace() {
                     }
                   />
                 </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.alertFrequency}</span>
+                  <select
+                    value={talentDiscoveryDraft.alertFrequency}
+                    onChange={(event) =>
+                      setTalentDiscoveryDraft((current) => ({
+                        ...current,
+                        alertFrequency: event.target.value as TalentDiscoveryDraft['alertFrequency'],
+                      }))
+                    }
+                  >
+                    <option value="manual">
+                      {workspaceMessages.discovery.alertFrequencyManual}
+                    </option>
+                    <option value="daily">
+                      {workspaceMessages.discovery.alertFrequencyDaily}
+                    </option>
+                    <option value="weekly">
+                      {workspaceMessages.discovery.alertFrequencyWeekly}
+                    </option>
+                  </select>
+                </label>
                 <div className={styles.inlineActions}>
                   <button type="button" onClick={() => void handleSearchTalentDirectory()}>
                     {workspaceMessages.discovery.searchTalent}
@@ -3701,23 +3886,33 @@ export function MarketplaceWorkspace() {
                       >
                         <div className={styles.stack}>
                           <strong>{search.label}</strong>
+                      <p className={styles.stateText}>
+                        {workspaceMessages.discovery.lastResultCount}:{' '}
+                        {search.lastResultCount}
+                      </p>
                           <p className={styles.stateText}>
-                            {workspaceMessages.discovery.lastResultCount}:{' '}
-                            {search.lastResultCount}
+                            {workspaceMessages.discovery.alertFrequency}:{' '}
+                            {search.alertFrequency}
                           </p>
-                          <div className={styles.inlineActions}>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteSavedSearch(search.id)}
-                            >
-                              {workspaceMessages.discovery.deleteSavedSearch}
-                            </button>
-                          </div>
-                        </div>
-                      </SharedCard>
-                    ))}
-                  </div>
-                ) : null}
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteSavedSearch(search.id)}
+                        >
+                          {workspaceMessages.discovery.deleteSavedSearch}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleRerunSavedSearch(search.id)}
+                        >
+                          {workspaceMessages.discovery.rerunSavedSearch}
+                        </button>
+                      </div>
+                    </div>
+                  </SharedCard>
+                ))}
+              </div>
+            ) : null}
                 {talentSearchResults.length === 0 ? (
                   <p className={styles.stateText}>
                     {workspaceMessages.discovery.noTalentResults}
@@ -3879,6 +4074,28 @@ export function MarketplaceWorkspace() {
                     }
                   />
                 </label>
+                <label className={styles.field}>
+                  <span>{workspaceMessages.discovery.alertFrequency}</span>
+                  <select
+                    value={opportunityDiscoveryDraft.alertFrequency}
+                    onChange={(event) =>
+                      setOpportunityDiscoveryDraft((current) => ({
+                        ...current,
+                        alertFrequency: event.target.value as OpportunityDiscoveryDraft['alertFrequency'],
+                      }))
+                    }
+                  >
+                    <option value="manual">
+                      {workspaceMessages.discovery.alertFrequencyManual}
+                    </option>
+                    <option value="daily">
+                      {workspaceMessages.discovery.alertFrequencyDaily}
+                    </option>
+                    <option value="weekly">
+                      {workspaceMessages.discovery.alertFrequencyWeekly}
+                    </option>
+                  </select>
+                </label>
                 <div className={styles.inlineActions}>
                   <button
                     type="button"
@@ -3916,12 +4133,22 @@ export function MarketplaceWorkspace() {
                             {workspaceMessages.discovery.lastResultCount}:{' '}
                             {search.lastResultCount}
                           </p>
+                          <p className={styles.stateText}>
+                            {workspaceMessages.discovery.alertFrequency}:{' '}
+                            {search.alertFrequency}
+                          </p>
                           <div className={styles.inlineActions}>
                             <button
                               type="button"
                               onClick={() => void handleDeleteSavedSearch(search.id)}
                             >
                               {workspaceMessages.discovery.deleteSavedSearch}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRerunSavedSearch(search.id)}
+                            >
+                              {workspaceMessages.discovery.rerunSavedSearch}
                             </button>
                           </div>
                         </div>

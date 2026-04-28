@@ -9,9 +9,9 @@ import {
   BodyText,
   EmptyState,
   Heading,
+  HeroSceneCard,
   MetricRow,
   ScrollScreen,
-  SectionHeader,
   SkeletonCard,
   StatusBadge,
   SurfaceCard,
@@ -26,10 +26,22 @@ export default function HomeRoute() {
 
   return (
     <ScrollScreen>
-      <SectionHeader
+      <HeroSceneCard
         eyebrow="Workspace"
         title={user?.activeWorkspace?.label || 'Milestone Escrow'}
         body="Mobile starts from the escrow tasks that matter most: setup, browse, contracts, delivery, and disputes."
+        signals={[
+          {
+            label: 'Runtime',
+            value: runtime.data?.profile ?? 'Checking',
+            tone: runtime.data?.profile === 'deployment-like' ? 'success' : 'warning',
+          },
+          {
+            label: 'Session',
+            value: accessToken ? 'Restored' : 'Signed out',
+            tone: accessToken ? 'success' : 'muted',
+          },
+        ]}
       />
 
       <NetworkStatusCard compact />

@@ -194,6 +194,119 @@ export function BodyText({ children, style, ...props }: TextProps) {
   );
 }
 
+export function HeroSceneCard({
+  eyebrow,
+  title,
+  body,
+  signals = [],
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  signals?: Array<{
+    label: string;
+    value: string | number;
+    tone?: ProductStatusTone;
+  }>;
+  children?: React.ReactNode;
+}) {
+  const theme = useMobileTheme();
+  const metrics = useAdaptiveMetrics();
+  const pulse = usePulseAnimation();
+
+  return (
+    <AnimatedEntrance>
+      <View
+        style={[
+          styles.mobileHero,
+          {
+            backgroundColor: theme.colors.surfaceStrong,
+            borderColor: theme.colors.borderStrong,
+            borderRadius: metrics.compact ? 22 : 28,
+            padding: metrics.cardPadding + 3,
+            shadowColor: theme.colors.shadow,
+          },
+        ]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.mobileHeroOrb,
+            {
+              backgroundColor: theme.colors.primarySoft,
+              opacity: pulse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.42, 0.68],
+              }),
+              transform: [
+                {
+                  scale: pulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.94, 1.04],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        <Heading tone="eyebrow">{eyebrow}</Heading>
+        <Heading style={{ fontSize: metrics.displaySize, lineHeight: metrics.displaySize + 4 }}>
+          {title}
+        </Heading>
+        <BodyText>{body}</BodyText>
+        {signals.length ? <TrustSignalStrip signals={signals} /> : null}
+        {children}
+      </View>
+    </AnimatedEntrance>
+  );
+}
+
+export function TrustSignalStrip({
+  signals,
+}: {
+  signals: Array<{
+    label: string;
+    value: string | number;
+    tone?: ProductStatusTone;
+  }>;
+}) {
+  const theme = useMobileTheme();
+
+  return (
+    <View style={styles.mobileTrustGrid}>
+      {signals.map((signal) => {
+        const tone = signal.tone ? theme.status[signal.tone] : null;
+        return (
+          <View
+            key={signal.label}
+            style={[
+              styles.mobileTrustCard,
+              {
+                backgroundColor: tone?.background ?? theme.colors.surface,
+                borderColor: tone?.border ?? theme.colors.border,
+              },
+            ]}
+          >
+            <Text
+              maxFontSizeMultiplier={1.2}
+              style={[styles.mobileTrustLabel, { color: theme.colors.foregroundMuted }]}
+            >
+              {signal.label}
+            </Text>
+            <Text
+              maxFontSizeMultiplier={1.25}
+              style={[styles.mobileTrustValue, { color: tone?.foreground ?? theme.colors.foreground }]}
+            >
+              {signal.value}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function SurfaceCard({
   children,
   animated,
@@ -747,6 +860,50 @@ const styles = StyleSheet.create({
   bodyText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  mobileHero: {
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.14,
+    shadowRadius: 34,
+    width: '100%',
+  },
+  mobileHeroOrb: {
+    borderRadius: 999,
+    height: 170,
+    position: 'absolute',
+    right: -52,
+    top: -62,
+    width: 170,
+  },
+  mobileTrustGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 2,
+  },
+  mobileTrustCard: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexBasis: '47%',
+    flexGrow: 1,
+    gap: 4,
+    minWidth: 128,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  mobileTrustLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  mobileTrustValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
   },
   card: {
     borderWidth: StyleSheet.hairlineWidth,

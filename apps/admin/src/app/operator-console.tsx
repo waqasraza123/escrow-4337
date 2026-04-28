@@ -22,6 +22,7 @@ import {
   saveDownloadedDocument,
   SectionCard,
   StatusNotice,
+  TrustSignalStrip,
   type AsyncState,
   writeStoredStringList,
 } from '@escrow4334/frontend-core';
@@ -1641,6 +1642,44 @@ export function OperatorConsole({
               </FactGrid>
             )
           }
+        />
+      </RevealSection>
+
+      <RevealSection delay={0.1}>
+        <TrustSignalStrip
+          items={[
+            {
+              label: 'Authority source',
+              value: runtimeChainIngestion
+                ? getChainIngestionStatusLabel(runtimeChainIngestion.status)
+                : 'Runtime pending',
+              detail: 'Operators see provenance before acting on disputes or sync repair.',
+              tone: runtimeChainIngestion?.status === 'failed' ? 'danger' : 'success',
+            },
+            {
+              label: 'Case posture',
+              value: caseBrief ? messages.labels.pressure[caseBrief.pressure] : 'No case loaded',
+              detail: 'Severity stays visible without forcing raw log scanning.',
+              tone:
+                caseBrief?.pressure === 'critical'
+                  ? 'danger'
+                  : caseBrief?.pressure === 'attention'
+                    ? 'warning'
+                    : 'neutral',
+            },
+            {
+              label: 'Operations access',
+              value: canAccessOperations ? 'Ready' : 'Blocked',
+              detail: operationsCapabilityReason ?? 'Capability-gated operator queue.',
+              tone: canAccessOperations ? 'success' : 'warning',
+            },
+            {
+              label: 'Resolution access',
+              value: canResolveDisputes ? 'Ready' : 'Blocked',
+              detail: resolveDisputesCapabilityReason ?? 'Arbitrator wallet controls final actions.',
+              tone: canResolveDisputes ? 'success' : 'warning',
+            },
+          ]}
         />
       </RevealSection>
 

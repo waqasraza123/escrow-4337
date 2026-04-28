@@ -6,6 +6,7 @@ import {
   Eyebrow,
   PageContainer,
   SectionHeading,
+  TrustSignalStrip,
 } from '@escrow4334/frontend-core';
 import { RevealSection } from '@escrow4334/frontend-core/spatial';
 import styles from './marketing.styles';
@@ -88,14 +89,14 @@ export default function Home() {
             <PublicSceneFrame accent="market">
               <MarketplaceHeroScene />
             </PublicSceneFrame>
-            <div className={styles.heroIllustrationMeta}>
-              {messages.marketing.heroSignals.map((item) => (
-                <div key={item.label} className={styles.heroIllustrationCard}>
-                  <span className={styles.heroIllustrationLabel}>{item.label}</span>
-                  <div>{item.value}</div>
-                </div>
-              ))}
-            </div>
+            <TrustSignalStrip
+              className="sm:grid-cols-2 xl:grid-cols-2"
+              items={messages.marketing.heroSignals.map((item) => ({
+                label: item.label,
+                value: item.value,
+                tone: 'success' as const,
+              }))}
+            />
           </div>
         </RevealSection>
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import {
   canApplyToOpportunity,
@@ -20,11 +20,11 @@ import {
   EmptyState,
   Field,
   Heading,
+  HeroSceneCard,
   ListCard,
   MetricRow,
   PrimaryButton,
   ScrollScreen,
-  SectionHeader,
   SegmentedControl,
   SkeletonCard,
   StatusBadge,
@@ -36,6 +36,12 @@ type MarketplaceTalentResponse = Awaited<ReturnType<typeof api.listMarketplacePr
 type MarketplaceOpportunitiesResponse = Awaited<
   ReturnType<typeof api.listMarketplaceOpportunities>
 >;
+type MarketplaceTalentSearchResult = Awaited<
+  ReturnType<typeof api.searchMarketplaceTalent>
+>['results'][number];
+type MarketplaceOpportunitySearchResult = Awaited<
+  ReturnType<typeof api.searchMarketplaceOpportunities>
+>['results'][number];
 type MarketplaceAnalyticsResponse = Awaited<
   ReturnType<typeof api.getMarketplaceAnalyticsOverview>
 >;
@@ -48,6 +54,24 @@ type MarketplaceClientOpportunitiesResponse = Awaited<
 type MarketplaceNotificationsResponse = Awaited<
   ReturnType<typeof api.listMarketplaceNotifications>
 >;
+type MarketplaceNotificationPreferencesResponse = Awaited<
+  ReturnType<typeof api.getMarketplaceNotificationPreferences>
+>;
+type MarketplaceDigestsResponse = Awaited<
+  ReturnType<typeof api.listMarketplaceDigests>
+>;
+type MarketplaceDigestDispatchRunsResponse = Awaited<
+  ReturnType<typeof api.listMarketplaceDigestDispatchRuns>
+>;
+type MarketplaceNotificationPreferencePatch = Parameters<
+  typeof api.updateMarketplaceNotificationPreferences
+>[0];
+type MarketplaceDigestDispatchOptions = Parameters<
+  typeof api.dispatchMarketplaceDigests
+>[0];
+type MarketplaceDigestGenerateOptions = Parameters<
+  typeof api.generateMarketplaceDigest
+>[0];
 
 function createMarketplaceSearchSnapshotId(search: { q: string; limit: number }) {
   return `q=${encodeURIComponent(search.q.trim().toLowerCase())}&limit=${search.limit}`;
@@ -77,6 +101,23 @@ export default function MarketplaceRoute() {
     queryFn: () => api.listMarketplaceOpportunities(search),
   });
 
+  const savedSearches = useQuery({
+    enabled: Boolean(accessToken),
+    queryKey: [
+      'marketplace',
+      'saved-searches',
+      tab,
+      workspace?.workspaceId ?? 'no-workspace',
+    ],
+    queryFn: () =>
+      api.listMarketplaceSavedSearches(
+        {
+          kind: tab === 'talent' ? 'talent' : 'opportunity',
+        },
+        accessToken as string,
+      ),
+  });
+
   const analytics = useQuery({
     enabled: Boolean(accessToken),
     queryKey: ['marketplace', 'analytics', workspace?.workspaceId],
@@ -100,6 +141,33 @@ export default function MarketplaceRoute() {
     queryKey: ['marketplace', 'notifications', workspace?.workspaceId],
     queryFn: () => api.listMarketplaceNotifications(accessToken as string),
   });
+  const notificationPreferences = useQuery({
+    enabled: Boolean(accessToken),
+    queryKey: [
+      'marketplace',
+      'notification-preferences',
+      workspace?.workspaceId ?? 'no-workspace',
+    ],
+    queryFn: () => api.getMarketplaceNotificationPreferences(accessToken as string),
+  });
+  const marketplaceDigests = useQuery({
+    enabled: Boolean(accessToken),
+    queryKey: ['marketplace', 'digests', workspace?.workspaceId ?? 'no-workspace'],
+    queryFn: () => api.listMarketplaceDigests(accessToken as string),
+  });
+  const marketplaceDigestDispatchRuns = useQuery({
+    enabled: Boolean(accessToken),
+    queryKey: ['marketplace', 'digest-dispatch-runs', workspace?.workspaceId ?? 'no-workspace'],
+    queryFn: () => api.listMarketplaceDigestDispatchRuns(accessToken as string),
+  });
+  const [savedTalentRerunResults, setSavedTalentRerunResults] =
+    useState<MarketplaceTalentSearchResult[] | null>(null);
+  const [savedOpportunityRerunResults, setSavedOpportunityRerunResults] =
+    useState<MarketplaceOpportunitySearchResult[] | null>(null);
+  const [notificationPreferenceDraft, setNotificationPreferenceDraft] =
+    useState<MarketplaceNotificationPreferencePatch>({});
+  const [digestDispatchMode, setDigestDispatchMode] =
+    useState<NonNullable<MarketplaceDigestDispatchOptions['mode']>>('due');
   const talentSnapshot = useOfflineSnapshot<MarketplaceTalentResponse>({
     cacheKey: createOfflineSnapshotCacheKey(
       'marketplace-talent',
@@ -191,6 +259,7 @@ export default function MarketplaceRoute() {
   const talentData = talent.data ?? (useTalentSnapshot ? talentSnapshot.data : null);
   const opportunitiesData =
     opportunities.data ?? (useOpportunitiesSnapshot ? opportunitiesSnapshot.data : null);
+  const savedSearchesData = savedSearches.data;
   const analyticsData = analytics.data ?? (useAnalyticsSnapshot ? analyticsSnapshot.data : null);
   const applicationsData =
     myApplications.data ?? (useApplicationsSnapshot ? applicationsSnapshot.data : null);
@@ -199,6 +268,12 @@ export default function MarketplaceRoute() {
     (useClientOpportunitiesSnapshot ? clientOpportunitiesSnapshot.data : null);
   const notificationsData =
     notifications.data ?? (useNotificationsSnapshot ? notificationsSnapshot.data : null);
+  const notificationPreferencesData =
+    notificationPreferences.data ?? null;
+  const marketplaceDigestsData = marketplaceDigests.data?.digests ?? [];
+  const marketplaceDigestDispatchRunsData = marketplaceDigestDispatchRuns.data?.runs ?? [];
+  const latestDigest = marketplaceDigestsData[0] ?? null;
+  const latestDigestDispatchRun = marketplaceDigestDispatchRunsData[0] ?? null;
   const workspaceSnapshotCachedAt = [
     useAnalyticsSnapshot ? analyticsSnapshot.cachedAt : null,
     useApplicationsSnapshot ? applicationsSnapshot.cachedAt : null,
@@ -207,6 +282,29 @@ export default function MarketplaceRoute() {
   ]
     .filter((cachedAt): cachedAt is number => typeof cachedAt === 'number')
     .sort((left, right) => right - left)[0] ?? null;
+
+  useEffect(() => {
+    setSavedTalentRerunResults(null);
+    setSavedOpportunityRerunResults(null);
+  }, [tab, query]);
+
+  useEffect(() => {
+    const preferences = notificationPreferences.data?.preferences;
+    if (!preferences) {
+      return;
+    }
+    setNotificationPreferenceDraft({
+      digestCadence: preferences.digestCadence,
+      talentInvitesEnabled: preferences.talentInvitesEnabled,
+      applicationActivityEnabled: preferences.applicationActivityEnabled,
+      interviewMessagesEnabled: preferences.interviewMessagesEnabled,
+      offerActivityEnabled: preferences.offerActivityEnabled,
+      reviewActivityEnabled: preferences.reviewActivityEnabled,
+      automationActivityEnabled: preferences.automationActivityEnabled,
+      lifecycleDigestEnabled: preferences.lifecycleDigestEnabled,
+      analyticsDigestEnabled: preferences.analyticsDigestEnabled,
+    });
+  }, [notificationPreferences.data?.preferences.updatedAt]);
 
   const selectWorkspace = useMutation({
     mutationFn: async (workspaceId: string) => {
@@ -236,16 +334,302 @@ export default function MarketplaceRoute() {
     },
   });
 
+  const rerunSavedSearch = useMutation({
+    mutationFn: async (searchId: string) => {
+      if (!accessToken) {
+        throw new Error('Sign in before rerunning searches.');
+      }
+
+      networkGate.requireOnline('Rerunning saved search');
+
+      return api.rerunMarketplaceSavedSearch(searchId, accessToken);
+    },
+    onSuccess: (response) => {
+      if (response.kind === 'talent') {
+        setSavedTalentRerunResults(response.results);
+        setSavedOpportunityRerunResults(null);
+        setTab('talent');
+      } else {
+        setSavedOpportunityRerunResults(response.results);
+        setSavedTalentRerunResults(null);
+        setTab('opportunities');
+      }
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'saved-searches', 'talent', workspace?.workspaceId ?? 'no-workspace'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          'marketplace',
+          'saved-searches',
+          'opportunities',
+          workspace?.workspaceId ?? 'no-workspace',
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', response.kind === 'talent' ? 'talent' : 'opportunities'],
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Saved search rerun failed',
+        error instanceof Error
+          ? error.message
+          : 'The saved search could not be rerun at this time.',
+      );
+    },
+  });
+
+  const deleteSavedSearch = useMutation({
+    mutationFn: async (searchId: string) => {
+      if (!accessToken) {
+        throw new Error('Sign in before deleting saved searches.');
+      }
+
+      networkGate.requireOnline('Deleting saved search');
+
+      return api.deleteMarketplaceSavedSearch(searchId, accessToken);
+    },
+    onSuccess: () => {
+      setSavedTalentRerunResults(null);
+      setSavedOpportunityRerunResults(null);
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'saved-searches', tab, workspace?.workspaceId ?? 'no-workspace'],
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Saved search delete failed',
+        error instanceof Error
+          ? error.message
+          : 'The saved search could not be deleted at this time.',
+      );
+    },
+  });
+
+  const updateNotificationPreferences = useMutation({
+    mutationFn: async (input: MarketplaceNotificationPreferencePatch) => {
+      if (!accessToken) {
+        throw new Error('Sign in before saving marketplace alert settings.');
+      }
+
+      networkGate.requireOnline('Saving marketplace alert settings');
+
+      return api.updateMarketplaceNotificationPreferences(input, accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          'marketplace',
+          'notification-preferences',
+          workspace?.workspaceId ?? 'no-workspace',
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'notifications', workspace?.workspaceId ?? 'no-workspace'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'digests', workspace?.workspaceId ?? 'no-workspace'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'digest-dispatch-runs', workspace?.workspaceId ?? 'no-workspace'],
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Marketplace alert settings failed',
+        error instanceof Error
+          ? error.message
+          : 'Marketplace alert preferences could not be updated.',
+      );
+    },
+  });
+
+  const dispatchMarketplaceDigests = useMutation({
+    mutationFn: async (input: MarketplaceDigestDispatchOptions) => {
+      if (!accessToken) {
+        throw new Error('Sign in before dispatching digest runs.');
+      }
+
+      networkGate.requireOnline('Dispatching marketplace digests');
+
+      return api.dispatchMarketplaceDigests(input, accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'digest-dispatch-runs', workspace?.workspaceId ?? 'no-workspace'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'digests', workspace?.workspaceId ?? 'no-workspace'],
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Digest dispatch failed',
+        error instanceof Error ? error.message : 'Could not dispatch marketplace digests.',
+      );
+    },
+  });
+
+  const generateMarketplaceDigest = useMutation({
+    mutationFn: async () => {
+      if (!accessToken) {
+        throw new Error('Sign in before generating marketplace digests.');
+      }
+
+      networkGate.requireOnline('Generating marketplace digest');
+
+      const input: MarketplaceDigestGenerateOptions = {
+        cadence: notificationPreferenceDraft.digestCadence,
+      };
+      return api.generateMarketplaceDigest(input, accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['marketplace', 'digests', workspace?.workspaceId ?? 'no-workspace'],
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Digest generation failed',
+        error instanceof Error
+          ? error.message
+          : 'Could not generate a marketplace digest.',
+      );
+    },
+  });
+
+  const setNotificationPreferenceBoolean = <
+    T extends keyof Pick<
+      MarketplaceNotificationPreferencePatch,
+      | 'talentInvitesEnabled'
+      | 'applicationActivityEnabled'
+      | 'interviewMessagesEnabled'
+      | 'offerActivityEnabled'
+      | 'reviewActivityEnabled'
+      | 'automationActivityEnabled'
+      | 'lifecycleDigestEnabled'
+      | 'analyticsDigestEnabled'
+    >,
+  >(
+    key: T,
+    value: NonNullable<MarketplaceNotificationPreferencePatch[T]>,
+  ) => {
+    setNotificationPreferenceDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const saveNotificationPreferences = () => {
+    const draft = { ...notificationPreferenceDraft };
+    updateNotificationPreferences.mutate(draft);
+  };
+
   const loading =
     (tab === 'talent' && talent.isLoading && !talentData) ||
     (tab === 'opportunities' && opportunities.isLoading && !opportunitiesData);
+  const isShowingRerunResults =
+    tab === 'talent'
+      ? savedTalentRerunResults !== null
+      : savedOpportunityRerunResults !== null;
+  const activeResultCount =
+    tab === 'talent'
+      ? isShowingRerunResults
+        ? savedTalentRerunResults?.length ?? 0
+        : talentData?.profiles.length ?? 0
+      : isShowingRerunResults
+        ? savedOpportunityRerunResults?.length ?? 0
+        : opportunitiesData?.opportunities.length ?? 0;
+
+  const hasNotificationPreferenceDraft =
+    notificationPreferences.data && Boolean(notificationPreferenceDraft.digestCadence);
+  const canSaveNotificationPreferences =
+    hasNotificationPreferenceDraft && !updateNotificationPreferences.isPending;
+  const canDispatchDigests = Boolean(workspace && accessToken);
+  const preferenceRows: Array<{
+    key: keyof Pick<
+      MarketplaceNotificationPreferencePatch,
+      | 'talentInvitesEnabled'
+      | 'applicationActivityEnabled'
+      | 'interviewMessagesEnabled'
+      | 'offerActivityEnabled'
+      | 'reviewActivityEnabled'
+      | 'automationActivityEnabled'
+      | 'lifecycleDigestEnabled'
+      | 'analyticsDigestEnabled'
+    >;
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: 'talentInvitesEnabled',
+      label: 'Talent invite alerts',
+      description: 'Notify on new talent invite activity.',
+    },
+    {
+      key: 'applicationActivityEnabled',
+      label: 'Application activity',
+      description: 'Notify on application status and submission changes.',
+    },
+    {
+      key: 'interviewMessagesEnabled',
+      label: 'Interview messages',
+      description: 'Notify when interview messages are posted.',
+    },
+    {
+      key: 'offerActivityEnabled',
+      label: 'Offer activity',
+      description: 'Notify on offer creation and responses.',
+    },
+    {
+      key: 'reviewActivityEnabled',
+      label: 'Review activity',
+      description: 'Notify on contract review updates.',
+    },
+    {
+      key: 'automationActivityEnabled',
+      label: 'Automation digest',
+      description: 'Notify on automation run updates.',
+    },
+    {
+      key: 'lifecycleDigestEnabled',
+      label: 'Lifecycle digest',
+      description: 'Notify from lifecycle digest summaries.',
+    },
+    {
+      key: 'analyticsDigestEnabled',
+      label: 'Analytics digest',
+      description: 'Notify on marketplace analytics and performance reports.',
+    },
+  ];
 
   return (
     <ScrollScreen>
-      <SectionHeader
+      <HeroSceneCard
         eyebrow="Discovery"
         title="Marketplace"
         body="Browse public profiles and scoped opportunities, then move into authenticated apply and workspace actions."
+        signals={[
+          {
+            label: 'Results',
+            value: activeResultCount,
+            tone: activeResultCount > 0 ? 'success' : 'muted',
+          },
+          {
+            label: 'Lane',
+            value: workspace
+              ? getMarketplaceLaneLabel(resolveMarketplaceLane(workspace))
+              : 'Public',
+            tone: workspace ? 'success' : 'warning',
+          },
+          {
+            label: 'Alerts',
+            value: latestDigest ? 'Digest ready' : 'Inbox live',
+            tone: latestDigest ? 'success' : 'muted',
+          },
+          {
+            label: 'Network',
+            value: networkGate.actionBlocked ? 'Offline-safe' : 'Live',
+            tone: networkGate.actionBlocked ? 'warning' : 'success',
+          },
+        ]}
       />
 
       <MarketplaceWorkspacePanel
@@ -274,6 +658,132 @@ export default function MarketplaceRoute() {
           cachedAt={workspaceSnapshotCachedAt}
           subject="marketplace workspace summary"
         />
+      ) : null}
+
+      {accessToken && notificationPreferences.data ? (
+        <SurfaceCard animated variant="elevated">
+          <Heading size="section">Marketplace alerts</Heading>
+          <BodyText style={styles.workspaceLabel}>
+            Set digest cadence and control what surfaces feed your marketplace inbox.
+          </BodyText>
+
+          <BodyText>Digest cadence</BodyText>
+          <SegmentedControl
+            value={notificationPreferenceDraft.digestCadence ?? 'manual'}
+            onChange={(value) =>
+              setNotificationPreferenceDraft((current) => ({
+                ...current,
+                digestCadence: value as 'manual' | 'daily' | 'weekly',
+              }))
+            }
+            options={[
+              { label: 'Manual', value: 'manual' },
+              { label: 'Daily', value: 'daily' },
+              { label: 'Weekly', value: 'weekly' },
+            ]}
+          />
+
+          <View style={styles.alertToggleSection}>
+            <BodyText>Notification categories</BodyText>
+            <View style={styles.alertToggleList}>
+              {preferenceRows.map((item) => (
+                <View key={item.key} style={styles.alertToggleRow}>
+                  <View style={styles.alertToggleCopy}>
+                    <BodyText>{item.label}</BodyText>
+                    <BodyText>{item.description}</BodyText>
+                  </View>
+                  <SegmentedControl
+                    value={
+                      notificationPreferenceDraft[item.key] ? 'enabled' : 'disabled'
+                    }
+                    onChange={(value) =>
+                      setNotificationPreferenceBoolean(
+                        item.key,
+                        value === 'enabled',
+                      )
+                    }
+                    options={[
+                      { label: 'On', value: 'enabled' },
+                      { label: 'Off', value: 'disabled' },
+                    ]}
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <PrimaryButton
+            onPress={() => saveNotificationPreferences()}
+            loading={updateNotificationPreferences.isPending}
+            disabled={!canSaveNotificationPreferences}
+            style={styles.alertActionPrimary}
+          >
+            Save alert settings
+          </PrimaryButton>
+
+          <View style={styles.alertActionRow}>
+            <SegmentedControl
+              value={digestDispatchMode}
+              onChange={(value) =>
+                setDigestDispatchMode(value as NonNullable<MarketplaceDigestDispatchOptions['mode']>)
+              }
+              options={[
+                { label: 'Due', value: 'due' },
+                { label: 'All enabled', value: 'all_enabled' },
+              ]}
+            />
+            <PrimaryButton
+              onPress={() =>
+                dispatchMarketplaceDigests.mutate({
+                  mode: digestDispatchMode,
+                  trigger: 'manual',
+                })
+              }
+              loading={dispatchMarketplaceDigests.isPending}
+              disabled={!canDispatchDigests}
+              style={styles.alertActionSecondary}
+            >
+              Dispatch digests
+            </PrimaryButton>
+            <PrimaryButton
+              onPress={() => generateMarketplaceDigest.mutate()}
+              loading={generateMarketplaceDigest.isPending}
+              disabled={!notificationPreferences.data}
+              style={styles.alertActionSecondary}
+            >
+              Generate digest now
+            </PrimaryButton>
+          </View>
+
+          {latestDigest ? (
+            <View style={styles.alertSummary}>
+              <BodyText>Latest digest</BodyText>
+              <MetricRow
+                label={latestDigest.title}
+                value={`${latestDigest.cadence} • ${latestDigest.status}`}
+              />
+              <BodyText numberOfLines={3}>{latestDigest.summary}</BodyText>
+            </View>
+          ) : null}
+          {latestDigestDispatchRun ? (
+            <View style={styles.alertSummary}>
+              <BodyText>Latest dispatch</BodyText>
+              <MetricRow
+                label={latestDigestDispatchRun.trigger === 'manual' ? 'Manual run' : 'Scheduled run'}
+                value={`${latestDigestDispatchRun.dispatchedCount} delivered`}
+              />
+              <BodyText numberOfLines={2}>{latestDigestDispatchRun.summary}</BodyText>
+            </View>
+          ) : null}
+
+          {marketplaceDigests.isLoading && !marketplaceDigestsData.length ? (
+            <BodyText>Loading digests…</BodyText>
+          ) : null}
+          {marketplaceDigestDispatchRuns.isLoading &&
+          !marketplaceDigestDispatchRunsData.length ? (
+            <BodyText>Loading dispatch runs…</BodyText>
+          ) : null}
+        </SurfaceCard>
       ) : null}
 
       <SegmentedControl
@@ -309,48 +819,120 @@ export default function MarketplaceRoute() {
           subject="opportunity results"
         />
       ) : null}
+      {accessToken && savedSearchesData?.searches.length ? (
+        <SurfaceCard animated variant="elevated">
+          <Heading size="section">Saved searches</Heading>
+          <BodyText style={styles.workspaceLabel}>Quickly rerun, inspect, or clean up saved searches.</BodyText>
+          {savedSearchesData.searches.map((search) => (
+            <View key={search.id} style={styles.listItemRow}>
+              <View style={styles.savedSearchCard}>
+                <BodyText>{search.label}</BodyText>
+                <BodyText>
+                  Results {search.lastResultCount} • {search.alertFrequency}
+                </BodyText>
+              </View>
+              <View style={styles.searchActions}>
+                <PrimaryButton
+                  onPress={() => rerunSavedSearch.mutate(search.id)}
+                  loading={rerunSavedSearch.isPending}
+                >
+                  Rerun
+                </PrimaryButton>
+                <PrimaryButton
+                  onPress={() => deleteSavedSearch.mutate(search.id)}
+                  loading={deleteSavedSearch.isPending}
+                >
+                  Delete
+                </PrimaryButton>
+              </View>
+            </View>
+          ))}
+        </SurfaceCard>
+      ) : null}
 
       {tab === 'talent'
-        ? talentData?.profiles.map((profile, index) => (
-            <ListCard
-              key={profile.slug}
-              title={profile.displayName}
-              body={profile.headline}
-              eyebrow={profile.verificationLevel.replaceAll('_', ' ')}
-              chips={profile.skills}
-              meta={profile.availability}
-              actionLabel="View profile"
-              delay={index * 45}
-              onPress={() =>
-                router.push({
-                  pathname: '/marketplace/profile/[slug]',
-                  params: { slug: profile.slug },
-                })
-              }
-            />
-          ))
-        : opportunitiesData?.opportunities.map((opportunity, index) => (
-            <ListCard
-              key={opportunity.id}
-              title={opportunity.title}
-              body={opportunity.summary}
-              eyebrow={opportunity.category}
-              chips={opportunity.requiredSkills}
-              meta={opportunity.status}
-              actionLabel={
-                accessToken && canApplyToOpportunity(workspace)
-                  ? 'Review and apply'
-                  : 'View opportunity'
-              }
-              delay={index * 45}
-              onPress={() =>
-                router.push({
-                  pathname: '/marketplace/opportunity/[id]',
-                  params: { id: opportunity.id },
-                })
-              }
-            />
-          ))}
+        ? isShowingRerunResults
+          ? (savedTalentRerunResults ?? []).map((result, index) => (
+              <ListCard
+                key={result.profile.userId}
+                title={result.profile.displayName}
+                body={result.profile.headline}
+                eyebrow={result.profile.verificationLevel.replaceAll('_', ' ')}
+                chips={result.profile.skills}
+                meta={result.profile.availability}
+                actionLabel="View profile"
+                delay={index * 45}
+                onPress={() =>
+                  router.push({
+                    pathname: '/marketplace/profile/[slug]',
+                    params: { slug: result.profile.slug },
+                  })
+                }
+              />
+            ))
+          : talentData?.profiles.map((profile, index) => (
+              <ListCard
+                key={profile.slug}
+                title={profile.displayName}
+                body={profile.headline}
+                eyebrow={profile.verificationLevel.replaceAll('_', ' ')}
+                chips={profile.skills}
+                meta={profile.availability}
+                actionLabel="View profile"
+                delay={index * 45}
+                onPress={() =>
+                  router.push({
+                    pathname: '/marketplace/profile/[slug]',
+                    params: { slug: profile.slug },
+                  })
+                }
+              />
+            ))
+        : isShowingRerunResults
+          ? (savedOpportunityRerunResults ?? []).map((result, index) => (
+              <ListCard
+                key={result.opportunity.id}
+                title={result.opportunity.title}
+                body={result.opportunity.summary}
+                eyebrow={result.opportunity.category}
+                chips={result.opportunity.requiredSkills}
+                meta={result.opportunity.status}
+                actionLabel={
+                  accessToken && canApplyToOpportunity(workspace)
+                    ? 'Review and apply'
+                    : 'View opportunity'
+                }
+                delay={index * 45}
+                onPress={() =>
+                  router.push({
+                    pathname: '/marketplace/opportunity/[id]',
+                    params: { id: result.opportunity.id },
+                  })
+                }
+              />
+            ))
+          : opportunitiesData?.opportunities.map((opportunity, index) => (
+              <ListCard
+                key={opportunity.id}
+                title={opportunity.title}
+                body={opportunity.summary}
+                eyebrow={opportunity.category}
+                chips={opportunity.requiredSkills}
+                meta={opportunity.status}
+                actionLabel={
+                  accessToken && canApplyToOpportunity(workspace)
+                    ? 'Review and apply'
+                    : 'View opportunity'
+                }
+                delay={index * 45}
+                onPress={() =>
+                  router.push({
+                    pathname: '/marketplace/opportunity/[id]',
+                    params: { id: opportunity.id },
+                  })
+                }
+              />
+            ))}
 
       {(tab === 'talent' && talent.isError) ||
       (tab === 'opportunities' && opportunities.isError) ? (
@@ -363,9 +945,7 @@ export default function MarketplaceRoute() {
         ) : null
       ) : null}
 
-      {!loading &&
-      ((tab === 'talent' && talentData?.profiles.length === 0) ||
-        (tab === 'opportunities' && opportunitiesData?.opportunities.length === 0)) ? (
+      {!loading && activeResultCount === 0 ? (
         <EmptyState title="No matches" body="Try a broader skill, category, or timezone search." />
       ) : null}
     </ScrollScreen>
@@ -548,5 +1128,54 @@ const styles = StyleSheet.create({
   },
   metricGrid: {
     gap: 8,
+  },
+  workspaceLabel: {
+    marginBottom: 8,
+  },
+  alertToggleSection: {
+    gap: 12,
+    marginTop: 14,
+    marginBottom: 14,
+  },
+  alertToggleList: {
+    gap: 14,
+  },
+  alertToggleRow: {
+    gap: 8,
+  },
+  alertToggleCopy: {
+    gap: 2,
+    marginBottom: 4,
+  },
+  alertActionRow: {
+    alignItems: 'stretch',
+    gap: 8,
+    marginTop: 12,
+  },
+  alertActionPrimary: {
+    marginTop: 8,
+  },
+  alertActionSecondary: {
+    marginTop: 4,
+  },
+  alertSummary: {
+    marginTop: 10,
+    gap: 4,
+  },
+  listItemRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  savedSearchCard: {
+    flex: 1,
+    gap: 2,
+  },
+  searchActions: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 10,
   },
 });
