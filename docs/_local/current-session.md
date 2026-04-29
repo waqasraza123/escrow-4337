@@ -3,6 +3,15 @@
 ## Date
 - 2026-04-29
 
+## Update (2026-04-29, Vercel API Jose Runtime Fix)
+- Fixed deployed API runtime crashes on Vercel caused by CommonJS output requiring ESM-only `jose@6`.
+- Replaced the API JWT helper's runtime `jose` usage with a Node `crypto` HS256 implementation that preserves issuer, audience, issued-at, expiry, access/refresh token type, session id, and refresh token id validation.
+- Verified the compiled API auth bundle no longer imports or requires `jose` at runtime.
+- Verification:
+  - `pnpm --filter escrow4334-api test -- auth.integration.spec.ts sessions.service.spec.ts auth.config.spec.ts`
+  - `pnpm --filter escrow4334-api build`
+- Next action: commit on `dev`, push `dev`, update `api` from `dev`, and fast-forward `main` from `dev` so Vercel rebuilds the API deployment from the fixed code.
+
 ## Update (2026-04-29, Vercel Main API Deploy Fix)
 - Investigated Vercel API build failure:
   - Vercel was building `main` at `de92264`.
