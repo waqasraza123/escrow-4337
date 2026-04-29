@@ -23,6 +23,7 @@ import {
   type MarketplaceApplication,
   type MarketplaceApplicationComparison,
   type MarketplaceApplicationTimeline,
+  type MarketplaceHiringCommunicationThread,
   type MarketplaceOffer,
   type MarketplaceOfferMilestoneDraft,
   type MarketplaceCryptoReadiness,
@@ -187,12 +188,14 @@ async function loadApplicationData(
   options: {
     includeComparisons?: boolean;
     includeTimelines?: boolean;
+    includeHiringThreads?: boolean;
   },
 ) {
   const applicationsByOpportunity: Record<string, MarketplaceApplication[]> = {};
   const comparisonsByOpportunity: Record<string, MarketplaceApplicationComparison[]> =
     {};
   const timelinesByApplication: Record<string, MarketplaceApplicationTimeline> = {};
+  const hiringThreadsByApplication: Record<string, MarketplaceHiringCommunicationThread> = {};
 
   await Promise.all(
     opportunities.map(async (opportunity) => {
@@ -212,8 +215,14 @@ async function loadApplicationData(
       }
 
       if (options.includeTimelines) {
-        await Promise.all(
+        const timelineEntries = await Promise.all(
           applicationsResponse.applications.map(async (application) => {
+            const threadResponse = options.includeHiringThreads
+              ? await webApi
+                  .getMarketplaceApplicationHiringThread(application.id, accessToken)
+                  .catch(() => null)
+              : null;
+
             const timelineResponse = await webApi.getMarketplaceApplicationTimeline(
               application.id,
               accessToken,
@@ -221,9 +230,21 @@ async function loadApplicationData(
             await webApi
               .markMarketplaceApplicationInterviewThreadRead(application.id, accessToken)
               .catch(() => {});
-            timelinesByApplication[application.id] = timelineResponse.timeline;
+
+            return {
+              applicationId: application.id,
+              timeline: timelineResponse.timeline,
+              thread: threadResponse?.thread ?? null,
+            };
           }),
         );
+
+        timelineEntries.forEach((entry) => {
+          timelinesByApplication[entry.applicationId] = entry.timeline;
+          if (entry.thread) {
+            hiringThreadsByApplication[entry.applicationId] = entry.thread;
+          }
+        });
       }
     }),
   );
@@ -232,7 +253,89 @@ async function loadApplicationData(
     applicationsByOpportunity,
     comparisonsByOpportunity,
     timelinesByApplication,
+    hiringThreadsByApplication,
   };
+}
+
+function formatHiringCommunicationSource(source: MarketplaceHiringCommunicationThread['events'][number]['source']) {
+  if (source === 'interview_message') {
+    return 'Interview Message';
+  }
+  if (source === 'application_decision') {
+    return 'Decision';
+  }
+  if (source === 'offer') {
+    return 'Offer';
+  }
+  return 'Project Room';
+}
+
+function formatHiringActorLabel(
+  event: MarketplaceHiringCommunicationThread['events'][number],
+  viewerUserId: string | null,
+) {
+  if (event.actor.userId && viewerUserId && event.actor.userId === viewerUserId) {
+    return 'You';
+  }
+  return event.actor.email ?? event.actor.role;
+}
+
+function renderHiringCommunicationThread(
+  thread: MarketplaceHiringCommunicationThread | null,
+  viewerUserId: string | null,
+  emptyLabel: string,
+) {
+  const events = thread?.events ?? [];
+
+  if (events.length === 0) {
+    return <p className={styles.stateText}>{emptyLabel}</p>;
+  }
+
+  return (
+    <div className={styles.stack}>
+      {events.map((event) => {
+        const actorLabel = formatHiringActorLabel(event, viewerUserId);
+
+        return (
+          <div key={event.id} className={styles.walletCard}>
+            <strong>
+              {actorLabel} • {formatHiringCommunicationSource(event.source)}
+            </strong>
+            <p className={styles.stateText}>
+              {new Date(event.createdAt).toLocaleString()}
+            </p>
+            <p className={styles.stateText}>{event.title}</p>
+            <p className={styles.stateText}>
+              {event.body ?? emptyLabel}
+            </p>
+            {event.offerId ? (
+              <p className={styles.stateText}>
+                Offer #{event.offerRevisionNumber ?? 'n/a'} • {event.offerStatus}
+              </p>
+            ) : null}
+            {event.messageKind ? (
+              <p className={styles.stateText}>Message kind: {event.messageKind}</p>
+            ) : null}
+            {event.attachments.length > 0 ? (
+              <div>
+                {event.attachments.map((attachment, attachmentIndex) => (
+                  <p
+                    key={`${attachment.id}-${attachmentIndex}`}
+                    className={styles.stateText}
+                    style={{ margin: '0.25rem 0' }}
+                  >
+                    <a href={attachment.url} target="_blank" rel="noreferrer">
+                      {attachment.label || attachment.url}
+                    </a>
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function countMilestones(job: JobView, status: JobView['milestones'][number]['status']) {
@@ -321,6 +424,9 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
   >({});
   const [applicationTimelines, setApplicationTimelines] = useState<
     Record<string, MarketplaceApplicationTimeline>
+  >({});
+  const [applicationHiringThreads, setApplicationHiringThreads] = useState<
+    Record<string, MarketplaceHiringCommunicationThread>
   >({});
   const [notifications, setNotifications] = useState<MarketplaceNotification[]>([]);
   const [digests, setDigests] = useState<MarketplaceDigest[]>([]);
@@ -512,6 +618,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
         setApplicationsByOpportunity({});
         setComparisonsByOpportunity({});
         setApplicationTimelines({});
+        setApplicationHiringThreads({});
         setNotifications([]);
         setDigests([]);
         setDigestRuns([]);
@@ -532,6 +639,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
         setApplicationsByOpportunity({});
         setComparisonsByOpportunity({});
         setApplicationTimelines({});
+        setApplicationHiringThreads({});
         setNotifications([]);
         setDigests([]);
         setDigestRuns([]);
@@ -566,11 +674,13 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
           ? loadApplicationData(nextTokens.accessToken, opportunitiesResponse.opportunities, {
               includeComparisons: section === 'applicants',
               includeTimelines: shouldLoadTimelines || section === 'applicants',
+              includeHiringThreads: section === 'interviews' || section === 'offers',
             })
           : Promise.resolve({
               applicationsByOpportunity: {},
               comparisonsByOpportunity: {},
               timelinesByApplication: {},
+              hiringThreadsByApplication: {},
             }),
         section === 'dashboard'
           ? webApi
@@ -597,6 +707,7 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
       setApplicationsByOpportunity(applicationBundle.applicationsByOpportunity);
       setComparisonsByOpportunity(applicationBundle.comparisonsByOpportunity);
       setApplicationTimelines(applicationBundle.timelinesByApplication);
+      setApplicationHiringThreads(applicationBundle.hiringThreadsByApplication);
       setNotifications(dashboardNotifications.notifications);
       setDigests(dashboardDigests.digests);
       setDigestRuns(dashboardDigestRuns.runs);
@@ -1158,6 +1269,21 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                               <p className={styles.stateText}>
                                 {notification.detail}
                               </p>
+                              {notification.messageActionPrompt ? (
+                                <p className={styles.stateText}>
+                                  {notification.messageActionPrompt}
+                                </p>
+                              ) : null}
+                              {notification.messageThreadHref ? (
+                                <div className={styles.inlineActions}>
+                                  <Link
+                                    className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                                    href={notification.messageThreadHref}
+                                  >
+                                    {notification.messageActionLabel ?? 'Open message thread'}
+                                  </Link>
+                                </div>
+                              ) : null}
                             </div>
                           </SharedCard>
                         ))}
@@ -1529,13 +1655,14 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                               (!timeline?.contractDraft ||
                                 timeline.contractDraft.status === 'finalized');
 
-                            return (
-                              <SharedCard
-                                key={application.id}
-                                className={styles.actionPanel}
-                                data-testid={`client-console-applicant-${application.id}`}
-                                interactive
-                              >
+                          return (
+                            <SharedCard
+                              key={application.id}
+                              className={styles.actionPanel}
+                              data-testid={`client-console-applicant-${application.id}`}
+                              id={`application-${application.id}`}
+                              interactive
+                            >
                                 <div className={styles.stack}>
                                   <strong>{application.applicant.displayName}</strong>
                                   <p className={styles.stateText}>
@@ -1639,10 +1766,15 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                       {clientMessages.interviews.empty}
                     </p>
                   ) : (
-                    interviewRows.map(({ timeline, summary }) => (
+                    interviewRows.map(({ timeline, summary }) => {
+                      const hiringThread =
+                        applicationHiringThreads[timeline.application.id] ?? null;
+
+                      return (
                       <SharedCard
                         key={timeline.application.id}
                         className={styles.actionPanel}
+                        id={`application-${timeline.application.id}`}
                         interactive
                       >
                         <div className={styles.stack}>
@@ -1707,9 +1839,18 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                               {clientMessages.actions.openApplicants}
                             </Link>
                           </div>
+                          <span className={styles.metaLabel}>
+                            {workspaceMessages.interviewTitle}
+                          </span>
+                          {renderHiringCommunicationThread(
+                            hiringThread,
+                            user?.id ?? null,
+                            workspaceMessages.noInterviewMessages,
+                          )}
                         </div>
                       </SharedCard>
-                    ))
+                    )
+                  })
                   )}
                 </SectionCard>
               </RevealSection>
@@ -1727,10 +1868,14 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                   ) : (
                     offerRows.map(({ timeline, latestOffer, draft, hasActiveNegotiation }) => {
                       const offerDraft = getOfferDraft(timeline.application.id, latestOffer);
+                      const hiringThread =
+                        applicationHiringThreads[timeline.application.id] ?? null;
+
                       return (
                         <SharedCard
                           key={latestOffer.id}
                           className={styles.actionPanel}
+                          id={`application-${timeline.application.id}`}
                           interactive
                         >
                           <div className={styles.stack}>
@@ -1886,15 +2031,23 @@ export function ClientConsole(props: { section: ClientConsoleSection }) {
                                           </button>
                                         </div>
                                       </div>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className={styles.inlineActions}>
-                              <Link
-                                className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
-                                href="/app/marketplace/client/applicants"
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <span className={styles.metaLabel}>
+                          {workspaceMessages.interviewTitle}
+                        </span>
+                        {renderHiringCommunicationThread(
+                          hiringThread,
+                          user?.id ?? null,
+                          workspaceMessages.noInterviewMessages,
+                        )}
+                        <div className={styles.inlineActions}>
+                          <Link
+                            className={`${styles.actionLink} ${styles.actionLinkSecondary}`}
+                            href="/app/marketplace/client/applicants"
                               >
                                 {clientMessages.actions.openApplicants}
                               </Link>

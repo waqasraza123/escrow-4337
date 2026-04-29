@@ -137,6 +137,10 @@ import type {
   MarketplaceInterviewMessageRecord,
   MarketplaceInterviewMessageView,
   MarketplaceInterviewThreadRecord,
+  MarketplaceHiringCommunicationActor,
+  MarketplaceHiringCommunicationEvent,
+  MarketplaceHiringCommunicationThread,
+  MarketplaceHiringCommunicationThreadResponse,
   MarketplaceJobReviewsResponse,
   MarketplaceInterviewThreadResponse,
   MarketplaceInterviewThreadView,
@@ -188,6 +192,7 @@ import type {
   MarketplaceRehireCandidateView,
   MarketplaceSavedSearchResponse,
   MarketplaceSavedSearchesResponse,
+  MarketplaceSavedSearchRerunResponse,
   MarketplaceSavedSearchRecord,
   MarketplaceSavedSearchView,
   MarketplaceSearchReason,
@@ -1304,6 +1309,108 @@ export class MarketplaceService {
     }
     await this.marketplaceRepository.deleteSavedSearch(searchId);
     return { ok: true as const };
+  }
+
+  async rerunSavedSearch(
+    userId: string,
+    searchId: string,
+  ): Promise<MarketplaceSavedSearchRerunResponse> {
+    const context = await this.organizationsService.buildWorkspaceContext(userId);
+    const search = await this.marketplaceRepository.getSavedSearchById(searchId);
+    if (!search || search.userId !== userId) {
+      throw new NotFoundException('Marketplace saved search not found');
+    }
+
+    const normalizedQuery = this.normalizeSavedSearchQuery(
+      search.kind,
+      search.query,
+    );
+    const skillTags = normalizeSkillTags(
+      [
+        asOptionalString(normalizedQuery.skill),
+        asOptionalString(normalizedQuery.skills),
+        asOptionalString(normalizedQuery.category),
+      ].filter(Boolean) as string[],
+    );
+    const category = asOptionalString(normalizedQuery.category) ?? null;
+    const timezone = asOptionalString(normalizedQuery.timezone) ?? null;
+    const now = Date.now();
+
+    if (search.kind === 'talent') {
+      const response = await this.searchTalent(
+        this.toTalentSearchQuery(normalizedQuery),
+      );
+      const rerunSearch: MarketplaceSavedSearchRecord = {
+        ...search,
+        query: normalizedQuery,
+        lastResultCount: response.results.length,
+        updatedAt: now,
+      };
+      await this.marketplaceRepository.saveSavedSearch(rerunSearch);
+      await this.trackMarketplaceEvent({
+        actorUserId: userId,
+        actorWorkspaceId: context.activeWorkspace?.workspaceId ?? null,
+        surface: 'workspace',
+        entityType: 'saved_search',
+        eventType: 'search_impression',
+        entityId: search.id,
+        searchKind: search.kind,
+        queryLabel: summarizeSearchQuery(search.kind, normalizedQuery),
+        category,
+        timezone,
+        skillTags,
+        resultCount: response.results.length,
+        relatedOpportunityId: null,
+        relatedProfileUserId: null,
+        relatedApplicationId: null,
+        relatedJobId: null,
+      });
+      return {
+        search: this.toSavedSearchView(
+          rerunSearch,
+          context.activeWorkspace?.workspaceId ?? null,
+        ),
+        kind: 'talent',
+        results: response.results,
+      };
+    }
+
+    const response = await this.searchOpportunities(
+      this.toOpportunitySearchQuery(normalizedQuery),
+    );
+    const rerunSearch: MarketplaceSavedSearchRecord = {
+      ...search,
+      query: normalizedQuery,
+      lastResultCount: response.results.length,
+      updatedAt: now,
+    };
+    await this.marketplaceRepository.saveSavedSearch(rerunSearch);
+    await this.trackMarketplaceEvent({
+      actorUserId: userId,
+      actorWorkspaceId: context.activeWorkspace?.workspaceId ?? null,
+      surface: 'workspace',
+      entityType: 'saved_search',
+      eventType: 'search_impression',
+      entityId: search.id,
+      searchKind: search.kind,
+      queryLabel: summarizeSearchQuery(search.kind, normalizedQuery),
+      category,
+      timezone,
+      skillTags,
+      resultCount: response.results.length,
+      relatedOpportunityId: null,
+      relatedProfileUserId: null,
+      relatedApplicationId: null,
+      relatedJobId: null,
+    });
+    return {
+      search: this.toSavedSearchView(
+        rerunSearch,
+        context.activeWorkspace?.workspaceId ?? null,
+      ),
+      kind: 'opportunity',
+      results: response.results,
+    };
   }
 
   async listTalentPools(
@@ -2479,6 +2586,10 @@ export class MarketplaceService {
       title: `New application for ${opportunity.title}`,
       detail: `${profile.displayName} submitted a proposal that is ready for dossier review.`,
       actorUserId: userId,
+      messageActionLabel: 'Open application thread',
+      messageActionPrompt:
+        'Confirm requirements, clarify scope boundaries, and request any missing details before moving forward.',
+      messageThreadHref: this.buildClientApplicationThreadHref(application.id),
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
     });
@@ -2696,6 +2807,187 @@ export class MarketplaceService {
     };
   }
 
+  async getApplicationHiringThread(
+    userId: string,
+    applicationId: string,
+  ): Promise<MarketplaceHiringCommunicationThreadResponse> {
+    const application = await this.requireApplication(applicationId);
+    const access = await this.getApplicationAccess(userId, application);
+    if (!access.asApplicant && !access.asOwner) {
+      throw new ForbiddenException(
+        'You do not have access to this hiring communication thread',
+      );
+    }
+
+    const opportunity = access.opportunity;
+    const thread = (await this.marketplaceRepository.listInterviewThreads())
+      .filter((entry) => entry.applicationId === application.id)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
+    if (thread) {
+      await this.markInterviewThreadRead(thread, access);
+    }
+
+    const interviewMessages = thread
+      ? (
+          await this.toInterviewThreadView(thread)
+        ).messages
+      : [];
+
+    const offers = (await this.marketplaceRepository.listOffers())
+      .filter((offer) => offer.applicationId === application.id)
+      .sort((left, right) => left.createdAt - right.createdAt);
+
+    const decisions = (
+      await this.marketplaceRepository.listApplicationDecisions()
+    )
+      .filter((decision) => decision.applicationId === application.id)
+      .sort((left, right) => left.createdAt - right.createdAt);
+
+    type HiringCommunicationDraftEvent = Omit<
+      MarketplaceHiringCommunicationEvent,
+      'actor'
+    > & {
+      actorUserId: string | null;
+      actorRole: MarketplaceHiringCommunicationActor['role'];
+    };
+
+    const resolveActorRole = (
+      actorUserId: string | null,
+    ): MarketplaceHiringCommunicationActor['role'] => {
+      if (!actorUserId) {
+        return 'system';
+      }
+      if (actorUserId === application.applicantUserId) {
+        return 'applicant';
+      }
+      if (actorUserId === opportunity.ownerUserId) {
+        return 'client';
+      }
+      return 'system';
+    };
+
+    const draftEvents: HiringCommunicationDraftEvent[] = [];
+
+    for (const message of interviewMessages) {
+      draftEvents.push({
+        id: message.id,
+        source: 'interview_message',
+        createdAt: message.createdAt,
+        actorUserId: message.senderUserId,
+        actorRole: resolveActorRole(message.senderUserId),
+        title: 'Interview message',
+        body: message.body,
+        offerId: null,
+        offerStatus: null,
+        offerRevisionNumber: null,
+        messageKind: message.kind,
+        attachments: message.attachments,
+      });
+    }
+
+    for (const offer of offers) {
+      draftEvents.push({
+        id: `${offer.id}-lifecycle`,
+        source: 'offer',
+        createdAt: offer.createdAt,
+        actorUserId:
+          offer.status === 'accepted' || offer.status === 'declined'
+            ? offer.applicantUserId
+            : offer.clientUserId,
+        actorRole: resolveActorRole(
+          offer.status === 'accepted' || offer.status === 'declined'
+            ? offer.applicantUserId
+            : offer.clientUserId,
+        ),
+        title: `Offer ${offer.status.replace(/_/g, ' ')}`,
+        body: offer.message ?? offer.counterMessage ?? offer.declineReason ?? null,
+        offerId: offer.id,
+        offerStatus: offer.status,
+        offerRevisionNumber: offer.revisionNumber,
+        messageKind: null,
+        attachments: [],
+      });
+    }
+
+    for (const decision of decisions) {
+      draftEvents.push({
+        id: decision.id,
+        source: 'application_decision',
+        createdAt: decision.createdAt,
+        actorUserId: decision.actorUserId,
+        actorRole: resolveActorRole(decision.actorUserId),
+        title: `Application ${decision.action.replace(/_/g, ' ')}`,
+        body: decision.reason ?? null,
+        offerId: null,
+        offerStatus: null,
+        offerRevisionNumber: null,
+        messageKind: null,
+        attachments: [],
+      });
+    }
+
+    if (application.hiredJobId) {
+      const { room } = await this.escrowService.getProjectRoom(
+        userId,
+        application.hiredJobId,
+      );
+      for (const message of room.messages) {
+        draftEvents.push({
+          id: message.id,
+          source: 'project_room_message',
+          createdAt: message.createdAt,
+          actorUserId: message.sender.userId,
+          actorRole: resolveActorRole(message.sender.userId),
+          title: `Project room message (${message.senderRole})`,
+          body: message.body,
+          offerId: null,
+          offerStatus: null,
+          offerRevisionNumber: null,
+          messageKind: null,
+          attachments: [],
+        });
+      }
+    }
+
+    draftEvents.sort((left, right) => left.createdAt - right.createdAt);
+
+    const actorEmailByUserId = new Map<string, string | null>();
+    const resolveActorEmail = async (actorUserId: string | null) => {
+      if (!actorUserId) {
+        return null;
+      }
+      const cached = actorEmailByUserId.get(actorUserId);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const actor = await this.usersService.getRequiredById(actorUserId);
+      actorEmailByUserId.set(actorUserId, actor.email);
+      return actor.email;
+    };
+
+    const events = await Promise.all(
+      draftEvents.map(async (entry) => ({
+        ...entry,
+        actor: {
+          userId: entry.actorUserId,
+          email: await resolveActorEmail(entry.actorUserId),
+          role: entry.actorRole,
+        },
+      })),
+    );
+
+    return {
+      thread: {
+        applicationId: application.id,
+        opportunityId: application.opportunityId,
+        hiredJobId: application.hiredJobId,
+        asApplicant: access.asApplicant,
+        asOwner: access.asOwner,
+        events,
+      } satisfies MarketplaceHiringCommunicationThread,
+    };
+  }
+
   async getApplicationInterviewThread(
     userId: string,
     applicationId: string,
@@ -2818,6 +3110,9 @@ export class MarketplaceService {
       relatedApplicationId: application.id,
       relatedJobId: null,
     });
+    const interviewMessageThreadHref = access.asOwner
+      ? this.buildFreelancerApplicationThreadHref(application.id)
+      : this.buildClientInterviewThreadHref(application.id);
     await this.emitNotification({
       userId: access.asOwner
         ? application.applicantUserId
@@ -2828,6 +3123,14 @@ export class MarketplaceService {
       kind: 'interview_message_received',
       title: `Interview update for ${opportunity.title}`,
       detail: dto.body.trim(),
+      messageActionLabel: access.asOwner
+        ? 'Reply in this message thread'
+        : 'Respond to this interview thread',
+      messageActionPrompt:
+        dto.kind === 'clarification'
+          ? 'Respond with a concrete ETA and revised scope clarifications before the next decision.'
+          : 'Confirm availability, scope, and milestone timing in the shared thread.',
+      messageThreadHref: interviewMessageThreadHref,
       actorUserId: userId,
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
@@ -2918,6 +3221,10 @@ export class MarketplaceService {
         offer.message ??
         'A client sent a milestone-backed offer for this opportunity.',
       actorUserId: userId,
+      messageActionLabel: 'Discuss offer terms in messages',
+      messageActionPrompt:
+        'Reply in the shared thread to confirm milestones, request revisions, or confirm ETA.',
+      messageThreadHref: this.buildFreelancerOfferThreadHref(application.id),
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
       relatedOfferId: offer.id,
@@ -2980,6 +3287,10 @@ export class MarketplaceService {
           dto.message?.trim() ||
           'The applicant accepted the marketplace offer.',
         actorUserId: userId,
+        messageActionLabel: 'Keep negotiation moving',
+        messageActionPrompt:
+          'Confirm start timing, contract handoff, and any final clarifications in this thread.',
+        messageThreadHref: this.buildClientOfferThreadHref(application.id),
         relatedOpportunityId: application.opportunityId,
         relatedApplicationId: application.id,
         relatedOfferId: offer.id,
@@ -3031,6 +3342,10 @@ export class MarketplaceService {
           offer.declineReason ??
           'The applicant declined the marketplace offer.',
         actorUserId: userId,
+        messageActionLabel: 'Continue negotiation',
+        messageActionPrompt:
+          'Request a revised scope or milestone split in the message thread so both parties stay aligned.',
+        messageThreadHref: this.buildClientOfferThreadHref(application.id),
         relatedOpportunityId: application.opportunityId,
         relatedApplicationId: application.id,
         relatedOfferId: offer.id,
@@ -3095,6 +3410,10 @@ export class MarketplaceService {
         counter.counterMessage ??
         'The applicant proposed a counter offer with updated terms.',
       actorUserId: userId,
+      messageActionLabel: 'Review counter-offer in thread',
+      messageActionPrompt:
+        'Clarify milestones, request revisions, and confirm availability before finalizing.',
+      messageThreadHref: this.buildClientOfferThreadHref(application.id),
       relatedOpportunityId: application.opportunityId,
       relatedApplicationId: application.id,
       relatedOfferId: counter.id,
@@ -3397,6 +3716,10 @@ export class MarketplaceService {
       detail:
         'The client moved your proposal into the shortlist and may continue with interviews or offers.',
       actorUserId: userId,
+      messageActionLabel: 'Open application thread',
+      messageActionPrompt:
+        'Align on interview checkpoints, confirm ETA, and agree on first milestones.',
+      messageThreadHref: this.buildClientApplicationThreadHref(application.id),
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
     });
@@ -3457,6 +3780,10 @@ export class MarketplaceService {
         dto.reason?.trim() ||
         'The client closed this application and did not move it forward.',
       actorUserId: userId,
+      messageActionLabel: 'Open application thread',
+      messageActionPrompt:
+        'Share closure reasons and next steps; if needed, request revisions before reapplying.',
+      messageThreadHref: this.buildClientApplicationThreadHref(application.id),
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
     });
@@ -3602,6 +3929,10 @@ export class MarketplaceService {
           detail:
             'Another candidate moved forward into escrow for this opportunity.',
           actorUserId: userId,
+          messageActionLabel: 'Review closure details',
+          messageActionPrompt:
+            'Review feedback and request any revision notes if reopening is needed.',
+          messageThreadHref: this.buildFreelancerApplicationThreadHref(sibling.id),
           relatedOpportunityId: opportunity.id,
           relatedApplicationId: sibling.id,
           relatedJobId: createResponse.jobId,
@@ -3625,6 +3956,10 @@ export class MarketplaceService {
       detail:
         'The client converted your accepted marketplace proposal into an escrow contract.',
       actorUserId: userId,
+      messageActionLabel: 'Review post-hire thread',
+      messageActionPrompt:
+        'Confirm project kickoff details, milestones, and communication cadence with the client.',
+      messageThreadHref: this.buildFreelancerApplicationThreadHref(application.id),
       relatedOpportunityId: opportunity.id,
       relatedApplicationId: application.id,
       relatedJobId: createResponse.jobId,
@@ -6979,6 +7314,9 @@ export class MarketplaceService {
     relatedApplicationId?: string | null;
     relatedOfferId?: string | null;
     relatedJobId?: string | null;
+    messageActionLabel?: string | null;
+    messageActionPrompt?: string | null;
+    messageThreadHref?: string | null;
     relatedAutomationRunId?: string | null;
   }) {
     const preferences = await this.getNotificationPreferencesRecord(
@@ -7001,12 +7339,35 @@ export class MarketplaceService {
       relatedApplicationId: input.relatedApplicationId ?? null,
       relatedOfferId: input.relatedOfferId ?? null,
       relatedJobId: input.relatedJobId ?? null,
+      messageActionLabel: input.messageActionLabel?.trim() || null,
+      messageActionPrompt: input.messageActionPrompt?.trim() || null,
+      messageThreadHref: input.messageThreadHref?.trim() || null,
       relatedAutomationRunId: input.relatedAutomationRunId ?? null,
       createdAt: now,
       updatedAt: now,
     };
     await this.marketplaceRepository.saveNotification(notification);
     return notification;
+  }
+
+  private buildClientApplicationThreadHref(applicationId: string) {
+    return `/app/marketplace/client/applicants#application-${applicationId}`;
+  }
+
+  private buildClientInterviewThreadHref(applicationId: string) {
+    return `/app/marketplace/client/interviews#application-${applicationId}`;
+  }
+
+  private buildClientOfferThreadHref(applicationId: string) {
+    return `/app/marketplace/client/offers#application-${applicationId}`;
+  }
+
+  private buildFreelancerApplicationThreadHref(applicationId: string) {
+    return `/app/marketplace/freelancer#application-${applicationId}`;
+  }
+
+  private buildFreelancerOfferThreadHref(applicationId: string) {
+    return `/app/marketplace/freelancer#offer-${applicationId}`;
   }
 
   private matchesAutomationRule(

@@ -393,6 +393,9 @@ type MarketplaceNotificationRow = QueryResultRow & {
   related_application_id: string | null;
   related_offer_id: string | null;
   related_job_id: string | null;
+  message_action_label: string | null;
+  message_action_prompt: string | null;
+  message_thread_href: string | null;
   related_automation_run_id: string | null;
   created_at_ms: string;
   updated_at_ms: string;
@@ -920,6 +923,9 @@ function mapNotification(
     relatedApplicationId: row.related_application_id,
     relatedOfferId: row.related_offer_id,
     relatedJobId: row.related_job_id,
+    messageActionLabel: row.message_action_label,
+    messageActionPrompt: row.message_action_prompt,
+    messageThreadHref: row.message_thread_href,
     relatedAutomationRunId: row.related_automation_run_id,
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),
@@ -2377,12 +2383,15 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           related_application_id,
           related_offer_id,
           related_job_id,
+          message_action_label,
+          message_action_prompt,
+          message_thread_href,
           related_automation_run_id,
           created_at_ms,
           updated_at_ms
         )
         VALUES (
-          $1, $2::uuid, $3, $4, $5, $6, $7, $8::uuid, $9, $10, $11, $12, $13, $14, $15
+          $1, $2::uuid, $3, $4, $5, $6, $7, $8::uuid, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -2396,6 +2405,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
           related_application_id = EXCLUDED.related_application_id,
           related_offer_id = EXCLUDED.related_offer_id,
           related_job_id = EXCLUDED.related_job_id,
+          message_action_label = EXCLUDED.message_action_label,
+          message_action_prompt = EXCLUDED.message_action_prompt,
+          message_thread_href = EXCLUDED.message_thread_href,
           related_automation_run_id = EXCLUDED.related_automation_run_id,
           updated_at_ms = EXCLUDED.updated_at_ms
       `,
@@ -2412,6 +2424,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         notification.relatedApplicationId,
         notification.relatedOfferId,
         notification.relatedJobId,
+        notification.messageActionLabel ?? null,
+        notification.messageActionPrompt ?? null,
+        notification.messageThreadHref ?? null,
         notification.relatedAutomationRunId,
         String(notification.createdAt),
         String(notification.updatedAt),

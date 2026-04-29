@@ -796,6 +796,22 @@ export type MarketplaceSavedSearch = {
   createdAt: number;
   updatedAt: number;
 };
+
+export type MarketplaceSavedSearchRerunTalentResponse = {
+  search: MarketplaceSavedSearch;
+  kind: 'talent';
+  results: MarketplaceTalentSearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunOpportunityResponse = {
+  search: MarketplaceSavedSearch;
+  kind: 'opportunity';
+  results: MarketplaceOpportunitySearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunResponse =
+  | MarketplaceSavedSearchRerunTalentResponse
+  | MarketplaceSavedSearchRerunOpportunityResponse;
 export type MarketplaceTalentPoolMemberStage =
   | 'saved'
   | 'contacted'
@@ -925,6 +941,9 @@ export type MarketplaceNotification = {
   relatedApplicationId: string | null;
   relatedOfferId: string | null;
   relatedJobId: string | null;
+  messageActionLabel?: string | null;
+  messageActionPrompt?: string | null;
+  messageThreadHref?: string | null;
   relatedAutomationRunId: string | null;
   createdAt: number;
   updatedAt: number;
@@ -1573,6 +1592,45 @@ export type MarketplaceApplicationTimeline = {
   offers: MarketplaceOffer[];
   decisions: MarketplaceApplicationDecision[];
   contractDraft: MarketplaceContractDraft | null;
+};
+
+export type MarketplaceHiringCommunicationEventKind =
+  | 'interview_message'
+  | 'application_decision'
+  | 'offer'
+  | 'project_room_message';
+
+export type MarketplaceHiringCommunicationActor = {
+  userId: string | null;
+  email: string | null;
+  role: 'client' | 'applicant' | 'system';
+};
+
+export type MarketplaceHiringCommunicationEvent = {
+  id: string;
+  source: MarketplaceHiringCommunicationEventKind;
+  createdAt: number;
+  actor: MarketplaceHiringCommunicationActor;
+  title: string;
+  body: string | null;
+  offerId: string | null;
+  offerStatus: MarketplaceOfferStatus | null;
+  offerRevisionNumber: number | null;
+  messageKind: MarketplaceInterviewMessageKind | null;
+  attachments: MarketplaceInterviewMessageAttachment[];
+};
+
+export type MarketplaceHiringCommunicationThread = {
+  applicationId: string;
+  opportunityId: string;
+  hiredJobId: string | null;
+  asApplicant: boolean;
+  asOwner: boolean;
+  events: MarketplaceHiringCommunicationEvent[];
+};
+
+export type MarketplaceHiringCommunicationThreadResponse = {
+  thread: MarketplaceHiringCommunicationThread;
 };
 
 export type MarketplaceApplicationComparison = {
@@ -2805,6 +2863,17 @@ export const webApi = {
       accessToken,
     );
   },
+  rerunMarketplaceSavedSearch(id: string, accessToken: string) {
+    return requestJson<MarketplaceSavedSearchRerunResponse>(
+      apiBaseUrl,
+      `/marketplace/saved-searches/${encodeURIComponent(id)}/rerun`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      accessToken,
+    );
+  },
   listMarketplaceTalentPools(accessToken: string) {
     return requestJson<{ pools: MarketplaceTalentPool[] }>(
       apiBaseUrl,
@@ -3278,6 +3347,17 @@ export const webApi = {
     return requestJson<{ thread: MarketplaceInterviewThread }>(
       apiBaseUrl,
       `/marketplace/applications/${id}/interview`,
+      { method: 'GET' },
+      accessToken,
+    );
+  },
+  getMarketplaceApplicationHiringThread(
+    id: string,
+    accessToken: string,
+  ) {
+    return requestJson<MarketplaceHiringCommunicationThreadResponse>(
+      apiBaseUrl,
+      `/marketplace/applications/${id}/hiring-thread`,
       { method: 'GET' },
       accessToken,
     );

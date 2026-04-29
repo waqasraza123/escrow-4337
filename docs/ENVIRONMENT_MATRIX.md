@@ -6,14 +6,16 @@ This matrix is the Phase 7 source of truth for local, staging, and production ex
 
 | Surface | Expected posture |
 | --- | --- |
-| API | `services/api/.env.local` with Postgres plus mock email, mock smart-account, and mock escrow execution providers |
+| API | Not started by root `npm run dev`; use `npm run dev:local` only when deliberately running the local API profile |
 | Worker | Optional local shell process using the same API build and local Postgres profile |
-| Web | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL`, typically derived from `NEXT_PUBLIC_API_PORT=4100` |
-| Admin | Provider-managed local Next dev server pointed at `NEXT_PUBLIC_API_BASE_URL`, typically derived from `NEXT_PUBLIC_API_PORT=4100` |
+| Web | Local Next dev server pointed at cloud `CLOUD_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL` |
+| Admin | Local Next dev server pointed at cloud `CLOUD_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL` |
 
 - Local is the default development profile.
 - The zero-cost Postgres path in [infra/postgres/README.md](/Users/mc/development/blockchain/ethereum/base/Escrow4337/infra/postgres/README.md) remains the expected local database path.
-- Local may use mock providers and should not be treated as staging evidence.
+- When a single shared cloud backend is needed, use Neon Postgres through the API only; see [Neon Shared Backend](/Users/mc/development/blockchain/ethereum/base/Escrow4337/docs/NEON_SHARED_BACKEND.md).
+- Root `npm run dev` is intentionally cloud-first and refuses localhost API URLs so local frontend work does not silently connect to local backend services.
+- `npm run dev:local` preserves the older full local dev behavior and may use mock providers; it should not be treated as staging evidence.
 
 ## Staging
 

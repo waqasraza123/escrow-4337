@@ -362,6 +362,9 @@ function normalizeNotification(
     relatedApplicationId: notification.relatedApplicationId?.trim() || null,
     relatedOfferId: notification.relatedOfferId?.trim() || null,
     relatedJobId: notification.relatedJobId?.trim() || null,
+    messageActionLabel: notification.messageActionLabel?.trim() || null,
+    messageActionPrompt: notification.messageActionPrompt?.trim() || null,
+    messageThreadHref: notification.messageThreadHref?.trim() || null,
     relatedAutomationRunId: notification.relatedAutomationRunId?.trim() || null,
   };
 }

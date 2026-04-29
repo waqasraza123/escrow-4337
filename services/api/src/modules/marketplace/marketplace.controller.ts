@@ -158,6 +158,12 @@ export class MarketplaceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('saved-searches/:id/rerun')
+  rerunSavedSearch(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.rerunSavedSearch(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('talent-pools')
   listTalentPools(@User() user: ReqUser) {
     return this.marketplaceService.listTalentPools(user.id);
@@ -604,6 +610,12 @@ export class MarketplaceController {
   @Get('applications/:id/timeline')
   getApplicationTimeline(@User() user: ReqUser, @Param('id') id: string) {
     return this.marketplaceService.getApplicationTimeline(user.id, id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('applications/:id/hiring-thread')
+  getApplicationHiringThread(@User() user: ReqUser, @Param('id') id: string) {
+    return this.marketplaceService.getApplicationHiringThread(user.id, id);
   }
 
   @UseGuards(AuthGuard)

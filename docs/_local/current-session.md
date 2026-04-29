@@ -1,7 +1,169 @@
 # Current Session
 
 ## Date
-- 2026-04-27
+- 2026-04-29
+
+## Update (2026-04-29, Commit/Push Current Work)
+- Prepared the current dirty `dev` tree for commit and push.
+- Scope includes marketplace saved-search rerun + unified hiring-thread work, notification thread-link persistence, Neon/shared-cloud backend docs/templates, cloud-first root dev command, and build-info cleanup.
+- Verification before staging:
+  - `git diff --check`
+  - First `git push origin dev` ran pre-push `pnpm build` and failed on invalid `workspaceMessages.noMessages` web i18n key.
+  - Fixed client/freelancer console empty-thread labels to use `workspaceMessages.noInterviewMessages`.
+  - `pnpm --filter web build`
+
+## Update (2026-04-29, Vercel API Compliance Build Fix)
+- Fixed the Vercel API build failure where `nest build` could not resolve `@escrow4334/compliance`.
+- Root cause: tracked `tsconfig.build.tsbuildinfo` files let a clean deploy skip compliance `dist` emission while `dist/**` stayed ignored.
+- Changes:
+  - moved compliance build info to ignored `packages/compliance/dist/tsconfig.build.tsbuildinfo`;
+  - removed tracked build-info files from `packages/compliance` and `services/api`;
+  - normalized marketplace saved-search event `category`/`timezone` from `undefined` to `null` to satisfy the API build.
+- Verification:
+  - `pnpm --filter @escrow4334/compliance build`
+  - `pnpm --filter escrow4334-api build`
+  - `pnpm exec turbo run build --filter=escrow4334-api`
+
+## Update (2026-04-29, Shared Cloud Backend Recommendation)
+- Recommended a single shared cloud environment shape for local plus deployed usage:
+  - one deployed API URL as the canonical backend surface;
+  - one shared managed Postgres database for API persistence;
+  - optional managed Redis only when a concrete queue/cache/rate-limit use case is added;
+  - local web/admin/mobile should point to the deployed API via `NEXT_PUBLIC_API_BASE_URL`;
+  - local API runs can point to the same cloud database for staging parity, but should use a staging database rather than production for development mutations.
+- Superseded by the Neon provider decision below.
+
+## Update (2026-04-29, Neon Shared Backend Decision)
+- Adopted Neon as the shared cloud Postgres provider for the "one cloud backend for local and deployed clients" workflow.
+- Added `docs/NEON_SHARED_BACKEND.md` with target shape, setup, migration, CORS, and local/shared usage guidance.
+- Added placeholder-only env templates:
+  - `services/api/.env.neon.example`
+  - `apps/web/.env.shared-cloud.example`
+  - `apps/admin/.env.shared-cloud.example`
+  - `apps/mobile/.env.shared-cloud.example`
+- Updated `.gitignore`, `docs/ENVIRONMENT_MATRIX.md`, and durable memory to record that Neon credentials stay API-only while the placeholder examples remain trackable.
+
+## Update (2026-04-29, Local API Wired To Neon)
+- Updated ignored `services/api/.env.local` so local API runs use the provided Neon pooled Postgres connection with `PERSISTENCE_DRIVER=postgres` and `DATABASE_SSL=true`.
+- Kept the real Neon credential out of docs, examples, and tracked files.
+- Applied all Postgres migrations to the Neon database.
+- Verification:
+  - `pnpm --filter escrow4334-api build`
+  - `pnpm --filter escrow4334-api db:migrate`
+  - `pnpm --filter escrow4334-api db:migrate:status` -> `pending: []`, `total: 37`
+
+## Update (2026-04-29, Live Provider Value Guidance)
+- Clarified that `AUTH_EMAIL_MODE=relay`, `WALLET_SMART_ACCOUNT_MODE=relay`, and `ESCROW_CONTRACT_MODE=relay` require repo-compatible HTTP relay services, not just raw vendor URLs.
+- Real vendor values come from:
+  - email provider account/API key/verified sender domain;
+  - Base Sepolia RPC provider, bundler/paymaster provider, smart-account factory/entrypoint;
+  - deployed `WorkstreamEscrow` contract and controlled arbitrator wallet.
+- The API-facing `*_RELAY_BASE_URL` values should point to deployed relay services that implement the repo's `/email/send`, `/wallets/smart-accounts/provision`, and `/escrow/execute` contracts.
+
+## Update (2026-04-29, Cloud-First Dev Command)
+- Changed root `npm run dev` / `pnpm dev` to run `scripts/dev-cloud.mjs`.
+- The new dev script:
+  - starts only local web/admin Next dev servers;
+  - requires `CLOUD_API_BASE_URL` or `NEXT_PUBLIC_API_BASE_URL` or `PLAYWRIGHT_DEPLOYED_API_BASE_URL`;
+  - rejects localhost/non-HTTPS API URLs;
+  - passes the cloud API URL into both Next apps;
+  - does not start `services/api` or local database services.
+- Added `npm run dev:local` for the previous `turbo run dev --parallel` behavior.
+- Added `.env.cloud.example` for the required cloud API URL and optional web/admin port overrides.
+- Updated shared backend docs, environment matrix, and durable memory.
+- Verification:
+  - `npm run dev` fails fast without a cloud API URL.
+  - `CLOUD_API_BASE_URL=https://api.example.com WEB_DEV_PORT=3100 ADMIN_DEV_PORT=3101 node ./scripts/dev-cloud.mjs` starts web/admin only; stopped after readiness check.
+
+## Update (2026-04-28, Unified Hiring Thread UI in Marketplace Consoles)
+- Completed the next product slice by wiring a single hiring communication stream into both marketplace console lanes:
+  - Added unified thread fetch usage in `apps/web/src/app/marketplace/client-console.tsx` and
+    `apps/web/src/app/marketplace/freelancer-console.tsx` for interviews and offers views.
+  - Introduced timeline/thread rendering helper for merged events (interview messages, offer events,
+    decisions, and project-room messages) and message metadata display.
+  - Kept existing compose/reply flows in place, adding thread cards under each active interview/offer
+    row and handling lane-switch/auth resets for the new thread state.
+- Updated session-safe state for `applicationHiringThreads` so thread data is loaded only where relevant
+  and cleared when leaving the corresponding workspace lane.
+
+## Update (2026-04-28, Mobile Marketplace Digest/Alert Controls)
+- Completed the next Upwork-style marketplace feature parity on mobile by wiring digest controls and alert preferences:
+  - Added marketplace saved-search rerun/delete actions already in place on mobile list page state handling.
+  - Added live marketplace alert controls using existing `product-core` marketplace preference/digest dispatch APIs:
+    - digest cadence control,
+    - category on/off toggles,
+    - manual dispatch (due/all-enabled),
+    - manual digest generation,
+    - latest digest and latest dispatch summary cards,
+    - loading states when digest lists are fetching.
+  - Kept alert section behind auth and connected all mutations to marketplace query invalidation.
+  - Fixed all compile blockers in `apps/mobile/src/app/(tabs)/marketplace.tsx` (missing dependencies/types/styles cleanup from prior incremental edits).
+- Verification:
+  - `pnpm --filter mobile exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
+  - `pnpm --filter @escrow4334/product-core exec tsc -p tsconfig.json --noEmit`
+- Changed files:
+  `apps/mobile/src/app/(tabs)/marketplace.tsx`,
+  `packages/product-core/src/api/client.ts`,
+  `packages/product-core/src/api/types.ts`
+
+## Update (2026-04-28, Marketplace Hiring Thread API + Web Client Wire-up)
+- Completed backend and client SDK work for unified hiring communication:
+  - `/marketplace/applications/:id/hiring-thread` endpoint now returns a merged stream of interview messages, offer events, application decisions, and project-room messages for access-authorized applicants/owners.
+  - Added marketplace hiring-thread response/types and `getMarketplaceApplicationHiringThread(...)` in `apps/web/src/lib/api.ts`.
+- This enables a single thread fetch path that mirrors the next-up "single inbox" parity direction for client/freelancer negotiation continuity.
+- Changed files:
+  - `services/api/src/modules/marketplace/marketplace.controller.ts`
+  - `services/api/src/modules/marketplace/marketplace.service.ts`
+  - `services/api/src/modules/marketplace/marketplace.types.ts`
+  - `apps/web/src/lib/api.ts`
+
+## Update (2026-04-28, Saved-Search Rerun + Alerts)
+- Implemented the next Upwork-style marketplace parity slice end-to-end:
+  - wired saved-search rerun on web and mobile marketplace surfaces,
+  - added alert-frequency selection to saved-search creation for talent/opportunity discovery,
+  - recorded web search-impression telemetry for public queries and recommendation loads,
+  - added clear rerun/delete actions and frequency labels in saved-search cards,
+  - added result refresh messaging for rerun actions.
+- Validation:
+  - passed: `pnpm --filter web exec tsc -p tsconfig.json --noEmit`
+  - passed: `pnpm --filter mobile exec tsc -p tsconfig.json --noEmit`
+  - blocked/unrelated: `pnpm --filter web test src/app/marketplace/marketplace-workspace.spec.tsx` (react/react-dom version mismatch)
+- Changed files:
+  `apps/web/src/app/marketplace/workspace.tsx`,
+  `apps/web/src/lib/i18n.tsx`,
+  `apps/mobile/src/app/(tabs)/marketplace.tsx`
+
+## Update (2026-04-28, Next Upwork-Style Feature Priority)
+- Recommended next product step for marketplace parity: complete discovery-to-matching loop with stronger user-facing search, saved-search, and alert workflows.
+- Rationale: hiring and execution pipelines are already in-repo; the highest remaining Upwork-style gap is converting discovery into steady repeatable matches.
+- Suggested scope:
+  - finish talent/opportunity directory filters and saved-search UX on web + mobile,
+  - ship recommendation digest/alert delivery,
+  - add conversion telemetry across search -> apply -> shortlist -> hire,
+  - expose ranking reasons clearly to reduce opaque matching behavior.
+- Suggested validation: focused marketplace e2e for search/recommendation paths, then keep `pnpm verify:ci`/launch-readiness gate intact for release confidence.
+
+## Update (2026-04-27, Marketplace Unified Message Threads + Inbox CTAs)
+- Implemented the resumed unified message-surface slice for marketplace lifecycle:
+  - added/propagated `messageActionLabel`, `messageActionPrompt`, and `messageThreadHref` through marketplace notification persistence layers and API types
+  - wired notification card UIs in marketplace workspace and client console to render action prompts and jump links into the exact message thread
+  - added deterministic hash-target IDs on applicant/offer cards in freelancer + client consoles for jump-link support
+  - added Postgres migration `033_marketplace_notification_thread_links.sql` for `message_thread_href`
+  - fixed hire-closure sibling alert linking to use `buildFreelancerApplicationThreadHref`
+- Verification:
+  - no tests/builds run by request
+- Changed files:
+  `services/api/src/modules/marketplace/marketplace.service.ts`,
+  `services/api/src/modules/marketplace/marketplace.types.ts`,
+  `services/api/src/persistence/file/file.marketplace.repositories.ts`,
+  `services/api/src/persistence/postgres/migrations/032_marketplace_notification_actions.sql`,
+  `services/api/src/persistence/postgres/migrations/033_marketplace_notification_thread_links.sql`,
+  `services/api/src/persistence/postgres/postgres.marketplace.repositories.ts`,
+  `apps/web/src/lib/api.ts`,
+  `apps/web/src/app/marketplace/client-console.tsx`,
+  `apps/web/src/app/marketplace/freelancer-console.tsx`,
+  `apps/web/src/app/marketplace/workspace.tsx`
 
 ## Update (2026-04-27, Interview Attachment Render Stability)
 - Finished final robustness pass on attachment rendering for interview messages:
@@ -2355,3 +2517,23 @@
   - passed: `git diff --check`
 - Not run:
   - browser/dev-server visual verification of the refreshed authenticated workspace shell
+
+## Update (2026-04-28, Trust-Fintech UI Polish Foundation)
+- Implemented the first cross-app UI polish slice from the trust-fintech plan:
+  - added reusable web presentation primitives in `packages/frontend-core/src/lib/ui.tsx` for visual scene cards, trust signal strips, action timelines, proof metric cards, section headers, and visual empty states
+  - replaced text-heavy public homepage hero stats with the shared trust signal strip
+  - added trust/proof summary bands to public marketplace discovery and authenticated marketplace workspace hero areas
+  - added an operator trust/provenance strip after the admin operator hero so queue posture, authority source, and capability gates are visible before dense panels
+  - added native mobile hero/trust primitives in `apps/mobile/src/ui/primitives.tsx`
+  - upgraded mobile Home and Marketplace screen headers to richer visual hero cards with runtime/session/lane/network signals
+- Scope stayed frontend-only; no backend APIs, database schema, or contracts changed.
+- Verification: not run by request.
+- Changed files:
+  `packages/frontend-core/src/lib/ui.tsx`,
+  `apps/web/src/app/page.tsx`,
+  `apps/web/src/app/marketplace/marketplace-browser.tsx`,
+  `apps/web/src/app/marketplace/workspace.tsx`,
+  `apps/admin/src/app/operator-console.tsx`,
+  `apps/mobile/src/ui/primitives.tsx`,
+  `apps/mobile/src/app/(tabs)/home.tsx`,
+  `apps/mobile/src/app/(tabs)/marketplace.tsx`

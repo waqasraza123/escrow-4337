@@ -7,10 +7,15 @@ coverage
 *.tsbuildinfo
 .DS_Store
 .env*
+!.env.cloud.example
 !services/api/.env.example
 !services/api/.env.local.example
+!services/api/.env.neon.example
 !apps/web/.env.example
+!apps/web/.env.shared-cloud.example
 !apps/admin/.env.example
+!apps/admin/.env.shared-cloud.example
+!apps/mobile/.env.shared-cloud.example
 !infra/postgres/.env.example
 cache
 broadcast

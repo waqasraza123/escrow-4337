@@ -661,6 +661,36 @@ export type MarketplaceOpportunitySearchResult = {
   inviteStatus: 'pending' | 'applied' | 'dismissed' | null;
 };
 
+export type MarketplaceSavedSearch = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  kind: 'talent' | 'opportunity';
+  label: string;
+  query: Record<string, string | number | boolean | null>;
+  alertFrequency: 'manual' | 'daily' | 'weekly';
+  lastResultCount: number;
+  activeWorkspaceId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceSavedSearchRerunTalentResponse = {
+  search: MarketplaceSavedSearch;
+  kind: 'talent';
+  results: MarketplaceTalentSearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunOpportunityResponse = {
+  search: MarketplaceSavedSearch;
+  kind: 'opportunity';
+  results: MarketplaceOpportunitySearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunResponse =
+  | MarketplaceSavedSearchRerunTalentResponse
+  | MarketplaceSavedSearchRerunOpportunityResponse;
+
 export type MarketplaceAnalyticsOverview = {
   generatedAt: string;
   workspace:
@@ -697,4 +727,83 @@ export type MarketplaceNotification = {
   relatedJobId: string | null;
   createdAt: number;
   updatedAt: number;
+};
+
+export type MarketplaceNotificationPreferences = {
+  userId: string;
+  digestCadence: 'manual' | 'daily' | 'weekly';
+  talentInvitesEnabled: boolean;
+  applicationActivityEnabled: boolean;
+  interviewMessagesEnabled: boolean;
+  offerActivityEnabled: boolean;
+  reviewActivityEnabled: boolean;
+  automationActivityEnabled: boolean;
+  lifecycleDigestEnabled: boolean;
+  analyticsDigestEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceDigestHighlight = {
+  kind: 'notification' | 'task' | 'rehire' | 'analytics';
+  title: string;
+  detail: string;
+  relatedEntityId: string | null;
+};
+
+export type MarketplaceDigestStats = {
+  unreadNotifications: number;
+  visibleNotifications: number;
+  taskCount: number;
+  rehireCandidateCount: number;
+  searchImpressions: number | null;
+  applications: number | null;
+  hires: number | null;
+};
+
+export type MarketplaceDigest = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  dispatchRunId: string | null;
+  cadence: 'manual' | 'daily' | 'weekly';
+  status: 'fresh' | 'acknowledged' | 'archived';
+  title: string;
+  summary: string;
+  highlights: MarketplaceDigestHighlight[];
+  stats: MarketplaceDigestStats;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MarketplaceDigestDispatchRecipientResult = 'dispatched' | 'skipped';
+export type MarketplaceDigestDispatchRecipientReason =
+  | 'due'
+  | 'all_enabled'
+  | 'manual_cadence'
+  | 'not_due'
+  | 'no_activity';
+
+export type MarketplaceDigestDispatchRecipient = {
+  userId: string;
+  userEmail: string;
+  cadence: 'manual' | 'daily' | 'weekly';
+  result: MarketplaceDigestDispatchRecipientResult;
+  reason: MarketplaceDigestDispatchRecipientReason;
+  digestId: string | null;
+};
+
+export type MarketplaceDigestDispatchRun = {
+  id: string;
+  workspaceId: string;
+  triggeredByUserId: string;
+  triggeredByEmail: string;
+  trigger: 'manual' | 'scheduled';
+  mode: 'due' | 'all_enabled';
+  summary: string;
+  recipients: MarketplaceDigestDispatchRecipient[];
+  createdAt: number;
+  dispatchedCount: number;
+  skippedCount: number;
+  preview: string;
 };

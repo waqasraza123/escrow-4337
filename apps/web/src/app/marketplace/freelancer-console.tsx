@@ -20,6 +20,7 @@ import {
   type JobView,
   type MarketplaceApplication,
   type MarketplaceApplicationTimeline,
+  type MarketplaceHiringCommunicationThread,
   type MarketplaceContractDraft,
   type MarketplaceContractDraftStatus,
   type MarketplaceOffer,
@@ -94,6 +95,84 @@ function parseOfferMilestones(input: string) {
   });
 }
 
+function formatHiringCommunicationSource(source: MarketplaceHiringCommunicationThread['events'][number]['source']) {
+  if (source === 'interview_message') {
+    return 'Interview Message';
+  }
+  if (source === 'application_decision') {
+    return 'Decision';
+  }
+  if (source === 'offer') {
+    return 'Offer';
+  }
+  return 'Project Room';
+}
+
+function formatHiringActorLabel(
+  event: MarketplaceHiringCommunicationThread['events'][number],
+  viewerUserId: string | null,
+) {
+  if (event.actor.userId && viewerUserId && event.actor.userId === viewerUserId) {
+    return 'You';
+  }
+  return event.actor.email ?? event.actor.role;
+}
+
+function renderHiringCommunicationThread(
+  thread: MarketplaceHiringCommunicationThread | null,
+  viewerUserId: string | null,
+  emptyLabel: string,
+) {
+  const events = thread?.events ?? [];
+  if (events.length === 0) {
+    return <p className={styles.stateText}>{emptyLabel}</p>;
+  }
+
+  return (
+    <div className={styles.stack}>
+      {events.map((event) => {
+        const actorLabel = formatHiringActorLabel(event, viewerUserId);
+
+        return (
+          <div key={event.id} className={styles.walletCard}>
+            <strong>
+              {actorLabel} • {formatHiringCommunicationSource(event.source)}
+            </strong>
+            <p className={styles.stateText}>
+              {new Date(event.createdAt).toLocaleString()}
+            </p>
+            <p className={styles.stateText}>{event.title}</p>
+            <p className={styles.stateText}>{event.body ?? emptyLabel}</p>
+            {event.offerId ? (
+              <p className={styles.stateText}>
+                Offer #{event.offerRevisionNumber ?? 'n/a'} • {event.offerStatus}
+              </p>
+            ) : null}
+            {event.messageKind ? (
+              <p className={styles.stateText}>Message kind: {event.messageKind}</p>
+            ) : null}
+            {event.attachments.length > 0 ? (
+              <div>
+                {event.attachments.map((attachment, attachmentIndex) => (
+                  <p
+                    key={`${attachment.id}-${attachmentIndex}`}
+                    className={styles.stateText}
+                    style={{ margin: '0.25rem 0' }}
+                  >
+                    <a href={attachment.url} target="_blank" rel="noreferrer">
+                      {attachment.label || attachment.url}
+                    </a>
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function createEmptyOfferDraft(): OfferDraft {
   return {
     message: '',
@@ -144,6 +223,9 @@ export function FreelancerConsole() {
   const [myApplications, setMyApplications] = useState<MarketplaceApplication[]>([]);
   const [applicationTimelines, setApplicationTimelines] = useState<
     Record<string, MarketplaceApplicationTimeline>
+  >({});
+  const [applicationHiringThreads, setApplicationHiringThreads] = useState<
+    Record<string, MarketplaceHiringCommunicationThread>
   >({});
   const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
   const [contractDraftEdits, setContractDraftEdits] = useState<
@@ -240,17 +322,27 @@ export function FreelancerConsole() {
       return;
     }
 
-    const response = await webApi.getMarketplaceApplicationTimeline(
-      applicationId,
-      tokens.accessToken,
-    );
+    const [timelineResponse, threadResponse] = await Promise.all([
+      webApi.getMarketplaceApplicationTimeline(applicationId, tokens.accessToken),
+      webApi
+        .getMarketplaceApplicationHiringThread(applicationId, tokens.accessToken)
+        .catch(() => null),
+    ]);
+
     await webApi
       .markMarketplaceApplicationInterviewThreadRead(applicationId, tokens.accessToken)
       .catch(() => {});
+
     setApplicationTimelines((current) => ({
       ...current,
-      [applicationId]: response.timeline,
+      [applicationId]: timelineResponse.timeline,
     }));
+    if (threadResponse?.thread) {
+      setApplicationHiringThreads((current) => ({
+        ...current,
+        [applicationId]: threadResponse.thread,
+      }));
+    }
   }
 
   async function handlePostInterviewMessage(
@@ -386,6 +478,7 @@ export function FreelancerConsole() {
         setUser(null);
         setMyApplications([]);
         setApplicationTimelines({});
+        setApplicationHiringThreads({});
         setOfferDrafts({});
         setContractDraftEdits({});
         setInterviewMessageDrafts({});
@@ -403,6 +496,7 @@ export function FreelancerConsole() {
       if (!nextWorkspace || getWorkspaceLane(nextWorkspace) !== 'freelancer') {
         setMyApplications([]);
         setApplicationTimelines({});
+        setApplicationHiringThreads({});
         setOfferDrafts({});
         setContractDraftEdits({});
         setInterviewMessageDrafts({});
@@ -417,17 +511,26 @@ export function FreelancerConsole() {
       const timelineEntries = await Promise.all(
         applicationsResponse.applications.map(async (application) => {
           try {
-            const timelineResponse = await webApi.getMarketplaceApplicationTimeline(
-              application.id,
-              nextTokens.accessToken,
-            );
+            const [timelineResponse, threadResponse] = await Promise.all([
+              webApi.getMarketplaceApplicationTimeline(
+                application.id,
+                nextTokens.accessToken,
+              ),
+              webApi
+                .getMarketplaceApplicationHiringThread(application.id, nextTokens.accessToken)
+                .catch(() => null),
+            ]);
             await webApi
               .markMarketplaceApplicationInterviewThreadRead(
                 application.id,
                 nextTokens.accessToken,
               )
               .catch(() => {});
-            return [application.id, timelineResponse.timeline] as const;
+            return {
+              applicationId: application.id,
+              timeline: timelineResponse.timeline,
+              thread: threadResponse?.thread ?? null,
+            };
           } catch {
             return null;
           }
@@ -435,13 +538,17 @@ export function FreelancerConsole() {
       );
 
       const timelines: Record<string, MarketplaceApplicationTimeline> = {};
+      const hiringThreads: Record<string, MarketplaceHiringCommunicationThread> = {};
       timelineEntries.forEach((entry) => {
         if (entry) {
-          const [applicationId, timeline] = entry;
-          timelines[applicationId] = timeline;
+          timelines[entry.applicationId] = entry.timeline;
+          if (entry.thread) {
+            hiringThreads[entry.applicationId] = entry.thread;
+          }
         }
       });
       setApplicationTimelines(timelines);
+      setApplicationHiringThreads(hiringThreads);
     } catch (loadError) {
       setError(
         loadError instanceof Error && loadError.message.trim()
@@ -868,11 +975,13 @@ export function FreelancerConsole() {
                       entry.application.id,
                       entry.latestOffer,
                     );
-                    const interviewMessages = entry.timeline.interviewThread?.messages ?? [];
+                    const hiringThread =
+                      applicationHiringThreads[entry.application.id] ?? null;
                     return (
                       <SharedCard
                         key={entry.latestOffer.id}
                         className={styles.actionPanel}
+                        id={`offer-${entry.application.id}`}
                         interactive
                       >
                         <div className={styles.stack}>
@@ -990,44 +1099,10 @@ export function FreelancerConsole() {
                           <span className={styles.metaLabel}>
                             {workspaceMessages.interviewTitle}
                           </span>
-                          {interviewMessages.length === 0 ? (
-                            <p className={styles.stateText}>
-                              {workspaceMessages.noInterviewMessages}
-                            </p>
-                          ) : (
-                            interviewMessages.map((message) => (
-                              <div key={message.id} className={styles.walletCard}>
-                                <strong>
-                                  {message.senderUserId === user?.id
-                                    ? 'You'
-                                    : message.senderEmail || workspaceMessages.none}
-                                </strong>
-                                <p className={styles.stateText}>
-                                  {message.kind} •{' '}
-                                  {new Date(message.createdAt).toLocaleString()}
-                                </p>
-                                <p className={styles.stateText}>{message.body}</p>
-                                {message.attachments.length > 0 ? (
-                                  <div className={styles.stateText}>
-                                    {message.attachments.map((attachment, attachmentIndex) => (
-                                      <p
-                                        key={`${attachment.id}-${attachmentIndex}`}
-                                        className={styles.stateText}
-                                        style={{ margin: '0.25rem 0' }}
-                                      >
-                                        <a
-                                          href={attachment.url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          {attachment.label || attachment.url}
-                                        </a>
-                                      </p>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            ))
+                          {renderHiringCommunicationThread(
+                            hiringThread,
+                            user?.id ?? null,
+                            workspaceMessages.noInterviewMessages,
                           )}
                           <label className={styles.field}>
                             <span>{workspaceMessages.messageBody}</span>
@@ -1082,7 +1157,11 @@ export function FreelancerConsole() {
                     const timeline = applicationTimelines[application.id];
                     const hasTimeline = Boolean(timeline);
                     return (
-                      <SharedCard key={application.id} className={styles.actionPanel}>
+                      <SharedCard
+                        key={application.id}
+                        className={styles.actionPanel}
+                        id={`application-${application.id}`}
+                      >
                         <div className={styles.stack}>
                           <strong>{application.opportunity.title}</strong>
                           <p className={styles.stateText}>

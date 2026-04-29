@@ -14,10 +14,15 @@ import type {
   MarketplaceOpportunitySearchResult,
   MarketplaceProfile,
   MarketplaceProofArtifact,
+  MarketplaceNotificationPreferences,
+  MarketplaceDigest,
+  MarketplaceDigestDispatchRun,
   MarketplaceReview,
   MarketplaceReviewScores,
   MarketplaceScreeningAnswer,
   MarketplaceScreeningQuestion,
+  MarketplaceSavedSearch,
+  MarketplaceSavedSearchRerunResponse,
   MarketplaceTalentSearchResult,
   MarketplaceVerificationLevel,
   ProjectMessage,
@@ -646,6 +651,60 @@ export function createProductApiClient(options: ProductApiClientOptions = {}) {
         { method: 'GET' },
       );
     },
+    listMarketplaceSavedSearches(
+      query: { kind?: 'talent' | 'opportunity' } | undefined,
+      accessToken: string,
+    ) {
+      const search = new URLSearchParams();
+      if (query?.kind) {
+        search.set('kind', query.kind);
+      }
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return requestJson<{ searches: MarketplaceSavedSearch[] }>(
+        baseUrl,
+        `/marketplace/saved-searches${suffix}`,
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    createMarketplaceSavedSearch(
+      input: {
+        kind: 'talent' | 'opportunity';
+        label: string;
+        query: Record<string, string | number | boolean | null>;
+        alertFrequency?: 'manual' | 'daily' | 'weekly';
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ search: MarketplaceSavedSearch }>(
+        baseUrl,
+        '/marketplace/saved-searches',
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    deleteMarketplaceSavedSearch(id: string, accessToken: string) {
+      return requestJson<{ ok: true }>(
+        baseUrl,
+        `/marketplace/saved-searches/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+        accessToken,
+      );
+    },
+    rerunMarketplaceSavedSearch(id: string, accessToken: string) {
+      return requestJson<MarketplaceSavedSearchRerunResponse>(
+        baseUrl,
+        `/marketplace/saved-searches/${encodeURIComponent(id)}/rerun`,
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+        },
+        accessToken,
+      );
+    },
     listMyMarketplaceApplications(accessToken: string) {
       return requestJson<{ applications: MarketplaceApplication[] }>(
         baseUrl,
@@ -695,6 +754,90 @@ export function createProductApiClient(options: ProductApiClientOptions = {}) {
         baseUrl,
         '/marketplace/notifications',
         { method: 'GET' },
+        accessToken,
+      );
+    },
+    getMarketplaceNotificationPreferences(accessToken: string) {
+      return requestJson<{ preferences: MarketplaceNotificationPreferences }>(
+        baseUrl,
+        '/marketplace/notification-preferences',
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    updateMarketplaceNotificationPreferences(
+      input: Partial<
+        Pick<
+          MarketplaceNotificationPreferences,
+          | 'digestCadence'
+          | 'talentInvitesEnabled'
+          | 'applicationActivityEnabled'
+          | 'interviewMessagesEnabled'
+          | 'offerActivityEnabled'
+          | 'reviewActivityEnabled'
+          | 'automationActivityEnabled'
+          | 'lifecycleDigestEnabled'
+          | 'analyticsDigestEnabled'
+        >
+      >,
+      accessToken: string,
+    ) {
+      return requestJson<{ preferences: MarketplaceNotificationPreferences }>(
+        baseUrl,
+        '/marketplace/notification-preferences',
+        {
+          method: 'PATCH',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    listMarketplaceDigests(accessToken: string) {
+      return requestJson<{ digests: MarketplaceDigest[] }>(
+        baseUrl,
+        '/marketplace/digests',
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    listMarketplaceDigestDispatchRuns(accessToken: string) {
+      return requestJson<{ runs: MarketplaceDigestDispatchRun[] }>(
+        baseUrl,
+        '/marketplace/digest-dispatch-runs',
+        { method: 'GET' },
+        accessToken,
+      );
+    },
+    generateMarketplaceDigest(
+      input: {
+        cadence?: MarketplaceNotificationPreferences['digestCadence'];
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ digest: MarketplaceDigest }>(
+        baseUrl,
+        '/marketplace/digests/generate',
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        accessToken,
+      );
+    },
+    dispatchMarketplaceDigests(
+      input: {
+        mode?: 'due' | 'all_enabled';
+        trigger?: 'manual' | 'scheduled';
+      },
+      accessToken: string,
+    ) {
+      return requestJson<{ run: MarketplaceDigestDispatchRun }>(
+        baseUrl,
+        '/marketplace/digest-dispatch-runs/dispatch',
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
         accessToken,
       );
     },

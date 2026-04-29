@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@9.7.0",
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "node ./scripts/dev-cloud.mjs",
+    "dev:local": "turbo run dev --parallel",
     "build": "turbo run build",
     "contracts:check": "./scripts/contracts-check.sh",
     "launch:candidate": "node ./scripts/launch-candidate.mjs",

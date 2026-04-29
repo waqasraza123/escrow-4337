@@ -438,6 +438,9 @@ export type MarketplaceNotificationRecord = {
   relatedApplicationId: string | null;
   relatedOfferId: string | null;
   relatedJobId: string | null;
+  messageActionLabel: string | null;
+  messageActionPrompt: string | null;
+  messageThreadHref: string | null;
   relatedAutomationRunId: string | null;
   createdAt: number;
   updatedAt: number;
@@ -904,6 +907,41 @@ export type MarketplaceRiskSignalView = {
   code: MarketplaceRiskSignalCode;
   severity: MarketplaceRiskSignalSeverity;
   summary: string;
+};
+
+export type MarketplaceHiringCommunicationEventKind =
+  | 'interview_message'
+  | 'application_decision'
+  | 'offer'
+  | 'project_room_message';
+
+export type MarketplaceHiringCommunicationActor = {
+  userId: string | null;
+  email: string | null;
+  role: 'client' | 'applicant' | 'system';
+};
+
+export type MarketplaceHiringCommunicationEvent = {
+  id: string;
+  source: MarketplaceHiringCommunicationEventKind;
+  createdAt: number;
+  actor: MarketplaceHiringCommunicationActor;
+  title: string;
+  body: string | null;
+  offerId: string | null;
+  offerStatus: MarketplaceOfferStatus | null;
+  offerRevisionNumber: number | null;
+  messageKind: MarketplaceInterviewMessageKind | null;
+  attachments: MarketplaceInterviewMessageAttachment[];
+};
+
+export type MarketplaceHiringCommunicationThread = {
+  applicationId: string;
+  opportunityId: string;
+  hiredJobId: string | null;
+  asApplicant: boolean;
+  asOwner: boolean;
+  events: MarketplaceHiringCommunicationEvent[];
 };
 
 export type MarketplaceReputationSnapshot = {
@@ -1430,6 +1468,10 @@ export type MarketplaceApplicationTimelineResponse = {
   timeline: MarketplaceApplicationTimelineView;
 };
 
+export type MarketplaceHiringCommunicationThreadResponse = {
+  thread: MarketplaceHiringCommunicationThread;
+};
+
 export type MarketplaceApplicationComparisonResponse = {
   candidates: MarketplaceApplicationComparisonView[];
 };
@@ -1453,6 +1495,22 @@ export type MarketplaceSavedSearchesResponse = {
 export type MarketplaceSavedSearchResponse = {
   search: MarketplaceSavedSearchView;
 };
+
+export type MarketplaceSavedSearchRerunTalentResponse = {
+  search: MarketplaceSavedSearchView;
+  kind: 'talent';
+  results: MarketplaceTalentSearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunOpportunityResponse = {
+  search: MarketplaceSavedSearchView;
+  kind: 'opportunity';
+  results: MarketplaceOpportunitySearchResult[];
+};
+
+export type MarketplaceSavedSearchRerunResponse =
+  | MarketplaceSavedSearchRerunTalentResponse
+  | MarketplaceSavedSearchRerunOpportunityResponse;
 
 export type MarketplaceTalentPoolsResponse = {
   pools: MarketplaceTalentPoolView[];

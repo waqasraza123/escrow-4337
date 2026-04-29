@@ -84,6 +84,7 @@
 - API now exposes public job export artifacts through `GET /jobs/:id/export`, with deterministic `job-history` and `dispute-case` JSON or CSV downloads derived from the public audit bundle, and runtime-profile now truthfully reports `operator.exportSupport: true`.
 - API escrow now exposes an authenticated jobs list so product surfaces can render participant-specific job views with derived client or worker roles.
 - Repo now includes `infra/postgres` plus root `pnpm db:*` scripts so local development can run against a pinned Postgres 16 container and a dedicated `services/api/.env.local.example` profile instead of a managed database vendor.
+- Shared cloud development should use Neon Postgres through the API boundary when local and deployed clients need the same data; browser and mobile apps must point at the shared API URL and must never receive Neon credentials. Root `npm run dev` is cloud-first: it starts local web/admin dev servers only, requires a non-local HTTPS cloud API URL, and does not start `services/api`; `npm run dev:local` preserves the older full local stack.
 - API now has a real test suite under `services/api/test` covering auth validation and the core auth session flow.
 - API now has direct unit coverage for policy normalization, OTP lifecycle behavior, and session lifecycle behavior.
 - API now has direct service and controller coverage for escrow lifecycle rules and endpoint validation.
@@ -133,6 +134,7 @@
 - `docs/_local/current-session.md` is the ignored restart/handoff file for the current working slice.
 - The current active backend direction is to consume compliance rules through the workspace package instead of importing repo-relative source paths.
 - The API TypeScript config resolves `@escrow4334/compliance` through the built declaration surface in `packages/compliance/dist`.
+- Build artifacts such as `*.tsbuildinfo` and `dist/**` must stay untracked; composite package build info should live under ignored output directories so clean deployments cannot skip required emits.
 - Workspace packages now own their own `typecheck` scripts, and the root Turbo `typecheck` task depends on upstream package builds.
 - Next app `typecheck` scripts should generate route types with `next typegen` before running `tsc`, so root typecheck does not depend on pre-existing `.next/types` artifacts.
 - Typecheck scripts must not leave new repo artifacts behind; `*.tsbuildinfo` is ignored and package typecheck commands disable incremental writes.
@@ -180,8 +182,8 @@
 
 ## Deferred / Not Yet Implemented
 
-- Marketplace still lacks advanced ranking, search indexing, richer in-product communication controls, open bidding, and multi-contractor escrow composition.
-- Marketplace fit scoring is deterministic and explainable, but it is still rules-based; there is no richer ranking UI in admin, no saved search or recommendation loop, and no live browser canary yet covering dossier review end to end.
+- Marketplace still lacks advanced ranking, search indexing, open bidding, and multi-contractor escrow composition.
+- Marketplace fit scoring is deterministic and explainable, but it is still rules-based; there is no richer ranking UI in admin or dedicated search index, but saved-search workflows now support rerun and frequency preferences on both web and mobile, and a full dossier review canary remains the remaining coverage gap.
 - Live end-to-end validation of the configured email relay against real environments.
 - Live end-to-end validation of proxy-trust and IP-aware auth throttling behavior in deployed environments.
 - Live end-to-end validation of the configured smart-account relay, bundler, and paymaster infrastructure against real environments.
