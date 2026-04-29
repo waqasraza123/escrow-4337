@@ -10,6 +10,7 @@
   - `services/api` then failed resolving `@escrow4334/compliance` during `nest build`.
 - The fix already exists on `dev`/`api` at `530cb7f` via the compliance build-info cleanup.
 - Next action: fast-forward `main` to `dev` and push `main` so Vercel builds the fixed commit.
+- Added API/deployed runtime env keys to `turbo.json` `globalEnv` so Vercel/Turbo no longer filters or warns on those project env vars during API builds.
 
 ## Update (2026-04-29, API Branch Publication Rule)
 - Added durable branch workflow guidance:
