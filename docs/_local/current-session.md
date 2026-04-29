@@ -3,6 +3,14 @@
 ## Date
 - 2026-04-29
 
+## Update (2026-04-29, API Branch Publication Rule)
+- Added durable branch workflow guidance:
+  - `dev` remains the active working branch.
+  - `main` receives release merges from `dev`.
+  - related branches such as `api` should be updated from `dev` when their area changes.
+  - whenever API-level changes land on `dev`, push the same commit lineage to `api` as well.
+- Next action: commit the note on `dev`, push `dev`, create/update `api` from the same commit, and push `api`.
+
 ## Update (2026-04-29, Commit/Push Current Work)
 - Prepared the current dirty `dev` tree for commit and push.
 - Scope includes marketplace saved-search rerun + unified hiring-thread work, notification thread-link persistence, Neon/shared-cloud backend docs/templates, cloud-first root dev command, and build-info cleanup.

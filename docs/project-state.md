@@ -34,6 +34,7 @@
 - Follow the current monorepo layout and existing NestJS module boundaries unless intentionally improving them.
 - Keep durable and local context files concise, exact, and free of secrets.
 - Do not claim checks are green unless they were run successfully.
+- Branch workflow: `dev` is the active working branch and remains the source branch for normal implementation. Changes merge from `dev` to `main` for release, and related downstream branches such as `api` should be updated from `dev` when their area changes; whenever API-level changes land on `dev`, push the same commit lineage to the `api` branch as well.
 
 ## Current Roadmap
 
